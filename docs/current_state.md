@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9a8cc1c94374ee05fe87a56a954b51280e375038`; tree: `5187a5c7ebed819c08aa46551d0c480f1b1e1597`.
+Accepted revision: `7e1c8bd7d435200d7ad4813cf4033e0270973353`; tree: `1883d4267713b9cfe12555195504a26eefe7207c`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,18 +25,44 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The accepted [Fibonacci completion checkpoint](evidence/fibonacci_completion_acceptance_20261106.json)
+at `7e1c8bd7` passes all 17 integration gates. Unchanged pinned Fibonacci executes
+all six assertions in Fast, Safe and Small with LLVM-equivalent status and output.
+Safe emits all 1,568 selected definitions. The permanent three-mode regression
+is part of full integration.
+
+All 44 native populations pass 1,718,508 local observations against 859,254 LLVM
+observations. The compiler-core cohort remains 100 lowered/emitted/linked and
+five executed functions per mode; its 24 canonical records match the preceding
+accepted checkpoint. Validation includes 1,897 unit tests in both Debug and
+ReleaseSafe, 26 policy tests in each mode, 19 structural checks, 60 ABI
+comparisons and readiness checks. Minimum free space is 47.94 GB, above the
+unchanged 24.36 GB reserve.
+
+The [implementation evidence](evidence/fibonacci_completion.md) records mandatory
+normalization before generic selection, shared compilation preparation, register
+repairs, bounded lowering and the corrected Debug compilation deadline. Optional
+legalizers still use recursive selection. This checkpoint does not establish
+self-hosting or release optimization quality. The next
+[execution-breadth milestone](plans/2026-11-06-execution-breadth.md) adds diverse
+unchanged programs and more callable compiler-core functions. Original scratch
+files and the diagnostic worktree remain intact; no archives were created.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
+
 The [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
 is separately validated at `978ffaf9`. The maintained program, native, candidate,
 fact and benchmark tools now use Zig with pinned process and test-support sources.
 All 22 policy/provider tests pass in Debug and ReleaseSafe; all 17 integration
 gates pass with Python blocked. The full log matches all 1,430 canonical records
 from the preceding Python-backed run, and fresh/cache replay matches all 24
-records across three modes. Compiler source and the accepted population above
-are unchanged. [Tooling documentation](validation_tools.md) records the commands
-and historical-evidence boundary. This task is complete; Fibonacci work remains
-stopped.
+records across three modes. That tooling migration left compiler source and
+the accepted population unchanged. [Tooling documentation](validation_tools.md) records the commands
+and historical-evidence boundary. This tooling checkpoint preceded the compiler
+work above.
 
-The accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
+The earlier accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
 at `9a8cc1c9` passes all 17 integration stages. Accumulator-address stores,
 narrow integer normalization and ABI carriers, constant two-word stores, and
 bounded i128 arithmetic preserve values and live operands. Reusing generated
@@ -63,7 +89,8 @@ The first is `debug.writeCurrentStackTrace` / `inline-asm-call`.
 The broader i65/i96 work remains an uncommitted diagnostic draft under
 `local-state/worktrees/fibonacci-crash-investigation`; it is excluded from this
 acceptance. The thirteen original scratch probes remain unchanged; no archives
-were made. Work is stopped after this slice at the user's request.
+were made. That slice was stopped at the user's request; subsequent authorization
+led to the accepted completion above.
 
 The earlier accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
 at `4242debd` passes all 17 integration stages. Scalar atomics preserve old

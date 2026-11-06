@@ -1,14 +1,21 @@
 # Active direction
 
-Current action: resume compiler work under the
-[Fibonacci completion plan](plans/2026-11-05-fibonacci-completion.md), following
-the user's new authorization. The working compiler emits all 1,568 definitions
-in the retained Safe input. Unchanged pinned Fibonacci now executes all six
-assertions in Fast, Safe and Small with LLVM-equivalent status and output.
-The permanent regression is wired into integration. The accepted compiler
-checkpoint is unchanged until the new full integration run passes.
-The [completion evidence](evidence/fibonacci_completion.md) records the changes,
-native execution results and remaining boundaries.
+The [Fibonacci completion plan](plans/2026-11-05-fibonacci-completion.md) is
+accepted through step 6 at `7e1c8bd7`: all 17 integration gates pass, unchanged
+Fibonacci executes all six assertions in Fast, Safe and Small, and Safe emits
+all 1,568 selected definitions. The permanent regression is part of integration.
+The [acceptance record](evidence/fibonacci_completion_acceptance_20261106.json)
+binds the frozen source and results; the [completion evidence](evidence/fibonacci_completion.md)
+explains the implementation and boundaries.
+
+Next action: follow the [execution-breadth plan](plans/2026-11-06-execution-breadth.md).
+Add diverse unchanged programs and extend the versioned compiler-core execution
+cohort. The accepted count remains five executed functions per mode, alongside
+100 lowered/emitted/linked rows and 44 native populations. Exploratory tagged-union
+and aggregate programs still fail Fast/Small emission. Reproduce that frontier,
+then repair parallel-copy cycles through the shared value-use planner and cover
+widths, aliases, PHIs, calls and pressure. Keep optimization performance as a
+separate measured milestone.
 
 The preceding completed task was the requested
 [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
@@ -68,9 +75,12 @@ sequential single-register ownership, absence of loop-carried XMM phi values, an
 no external vector escapes. Machine structure, assembly (`movups`), and bit-exact
 runtime execution pass across 0, 32, and 64 byte inputs.
 
-## Current checkpoint and next work
+## Historical checkpoints
 
-The accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
+The counts and failures below describe earlier checkpoints. Current accepted
+capability and the next action are recorded above.
+
+The earlier accepted [integer arithmetic and hash checkpoint](evidence/fibonacci_arithmetic_acceptance_20261105.json)
 at `9a8cc1c9` passes all 17 integration stages. Accumulator-address stores,
 narrow integer normalization and ABI carriers, constant two-word stores, and
 bounded i128 arithmetic preserve values and live operands. Reusing generated
@@ -97,8 +107,8 @@ The first was `debug.writeCurrentStackTrace` / `inline-asm-call`.
 The broader i65/i96 work remains an uncommitted diagnostic draft under
 `local-state/worktrees/fibonacci-crash-investigation`; it is excluded from this
 acceptance. The thirteen original scratch probes remain unchanged; no archives
-were made. That slice was stopped at the user's request; the active plan above
-records the subsequent authorization to continue.
+were made. That slice was stopped at the user's request; subsequent authorization
+led to the accepted completion above.
 
 The earlier accepted [atomic, pointer, frame and call checkpoint](evidence/fibonacci_state_acceptance_20261105.json)
 at `4242debd` passes all 17 integration stages. Scalar atomics preserve old

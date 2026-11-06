@@ -1,0 +1,1165 @@
+{
+  "schema": 1,
+  "status": "accepted",
+  "accepted_revision": "7e1c8bd7d435200d7ad4813cf4033e0270973353",
+  "accepted_tree": "1883d4267713b9cfe12555195504a26eefe7207c",
+  "source_snapshot_files": 2915,
+  "gates": [
+    {
+      "id": "selected-object-suite",
+      "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+      "exit_status": "0",
+      "duration_ms": "64565",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "2055",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "3700",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "3547",
+      "cache_status": "none"
+    },
+    {
+      "id": "zig-source-native-link",
+      "tool": "tools/run_distribution_zig_source_native_link.zig",
+      "exit_status": "0",
+      "duration_ms": "22795",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-postopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "88268",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-preopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "--pipeline": "preopt",
+      "exit_status": "0",
+      "duration_ms": "705795",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-ir-writer",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "25073",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-release",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "77950",
+      "cache_status": "none"
+    },
+    {
+      "id": "real-rows-release-fast",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseFast",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "503612",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-safe",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSafe",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "534616",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-small",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSmall",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "350581",
+      "cache_status": "hit"
+    },
+    {
+      "id": "integrated-executable",
+      "tool": "tools/run_distribution_zig_integrated_exe.zig",
+      "exit_status": "0",
+      "duration_ms": "2018295",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "511",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "1161",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "1052",
+      "cache_status": "none"
+    },
+    {
+      "id": "boundary-gates",
+      "tool": "tools/run_distribution_boundary_gates.zig",
+      "exit_status": "0",
+      "duration_ms": "7527",
+      "cache_status": "none"
+    }
+  ],
+  "compiler_core": [
+    {
+      "counter_schema": "distribution-real-rows-v2",
+      "mode": "ReleaseFast",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "5",
+      "real_programs_ok": "5",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v2",
+      "mode": "ReleaseSafe",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "5",
+      "real_programs_ok": "5",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v2",
+      "mode": "ReleaseSmall",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "5",
+      "real_programs_ok": "5",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    }
+  ],
+  "fibonacci": {
+    "schema": "real-program-v1",
+    "program": "recursive_fibonacci",
+    "programs": "1",
+    "program_modes": "3",
+    "reference_executions": "3",
+    "local_executions": "3",
+    "matched_program_modes": "3",
+    "local_fail": "0"
+  },
+  "native_population_count": 44,
+  "native_local_observations": 1718508,
+  "native_reference_observations": 859254,
+  "native_populations": [
+    {
+      "population": "standalone-two-word-stack-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "384",
+      "reference_observations": "192",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-pointer-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "486",
+      "reference_observations": "243",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-pointer-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-signed-nonnegative",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-type-allocation-padding",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-scalar",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "110592",
+      "reference_observations": "55296",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-branches",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "18432",
+      "reference_observations": "9216",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aligned-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "36864",
+      "reference_observations": "18432",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-vectors",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "795648",
+      "reference_observations": "397824",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "32256",
+      "reference_observations": "16128",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-integer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "73728",
+      "reference_observations": "36864",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-system-assembly",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "70656",
+      "reference_observations": "35328",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "78336",
+      "reference_observations": "39168",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-accumulator-store",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-contracts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-address-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14208",
+      "reference_observations": "7104",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-atomics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "112908",
+      "reference_observations": "56454",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "87552",
+      "reference_observations": "43776",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-switch-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "26112",
+      "reference_observations": "13056",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-word-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "29568",
+      "reference_observations": "14784",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-integers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46464",
+      "reference_observations": "23232",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-stack-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3456",
+      "reference_observations": "1728",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "5760",
+      "reference_observations": "2880",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "guard_checks": "18"
+    },
+    {
+      "population": "standalone-safe-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-safe-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-stack-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9984",
+      "reference_observations": "4992",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3840",
+      "reference_observations": "1920",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aggregate-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-remainder",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-rax-pointer-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "2688",
+      "reference_observations": "1344",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-general-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1920",
+      "reference_observations": "960",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-frame",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-module-dependencies",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "330",
+      "reference_observations": "165",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "negative_controls": "30",
+      "environment_checks": "3"
+    },
+    {
+      "population": "standalone-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-boolean-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "192",
+      "reference_observations": "96",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "240",
+      "reference_observations": "120",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    }
+  ],
+  "disk": {
+    "schema_version": "1",
+    "run_id": "09daaa0b924d80b8e4cf689618974a02",
+    "scratch_path": "tmp/distribution_all_serial_09daaa0b924d80b8e4cf689618974a02",
+    "bundle_path": "tmp/distribution_all_serial_09daaa0b924d80b8e4cf689618974a02/release_source_object_bundle",
+    "target": "x86_64-unknown-linux-gnu",
+    "mode": "serial",
+    "real_rows_concurrency": "3",
+    "subgates": "17",
+    "wall_ms": "3677826",
+    "starting_free_bytes": "49723183104",
+    "minimum_observed_free_bytes": "47936503808",
+    "final_free_bytes": "49458356224",
+    "observed_peak_bytes": "1786679296",
+    "reserve_bytes": "24359738368",
+    "required_start_bytes": "32949672960",
+    "local_fail": "0"
+  },
+  "returncode": 0,
+  "wall_ns": 3678023472253,
+  "recorded_utc": "2026-11-06T07:45:56Z",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-linux-gnu",
+  "source_snapshot": {
+    "path": "local-state/validations/fibonacci-completion-20261105/full-source-snapshot-v3.json",
+    "sha256": "d1b628e0f10492d66b74f5bca1d5cbe2dc6d8a09bb5e89e491451070a9f1cda3"
+  },
+  "compiler_sha256": "84c1ec344fb62091c5c638522de585bf6b322c96d624883f8b8ce6d170e24195",
+  "validation": {
+    "unit_tests_per_mode": 1897,
+    "unit_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "structural_checks": 19,
+    "policy_tests_per_mode": 26,
+    "policy_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "abi_comparisons": 60,
+    "abi_function_mode_matches": 30,
+    "compiler_rt_bypass_ratchet": 130,
+    "checks": [
+      {
+        "name": "unit-frozen-debug",
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 21748139896
+      },
+      {
+        "name": "unit-frozen-safe",
+        "argv": [
+          "zig",
+          "build",
+          "test-unit",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 163570430536
+      },
+      {
+        "name": "structural-frozen",
+        "argv": [
+          "zig",
+          "build",
+          "structural-smoke",
+          "--summary",
+          "all"
+        ],
+        "returncode": 0,
+        "wall_ns": 592654498
+      },
+      {
+        "name": "abi-frozen",
+        "argv": [
+          "zig",
+          "build",
+          "abi-differential"
+        ],
+        "returncode": 0,
+        "wall_ns": 14683387950
+      },
+      {
+        "name": "deadline-policy-debug-v2",
+        "argv": [
+          "zig",
+          "build",
+          "real-program-policy-tests",
+          "verify-validation-sources",
+          "--summary",
+          "all",
+          "--cache-dir",
+          "local-state/caches/fibonacci-completion-policy-20261106"
+        ],
+        "returncode": 0,
+        "wall_ns": 4300786876
+      },
+      {
+        "name": "deadline-policy-safe",
+        "argv": [
+          "zig",
+          "build",
+          "real-program-policy-tests",
+          "-Doptimize=ReleaseSafe",
+          "--summary",
+          "all",
+          "--cache-dir",
+          "local-state/caches/fibonacci-completion-policy-safe-20261106"
+        ],
+        "returncode": 0,
+        "wall_ns": 23550603532
+      },
+      {
+        "name": "readiness-components-frozen",
+        "argv": [
+          "bash",
+          "local-state/validations/fibonacci-completion-20261105/check-readiness-components.sh"
+        ],
+        "returncode": 0,
+        "wall_ns": 426087682600
+      },
+      {
+        "name": "fibonacci-debug-deadline-fixed",
+        "argv": [
+          "zig",
+          "run",
+          "tools/run_real_program.zig",
+          "--",
+          "--output-root",
+          "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-budget-fixed",
+          "--manifest",
+          "test/real_programs/recursive_fibonacci.json",
+          "--mode",
+          "ReleaseSafe",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zllvm",
+          "zig-out/bin/z_llvm",
+          "--codegen-reachable"
+        ],
+        "returncode": 0,
+        "wall_ns": 739805490239
+      },
+      {
+        "name": "native-frozen-v3",
+        "argv": [
+          "zig",
+          "run",
+          "tools/run_upstream_c_program.zig",
+          "--",
+          "--output-root",
+          "local-state/validations/fibonacci-completion-20261105/native-frozen-v3-report",
+          "--zig-emitter",
+          "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+          "--zig-source",
+          "/home/oleg/prog/ziglang",
+          "--zllvm",
+          "zig-out/bin/z_llvm"
+        ],
+        "returncode": 0,
+        "wall_ns": 448799989179
+      },
+      {
+        "name": "boundaries-frozen-v3",
+        "argv": [
+          "zig",
+          "run",
+          "tools/run_distribution_boundary_gates.zig"
+        ],
+        "returncode": 0,
+        "wall_ns": 9070636872
+      },
+      {
+        "name": "snapshot-after-full",
+        "argv": [
+          "zig",
+          "run",
+          "tools/validation_snapshot.zig",
+          "--",
+          "--verify",
+          "local-state/validations/fibonacci-completion-20261105/full-source-snapshot-v3.json"
+        ],
+        "returncode": 0,
+        "wall_ns": 937969406
+      },
+      {
+        "name": "canonical-full-structure",
+        "argv": [
+          "zig",
+          "run",
+          "tools/compare_distribution_all_logs.zig",
+          "--",
+          "local-state/validations/fibonacci-completion-20261105/full-acceptance-v3.log",
+          "local-state/validations/fibonacci-completion-20261105/full-acceptance-v3.log"
+        ],
+        "returncode": 0,
+        "wall_ns": 539274131
+      },
+      {
+        "name": "canonical-core-equivalence",
+        "argv": [
+          "zig",
+          "run",
+          "tools/compare_distribution_all_logs.zig",
+          "--",
+          "--real-rows",
+          "local-state/validations/fibonacci-completion-20261105/previous-compiler-core.log",
+          "local-state/validations/fibonacci-completion-20261105/accepted-compiler-core.log"
+        ],
+        "returncode": 0,
+        "wall_ns": 190659838
+      }
+    ],
+    "compiler_check_reuse": {
+      "from": "4d19fb16d16d5f8d823efc0e8234c1612e8f4696",
+      "to": "7e1c8bd7d435200d7ad4813cf4033e0270973353",
+      "changed": [
+        "docs/evidence/fibonacci_completion.md",
+        "docs/validation_tools.md",
+        "test/real_programs/recursive_fibonacci.json",
+        "tools/validation/program.zig",
+        "tools/validation/runner.zig",
+        "tools/validation_tests.zig"
+      ],
+      "compiler_sources_unchanged": true,
+      "scratch_unchanged": true
+    },
+    "compiler_check_reuse_scope": "Unit, structural, ABI and readiness checks ran before the timeout-only tooling commit. Compiler sources and their build configuration are unchanged, as are the original scratch files. Policy tests cover the changed runner, and full integration runs on the new frozen checkpoint.",
+    "comparison_scope": "Full-log self-comparison validates canonical structure only. The separate prior/new comparison checks the unchanged compiler-core cohort. The larger native population and new Fibonacci summary intentionally change the full log."
+  },
+  "fibonacci_program": {
+    "schema": "real-program-v1",
+    "status": "passed",
+    "program": "recursive_fibonacci",
+    "source": "/home/oleg/prog/ziglang/test/cases/recursive_fibonacci.zig",
+    "source_head": "7e1c8bd7d435200d7ad4813cf4033e0270973353",
+    "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+    "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+    "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "zllvm_sha256": "84c1ec344fb62091c5c638522de585bf6b322c96d624883f8b8ce6d170e24195",
+    "pipeline": "preopt",
+    "codegen_selection": "reachable",
+    "target": "x86_64-linux-gnu",
+    "cpu": "baseline",
+    "link_driver": "zig-compiler-rt",
+    "compile_timeout_ms": 900000,
+    "program_modes": 3,
+    "local_executions": 3,
+    "reference_executions": 3,
+    "matched_program_modes": 3,
+    "rows": [
+      {
+        "mode": "ReleaseFast",
+        "status": "matched",
+        "failure_stage": null,
+        "local_executions": 1,
+        "hook_object_sha256": "da8c92aca25c837cad69c85ed881d28846c7fd999568756c99451fa08f27facc",
+        "selector_owners": {
+          "composed_cfg": 23,
+          "composed_block": 11
+        },
+        "object_bytes": 285368,
+        "object_sha256": "73aaf1a2bf2508ca7bd8645b6be32c5c2deb33522df2cd1ff11104a399f16023"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "matched",
+        "failure_stage": null,
+        "local_executions": 1,
+        "hook_object_sha256": "84aa93522fa3e6ec97498d1f13d4d2413003b3fb3badcb7d1f9a001d23036411",
+        "selector_owners": {
+          "composed_cfg": 1072,
+          "composed_block": 496
+        },
+        "object_bytes": 3132496,
+        "object_sha256": "700420531292c9e8b3811fc6c14c02c2c267fd7f513a56a3dc0ab2979e0b8451"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "matched",
+        "failure_stage": null,
+        "local_executions": 1,
+        "hook_object_sha256": "7d3167f5166bbd4c77a5c363cf7bad0b23fee8564d9cb6bf8ff4f24358bd056f",
+        "selector_owners": {
+          "composed_cfg": 23,
+          "composed_block": 11
+        },
+        "object_bytes": 285256,
+        "object_sha256": "e65e7e9fbdc1dcbeac6533b3f667f63ea6b4b58cee2478fffad574f99a4fdb58"
+      }
+    ],
+    "remaining_dependencies": [
+      "libLLVM IR construction",
+      "Zig linker and compiler-rt",
+      "libc and CRT",
+      "single-threaded Zig startup"
+    ],
+    "tool_provenance": {
+      "binary_sha256": "258f2b8737f38ac101917dbab60cb8e32e41456f9de4b38461d2168ad8bf3ead",
+      "process_provider_revision": "e9fcfccecc84f44a362b12de1bee78258b1e811f",
+      "test_support_provider_revision": "f0f54d4e8cb649af7673ca498f259b6b2f9aa25e"
+    }
+  },
+  "original_scratch_files_verified": 13,
+  "original_scratch_sha256": {
+    "scratch/test_abi.s": "d439a7beb674e08b519923b308207f6c510f463ab229af7ca098fd1ce0ccdb15",
+    "scratch/test_abi.zig": "e889e005850511755f57196e564a41e486686b9fd4f98c478482c969b7638d32",
+    "scratch/test_bitset.ll": "b34f6bfd3750284e36ff225111aed27e7961f570048b42628b375cfa99a6d8eb",
+    "scratch/test_bitset.zig": "a0ae945f89311108811a07bdfaf65ddd2e9b453b59436df15c66dce739b6e137",
+    "scratch/test_chunkstate_layout.zig": "8f12f11ced9863d48bb1e949ab5c414db8005d80569fb6bfb27b17a2a91473d6",
+    "scratch/test_init.zig": "38c327156a57e8a989db2d7ff35fafcb6fba9ae761bfafabf965ef92b71c343e",
+    "scratch/test_llvm.ll": "17738822b102735f481bddb59f6bf63b4ddfdf48d9f9812008167e7c7cb35da6",
+    "scratch/test_offset.zig": "8b49ea64bf64a90fbd741d299eb1bacaccf24e5805073a08303dbfa26dec9534",
+    "scratch/test_opt.zig": "c2cfadc84692240bdfaca03406cae67692310b30fd11fcfb94a338fc80c95242",
+    "scratch/test_query.ll": "99d0ca5c1b9472ef33bf9eb2dbf2cf8c05c69aab775588109826b763b233d476",
+    "scratch/test_query.zig": "5c7cbb510723d088f389cc932a67222e72ad736b651189c6b3e88bffd6fe3dbf",
+    "scratch/test_query_debug.ll": "3a0798cb323fe6928565a8e5d450e85312df8437f2a79d5583d2a618a658d11c",
+    "scratch/test_size.zig": "a255ebc31f0eba577c2b616708dbb42a1727b9bc29b839abf2c30a1c35b57f10"
+  },
+  "archives_created": false,
+  "diagnostic_worktree_preserved": "local-state/worktrees/fibonacci-crash-investigation",
+  "authenticated_exports_reused": true,
+  "known_boundaries": [
+    "Compiler-core acceptance still executes five functions per mode; 100 emitted and linked rows do not imply 100 executed functions.",
+    "Mandatory normalization precedes generic x86-64 selection. Optional instruction-form rewrites still use recursive selection; ordinary CLI selection retains its explicit selector option.",
+    "Structured adapter envelopes carry validated deferred preparation recipes; transporting the envelope does not itself run optimization or produce optimized LLVM IR.",
+    "Vector PHIs, stack-passed or oversized vectors, general wide-memory and wide-ABI shapes, indirect-branch PHI edges, and assembly or layouts outside checked envelopes remain unsupported.",
+    "The bounded checked i128 constant multiply does not admit general i128 products.",
+    "Execution depends on LLVM IR construction, the pinned Zig linker and compiler-rt, libc/CRT and single-threaded startup. No self-hosting or optimization-performance claim is made."
+  ],
+  "prior_failures": [
+    "The first full run stopped at gate 8 when structured IR-writer optimization was rejected. The retained failed run precedes the shared adapter preparation repair.",
+    "Prepared recipe execution exposed incorrect descriptor slice behavior, missing typed records/declarations, calling convention and TLS mismatches, FP literal bitcasts, array addressing and a false-success Base64 matcher. The frozen full run validates their repairs.",
+    "LLVM and AddressSanitizer independently validate all 24 corrected Base64 recipes. Earlier focused failures remain in local-state.",
+    "The second full run stopped at Fibonacci Safe compilation under the default 120-second command deadline. An isolated reproduction records timed_out, return code 124 and actual termination -15. The manifest now grants 900000 ms to compilation and owner replay; executable observations retain their 5000 ms deadline."
+  ],
+  "next_milestone": "Add diverse unchanged programs and more callable compiler-core functions through shared semantic and register repairs.",
+  "artifacts": [
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-source-snapshot-v3.json",
+      "sha256": "d1b628e0f10492d66b74f5bca1d5cbe2dc6d8a09bb5e89e491451070a9f1cda3"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-source-snapshot-v2.json",
+      "sha256": "3b32a5b1973adc5d426e92b572cad041bbb375f3d5b36073841b22f847f96f63"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/deadline-source-comparison.json",
+      "sha256": "8669f897f1f963a0f7fd3d98e2d80cc2c7a9e0845c7e8c090eacb9367130a7ec"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-acceptance-v3.json",
+      "sha256": "7cef418de65004792f5892d1436de4ae79f185192d450d38fe13f50dbc3860fd"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-acceptance-v3.log",
+      "sha256": "99dd59777708cdebf585b2b8485cc64f6f9e22f61eee0dec54553bf16ab1e9b1"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/verified-full-acceptance.json",
+      "sha256": "45078940ac26ee6f928d06185f3f2ea509260923ead99655dced6e24aea4ce1d"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/check-acceptance.jq",
+      "sha256": "7fa0d75520538abf5d0d66d2c0b055490925fc722af9bab649b6ec23dfc24120"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/collect-acceptance.sh",
+      "sha256": "1cc1e998a2d6871fad4b2b6196239f49db068d92542329693ad11fb612109f18"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-full-acceptance-report.json",
+      "sha256": "f684432a4b1f29343730ff501397150f8d60dfa810cca19f155af31df02295af"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/native-full-acceptance-report.json",
+      "sha256": "f191a08b3f3275e3413920ddad3b9ac43bf2325f2e72014f056b2d95ad5d6c44"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/hello-full-acceptance-report.json",
+      "sha256": "17f8ec00ba4672a8281c4a68fce10c0222f0eb14c505445430e180129ad56001"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-budget-fixed/report.json",
+      "sha256": "8344091db4c89f1c97baed9b1ec3310d964470d567704bf0a06f3e9c8351cf97"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-budget-fixed/commands.json",
+      "sha256": "f44dc66ffdd7ff0bdbd88b31f4fe096d532fed89f97a6e16aec44ee5c7324b58"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/native-frozen-v3-report/report.json",
+      "sha256": "f191a08b3f3275e3413920ddad3b9ac43bf2325f2e72014f056b2d95ad5d6c44"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/native-frozen-v3-verified.json",
+      "sha256": "486a8d27e74359c4442a49485ebb994f2b7ea8ddc2baf83cb5f82dd238bf879d"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/unit-frozen-debug.json",
+      "sha256": "761965dccc289c7f63f16c69f2791c8beff163054b8ddb4c1f9f9a303b5680a0"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/unit-frozen-debug.log",
+      "sha256": "104d87aba38d75f152ab0ac1e204e4861dbe4f5d0924353db45f6844eb491d5c"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/unit-frozen-safe.json",
+      "sha256": "753147938d64a5dd5b7e104fb2e040dd5cccc98a115f90b77ec596182c94fe00"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/unit-frozen-safe.log",
+      "sha256": "6d0187fc1e44fc70c98892ad20f2868d60d806a6e86efd1db11ce635e574f68c"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/structural-frozen.json",
+      "sha256": "dbe0098ab5be62cddf36bba87958f58010c4a4db9e7979e41d8f0f7a3c975be4"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/structural-frozen.log",
+      "sha256": "24da42fea000337e9ad270cd5a46a84487af1b807ee43f6f25cea4341cfd27bf"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/abi-frozen.json",
+      "sha256": "a425d208252245bbb7126a2def1656fe1c21f9685b7fbbaf003e7bb601a2d264"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/abi-frozen.log",
+      "sha256": "6176015df8e4b886aa669a89a8faa21596caa0a3f2b15b741ca6a4f042902f21"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/deadline-policy-debug-v2.json",
+      "sha256": "6f99d57620ef20bca96aa25c459ffc787eb416921f20cd7d9818559229df50d6"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/deadline-policy-debug-v2.log",
+      "sha256": "3dc20147c22afaae94a864290532a3c7d3d3b3b4b8005522ef4828e2a392c7ec"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/deadline-policy-safe.json",
+      "sha256": "8115d673194a06577b474439f4ea6bcbcc93105c2f2268e2b8e29780ecf7eedb"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/deadline-policy-safe.log",
+      "sha256": "dd46e8170a041054f18176bd2d410559b36839e95dbc7add2ddaf47b7e74004e"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/readiness-components-frozen.json",
+      "sha256": "8b59ed12f7ceedd74e27d5b178b2f1e2ee866b9f0e1c6a553890dd3a1abdf098"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/readiness-components-frozen.log",
+      "sha256": "537ab534c9c1980e1859971893abd0e83d07c420ec328dea6243aa65aba8b8a9"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-deadline-fixed.json",
+      "sha256": "53cd9b4131962577a546d087734b1e72c3dd1063f3aad1d9cdf68a89aee4dfac"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-deadline-fixed.log",
+      "sha256": "bac0cb743b05c8b5df01f49ac96eb69eef724f13fb9d57ffcf7b69f8084aef17"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/native-frozen-v3.json",
+      "sha256": "440df54e3acbd596bcf0c8cac3fa9b8ff1b6937652f324f8b59b92b067246150"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/native-frozen-v3.log",
+      "sha256": "533af16cf3138888d83b6fe21476b84dba680ee7c47abc198915c9c94bf3f606"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/boundaries-frozen-v3.json",
+      "sha256": "6d1a44532fb5213b7e3ae0ea6e1fc4430c63e64f39d7fc4608a1a8700157f201"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/boundaries-frozen-v3.log",
+      "sha256": "b17d6ad94ce0ad5d5133548869d1874277d1ced49ef730eed0f5e58f81fd9b4f"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/snapshot-after-full.json",
+      "sha256": "4669dacaafcb62144ee9ea5fc6d707fcff86508a9996c724716a690f041e9249"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/snapshot-after-full.log",
+      "sha256": "5eb5bbac0e61b49bf61fe6e91df6dd1e4408b9ef96eaaf176ab3f9fc34c3d3e3"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/canonical-full-structure.json",
+      "sha256": "5e0ff98896eb62c8e9b92ba6f3b0087bcb8b0ae7a7f5745c1cf84d88495ec162"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/canonical-full-structure.log",
+      "sha256": "390c6d55ff67b51b413b8148f9dde9eedc209b947e18afcc693187c9566699a3"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/canonical-core-equivalence.json",
+      "sha256": "8609cf9f330338eb20f72df01615ba8a7cd57d51e7843133eea055542c714c7d"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/canonical-core-equivalence.log",
+      "sha256": "2a140a586dd31575ee74af05cba99e324a431375e2b1fdf29ae42807660faf10"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-acceptance.json",
+      "sha256": "2df3f719e3de0008a39899ddd80defc3ec9a0bac6f19eaaa347f5d2c8e5dccba"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-acceptance.log",
+      "sha256": "e405982ea0d1d3aaabcfcf1bfe3d6ef882ec6eeb534efa4c277ff2a1f3efef3a"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-acceptance-v2.json",
+      "sha256": "221641ced50b405a869f50ea25992ebecf231404684063b159f81337e911562c"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/full-acceptance-v2.log",
+      "sha256": "a2798cf608b40ed33053972034cc1f0d43fabdcc3deb96d3e4058de21570b557"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-full-acceptance-v2-report.json",
+      "sha256": "dac0c6cf60a81112f5dd94342605ae2f6e44289001fe6afb8a694a540daf5cd4"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-deadline-repro/commands.json",
+      "sha256": "15ff23406f07c1eee6911b5c933d35f157f28a2b00bb346d866e33a7e7dd8c3c"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-debug-deadline-repro/report.json",
+      "sha256": "2e2a8f2299f0bd48fc4f93ea0ec35f9d483a6332eb5c7f661db718dea72c84b6"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/base64-reference-v4.json",
+      "sha256": "dd745c8a3b66f82dade7fbd5752efa3b3923d86a702ecd3e4ccf757d4034c9fa"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/base64-reference-v4.log",
+      "sha256": "01f3a3d834ba9919cae459f0fc7c3e8d16c17aa3e14fdbabcbf7a1732e6f944e"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/previous-compiler-core.log",
+      "sha256": "a01c89895bd38354a55e52a708ea2759f7402f011e2c460a8a71f434e2f4f37d"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/accepted-compiler-core.log",
+      "sha256": "14fb988816a051745f5321c4e59e44ef63e68d4a1989795bea4b6dba81d232cb"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/postcheck-full.sh",
+      "sha256": "df910a2d8baf81a72379526383829c705dfed77f9f6cc6c32ba994cd7dc8aceb"
+    },
+    {
+      "path": "local-state/validations/fibonacci-completion-20261105/fibonacci-full-acceptance-commands.json",
+      "sha256": "dcc5696e12bff8a2fa91a625af014e05fe1caf6119b34741c8297fdcffc6580d"
+    }
+  ]
+}

@@ -4505,6 +4505,17 @@ One line per completed cycle, append-only, newest last. This is the
   uncommitted. Work stopped at the user's request. Evidence:
   `docs/evidence/fibonacci_arithmetic_acceptance_20261105.json`.
 
+- 2026-11-06 (Fibonacci completion, `7e1c8bd7`) All 17 integration gates pass.
+  Unchanged pinned Fibonacci executes all six assertions in Fast, Safe and Small;
+  Safe emits all 1,568 selected definitions. Mandatory normalization precedes
+  generic selection, ordinary emission honors explicit optimization, and typed
+  adapters share preparation contracts. All 44 native populations pass 1,718,508
+  local observations against 859,254 LLVM observations. The compiler-core cohort
+  remains 100 lowered/emitted/linked and five executed functions per mode, with
+  bypass ratchet 130. The Debug compile timeout is reproduced and repaired;
+  earlier failed runs remain retained. Evidence:
+  `docs/evidence/fibonacci_completion_acceptance_20261106.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4512,7 +4523,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9a8cc1c94374ee05fe87a56a954b51280e375038`; tree: `5187a5c7ebed819c08aa46551d0c480f1b1e1597`.
+Accepted revision: `7e1c8bd7d435200d7ad4813cf4033e0270973353`; tree: `1883d4267713b9cfe12555195504a26eefe7207c`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

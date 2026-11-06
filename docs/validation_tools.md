@@ -1,8 +1,8 @@
 # Validation tools
 
-The maintained Python tools were replaced by Zig 0.17.0 programs. The compiler
-and its accepted populations are unchanged. Shared process mechanics come from
-`zig-process` 0.6.1; file/JSON helpers and file-backed reports come from
+The maintained Python tools were replaced by Zig 0.17.0 programs. That migration
+left the compiler and its accepted populations unchanged. Shared process
+mechanics come from `zig-process` 0.6.1; file/JSON helpers and file-backed reports come from
 `zig-test-support` 0.2.0. The [source ledger](../tools/vendor/README.md) records
 their committed revisions and exact copied files. Standalone `zig run` commands
 do not require another checkout at runtime.
@@ -13,7 +13,8 @@ The [migration acceptance](evidence/python_tools_migration_20261105.json) and
 provider digests, output comparisons and cleanup. At `978ffaf9`, all 22 tests
 pass in Debug and ReleaseSafe and all 17 integration gates pass with Python
 blocked. The complete log matches 1,430 prior canonical records; the separate
-fresh/cache pair matches all 24 records. Compiler acceptance remains unchanged.
+fresh/cache pair matches all 24 records. That migration did not change compiler
+acceptance.
 
 The subsequent [shared-library adoption](evidence/shared_validation_libraries_20261105.md)
 adds atomic JSON writes, shared append-safe logs and file-backed command reports,
@@ -23,10 +24,11 @@ preserves object-order independence and distinguishes number representations;
 empty strings use explicit permissive extraction. Compiler and Fibonacci policy
 remain in this repository.
 
-| Former Python role | Zig entry point / build step |
+| Validation role | Zig entry point / build step |
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
-| Upstream C program and 35 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
+| Upstream C program and 44 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
+| Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
 | Fixed candidate selector | `tools/build_real_candidates_v3.zig` / `real-candidates-v3` |
 | Checked semantic facts | `tools/validation/candidate_facts.zig` library |
 | Fact freezing and replay proof | `tools/freeze_real_candidate_facts.zig` / `freeze-real-candidate-facts` |
@@ -48,8 +50,9 @@ millisecond budget. It applies to reference/local compilation, selector-owner
 replay and diagnostic re-emission; the default is 120,000 ms. Fibonacci uses
 900,000 ms so a Debug compiler can process the Safe runtime. Links retain the
 default command budget and executable observations retain their five-second
-limit. Failed stage reports preserve the command outcome and actual termination
-even when the compiler produces no stderr; command records include the budget.
+limit. Failed compilation, link and owner-replay stages preserve the command
+outcome and actual termination even when the compiler produces no stderr;
+command records include the budget.
 
 The native population registry now lives in
 [`test/real_programs/native_canaries.json`](../test/real_programs/native_canaries.json).

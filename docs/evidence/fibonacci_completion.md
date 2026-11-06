@@ -1,9 +1,10 @@
 # Fibonacci completion and compilation contracts
 
-The working compiler executes unchanged pinned `test/cases/recursive_fibonacci.zig`
+The accepted compiler at `7e1c8bd7` executes unchanged pinned `test/cases/recursive_fibonacci.zig`
 in ReleaseFast, ReleaseSafe and ReleaseSmall. All six assertions complete with
-the same exit status, stdout and stderr as the LLVM reference. This focused
-result is not full integration acceptance.
+the same exit status, stdout and stderr as the LLVM reference. All 17 integration
+gates pass on the frozen checkpoint. The [acceptance record](fibonacci_completion_acceptance_20261106.json)
+binds the source snapshot, reports, commands and validation results.
 
 The source pin is `1c08b09d1c847f4f02c8216e3b62df323861a437`; the source SHA-256 is
 `bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b`.
@@ -13,7 +14,9 @@ LLVM still constructs the input IR. This is not a self-hosting claim.
 
 Raw reports are under
 `local-state/validations/fibonacci-completion-20261105/`. The decisive program
-report is `fibonacci-three-modes-symbols/report.json`. The Safe object contains
+report is `fibonacci-full-acceptance-report.json`, retained from
+`full-acceptance-v3`. The earlier focused result remains in
+`fibonacci-three-modes-symbols/report.json`. The Safe object contains
 1,568 selected definitions: 1,072 `composed_cfg` and 496 `composed_block`.
 Its final object SHA-256 is
 `700420531292c9e8b3811fc6c14c02c2c267fd7f513a56a3dc0ab2979e0b8451`.
@@ -80,10 +83,13 @@ default 120-second compile deadline. The isolated
 124, actual termination -15, and 120.012 seconds for the local compile. The
 earlier three-mode focused run used a ReleaseFast compiler. The Fibonacci
 manifest now gives compilation and selection-owner replay a 900,000 ms budget;
-executable observations retain their five-second limit. Failed stage reports
-retain command outcome, return code, deadline, timing and diagnostics, and the
-runner prints the termination reason. This tooling repair still needs a new
-full acceptance run.
+executable observations retain their five-second limit. Failed compilation,
+link and owner-replay stages retain command outcome, return code, deadline,
+timing and diagnostics, and the runner prints the termination reason. The
+standalone Debug check passes in 739.805 seconds, including a 400.564-second
+compile and 324.408-second owner replay. The subsequent full run also passes
+all three Fibonacci modes; its Safe compile takes 390.588 seconds. The Safe
+object is byte-identical to the earlier passing ReleaseFast-compiler result.
 
 Shared register repairs cover overlapping compare moves, accumulator divisors,
 live RCX shift sources, 32-bit shift writeback, and odd-width cast sources. The
@@ -130,10 +136,29 @@ three modes. Counts are observations, not unique source programs.
 The full unit suite passes 1,897 tests in Debug and ReleaseSafe. The validation
 policy suite passes 26 tests in each mode, including silent timeout reporting
 and compile-budget validation. Compilation contract checks pass.
+All 19 structural checks, 60 ABI comparisons and readiness components pass.
+The unit, structural, ABI and readiness results precede the timeout-only tooling
+commit; their compiler sources and build configuration are unchanged. The
+acceptance record binds that source comparison and the new policy results.
 The initial reference-link failure (missing compiler runtime), quoted-symbol
 link failure, and earlier vector failures remain in the raw evidence.
 
-## Boundaries and next acceptance
+## Full acceptance
+
+`full-acceptance-v3` passes all 17 gates in 3,678.023 seconds. Its 44 native
+populations check 1,718,508 local observations against 859,254 LLVM observations
+across three modes and both local routes. The unchanged compiler-core prefix
+still lowers, emits and links 100 functions and executes five per mode. Its
+24 canonical records match the preceding accepted checkpoint. The full log's
+1,443 canonical records pass structural validation; self-comparison is not a
+claim that the expanded log equals the older one.
+
+The 2,915-file source snapshot verifies unchanged after the run. Minimum free
+space is 47,936,503,808 bytes, above the 24,359,738,368-byte execution reserve.
+The original 13 scratch files and diagnostic worktree remain intact. No
+archives were created. Both earlier failed full runs remain retained.
+
+## Boundaries and next work
 
 Vector PHIs, oversized vectors, stack-passed vectors, arbitrary wide-memory and
 wide-ABI shapes, indirect-branch PHI edges, unsupported assembly, and custom
@@ -143,8 +168,9 @@ symbol boundary does not change the IR verifier's existing name lookup rules.
 
 `zig build fibonacci-regression -- --output-root DIR` runs the permanent
 three-mode check. Full integration also runs it after the existing unchanged
-program gate. Accepted status remains at `9a8cc1c9` until all 17 integration gates
-pass on the completed checkpoint. The next breadth milestone adds diverse
-unchanged programs and executes more callable compiler-core functions. Historical
-performance measurements remain separate; this work does not establish an
-optimization-quality or speed claim.
+program gate. The [execution-breadth plan](../plans/2026-11-06-execution-breadth.md)
+adds diverse unchanged programs and more callable compiler-core functions.
+Exploratory tagged-union and aggregate programs still fail Fast/Small emission;
+their largest observed blocker is parallel register-copy cycles. These probes
+are not accepted execution coverage. Historical performance measurements remain
+separate; this work does not establish an optimization-quality or speed claim.
