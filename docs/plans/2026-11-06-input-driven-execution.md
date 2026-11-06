@@ -1,7 +1,9 @@
 # Input-driven execution and compiler phase measurements
 
-Status: in progress. Builds on the accepted
-[execution-breadth checkpoint](../evidence/execution_breadth.md).
+Status: complete at `1e513b68`. All 17 integration gates pass; see the
+[implementation evidence](../evidence/input_driven_execution.md) and
+[acceptance record](../evidence/input_driven_execution_acceptance_20261106.json).
+Builds on the accepted [execution-breadth checkpoint](../evidence/execution_breadth.md).
 
 ## Intended result
 
@@ -59,3 +61,19 @@ Retain prior evidence, the original thirteen scratch probes and diagnostic
 worktrees. Create no archives. Keep the 32,949,672,960-byte start threshold and
 24,359,738,368-byte execution reserve; remove only reproducible task-owned build
 products if needed after retaining reports and provenance.
+
+## Completed result
+
+The unchanged parser passes 46 inputs in each of the three local release modes,
+with 138 matched input/mode pairs and 552 rejected observation mutations.
+Its failures exposed shared repairs for promoted PHI edge multiplicity and
+identity, and named-structure field addresses. Optional legalization now uses
+one bounded iterative driver with the existing retry and transfer contracts.
+
+Profiles identify selection and optional legalization as the dominant elapsed
+phases on the retained Safe Fibonacci IR. Object emission writes ownership in
+the same selection run; permanent checks retain independent replay and verify
+object-byte equality. Debug and ReleaseFast measurements produce identical
+objects, ownership and counters. All existing program and native populations
+remain accepted; pair/vector PHIs, spill destinations and generated-code
+optimization quality remain separate follow-up work.

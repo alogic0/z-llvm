@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac`; tree: `06d222b29524f157950e80b6e4dd0c1dafdc0462`.
+Accepted revision: `1e513b68ff0a0bf4ade9ead5c5a639a5d94db2c2`; tree: `c05b2eb0ed7676e3903af6abb6ca0182116043f4`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,43 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [execution-breadth checkpoint](evidence/execution_breadth_acceptance_20261106.json)
+The accepted [input-driven execution checkpoint](evidence/input_driven_execution_acceptance_20261106.json)
+at `1e513b68` passes all 17 integration gates. An unchanged pinned JSON parser
+executes 46 stdin inputs in each local release mode: 138 input/mode pairs match
+independent expected observations and LLVM, and 552 observation mutations are
+rejected. This adds C frontend coverage with allocation, mutation, recursion and
+error paths; it does not expand Zig frontend coverage or claim JSON conformance.
+The five unchanged Zig programs, including all six Fibonacci assertions, also
+pass in Fast, Safe and Small.
+
+The compiler-core prefix remains 100 lowered/emitted/linked functions with nine
+executed per mode; all 36 records match prior fresh execution. All 45 native
+populations pass 1,767,660 local observations against 883,830 references. Debug
+and ReleaseSafe each pass 1,906 unit tests and 28 policy tests; structural checks,
+60 ABI comparisons, compilation-route checks and readiness pass.
+
+Optional legalization now uses one bounded iterative driver. Shared repairs
+preserve repeated PHI edges, valid PHI identities and named-structure field
+addresses. Object emission can write ownership from the same selection run;
+permanent checks preserve independent replay and object-byte equality. Phase
+profiles on the retained Safe Fibonacci IR attribute most elapsed time to
+selection and optional legalization. Combined object/profile/ownership takes
+31.76 s with ReleaseFast and 350.05 s with Debug, with identical objects,
+ownership and counters. These single samples measure compiler throughput,
+not generated-code performance or profiling overhead.
+
+The [completed plan](plans/2026-11-06-input-driven-execution.md) and
+[implementation evidence](evidence/input_driven_execution.md) record scope and
+remaining work. Pair/vector PHIs, spill destinations and ordinary CLI structural
+fallback remain separate boundaries. No self-hosting or release optimization
+quality is claimed. Minimum free space is 30.62 GB, above the unchanged 24.36 GB
+reserve. Original scratch files, diagnostic worktrees, prior evidence and
+authenticated AIR caches are preserved; no archives were created.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
+
+The earlier [execution-breadth checkpoint](evidence/execution_breadth_acceptance_20261106.json)
 at `f68ab145` passes all 17 integration gates. The fixed compiler-core prefix
 remains 100 lowered/emitted/linked functions, with nine functions executed per
 mode. Fresh and cached execution match all 36 canonical records. Fibonacci,
@@ -52,9 +88,6 @@ remaining work: optional legalization, explicit register effects and larger stat
 and memory programs. This checkpoint does not establish self-hosting or release
 optimization quality. Original scratch probes, diagnostic worktrees and the old
 authenticated AIR cache remain intact; no archives were created.
-
-The entries below are historical. Their counts and remaining failures describe
-those checkpoints, not the current frontier.
 
 The earlier [Fibonacci completion checkpoint](evidence/fibonacci_completion_acceptance_20261106.json)
 at `7e1c8bd7` passes all 17 integration gates. Unchanged pinned Fibonacci executes

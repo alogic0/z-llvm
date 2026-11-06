@@ -1,32 +1,39 @@
 # Active direction
 
-The [execution-breadth plan](plans/2026-11-06-execution-breadth.md) is implemented
-at `f68ab145`: all 17 integration gates pass. Fibonacci and four additional
-unchanged programs execute in Fast, Safe and Small. The fixed compiler-core
-prefix remains 100 lowered/emitted/linked functions, with nine executed functions
-per mode. All 45 native populations pass. The
-[acceptance record](evidence/execution_breadth_acceptance_20261106.json) and
-[implementation evidence](evidence/execution_breadth.md) bind these separate
-populations and the fresh/cache replay.
+The [input-driven execution plan](plans/2026-11-06-input-driven-execution.md) is
+complete at `1e513b68`: all 17 integration gates pass. The unchanged JSON parser
+matches 46 inputs in each of three local release modes, including heap growth,
+mutation and error paths. All five existing unchanged Zig programs also pass.
+The fixed compiler-core prefix remains 100 lowered/emitted/linked functions,
+with nine executed per mode, and all 45 native populations pass. The
+[acceptance record](evidence/input_driven_execution_acceptance_20261106.json) and
+[implementation evidence](evidence/input_driven_execution.md) keep these
+populations separate and authenticate the source, tools and observations.
 
-Next action: consolidate optional legalization around checked normalized input,
-while adding larger unchanged programs with state and memory interactions.
-Continue testing register effects, aliases, widths and pressure through shared
-transactions. Pair/vector PHIs and spill destinations remain on their existing
-paths. Keep generated-code optimization quality as a separate measured milestone.
+Recommended next work: add per-function and per-legalizer timing attribution,
+then reduce repeated optional-legalizer scans and original-form trials under
+the existing execution gates. Selection and optional legalization account for
+most elapsed compilation time in the retained Fibonacci sample; aggregate
+phase timers alone do not identify which individual functions or stages to
+change. Add a larger unchanged Zig program with runtime input and allocation
+to expand frontend evidence beyond the new C corpus.
 
-For large development gates, use a ReleaseFast compiler build while retaining
-Debug tests. On the same Safe Fibonacci IR, emission plus ownership replay took
-about 65 seconds with ReleaseFast versus 650 seconds with Debug, with byte-identical
-outputs. These are single compiler-throughput samples. Ownership reporting during
-emission could avoid a second selection pass; preserve its proof and output
-contracts before changing that workflow. Host policy currently blocks `perf`
-sampling, so hotspot attribution remains open.
+Keep extending the common transfer contract when addressing pair/vector PHIs
+and spill destinations. Those cases and ordinary CLI structural selection still
+use their existing paths. Keep generated-code optimization quality as a separate
+measured milestone.
 
-The preceding completed task was the requested
+For large development gates, use a ReleaseFast compiler while retaining Debug
+tests. The unchanged-program runner now obtains ownership during object emission;
+independent replay remains a permanent route/corpus regression and is available
+with `--replay-owners`. The retained combined Fibonacci measurement takes 31.76 s
+with ReleaseFast and 350.05 s with Debug, with identical outputs and counters.
+These single samples do not establish profiling overhead or generated-code speed.
+
+The entries below describe earlier milestones. The requested
 [Python-to-Zig tooling migration](evidence/python_tools_migration_20261105.json)
-at `978ffaf9`. All nine maintained Python modules were replaced using the pinned
-`zig-process` and `zig-test-support` sources. All 22 policy/provider tests pass in
+completed at `978ffaf9`. All nine maintained Python modules were replaced using
+the pinned `zig-process` and `zig-test-support` sources. All 22 policy/provider tests pass in
 Debug and ReleaseSafe, all 17 integration gates pass, and the final log matches
 all 1,430 canonical records from the Python-backed accepted run. The separate
 fresh/cache replay matches all 24 records across three modes. The frozen

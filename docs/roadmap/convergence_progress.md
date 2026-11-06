@@ -4516,6 +4516,19 @@ One line per completed cycle, append-only, newest last. This is the
   earlier failed runs remain retained. Evidence:
   `docs/evidence/fibonacci_completion_acceptance_20261106.json`.
 
+- 2026-11-06 (input-driven execution, `1e513b68`) All 17 integration gates pass.
+  The unchanged pinned JSON parser matches 46 stdin inputs per local release
+  mode, with 138 input/mode pairs and 552 rejected observation mutations. This
+  adds C frontend evidence; all five unchanged Zig programs still pass.
+  Optional legalization uses one bounded iterative driver; shared repairs
+  preserve promoted PHI edges and identities and named-structure field addresses.
+  Object emission records ownership without selecting twice. Phase profiles,
+  independent replay and object-byte comparisons pass. Debug and ReleaseSafe
+  each pass 1,906 unit tests and 28 policy checks. The compiler-core cohort
+  retains 100 lowered/emitted/linked and nine executed per mode; its 36 canonical
+  records match prior fresh execution. All 45 native populations pass.
+  Evidence: `docs/evidence/input_driven_execution_acceptance_20261106.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4523,7 +4536,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac`; tree: `06d222b29524f157950e80b6e4dd0c1dafdc0462`.
+Accepted revision: `1e513b68ff0a0bf4ade9ead5c5a639a5d94db2c2`; tree: `c05b2eb0ed7676e3903af6abb6ca0182116043f4`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

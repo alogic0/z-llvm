@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac",
-  "accepted_tree": "06d222b29524f157950e80b6e4dd0c1dafdc0462",
+  "accepted_revision": "1e513b68ff0a0bf4ade9ead5c5a639a5d94db2c2",
+  "accepted_tree": "c05b2eb0ed7676e3903af6abb6ca0182116043f4",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 9,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "f68ab145",
+  "declaration_revision": "1e513b68",
   "evidence": [
+    "docs/evidence/input_driven_execution_acceptance_20261106.json",
+    "docs/evidence/input_driven_execution.md",
     "docs/evidence/execution_breadth_acceptance_20261106.json",
     "docs/evidence/execution_breadth.md",
     "docs/evidence/fibonacci_completion_acceptance_20261106.json",
