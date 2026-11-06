@@ -78,6 +78,11 @@ pub fn build(b: *std.Build) void {
     const test_unit_step = b.step("test-unit", "Run isolated compiler unit tests without external integration tools");
     test_unit_step.dependOn(&unit_run.step);
 
+    const compilation_contract = b.addSystemCommand(&.{ b.graph.zig_exe, "run", "tools/run_compilation_contract.zig", "--" });
+    compilation_contract.addPassthruArgs();
+    compilation_contract.step.dependOn(b.getInstallStep());
+    b.step("compilation-contract", "Check explicit optimization across IR, AIR, object, assembly and owner routes").dependOn(&compilation_contract.step);
+
     const abi_diff_run = b.addSystemCommand(&.{ "bash", "tools/run_abi_differential.sh" });
     abi_diff_run.step.dependOn(b.getInstallStep());
     const abi_diff_step = b.step("abi-differential", "Run mandatory audited compiler-rt ABI differential gate");

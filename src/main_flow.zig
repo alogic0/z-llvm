@@ -1,7 +1,6 @@
 const std = @import("std");
 const ir = @import("ir.zig");
-const pass_manager = @import("pass_manager.zig");
-const pipelines = @import("pipelines.zig");
+const compilation = @import("compilation.zig");
 const target = @import("target.zig");
 const zae = @import("zig_air_export.zig");
 const zal = @import("zig_air_lowering.zig");
@@ -29,6 +28,7 @@ const usage =
     \\Supported pipelines: scalar-foundation,memory-foundation,zig-scalar-foundation,debug-o0,zig-debug-accepted,zig-release-safe-accepted,zig-release-fast-accepted,zig-release-small-accepted,aarch64-target-independent,release-o3,release-oz,lto-prelink-o3,lto-prelink-oz
     \\Default input limit: 1048576 bytes
     \\--codegen-reachable selects module dependencies for object/owner output; opaque references retain all definitions.
+    \\Explicit --passes/--pipeline run before IR, object, assembly and owner output. Object emission defaults to no optimization. Codegen traces and timing go to stderr.
     \\
 ;
 
@@ -43,6 +43,7 @@ pub fn main(init: std.process.Init) !void {
     _ = args.next();
 
     var pass_list: []const u8 = "instcombine,dce";
+    var explicit_optimization = false;
     var trace = false;
     var timing = false;
     var quiet = false;
@@ -102,8 +103,10 @@ pub fn main(init: std.process.Init) !void {
             target_datalayout = arg["--datalayout=".len..];
         } else if (std.mem.startsWith(u8, arg, "--pipeline=")) {
             pass_list = arg["--pipeline=".len..];
+            explicit_optimization = true;
         } else if (std.mem.startsWith(u8, arg, "--passes=")) {
             pass_list = arg["--passes=".len..];
+            explicit_optimization = true;
         } else if (input_path == null) {
             input_path = arg;
         } else {
@@ -115,6 +118,14 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
+    const optimization: compilation.Options = .{
+        .optimization = if (explicit_optimization) pass_list else null,
+        .passes = .{ .trace = trace, .timing = timing, .pass_limit = pass_limit },
+    };
+    if ((emit == .ir_writer or emit == .semantic_descriptor) and explicit_optimization)
+        return error.OptimizationNotApplicableToArtifact;
+    if (emit != .ir and (trace or timing or pass_limit != null) and !explicit_optimization)
+        return error.CodegenPassOptionsRequireExplicitOptimization;
     if (emit == .ir_writer) {
         try writeIrWriterModuleFromEnv(allocator, io, init.environ_map);
         return;
@@ -154,7 +165,8 @@ pub fn main(init: std.process.Init) !void {
             };
             lowered.module.target_triple = triple;
         }
-        if (emit == .obj or emit == .@"asm") {
+        try prepareForCodegen(allocator, io, &lowered.module, optimization);
+        if (emit == .obj or emit == .@"asm" or emit == .selection_owner_manifest) {
             try emitCodegenModule(allocator, io, lowered.module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
@@ -171,6 +183,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     } else if (resolveDirectSemanticDescriptor(io, input)) |descriptor| {
         if (emit == .ir) {
+            if (explicit_optimization) return error.OptimizationNotApplicableToArtifact;
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
             try stdout_writer.interface.writeAll(input);
@@ -189,6 +202,7 @@ pub fn main(init: std.process.Init) !void {
                 if (module.target_triple == null) module.target_triple = triple;
             }
             try runStructuredDirectAcceptedPipelineForSurface(allocator, io, &module, init.environ_map, descriptor.surface);
+            try prepareForCodegen(allocator, io, &module, optimization);
             try emitCodegenModule(allocator, io, module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
@@ -199,6 +213,7 @@ pub fn main(init: std.process.Init) !void {
         }
     } else if (resolveDirectIrWriterCase(input)) |ir_writer_case| {
         if (emit == .ir) {
+            if (explicit_optimization) return error.OptimizationNotApplicableToArtifact;
             var stdout_buffer: [4096]u8 = undefined;
             var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
             try stdout_writer.interface.writeAll(input);
@@ -220,6 +235,7 @@ pub fn main(init: std.process.Init) !void {
                 if (module.target_triple == null) module.target_triple = triple;
             }
             try runStructuredDirectAcceptedPipeline(allocator, io, &module, init.environ_map, ir_writer_case);
+            try prepareForCodegen(allocator, io, &module, optimization);
             try emitCodegenModule(allocator, io, module, emit, target_triple, .{
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
@@ -253,6 +269,7 @@ pub fn main(init: std.process.Init) !void {
     const stdout = if (quiet) &discard_writer.writer else &stdout_writer.interface;
 
     if (emit == .@"asm" or emit == .obj or emit == .selection_owner_manifest) {
+        try prepareForCodegen(allocator, io, &module, optimization);
         try emitCodegenModule(allocator, io, module, emit, target_triple, .{
             .quiet = quiet,
             .report_all_failures = report_all_codegen_failures,
@@ -262,18 +279,18 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
 
-    var pm = pass_manager.ModulePassManager.init(allocator);
-    defer pm.deinit();
-    try pipelines.addPasses(&pm, pass_list);
-
-    var context: pass_manager.Context = .{ .allocator = allocator, .io = io };
-    _ = try pm.runWithOptions(&module, &context, stdout, .{
-        .trace = trace,
-        .timing = timing,
-        .pass_limit = pass_limit,
-    });
+    var ir_options = optimization;
+    ir_options.optimization = pass_list;
+    try compilation.prepare(allocator, io, &module, stdout, ir_options);
     if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
+}
+
+fn prepareForCodegen(allocator: std.mem.Allocator, io: std.Io, module: *ir.Module, options: compilation.Options) !void {
+    var buffer: [4096]u8 = undefined;
+    var writer = std.Io.File.stderr().writerStreaming(io, &buffer);
+    try compilation.prepare(allocator, io, module, &writer.interface, options);
+    try writer.interface.flush();
 }
 
 fn envFlag(environ: *const std.process.Environ.Map, name: []const u8) bool {

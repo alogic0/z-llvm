@@ -3,8 +3,6 @@ const codegen = @import("codegen.zig");
 const ir = @import("ir.zig");
 const irw = @import("ir_writer_helpers.zig");
 const mc = @import("mc.zig");
-const pass_manager = @import("pass_manager.zig");
-const pipelines = @import("pipelines.zig");
 const sd = @import("semantic_descriptor.zig");
 const sdv2 = @import("semantic_descriptor_v2.zig");
 const sib = @import("structured_ir_builder.zig");
@@ -14,6 +12,7 @@ const zal = @import("zig_air_lowering.zig");
 const zsl = @import("zig_semantic_lowering.zig");
 const base64_rows = @import("main_base64_rows.zig");
 const dependencies = @import("analysis/global_dependencies.zig");
+const compilation = @import("compilation.zig");
 
 const writeBase64SourceByte = base64_rows.writeBase64SourceByte;
 const writeBase64OutputStore = base64_rows.writeBase64OutputStore;
@@ -517,7 +516,7 @@ pub fn emitCodegenModule(
         selected_functions += 1;
         var selector_diagnostic_tag: ?[]const u8 = null;
         var selector_diagnostic_detail: ?[]const u8 = null;
-        var machine = codegen.x86_64.lowerFunctionWithOptions(allocator, triple, function, .{
+        var machine = compilation.select(allocator, triple, function, .{
             .generic_cfg_selector = options.generic_cfg_selector,
             .module_context = &module_context,
             .generic_cfg_selector_diagnostic_tag = &selector_diagnostic_tag,
@@ -713,14 +712,12 @@ pub fn runStructuredDirectAcceptedPipelineForSurface(
     if (environ.get("ZLLVM_ZIG_MODE") == null) return;
     if (structuredDirectFoldPipelineReason(surface) == null) return;
 
-    var pm = pass_manager.ModulePassManager.init(allocator);
-    defer pm.deinit();
-    try pipelines.addPasses(&pm, "sccp,simplifycfg,instcombine,dce");
-
     var discard_buffer: [4096]u8 = undefined;
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
-    var context: pass_manager.Context = .{ .allocator = allocator, .io = io };
-    _ = try pm.runWithOptions(module, &context, &discard_writer.writer, .{ .verify_each_pass = false });
+    try compilation.prepare(allocator, io, module, &discard_writer.writer, .{
+        .optimization = "sccp,simplifycfg,instcombine,dce",
+        .passes = .{ .verify_each_pass = false },
+    });
 }
 
 pub const StructuredDirectFoldPipelineSurface = struct {

@@ -7,6 +7,7 @@ const Gate = struct {
 };
 
 const gates = [_]Gate{
+    .{ .tool = "tools/run_compilation_contract.zig" },
     .{ .tool = "tools/run_distribution_linker_boundary.zig" },
     .{ .tool = "tools/run_distribution_releasesmall_boundary_m3.zig" },
     .{ .tool = "tools/run_distribution_debug_unwind_boundary.zig" },
