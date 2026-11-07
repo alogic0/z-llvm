@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `fbb249a7d9a10b118696af3ef1b378a11a3e45aa`; tree: `10bff8f7b829b0d234e656cfcca0abdae23da278`.
+Accepted revision: `9cc31c38c449142ad3d25f9576702afb4a1ad9de`; tree: `69a240c79902f55c7b81872824026f30cd69f238`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,43 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [selection-performance checkpoint](evidence/selection_performance_acceptance_20261106.json)
+The accepted [unchanged Zig input-program checkpoint](evidence/zig_input_program_acceptance_20261106.json)
+at `9cc31c38` passes all 17 integration gates. The pinned 457-line
+`tools/migrate_langref.zig` runs unchanged with runtime filenames, allocated
+document data, mutable lists and tokenizer state, generated files, and parser
+and filesystem errors. All 29 cases pass in Fast, Safe and Small: 87 input/mode
+pairs and 603 rejected observation mutations. Independent ownership replay
+matches in every mode. These controls mutate observations, not compiler
+implementations; emitted-definition counts do not count executed functions.
+
+Shared lowering repairs runtime pointer arguments to boolean calls, integer
+`undef` atomic operands, and popcount calls without optional range annotations.
+All 1,913 unit tests and 30 policy tests pass in both Debug and ReleaseSafe,
+along with 19 structural checks, 38 captured objects, 60 ABI comparisons,
+compilation routes and readiness. All five fixed Zig programs, the C corpus,
+seven original executable canaries and 27 compiler-core controls also pass.
+All 45 native populations pass 1,767,660 local observations against 883,830
+references. The compiler-core cohort remains 100 lowered/emitted/linked and
+nine executed functions per mode; its 36 records match prior fresh execution.
+
+The [completed plan](plans/2026-11-06-unchanged-zig-input-program.md) and
+[evidence](evidence/zig_input_program.md) retain per-function/legalizer profiles
+and the exact scope. Full-gate object emission takes 17.15 s, 28.15 s and 5.36 s
+for program modes Fast, Safe and Small using a ReleaseFast compiler; independent
+replay takes similar time.
+These individual observations do not establish compiler or generated-code speedup.
+
+The [project cleanup](evidence/project_space_cleanup_20261106.json) removes
+7.24 GB of allocated data across three intervals, including the build cache
+regenerated during validation. Current AIR, compiler binaries, prior evidence,
+diagnostic worktrees and the thirteen original probes remain. Final recorded
+free space is 53.30 GB; admission and reserve remain 32.95 GB and 24.36 GB.
+No archives were created.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
+
+The earlier [selection-performance checkpoint](evidence/selection_performance_acceptance_20261106.json)
 at `fbb249a7` passes all 17 integration gates. Profile v2 records per-function
 timing and per-legalizer outcomes and allocation work. Nine legalizers now defer
 candidate copies until the first rewrite, preserving eligibility, ordered
@@ -50,14 +86,12 @@ compilation routes and readiness also pass.
 
 The [completed plan](plans/2026-11-06-compiler-selection-performance.md) and
 [measurement evidence](evidence/selection_performance.md) describe the scope.
-A larger unchanged Zig program using runtime input and allocation is the next
-separate coverage milestone. Minimum free space is 30.69 GB, above the unchanged
-24.36 GB reserve. Original scratch files, prior evidence, baseline compilers,
+A larger unchanged Zig program using runtime input and allocation remained the
+next separate coverage milestone at that checkpoint; it is completed above.
+Minimum free space was 30.69 GB, above the unchanged 24.36 GB reserve.
+Original scratch files, prior evidence, baseline compilers,
 diagnostic worktrees and authenticated AIR caches are preserved. No archives
 were created.
-
-The entries below are historical. Their counts and remaining failures describe
-those checkpoints, not the current frontier.
 
 The earlier [input-driven execution checkpoint](evidence/input_driven_execution_acceptance_20261106.json)
 at `1e513b68` passes all 17 integration gates. An unchanged pinned JSON parser

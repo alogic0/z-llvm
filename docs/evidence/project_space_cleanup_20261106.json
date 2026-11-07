@@ -36,7 +36,7 @@
     "shared_cache_removed": false,
     "archives_created": false
   },
-  "total_allocated_bytes_recovered": 7058235392,
+  "total_allocated_bytes_recovered": 7243792384,
   "space_attribution": "About 40 GB became available before the second deletion interval through activity outside this cleanup. Only the measured interval increase is attributed to this operation.",
   "replacement": {
     "accepted_revision": "f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac",
@@ -154,6 +154,29 @@
     {
       "path": "local-state/validations/zig-input-20261106/project-space/consumers.stderr",
       "sha256": "588d070de4531ffb1f34af238ebde81ebee1f4c534189077762e54494e70ce39"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/post-validation-cache/result.json",
+      "sha256": "83475e0cbc67b017099314863c70eb1f6f9d30481c3b26393a0988ffd47b730f"
     }
-  ]
+  ],
+  "post_validation_cache_cleanup": {
+    "schema": 1,
+    "status": "completed",
+    "recorded_utc": "2026-11-07T01:11:16Z",
+    "scope": "idle project .zig-cache regenerated during full acceptance",
+    "files": 985,
+    "allocated_bytes_removed": 185556992,
+    "free_bytes_before": 53115953152,
+    "free_bytes_after": 53301501952,
+    "measured_free_increase": 185548800,
+    "compilers_verified": true,
+    "source_snapshot_verified": true,
+    "original_scratch_files_verified": 13,
+    "shared_caches_removed": false,
+    "archives_created": false,
+    "limitation": "A regenerable build cache; allocated bytes count this deletion interval, not net project growth."
+  },
+  "deletion_intervals": 3,
+  "allocated_space_scope": "Cumulative allocated bytes removed in three audited intervals, including 185,556,992 bytes regenerated during full validation; not a net project-size reduction."
 }

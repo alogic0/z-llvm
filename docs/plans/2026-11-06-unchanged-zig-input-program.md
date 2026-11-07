@@ -1,6 +1,6 @@
 # Unchanged Zig program with runtime input
 
-Status: implementation and focused execution pass; full acceptance is pending.
+Status: complete at `9cc31c38`; all 17 integration gates pass.
 Successor to the accepted
 [compiler selection performance plan](2026-11-06-compiler-selection-performance.md).
 
@@ -59,27 +59,33 @@ compiler-core and native regression populations required.
 Retain accepted evidence and compilers, authenticated AIR, diagnostic worktrees,
 and the original thirteen scratch probes. Create no archives. The full gate
 still requires 32,949,672,960 bytes free before starting and a 24,359,738,368-byte
-reserve during execution. Initial free space is only about 14.3 GB; full
-acceptance must wait for sufficient space. Small qualification builds and
-implementation can proceed within bounded task-owned directories.
+reserve during execution. The task began with only about 14.3 GB free. Audited
+project cleanup and additional filesystem activity subsequently satisfied
+admission; the completed gate retained the original thresholds.
 
-## Implemented checkpoint
+## Completed checkpoint
 
-Steps 1–4 are implemented. The unchanged program passes all 29 cases in Fast,
+Steps 1–5 are complete. The unchanged program passes all 29 cases in Fast,
 Safe and Small: 87 input/mode pairs and 603 rejected observation mutations.
 Safe exposed three shared backend gaps: runtime pointer arguments to boolean
 calls, integer `undef` atomic RMW operands, and popcount calls without optional
 range annotations. All are repaired with executable regressions; the workload
 source remains unchanged. See the [evidence and upstream mapping](../evidence/zig_input_program.md)
-and [machine-readable record](../evidence/zig_input_program_focused_20261106.json).
+and [full acceptance record](../evidence/zig_input_program_acceptance_20261106.json).
 
-Step 5 has profiles and identical independent ownership replay for every mode.
+Step 5 retains profiles and identical independent ownership replay for every mode.
 Debug and Safe unit/policy tests, structural, captured-object, ABI, compilation
-routes, readiness and three-mode Fibonacci pass. Full acceptance is still open.
-After retiring 2.64 GB of idle project/task caches, initial admission measured
-14.19 GB available and was short by 18.76 GB. The subsequent
-[project-only cleanup](../evidence/project_space_cleanup_20261106.json) recovers
-another 4.42 GB. Other filesystem activity also releases space; 58.71 GB is now
-available, satisfying admission. The 17 gates have not started. Preserve
-the accepted checkpoint and run the prepared full-acceptance command once the
-existing headroom requirement is satisfied; do not move to another milestone.
+routes, readiness and three-mode Fibonacci pass. The frozen 2,967-file source
+snapshot passes all 17 integration gates and 1,475 canonical log records.
+All 36 compiler-core records match prior fresh execution; the cohort remains
+100 lowered/emitted/linked and nine executed functions per mode. All 45 native
+populations pass 1,767,660 local observations against 883,830 references.
+
+The [project-only cleanup](../evidence/project_space_cleanup_20261106.json)
+removes 7.24 GB of allocated data across three audited intervals, including
+185.56 MB of build cache regenerated during full validation. Current AIR,
+compilers, prior evidence, diagnostic worktrees and all thirteen original probes
+remain. No archives were created. Final recorded free space is 53.30 GB.
+The retained profiles support subsequent compiler-performance investigation;
+this milestone does not claim generated-code optimization quality or execution
+of every emitted definition.

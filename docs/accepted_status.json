@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "fbb249a7d9a10b118696af3ef1b378a11a3e45aa",
-  "accepted_tree": "10bff8f7b829b0d234e656cfcca0abdae23da278",
+  "accepted_revision": "9cc31c38c449142ad3d25f9576702afb4a1ad9de",
+  "accepted_tree": "69a240c79902f55c7b81872824026f30cd69f238",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 9,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "fbb249a7",
+  "declaration_revision": "9cc31c38",
   "evidence": [
+    "docs/evidence/zig_input_program_acceptance_20261106.json",
+    "docs/evidence/zig_input_program.md",
     "docs/evidence/selection_performance_acceptance_20261106.json",
     "docs/evidence/selection_performance.md",
     "docs/evidence/input_driven_execution_acceptance_20261106.json",

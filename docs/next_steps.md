@@ -1,7 +1,28 @@
 # Active direction
 
-The [compiler selection performance plan](plans/2026-11-06-compiler-selection-performance.md)
-is complete at `fbb249a7`. All 17 integration gates pass. Profile v2 attributes
+The [unchanged Zig input-program plan](plans/2026-11-06-unchanged-zig-input-program.md)
+is complete at `9cc31c38`. The pinned language-reference migration tool runs
+unchanged with runtime document input, allocation, mutable directives, generated
+files and error paths. All 87 input/mode pairs and 603 observation controls pass,
+with identical independent ownership replay in Fast, Safe and Small. Three Safe
+backend gaps are repaired through shared lowering and executable regressions.
+See the [acceptance record](evidence/zig_input_program_acceptance_20261106.json)
+and [implementation evidence](evidence/zig_input_program.md).
+
+All 17 integration gates pass. All five existing fixed Zig programs and the C
+parser remain green; the parser passes 138 input/mode pairs and 552 observation
+controls. Compiler-core counters remain 100 lowered/emitted/linked and nine
+executed functions per mode, with all 36 records matching prior fresh execution.
+All 45 native populations pass. Original probes and diagnostic worktrees remain.
+
+The [project cleanup](evidence/project_space_cleanup_20261106.json) removes
+7.24 GB of allocated data across three audited intervals, including 185.56 MB
+of cache regenerated during full validation. This is not a net project-size
+change. Current AIR, compiler binaries and prior evidence remain; no archives
+were created. Final recorded free space is 53.30 GB.
+
+The preceding [compiler selection performance plan](plans/2026-11-06-compiler-selection-performance.md)
+completed at `fbb249a7`. Profile v2 attributes
 time and allocation work to functions and legalizers; nine legalizers defer
 candidate copying until the first rewrite. See the
 [acceptance record](evidence/selection_performance_acceptance_20261106.json) and
@@ -14,29 +35,13 @@ ownership manifest is byte-identical, with unchanged per-function/per-stage
 counters. Profiling overhead is unresolved within sample variation. Twenty-five
 parser comparisons per compiler show no regression at 10 ms timing resolution.
 
-The active [unchanged Zig input-program plan](plans/2026-11-06-unchanged-zig-input-program.md)
-adds the pinned language-reference migration tool with runtime document input,
-allocation, mutable directives, extracted files and error paths. Implementation
-and focused execution pass: 87 input/mode pairs, 603 observation controls and
-identical ownership replay. Three Safe backend gaps are repaired with executable
-regressions. See the [evidence](evidence/zig_input_program.md). Full 17-gate
-acceptance remains the next action. The [project cleanup](evidence/project_space_cleanup_20261106.json)
-recovers 7.06 GB across two deletion intervals; other filesystem activity also
-releases space, bringing availability to 58.71 GB. Admission is now sufficient.
-The prepared command is
-`bash local-state/validations/zig-input-20261106/full-acceptance.sh`.
-The plan remains open and the accepted checkpoint is unchanged.
-The existing
-[input-driven C corpus](evidence/input_driven_execution.md) passes 138 input/mode
-pairs and 552 observation-mutation controls; it does not add Zig frontend
-coverage or compiler mutation tests. All five unchanged Zig programs pass in
-Fast, Safe and Small. The compiler-core prefix remains 100
-lowered/emitted/linked functions and nine executed per mode; all 45 native
-populations pass.
-
-For further compiler-performance work, use the retained function and stage
-profiles to choose the next measured cost. Ordered scans and original-form
-retries remain. Keep extending the common transfer contract when addressing
+For the next compiler-performance investigation, use both Fibonacci and the
+new document-input corpus. Retained Safe profiles identify block-sort
+specializations and the DWARF stack-machine interpreter among the expensive
+functions; measure the shared costs before choosing a repair. Ownership replay
+still duplicates selection work. These are single observations, not speedup
+measurements. Ordered scans and original-form retries remain. Keep extending
+the common transfer contract when addressing
 pair/vector PHIs and spill destinations; those cases and ordinary CLI structural
 selection still use their existing paths. Generated-code optimization quality
 remains a separate measured milestone.

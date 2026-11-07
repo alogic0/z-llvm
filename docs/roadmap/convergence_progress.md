@@ -4544,6 +4544,21 @@ One line per completed cycle, append-only, newest last. This is the
   were made. Evidence:
   `docs/evidence/selection_performance_acceptance_20261106.json`.
 
+- 2026-11-06 (unchanged Zig input program, `9cc31c38`) All 17 integration gates
+  pass on the frozen 2,967-file snapshot. The pinned 457-line language-reference
+  migration tool runs unchanged on 29 runtime document inputs in each release
+  mode: 87 input/mode pairs and 603 rejected observation mutations. Independent
+  ownership replay matches, and profiles retain function and legalizer costs.
+  Shared fixes admit runtime pointer arguments to boolean calls, integer undef
+  atomic operands and popcount without optional range attributes. Debug and
+  ReleaseSafe each pass 1,913 unit tests and 30 policy checks. All five fixed Zig
+  programs, the C corpus and all 45 native populations remain green. The core
+  cohort retains 100 lowered/emitted/linked and nine executed per mode, with
+  all 36 records matching prior fresh execution. Audited project cleanup removes
+  7.24 GB across three intervals, including regenerated cache; current inputs,
+  compilers, evidence, worktrees and probes remain. No archives were created.
+  Evidence: `docs/evidence/zig_input_program_acceptance_20261106.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4551,7 +4566,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `fbb249a7d9a10b118696af3ef1b378a11a3e45aa`; tree: `10bff8f7b829b0d234e656cfcca0abdae23da278`.
+Accepted revision: `9cc31c38c449142ad3d25f9576702afb4a1ad9de`; tree: `69a240c79902f55c7b81872824026f30cd69f238`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

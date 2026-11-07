@@ -1,16 +1,20 @@
 # Unchanged Zig document-input program
 
-Implementation and focused execution pass. The existing 457-line
+Accepted at `9cc31c38` after all 17 integration gates pass. The existing 457-line
 `tools/migrate_langref.zig` passes 29 runtime inputs in each of ReleaseFast,
 ReleaseSafe and ReleaseSmall: 87 local/reference pairs and 603 observation
-controls. Full 17-gate acceptance remains pending. Accepted
-capability counters have not advanced.
+controls. Compiler-core counters remain 100 lowered/emitted/linked functions and
+nine executed per mode; this corpus is a separate execution population.
 
-The [focused record](zig_input_program_focused_20261106.json) binds the tested
-worktree snapshot, compiler hashes, reports, profiles and logs. Raw evidence is
-under `local-state/validations/zig-input-20261106/`. The snapshot precedes the
-documentation and split commits; it includes the exact corpus and backend
-bytes used by the tests, not just the base revision.
+The [acceptance record](zig_input_program_acceptance_20261106.json) binds the
+frozen 2,967-file source snapshot, compiler hashes, reports, profiles and logs.
+Raw evidence is under `local-state/validations/zig-input-20261106/`. Production,
+tool, build and test bytes match the earlier
+[focused record](zig_input_program_focused_20261106.json), whose pending-acceptance
+status is superseded by the complete run. The accepted source revision is
+`9cc31c38c449142ad3d25f9576702afb4a1ad9de`, tree
+`69a240c79902f55c7b81872824026f30cd69f238`; this documentation promotion follows
+the frozen run.
 
 ## Program and oracle
 
@@ -74,31 +78,38 @@ admission condition; residual pair-operation classifications and counts remain.
 
 ## Results and compiler cost
 
-`fixed-three-mode/report.json` retains all 174 actual execution observations,
-authenticates the oracle manifest, and records tool/source identities. Ownership sidecars match independently
-reselected manifests byte for byte. Linked candidate objects match the captured
-hook object's sections, symbols and relocations.
+`full-reports/unchanged-migrate_langref--report.json` retains all 174 actual
+execution observations, authenticates the oracle manifest, and records tool and
+source identities. Ownership sidecars match independently reselected manifests
+byte for byte. Linked candidate objects match the captured hook object's
+sections, symbols and relocations.
 
 | Program mode | Selected/emitted definitions | Composed block / CFG | Object-emission profile | Ownership replay |
 | --- | ---: | ---: | ---: | ---: |
-| ReleaseFast | 1,654 | 669 / 985 | 19.21 s | 19.92 s |
-| ReleaseSafe | 1,873 | 595 / 1,278 | 30.98 s | 30.88 s |
-| ReleaseSmall | 866 | 377 / 489 | 5.99 s | 5.88 s |
+| ReleaseFast | 1,654 | 669 / 985 | 17.15 s | 16.97 s |
+| ReleaseSafe | 1,873 | 595 / 1,278 | 28.15 s | 28.35 s |
+| ReleaseSmall | 866 | 377 / 489 | 5.36 s | 5.36 s |
 
 These use a ReleaseFast compiler. Profiles retain per-function and per-legalizer
-timings and counters. Selection plus optional legalization accounts for 16.82 s,
-26.67 s and 5.36 s respectively, with 140,522, 163,738 and 71,071 legalizer
-attempts. These single observations ran alongside other validation and are not
-controlled speedup measurements. Emitted definitions are not executed-function
-counts, and the ownership replay remains substantial duplicate selection work.
+timings and counters. Selection plus optional legalization accounts for 14.98 s,
+24.11 s and 4.77 s respectively, with 140,522, 163,738 and 71,071 legalizer
+attempts. These are individual observations within the complete gate, not
+controlled speedup measurements. Observations, ownership manifests and selection
+counters for each function and legalizer stage match the focused run. Emitted
+definitions are not executed-function counts, and ownership replay remains
+substantial duplicate selection work.
 
 All 1,913 unit tests pass in both Debug and ReleaseSafe, as do all 30 policy tests
 in both modes, 19 structural checks, 38 captured-object checks, 60 ABI differential
 cases, compilation-route checks and readiness. Readiness includes 6,528 generated
 program observations. Unchanged Fibonacci passes all three modes with independent
 ownership replay. The existing single-observation hello manifest still passes.
-The modified integrated runner compiles; its complete run and the full native
-and compiler-core populations remain part of pending full acceptance.
+All 17 integration gates pass, and the complete log validates 1,475 canonical
+records. The compiler-core cohort matches all 36 records from prior fresh
+execution. All 45 native populations pass 1,767,660 local observations against
+883,830 references. All five fixed Zig programs pass in three modes, the C parser
+passes 138 input/mode pairs and 552 observation controls, and all seven original
+integrated canaries and 27 compiler-core controls remain required and pass.
 
 ## Acceptance, storage and reproduction
 
@@ -110,7 +121,7 @@ LLVM IR construction, Zig's linker/compiler-rt and libc/CRT remain dependencies.
 This corpus does not claim allocation-failure injection, concurrency or panic
 trace coverage.
 
-After validation, 32 complete idle project/task cache roots were removed. The
+After focused validation, 32 complete idle project/task cache roots were removed. The
 deletion interval reclaimed 2.64 GB. All 4,359 retained task files, compiler
 identities and thirteen original probes were verified unchanged. Shared caches,
 authenticated AIR, diagnostic worktrees, accepted evidence and installed outputs
@@ -118,18 +129,26 @@ remain. No archives were created. The retained cache audit distinguishes
 allocated bytes from filesystem free-space movement and notes regeneration.
 
 The first full admission measured 14,188,736,512 bytes available: 18,760,936,448 bytes short
-of the unchanged 32,949,672,960-byte requirement. No full gate started. The
-24,359,738,368-byte execution reserve also remains unchanged. The prepared
-`local-state/validations/zig-input-20261106/full-acceptance.sh` checks admission,
-compiler and source identity, freezes a new snapshot, retains reports, and runs
-the authoritative 17 gates once space is available. The
-[plan](../plans/2026-11-06-unchanged-zig-input-program.md) stays open until that
-run passes and its evidence is reviewed.
+of the unchanged 32,949,672,960-byte requirement. No gate started at that point.
+The 24,359,738,368-byte execution reserve also remains unchanged.
 
 The subsequent user-requested [project cleanup](project_space_cleanup_20261106.json)
-recovers another 4.42 GB from superseded AIR, idle caches and identical captured
+recovered another 4.42 GB from superseded AIR, idle caches and identical captured
 IR while preserving current inputs and evidence. Other filesystem activity also
-releases space; availability reaches 58.71 GB, so full admission is now satisfied.
+released space, bringing availability to 58.71 GB and satisfying admission.
+
+`full-acceptance.sh` then ran all 17 gates in 3,142.36 seconds against the frozen
+snapshot, starting with 58.02 GB free. Gate-boundary samples record 53.12 GB at
+their minimum; an additional live spot check observed 51.71 GB. These samples
+remain above the reserve but do not measure a continuous filesystem minimum.
+Source, compiler, oracle, report and original-probe checks all pass after the run.
+The [plan](../plans/2026-11-06-unchanged-zig-input-program.md) is complete.
+
+The gate removes its large temporary directories. A final audited cleanup removes
+185.56 MB of regenerated project build cache, preserving compiler binaries and
+rechecking the frozen source and probes. Cumulative allocated bytes removed
+across the three cleanup intervals total 7.24 GB; this is not net project growth.
+Final recorded free space is 53.30 GB. Shared caches remain; no archives were made.
 
 To rerun the bounded corpus:
 
