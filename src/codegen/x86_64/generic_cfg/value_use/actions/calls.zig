@@ -285,8 +285,9 @@ fn validateCallRequest(request: *const Types.StoredRequest, declared_type: ir.Ty
     if (!request.expected.ty.eql(declared_type) or request.destination != .prepared_source)
         return error.ValueUseCallArgumentTypeUnsupported;
     if (declared_type == .ptr) {
-        if (request.form != .stack_object_address or request.expected.register_class != .stack_object or
-            request.expected.pointer_address_space != 0)
+        const stack = request.form == .stack_object_address and request.expected.register_class == .stack_object;
+        const runtime = request.form == .pointer and request.expected.register_class == .gpr64;
+        if ((!stack and !runtime) or request.expected.pointer_address_space != 0)
             return error.ValueUseCallArgumentTypeUnsupported;
         return;
     }
@@ -525,6 +526,9 @@ fn stageValidatedCallArgument(
     const current = (try Authority.validateRequestAt(Authority, transaction, index)) orelse
         return error.ValueUseCallArgumentLocationUnsupported;
     if (declared_type == .ptr) {
+        if (request.form == .pointer) {
+            return materialization.materializePointer(transaction.selector, current, .{ .gpr64 = target });
+        }
         const disp = switch (current) {
             .stack_scalar => |stack| stack.base_disp,
             .stack128 => |value| value,

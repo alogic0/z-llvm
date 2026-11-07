@@ -1488,9 +1488,55 @@ test "generic cfg selector executes exact i64 and i128 bit permutations" {
     }) |case| try std.testing.expectEqual(case[1], bit_reverse_i128(case[0]));
 }
 
+test "generic cfg selector executes boolean calls with loaded and live pointer arguments" {
+    for ([_]bool{ false, true }) |loaded| {
+        const input = try std.fmt.allocPrint(std.testing.allocator, "declare fastcc i1 @read_boolean(ptr)\ndefine i64 @probe(ptr %input, i64 %salt) {{\nentry:\n{s}  %tag = add i64 %salt, 17\n  %flag = call fastcc i1 @read_boolean(ptr {s})\n  %wide = zext i1 %flag to i64\n  %after = load i64, ptr %input, align 8\n  %both = xor i64 %after, %tag\n  %result = xor i64 %both, %wide\n  ret i64 %result\n}}\n", .{ if (loaded) "  %slot = alloca ptr, align 8\n  store ptr %input, ptr %slot, align 8\n  %pointer = load ptr, ptr %slot, align 8\n" else "", if (loaded) "%pointer" else "%input" });
+        defer std.testing.allocator.free(input);
+        var module = try ir.Module.parse(std.testing.allocator, input);
+        defer module.deinit();
+        try module.verify();
+        const function = module.functions.items[0];
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try @import("../generic_cfg_selector.zig").tryLower(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        // Read *RDI, return a valid AL with dirty upper bits, and clobber all
+        // volatile integer argument registers as an ordinary callee may.
+        const stub = [_]u8{
+            0x48, 0x8b, 0x07, 0x83, 0xe0, 0x01,
+            0x49, 0xba, 0x00, 0x00, 0xfe, 0xca,
+            0xef, 0xbe, 0xad, 0xde, 0x4c, 0x09,
+            0xd0, 0x31, 0xff, 0x31, 0xf6, 0x31,
+            0xd2, 0x31, 0xc9, 0x45, 0x31, 0xc0,
+            0x45, 0x31, 0xc9, 0x45, 0x31, 0xd2,
+            0x45, 0x31, 0xdb, 0xc3,
+        };
+        const mapping = try std.posix.mmap(null, bytes.len + stub.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping[0..bytes.len], bytes);
+        @memcpy(mapping[bytes.len..][0..stub.len], &stub);
+        var offset: usize = 0;
+        var calls: usize = 0;
+        for (machine.instructions.items) |instruction| {
+            if (instruction == .direct_call) {
+                try std.testing.expectEqualStrings("read_boolean", instruction.direct_call.symbol);
+                std.mem.writeInt(i32, mapping[offset + 1 ..][0..4], @intCast(bytes.len - (offset + 5)), .little);
+                calls += 1;
+            }
+            offset += encoding.instructionSize(instruction);
+        }
+        try std.testing.expectEqual(@as(usize, 1), calls);
+        const run: *const fn (*const u64, u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+        for ([_]u64{ 0, 1, 2, 3, 0xdead_beef_cafe_0123, std.math.maxInt(u64) }) |value| for ([_]u64{ 0, 1, 0x1234_5678_9abc_def0, std.math.maxInt(u64) }) |salt| {
+            try std.testing.expectEqual(value ^ (salt +% 17) ^ (value & 1), run(&value, salt));
+        };
+    }
+}
+
 test "generic cfg selector keeps range-attributed popcount near misses fail closed" {
     inline for (.{
-        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, null), .tail_kind = @as(?[]const u8, "tail") },
         .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 0, 64)"), .tail_kind = @as(?[]const u8, "tail") },
         .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i32 0, 65)"), .tail_kind = @as(?[]const u8, "tail") },
         .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 0, 65), zeroext"), .tail_kind = @as(?[]const u8, "tail") },
@@ -1516,7 +1562,7 @@ test "generic cfg selector keeps range-attributed popcount near misses fail clos
     }
 }
 
-test "generic cfg selector executes exact range-attributed i64 and i128 popcount" {
+test "generic cfg selector executes i64 and i128 popcount with optional range attributes" {
     const input =
         \\declare i64 @llvm.ctpop.i64(i64)
         \\declare i128 @llvm.ctpop.i128(i128)
@@ -1530,13 +1576,23 @@ test "generic cfg selector executes exact range-attributed i64 and i128 popcount
         \\  %result = notail call range(i128 0, 129) i128 @llvm.ctpop.i128(i128 %value)
         \\  ret i128 %result
         \\}
+        \\define i64 @plain_popcount_i64(i64 %value) {
+        \\entry:
+        \\  %result = call i64 @llvm.ctpop.i64(i64 %value)
+        \\  ret i64 %result
+        \\}
+        \\define i128 @plain_popcount_i128(i128 %value) {
+        \\entry:
+        \\  %result = call i128 @llvm.ctpop.i128(i128 %value)
+        \\  ret i128 %result
+        \\}
         \\
     ;
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
     try module.verify();
 
-    var mappings: [2]?[]align(std.heap.page_size_min) u8 = .{ null, null };
+    var mappings: [4]?[]align(std.heap.page_size_min) u8 = @splat(null);
     defer for (mappings) |mapping| if (mapping) |bytes| std.posix.munmap(bytes);
     for (module.functions.items, 0..) |function_ir, index| {
         var machine = MachineFunction.init(function_ir.name, function_ir.ret_ty);
@@ -1558,7 +1614,11 @@ test "generic cfg selector executes exact range-attributed i64 and i128 popcount
         .{ @as(u64, 0x8000_0000_0000_0001), @as(u64, 2) },
         .{ @as(u64, 0x0123_4567_89ab_cdef), @as(u64, 32) },
         .{ std.math.maxInt(u64), @as(u64, 64) },
-    }) |case| try std.testing.expectEqual(case[1], popcount_i64(case[0]));
+    }) |case| {
+        try std.testing.expectEqual(case[1], popcount_i64(case[0]));
+        const plain: *const fn (u64) callconv(.c) u64 = @ptrCast(mappings[2].?.ptr);
+        try std.testing.expectEqual(case[1], plain(case[0]));
+    }
     inline for (.{
         .{ @as(u128, 0), @as(u128, 0) },
         .{ @as(u128, 1), @as(u128, 1) },
@@ -1566,5 +1626,9 @@ test "generic cfg selector executes exact range-attributed i64 and i128 popcount
         .{ (@as(u128, 1) << 127) | 1, @as(u128, 2) },
         .{ @as(u128, 0x0123_4567_89ab_cdef_fedc_ba98_7654_3210), @as(u128, 64) },
         .{ std.math.maxInt(u128), @as(u128, 128) },
-    }) |case| try std.testing.expectEqual(case[1], popcount_i128(case[0]));
+    }) |case| {
+        try std.testing.expectEqual(case[1], popcount_i128(case[0]));
+        const plain: *const fn (u128) callconv(.c) u128 = @ptrCast(mappings[3].?.ptr);
+        try std.testing.expectEqual(case[1], plain(case[0]));
+    }
 }

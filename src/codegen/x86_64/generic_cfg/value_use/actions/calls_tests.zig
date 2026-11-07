@@ -971,6 +971,45 @@ test "value-use direct call stages parallel arguments and rolls back exactly" {
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
 }
 
+test "value-use pointer call rollback restores live registers spills and accumulator aliases" {
+    for ([_]ValueLoc{ .rax, .{ .arg64 = .rdi }, .{ .arg64 = .rsi }, .{ .spill64 = .slot3 } }) |home| {
+        for ([_]call_actions.CallTestFailure{ .after_preservation, .after_argument, .after_call_append, .after_mask }) |boundary| {
+            var machine = MachineFunction.init("pointer-call-rollback", .{ .int = 1 });
+            defer machine.deinit(std.testing.allocator);
+            var plan = SelectorAllocationPlan.init(std.testing.allocator);
+            defer plan.deinit();
+            inline for (&.{ "pointer", "witness" }) |name| try addLive(&plan, name);
+            var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+            defer selector.deinit();
+            selector.allocation_plan = &plan;
+            selector.stack_frame_bytes = 128;
+            try selector_state.bindValueLoc(&selector, "pointer", home);
+            try selector_state.bindValueLoc(&selector, "witness", .{ .arg64 = .r9 });
+            const pointer = selector.values.get("pointer").?;
+            const witness = selector.values.get("witness").?;
+            const next_spill = selector.next_spill_slot;
+            const flags = selector.eflags.snapshot();
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const argument = try transaction.register(preparedSourceRequest("pointer", .ptr, .gpr64, .pointer));
+            try transaction.attachCallAction(.{ .direct_call = try Transaction.DirectCallAction.init("callee", "result", .{ .int = 1 }, &.{argument}, &.{.ptr}) });
+            try transaction.seal();
+            try call_actions.setCallTestFailureForTest(&transaction, boundary, 0);
+            try transaction.prepare();
+            try std.testing.expectError(error.ValueUseCallTestFailure, transaction.materializeAll());
+            try std.testing.expectEqual(pointer, selector.values.get("pointer").?);
+            try std.testing.expectEqual(witness, selector.values.get("witness").?);
+            try std.testing.expect(!selector.values.contains("result"));
+            try std.testing.expectEqual(next_spill, selector.next_spill_slot);
+            try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+            try selector.eflags.validateSnapshot(flags);
+            try expectCallRollbackStorageCleared(&transaction);
+        }
+    }
+}
+
 test "value-use dormant call rollback restores every declared mutation boundary" {
     const boundaries = [_]call_actions.CallTestFailure{
         .after_preservation,

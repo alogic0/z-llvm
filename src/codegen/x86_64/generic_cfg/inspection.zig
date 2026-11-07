@@ -385,7 +385,7 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
         const bits: u16 = if (std.mem.endsWith(u8, call.callee, ".i64")) 64 else 128;
         const ty: ir.Type = .{ .int = bits };
         return if (call.ret_ty.eql(ty) and call.args.items.len == 1 and call.args.items[0].ty.eql(ty) and
-            intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, @as(u128, bits) + 1)) null else .{ .unsupported_type = "llvm.ctpop" };
+            (call.ret_attrs == null or intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, @as(u128, bits) + 1))) null else .{ .unsupported_type = "llvm.ctpop" };
     }
     if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) {
         return if (call.ret_ty.eql(.{ .int = 16 }) and call.args.items.len == 2 and

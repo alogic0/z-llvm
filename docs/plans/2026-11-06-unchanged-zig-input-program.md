@@ -1,6 +1,7 @@
 # Unchanged Zig program with runtime input
 
-Status: implementation in progress. Successor to the accepted
+Status: implementation and focused execution pass; full acceptance is pending.
+Successor to the accepted
 [compiler selection performance plan](2026-11-06-compiler-selection-performance.md).
 
 ## Intended result
@@ -61,3 +62,21 @@ still requires 32,949,672,960 bytes free before starting and a 24,359,738,368-by
 reserve during execution. Initial free space is only about 14.3 GB; full
 acceptance must wait for sufficient space. Small qualification builds and
 implementation can proceed within bounded task-owned directories.
+
+## Implemented checkpoint
+
+Steps 1–4 are implemented. The unchanged program passes all 29 cases in Fast,
+Safe and Small: 87 input/mode pairs and 603 rejected observation mutations.
+Safe exposed three shared backend gaps: runtime pointer arguments to boolean
+calls, integer `undef` atomic RMW operands, and popcount calls without optional
+range annotations. All are repaired with executable regressions; the workload
+source remains unchanged. See the [evidence and upstream mapping](../evidence/zig_input_program.md)
+and [machine-readable record](../evidence/zig_input_program_focused_20261106.json).
+
+Step 5 has profiles and identical independent ownership replay for every mode.
+Debug and Safe unit/policy tests, structural, captured-object, ABI, compilation
+routes, readiness and three-mode Fibonacci pass. Full acceptance is still open.
+After retiring 2.64 GB of idle project/task caches, initial admission measured
+14.19 GB available and was short by 18.76 GB. The 17 gates have not started. Preserve
+the accepted checkpoint and run the prepared full-acceptance command once the
+existing headroom requirement is satisfied; do not move to another milestone.

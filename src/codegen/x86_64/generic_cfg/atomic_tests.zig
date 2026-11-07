@@ -63,6 +63,32 @@ test "scalar atomics read-modify-write preserves width memory and live operands"
     };
 }
 
+test "scalar atomic undefined operands retain old memory results and neighboring bytes" {
+    for ([_]u16{ 8, 16, 32, 64 }) |bits| for ([_][]const u8{ "xchg", "add", "xor" }) |op| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        const widen = if (bits == 64) "  %wide = add i64 %old, 0\n" else try std.fmt.allocPrint(a, "  %wide = zext i{d} %old to i64\n", .{bits});
+        const input = try std.fmt.allocPrint(a, "define i64 @probe(ptr %p, i64 %salt) {{\nentry:\n  %old = atomicrmw volatile {s} ptr %p, i{d} undef syncscope(\"singlethread\") monotonic, align {d}\n{s}  %result = xor i64 %wide, %salt\n  ret i64 %result\n}}\n", .{ op, bits, bits / 8, widen });
+        var module = try ir.Module.parse(std.testing.allocator, input);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (*u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const mask = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+        for ([_]u64{ 0, 1, 0x8000_0000_0000_0000, 0x1234_5678_9abc_def0, std.math.maxInt(u64) }) |value| {
+            var cells = [_]u64{ 0xa5a5_a5a5_a5a5_a5a5, value, 0x5a5a_5a5a_5a5a_5a5a };
+            try std.testing.expectEqual((value & mask) ^ 0xfedc_ba98_7654_3210, run(&cells[1], 0xfedc_ba98_7654_3210));
+            // This lowering chooses zero for undef. The old value remains
+            // defined even though the replacement was unconstrained.
+            try std.testing.expectEqual(if (std.mem.eql(u8, op, "xchg")) value & ~mask else value, cells[1]);
+            try std.testing.expectEqual(@as(u64, 0xa5a5_a5a5_a5a5_a5a5), cells[0]);
+            try std.testing.expectEqual(@as(u64, 0x5a5a_5a5a_5a5a_5a5a), cells[2]);
+        }
+    };
+}
+
 test "scalar atomics compare exchange preserves old value success and live inputs" {
     for ([_]u16{ 8, 16, 32, 64, 0 }) |kind| for ([_]bool{ false, true }) |weak| for ([_]bool{ false, true }) |flag_first| {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);

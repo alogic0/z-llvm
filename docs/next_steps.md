@@ -17,7 +17,13 @@ parser comparisons per compiler show no regression at 10 ms timing resolution.
 The active [unchanged Zig input-program plan](plans/2026-11-06-unchanged-zig-input-program.md)
 adds the pinned language-reference migration tool with runtime document input,
 allocation, mutable directives, extracted files and error paths. Implementation
-and qualification are in progress; the accepted checkpoint remains unchanged.
+and focused execution pass: 87 input/mode pairs, 603 observation controls and
+identical ownership replay. Three Safe backend gaps are repaired with executable
+regressions. See the [evidence](evidence/zig_input_program.md). Full 17-gate
+acceptance remains the next action. Initial admission after idle-cache cleanup
+measured 14.19 GB available and was short by 18.76 GB. The prepared command is
+`bash local-state/validations/zig-input-20261106/full-acceptance.sh`.
+The plan remains open and the accepted checkpoint is unchanged.
 The existing
 [input-driven C corpus](evidence/input_driven_execution.md) passes 138 input/mode
 pairs and 552 observation-mutation controls; it does not add Zig frontend

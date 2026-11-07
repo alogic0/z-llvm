@@ -422,7 +422,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_calls.zig", .function = "lowerFpAbs", .body_sha256 = "c6abc1b3e6db1cb525680f9fc387476665f04bb05e65faec8f0a959e0b5bfc68" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerUnsignedOverflowI32", .body_sha256 = "4dc4da7d4dd45a3ddb97b01d1c722605a902b76c147962bfc5581e59333d0121" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerSmulOverflowI64", .body_sha256 = "2a2054e1320aecd14ce33eea5acce117193675bcf71cbf9efc8160f573b98ded" },
-    .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .body_sha256 = "386892044354332641c3184338b678f04aa018652f909cb27820bb82788fd66a" },
+    .{ .source = "composed_selector_calls.zig", .function = "lowerCtpop", .body_sha256 = "893aaf21de363f3b706e5d95a840d2eccff6e449cacf17154abd138160ae95d4" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerBitPermutation", .body_sha256 = "ff4e9bae90ab951677b25c6f17249cc8bd2fb4600351488ecd0056ea33d9341a" },
     .{ .source = "composed_selector_calls.zig", .function = "lowerAbsI128", .body_sha256 = "cf69f866c281db4b54bbeec420603927e57fc1b11220102ce0da5d2137296d79" },
 

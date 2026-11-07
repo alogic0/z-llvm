@@ -1176,7 +1176,9 @@ fn lowerCtpop(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
         }
     }
     const upper: u128 = @as(u128, bits) + 1;
-    if (!intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, upper)) {
+    // The result range follows from ctpop's semantics; a frontend need not
+    // repeat it as a call-site attribute.
+    if (call.ret_attrs != null and !intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, upper)) {
         return .{ .no_emitter = "composed-block-ctpop-range" };
     }
     const ty: ir.Type = .{ .int = bits };
@@ -1469,14 +1471,19 @@ fn lowerBooleanCall(selector: *ComposedBlockSelector, result: ?[]const u8, call:
     var arguments: [6]ValueUseTransaction.RequestHandle = undefined;
     var argument_types: [6]ir.Type = undefined;
     for (call.args.items, 0..) |arg, index| {
+        const runtime_pointer = if (arg.ty == .ptr) blk: {
+            const register_class = selector_state.valueRegisterClass(selector, arg.value) orelse
+                return .{ .unsupported_value = "composed-block-boolean-call-arg-value" };
+            break :blk register_class == .gpr64;
+        } else false;
         arguments[index] = try transaction.register(.{
             .source = arg.value,
             .expected = .{
                 .ty = arg.ty,
-                .register_class = if (arg.ty == .ptr) .stack_object else if (arg.ty.int == 32) .gpr32 else .gpr64,
+                .register_class = if (arg.ty == .ptr) (if (runtime_pointer) .gpr64 else .stack_object) else if (arg.ty.int == 32) .gpr32 else .gpr64,
                 .pointer_address_space = if (arg.ty == .ptr) 0 else null,
             },
-            .form = if (arg.ty == .ptr) .stack_object_address else if (arg.ty.int == 32) .gpr32 else .gpr64,
+            .form = if (arg.ty == .ptr) (if (runtime_pointer) .pointer else .stack_object_address) else if (arg.ty.int == 32) .gpr32 else .gpr64,
             .destination = .prepared_source,
         });
         argument_types[index] = arg.ty;

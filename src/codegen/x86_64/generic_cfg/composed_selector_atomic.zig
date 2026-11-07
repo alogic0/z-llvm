@@ -126,16 +126,19 @@ pub fn lowerRmw(selector: *Selector, result: ?[]const u8, rmw: core_ir.AtomicRmw
     if (inspectRmw(rmw)) |diagnostic| return diagnostic;
     const name = result orelse return .{ .unsupported_value = "scalar-atomic-rmw-result" };
     const bits = width(rmw.ty).?;
+    // An integer undef operand can take any bit pattern. Choose zero while
+    // retaining the atomic operation and its defined old-memory result.
+    const value: ir.Value = if (rmw.ty == .int and rmw.value == .undef) .{ .int = 0 } else rmw.value;
     var transaction = try ValueUseTransaction.begin(selector);
     defer transaction.deinit();
     try registerOperand(&transaction, .ptr, rmw.ptr, .rdi);
-    try registerOperand(&transaction, rmw.ty, rmw.value, .rsi);
+    try registerOperand(&transaction, rmw.ty, value, .rsi);
     try transaction.seal();
     const accumulator = try transaction.beginAccumulatorSession();
     try transaction.prepare();
     try transaction.materializeAll();
     if (try materializeSpecial(selector, .ptr, rmw.ptr, .rdi)) |diagnostic| return diagnostic;
-    if (try materializeSpecial(selector, rmw.ty, rmw.value, .rsi)) |diagnostic| return diagnostic;
+    if (try materializeSpecial(selector, rmw.ty, value, .rsi)) |diagnostic| return diagnostic;
     try selector_state.clobberArgReg(selector, .rcx);
     if (try transaction.prepareAccumulator(accumulator, .clobber, .spill_live)) |diagnostic| return diagnostic;
     try selector_state.emitEflagsInstruction(selector, rmwInstruction(rmw.op, bits), .clobber);

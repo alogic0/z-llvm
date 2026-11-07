@@ -1,0 +1,429 @@
+{
+  "schema": "unchanged-zig-input-focused-v1",
+  "recorded_utc": "2026-11-07T00:02:46Z",
+  "status": "focused-passed-full-acceptance-pending",
+  "source_provenance": {
+    "base_revision": "8e442843a85abd1654b95d6e5942c95d39d1d82e",
+    "tested_state": "Base revision plus the exact worktree files in the frozen snapshot; includes both corpus and backend changes before their commits.",
+    "snapshot": {
+      "path": "local-state/validations/zig-input-20261106/focused-source-snapshot.json",
+      "sha256": "1f5c9888be7b8d443d1814717a09f6f3d97df9b3486fd526e98f23298a87d50c"
+    },
+    "files": 2964,
+    "snapshot_verified_before_documentation_and_commits": true,
+    "corpus_commit": "9f59bb933c9e9ac44c6748709cc28871a10207c3",
+    "releasefast_compiler_sha256": "129cbf907f9fb264e2a930a6206ba7035f3a59d10a53661ad6181293fc2dab0f",
+    "debug_compiler_sha256": "08debd52d686531d8b96f0163108b0de99d7efd8bd9f25f3836016f333646216",
+    "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+    "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "zig_source_worktree_clean_after": true
+  },
+  "workload": {
+    "program": "migrate_langref",
+    "source": "/home/oleg/prog/ziglang/tools/migrate_langref.zig",
+    "source_sha256": "9aec36ec200d80b82dffefac559d7c488ec616690aca167346c82be4693b7b25",
+    "source_lines": 457,
+    "manifest": "test/real_programs/migrate_langref.json",
+    "manifest_sha256": "9727fb3e0796b7a32bc2d5a3b41f2fc725aa99f7ca310735a6fb59167b76ea15",
+    "target": "x86_64-linux-gnu",
+    "cpu": "baseline",
+    "pipeline": "preopt",
+    "extra_compile_args": [
+      "-fsingle-threaded",
+      "-fno-error-tracing"
+    ],
+    "inputs": 29,
+    "input_bytes": 171924,
+    "expected_files_per_mode": 142,
+    "program_modes": 3,
+    "matched_input_mode_pairs": 87,
+    "reference_executions": 87,
+    "local_executions": 87,
+    "negative_controls": 603,
+    "control_scope": "Mutated observations, not mutated compiler implementations",
+    "oracle": "Independently authored document/source contents and exact diagnostics from the pinned markup contract; LLVM is a second comparison, not the source of expected results. Negative controls mutate observations only.",
+    "report": {
+      "path": "local-state/validations/zig-input-20261106/fixed-three-mode/report.json",
+      "sha256": "bcb7356aca2154f5885cdbd4d341bd5d2b74749520f27db923574bf5e9951b2e"
+    },
+    "modes": [
+      {
+        "mode": "ReleaseFast",
+        "status": "matched",
+        "local_executions": 29,
+        "reference_executions": 29,
+        "selector_owners": {
+          "composed_cfg": 985,
+          "composed_block": 669
+        },
+        "object_bytes": 2764712,
+        "object_sha256": "b6984ce8883dc640607505703bf4854961037eb4e576a371f271a1447640f293",
+        "hook_object_sha256": "4aa902a4b5415abcfd0ae9108840196f3c2094e20130c0250d7a7533e7bc70c8",
+        "ownership_replay_equal": true,
+        "ownership_replay_ns": 19918259661,
+        "profile": {
+          "path": "local-state/validations/zig-input-20261106/fixed-three-mode/ReleaseFast/capture/profile.json",
+          "schema": "compilation-profile-v2",
+          "total_ns": 19210918342,
+          "phases": [
+            {
+              "phase": "other",
+              "exclusive_ns": 15519443
+            },
+            {
+              "phase": "input",
+              "exclusive_ns": 5347307
+            },
+            {
+              "phase": "parse",
+              "exclusive_ns": 73712574
+            },
+            {
+              "phase": "air_lowering",
+              "exclusive_ns": 0
+            },
+            {
+              "phase": "verify",
+              "exclusive_ns": 53694921
+            },
+            {
+              "phase": "optimize",
+              "exclusive_ns": 0
+            },
+            {
+              "phase": "reachability",
+              "exclusive_ns": 2060812818
+            },
+            {
+              "phase": "normalize",
+              "exclusive_ns": 141948207
+            },
+            {
+              "phase": "legalize",
+              "exclusive_ns": 5083921015
+            },
+            {
+              "phase": "select",
+              "exclusive_ns": 11731837244
+            },
+            {
+              "phase": "object_write",
+              "exclusive_ns": 43576102
+            },
+            {
+              "phase": "ownership_write",
+              "exclusive_ns": 548711
+            }
+          ],
+          "counters": {
+            "selected_functions": 1654,
+            "failed_functions": 0,
+            "normalization_runs": 7446,
+            "legalizer_attempts": 140522,
+            "legalizer_rewrites": 6836,
+            "original_form_retries": 2689,
+            "original_form_selected": 1044,
+            "selection_iterations": 7446,
+            "max_selection_iterations": 18,
+            "emitted_instructions": 365853,
+            "emitted_spill_instructions": 67217
+          }
+        }
+      },
+      {
+        "mode": "ReleaseSafe",
+        "status": "matched",
+        "local_executions": 29,
+        "reference_executions": 29,
+        "selector_owners": {
+          "composed_cfg": 1278,
+          "composed_block": 595
+        },
+        "object_bytes": 3499608,
+        "object_sha256": "32c23be47a3439ce63e85e776e64f80d148276485c4c91c3a2a8ce7aa3739a4d",
+        "hook_object_sha256": "9c2ae360ea0ab1bf8e6bfacb0e7c1d7d3e78c73a4e6ef6f2ae07d6f3df779ac3",
+        "ownership_replay_equal": true,
+        "ownership_replay_ns": 30880292682,
+        "profile": {
+          "path": "local-state/validations/zig-input-20261106/fixed-three-mode/ReleaseSafe/capture/profile.json",
+          "schema": "compilation-profile-v2",
+          "total_ns": 30982888790,
+          "phases": [
+            {
+              "phase": "other",
+              "exclusive_ns": 18287873
+            },
+            {
+              "phase": "input",
+              "exclusive_ns": 5664358
+            },
+            {
+              "phase": "parse",
+              "exclusive_ns": 92727346
+            },
+            {
+              "phase": "air_lowering",
+              "exclusive_ns": 0
+            },
+            {
+              "phase": "verify",
+              "exclusive_ns": 71120467
+            },
+            {
+              "phase": "optimize",
+              "exclusive_ns": 0
+            },
+            {
+              "phase": "reachability",
+              "exclusive_ns": 3881619160
+            },
+            {
+              "phase": "normalize",
+              "exclusive_ns": 183574541
+            },
+            {
+              "phase": "legalize",
+              "exclusive_ns": 10788864332
+            },
+            {
+              "phase": "select",
+              "exclusive_ns": 15881235278
+            },
+            {
+              "phase": "object_write",
+              "exclusive_ns": 59287032
+            },
+            {
+              "phase": "ownership_write",
+              "exclusive_ns": 508403
+            }
+          ],
+          "counters": {
+            "selected_functions": 1873,
+            "failed_functions": 0,
+            "normalization_runs": 9117,
+            "legalizer_attempts": 163738,
+            "legalizer_rewrites": 8509,
+            "original_form_retries": 3311,
+            "original_form_selected": 1265,
+            "selection_iterations": 9117,
+            "max_selection_iterations": 20,
+            "emitted_instructions": 474467,
+            "emitted_spill_instructions": 83491
+          }
+        }
+      },
+      {
+        "mode": "ReleaseSmall",
+        "status": "matched",
+        "local_executions": 29,
+        "reference_executions": 29,
+        "selector_owners": {
+          "composed_cfg": 489,
+          "composed_block": 377
+        },
+        "object_bytes": 1408648,
+        "object_sha256": "259efb54ac89f063a6fc0aeaf5f9416212ee67f28f0ffa952803472ab85b3f2a",
+        "hook_object_sha256": "0d227daff8792287b259065ec8c7439f9fccb461f9e42d59227d910d5e883610",
+        "ownership_replay_equal": true,
+        "ownership_replay_ns": 5882381487,
+        "profile": {
+          "path": "local-state/validations/zig-input-20261106/fixed-three-mode/ReleaseSmall/capture/profile.json",
+          "schema": "compilation-profile-v2",
+          "total_ns": 5988478769,
+          "phases": [
+            {
+              "phase": "other",
+              "exclusive_ns": 4619093
+            },
+            {
+              "phase": "input",
+              "exclusive_ns": 823217
+            },
+            {
+              "phase": "parse",
+              "exclusive_ns": 26574141
+            },
+            {
+              "phase": "air_lowering",
+              "exclusive_ns": 0
+            },
+            {
+              "phase": "verify",
+              "exclusive_ns": 9669197
+            },
+            {
+              "phase": "optimize",
+              "exclusive_ns": 0
+            },
+            {
+              "phase": "reachability",
+              "exclusive_ns": 500360309
+            },
+            {
+              "phase": "normalize",
+              "exclusive_ns": 68129122
+            },
+            {
+              "phase": "legalize",
+              "exclusive_ns": 1640878675
+            },
+            {
+              "phase": "select",
+              "exclusive_ns": 3721287940
+            },
+            {
+              "phase": "object_write",
+              "exclusive_ns": 15914360
+            },
+            {
+              "phase": "ownership_write",
+              "exclusive_ns": 222715
+            }
+          ],
+          "counters": {
+            "selected_functions": 866,
+            "failed_functions": 0,
+            "normalization_runs": 3790,
+            "legalizer_attempts": 71071,
+            "legalizer_rewrites": 3455,
+            "original_form_retries": 1296,
+            "original_form_selected": 531,
+            "selection_iterations": 3790,
+            "max_selection_iterations": 17,
+            "emitted_instructions": 164735,
+            "emitted_spill_instructions": 29502
+          }
+        }
+      }
+    ]
+  },
+  "backend_repairs": [
+    {
+      "function": "heap.SafeAllocator.AllocFooter.tracesPtr",
+      "before": "ValueUseRegisterClassMismatch",
+      "repair": "Typed boolean-call actions accept runtime pointer arguments through shared pointer materialization and transaction preservation/rollback."
+    },
+    {
+      "function": "heap.SafeAllocator.deinitLeakedBucket",
+      "before": "ValueUseUnsupportedSource",
+      "repair": "Choose zero for integer atomicrmw undef operands while retaining the atomic operation and its defined old-memory result."
+    },
+    {
+      "function": "os.linux.CPU_COUNT",
+      "before": "unsupported_type llvm.ctpop",
+      "repair": "Accept scalar i64/i128 ctpop without an optional range return attribute; existing lowering and unsupported-form checks remain."
+    }
+  ],
+  "validation": {
+    "unit_debug": 1913,
+    "unit_releasesafe": 1913,
+    "policy_debug": 30,
+    "policy_releasesafe": 30,
+    "structural": 19,
+    "captured_objects": 38,
+    "abi_differential_cases": 60,
+    "compilation_routes": "passed",
+    "readiness": "passed",
+    "behavioral_observations": 6528,
+    "fibonacci": {
+      "matched_program_modes": 3,
+      "path": "local-state/validations/zig-input-20261106/fibonacci/report.json",
+      "sha256": "c18e8d489d1b2861ada4b437fa5e00ac5056e9115596f70730cc0251b84f38dd",
+      "ownership_replay_equal": true
+    },
+    "existing_single_observation_manifest": "hello_libc ReleaseFast passed",
+    "integrated_gate": "New entry compiled; complete integrated executable gate awaits full acceptance",
+    "logs": [
+      {
+        "path": "local-state/validations/zig-input-20261106/unit-debug-final.log",
+        "sha256": "92de8f3f68dbabf579491e5b8cdbe5a626465da2e48a019444209408cfffb7f1"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/unit-safe-final.log",
+        "sha256": "24baabd68af8e1b9fc8c8b743a7fc7c003d7ae0475bbc32d2dd62e2a09493491"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/structural-policy-debug.log",
+        "sha256": "f7bbff10c0a524d62acdc6f7f9d01b953a50eca350f9b14914db67c12dc9fbd6"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/policy-safe-summary.log",
+        "sha256": "f1dce36d49bd449d6247017e9aeea6a165c5037a713eb953e448f6b745be6231"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/compilation-contract.log",
+        "sha256": "f60eb78920e150ece3ba219d1846c8d01b1dfc902702b7f48e76cb2085aa3ed8"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/captured-object.log",
+        "sha256": "d94aecc6563e829b2e308a54c71224341a7052792c54991dc6eceb9e5fa4f2fc"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/readiness.log",
+        "sha256": "995165ff843cc9e54cf803523f42892050fcdbeee5dba0afb99311eac54d42f0"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/fixed-three-mode.log",
+        "sha256": "850e451df09e0dba5d159fd8e0829677053103cfc042eebecd18ed1440b0a598"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/fibonacci.log",
+        "sha256": "07675889e2c8fd9c4ef72cf3b45c6eb4ee22f6a4d28cb59eed22e1fdea9211b1"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/legacy-manifest.log",
+        "sha256": "7c3173d4eb044f473721d1c4e805baa2e712f8ab354a766bb3bf845489c57fc6"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/integrated-gate-compile.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/focused-source-verify.log",
+        "sha256": "0ddb13279bbe362d5eb24f265ac9a6ab319f2162bb0e67fd55ce07cc2e2ef5ce"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/post-cleanup-source-verify.log",
+        "sha256": "0ddb13279bbe362d5eb24f265ac9a6ab319f2162bb0e67fd55ce07cc2e2ef5ce"
+      },
+      {
+        "path": "local-state/validations/zig-input-20261106/full-admission.log",
+        "sha256": "f76f8702e343a6ce6f67bcda98b6127ece5d2902c2d3e3f10874def09b878a40"
+      }
+    ]
+  },
+  "cleanup": {
+    "schema": 1,
+    "scope": "idle project build cache and this task’s compiler caches",
+    "cache_roots": 32,
+    "allocated_bytes_before": 2637828096,
+    "free_bytes_before": 11550953472,
+    "free_bytes_after": 14188773376,
+    "measured_free_increase": 2637819904,
+    "retained_files_verified": true,
+    "original_probes_verified": 13,
+    "shared_caches_removed": false,
+    "archives_created": false,
+    "limitation": "Filesystem free-space change includes unrelated activity; caches are regenerable and may grow again.",
+    "audit_root": "local-state/validations/zig-input-20261106/cache-cleanup",
+    "retained_regular_files_verified": 4359
+  },
+  "full_acceptance": {
+    "started": false,
+    "required_gates": 17,
+    "admission_bytes": 32949672960,
+    "reserve_bytes": 24359738368,
+    "available_at_admission_bytes": 14188736512,
+    "missing_at_admission_bytes": 18760936448,
+    "prepared_command": "bash local-state/validations/zig-input-20261106/full-acceptance.sh",
+    "accepted_status_advanced": false
+  },
+  "boundaries": [
+    "LLVM still constructs input IR; pinned Zig linker/compiler-rt and libc/CRT remain dependencies.",
+    "No allocation-failure injection, concurrency or panic/error-trace coverage is claimed.",
+    "Definition emission is distinct from function execution.",
+    "Profiles are single observations alongside other validation, not controlled speedup measurements.",
+    "The full compiler-core and native regression populations require the pending full gate."
+  ]
+}
