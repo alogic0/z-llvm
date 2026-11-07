@@ -1,5 +1,34 @@
 # Active direction
 
+The [whole-compiler diagnostic plan](plans/2026-11-07-whole-compiler-diagnostic.md)
+is complete as a diagnostic; compiler emission remains blocked. The pinned
+LLVM-enabled ReleaseFast configuration produces 443.6 MB of optimized compiler
+IR with 8,928 definition lines. Local parsing stops on a packed aggregate
+global. Independent syntax census records 111 packed-global rejections among
+36,959 global/alias lines. The executable build separately stops on runtime
+verification: vector `fptrunc` in `compiler_rt.sincos.sincos_f32` is rejected
+with `InvalidCast`. No compiler object, executable or self-rebuild is accepted.
+See the [report](evidence/whole_compiler_diagnostic.md) and
+[record](evidence/whole_compiler_diagnostic_20261107.json).
+
+The recommended next slice is shared packed aggregate support, including
+layout and constant emission, using `test/whole_compiler/packed_global.ll` and
+the retained complete compiler IR. Replay that input to discover subsequent
+barriers; do not assume the 111 syntax failures describe all remaining work.
+Vector floating-point casts are the separate runtime slice. Preserve the
+twelve-member cohort and all accepted populations. This priority supersedes
+the earlier isolated AIR error-returning function recommendation.
+
+Raw diagnostics and exact configuration are under
+`local-state/validations/whole-compiler-20261107/attempt-4/`. Use the new runner's
+`--input-ir` mode for backend replay. Both census tools and focused controls
+pass; original probes and compiler/provider hashes verify. Postcheck free space
+is 39.64 GB. Admission remains 32,949,672,960 bytes and execution reserve
+24,359,738,368 bytes. No archives were created. The older worker-inbox directive
+remains historical and superseded.
+
+The entries below describe preceding checkpoints.
+
 The [compiler-core memory and width execution plan](plans/2026-11-07-compiler-core-execution-breadth.md)
 is complete at `c08b98d1`. Guarded event resets and packed 64-bit conversions
 extend the fixed-prefix cohort from nine to twelve executed functions per mode.
@@ -9,7 +38,7 @@ Zig programs and all 45 native populations pass. See the
 [acceptance record](evidence/compiler_core_memory_width_acceptance_20261107.json)
 and [evidence](evidence/compiler_core_memory_width.md).
 
-The recommended next capability is callable error-returning compiler-core
+The preceding recommendation was callable error-returning compiler-core
 execution. `fmt.charToDigit` fails typed AIR lowering on its `error!u8` contract.
 Establish Zig-owned payload layout, error-code and calling-convention facts,
 then execute the unchanged function on valid and invalid character/base pairs.

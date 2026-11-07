@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "diagnostic": "whole-compiler-postopt",
+  "diagnostic_complete": true,
+  "implementation_revision": "10dbc168f6ffe1342f21fd191545605ccb686501",
+  "compiler_build_status": "blocked",
+  "accepted_capability_change": false,
+  "evidence_root": "local-state/validations/whole-compiler-20261107",
+  "authoritative_report": "local-state/validations/whole-compiler-20261107/attempt-4/report.json",
+  "project_revision_at_run": "5d6be1e1a53a27dea0b7fab8e1b63fb6de52a1b5",
+  "backend": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/large-function-performance-20261107/compiler-fast/bin/z_llvm",
+    "bytes": 39490320,
+    "sha256": "28962d94a9c832f56098273a55ae92fbe809598f3eb5e670e29b475c1ba53a4a"
+  },
+  "frontend": {
+    "path": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "bytes": 149918648,
+    "sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e"
+  },
+  "frontend_source_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "frontend_version": "0.17.0-dev.11+1c08b09d1",
+  "configuration": {
+    "target": "x86_64-linux-gnu",
+    "cpu": "baseline",
+    "mode": "ReleaseFast",
+    "llvm_enabled": true,
+    "llvm_optimization": true,
+    "cmake_config": {
+      "path": "/home/oleg/prog/ziglang/build/config.h",
+      "bytes": 1364,
+      "sha256": "4e5b3790e533d7f30183f0cf8af9b6e089c5ad8963a854a09db4d1a69bcb8fbc"
+    },
+    "resolved_cmake_config": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/whole-compiler-20261107/attempt-4/resolved-config.h",
+      "bytes": 1514,
+      "sha256": "55ee3176c7189446ea41c248214f00e0d86b991dba79f82c64d5ccc31c71c7ec"
+    }
+  },
+  "source_and_backend_verified": true,
+  "runtime_object": {
+    "input": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/whole-compiler-20261107/attempt-4/captures/3276317/input.ll",
+      "bytes": 1856543,
+      "sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af"
+    },
+    "scan": {
+      "scope": "line-prefix inventory; not parsed or proven reachable",
+      "definitions": 455,
+      "declarations": 83,
+      "global_or_alias_lines": 482
+    },
+    "stage": "verify",
+    "diagnostic": "error: InvalidCast\n",
+    "object_complete": false
+  },
+  "compiler_module": {
+    "scope": "compiler module only; runtime failure remains; no object fallback or link credit",
+    "input": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/whole-compiler-20261107/attempt-4/compiler-module/backend/input.ll",
+      "bytes": 443624107,
+      "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e"
+    },
+    "scan": {
+      "scope": "line-prefix inventory; not parsed or proven reachable",
+      "definitions": 8928,
+      "declarations": 473,
+      "global_or_alias_lines": 36959
+    },
+    "stage": "parse",
+    "diagnostic": "error: UnsupportedGlobalVariable\n",
+    "object_complete": false,
+    "frontend_wall_seconds": 313.16,
+    "frontend_max_rss_kib": 2499648,
+    "backend_wall_seconds": 0.71,
+    "backend_max_rss_kib": 869856
+  },
+  "global_syntax_census": {
+    "scope": "independent global/alias syntax parsing only; no verification, reachability or function acceptance",
+    "examined": 36959,
+    "rejected": 111,
+    "packed_aggregate_rejections": 111,
+    "first_rejection": {
+      "line": 11597,
+      "name": "@__anon_756545",
+      "error_name": "UnsupportedGlobalVariable",
+      "thread_local": false,
+      "prefix": "@__anon_756545 = private unnamed_addr constant <{ { { { [3 x i8], i8 }, { [3 x i8], i8 }, { [3 x i8], i8 } }, { i8, i8 } } }> <{ { { { [3 x i8], i8 }, { [3 x i8], i8 }, { [3 x i8], i8 } }, { i8, i8 } } { { { [3 x i8], i8 }, { [3 x i8], i8 }, { [3 x i8], i8 } } { { [3 x i8], i8 } { [3 x i8] undef, i8 15 }, { [3 x i8], i8 } { [3 x i8] undef, i8 15 }, { [3 x i8], i8 } { [3 x i8] undef, i8 0 } }, { i8, i8 } zeroinitializer } }>, align 2"
+    },
+    "all_rejections_artifact": "local-state/validations/whole-compiler-20261107/verified-global-census.jsonl"
+  },
+  "runtime_verification_census": {
+    "scope": "verification diagnostic only; other function bodies replaced with unreachable; full module declarations and data preserved",
+    "full_module_error": "InvalidCast",
+    "counts": {
+      "definitions": 455,
+      "passed_verification_in_context": 454,
+      "rejected": 1,
+      "codegen_attempted": false
+    },
+    "failures": [
+      {
+        "function": "compiler_rt.sincos.sincos_f32",
+        "error_name": "InvalidCast"
+      }
+    ]
+  },
+  "later_stages": {
+    "compiler_link": "not reached",
+    "zig_version": "not reached",
+    "compiler_behavior": "not reached",
+    "self_rebuild": "not reached"
+  },
+  "validation": {
+    "report_tests": {
+      "Debug": 4,
+      "ReleaseSafe": 4
+    },
+    "fixture_outcomes": {
+      "success": "object accepted",
+      "parse_failure": "parse rejected",
+      "selection_failures": "2 rejected, 1 selected; no object",
+      "packed_global": "parse rejected",
+      "vector_fptrunc": "verify rejected"
+    },
+    "real_postopt_hook_object_complete": true,
+    "native_smoke_observations": 4,
+    "native_smoke_exit": 0,
+    "census_controls": [
+      "module context rejected before function census",
+      "verification passes while selection fails",
+      "existing output and input cannot be overwritten"
+    ],
+    "reused_full_integration": "docs/evidence/compiler_core_memory_width_acceptance_20261107.json",
+    "reuse_reason": "Production compiler, registered gates, pin, pipelines and accepted corpora unchanged; standalone diagnostic adds no accepted population or capability.",
+    "preserved_scratch_files": 13
+  },
+  "storage": {
+    "starting_free_bytes": 42022137856,
+    "minimum_sampled_free_bytes": 40325287936,
+    "reserve_bytes": 24359738368,
+    "required_start_bytes": 32949672960,
+    "reserve_violated": false,
+    "sampling_failed": false,
+    "interval_ms": 2000
+  },
+  "artifact_manifest": {
+    "path": "local-state/validations/whole-compiler-20261107/artifacts.sha256",
+    "sha256": "4f609eefee45ac44207ae3187efe3a1a289c92dcbfe1e5cb129296e46f1f0bcc",
+    "verified_artifacts": 62
+  },
+  "final_runner_replay": {
+    "runner_sha256": "bed99cc31aab1d097699467683e3661435e717fe8313fc6b9673fe3ab40b4144",
+    "compiler_report": "local-state/validations/whole-compiler-20261107/final-compiler-replay/report.json",
+    "runtime_report": "local-state/validations/whole-compiler-20261107/final-runtime-replay/report.json",
+    "identical_retained_inputs": true,
+    "compiler_result": "UnsupportedGlobalVariable during parsing",
+    "runtime_result": "InvalidCast during verification",
+    "source_and_backend_verified": true
+  },
+  "postcheck_free_bytes": 39643308032,
+  "final_source_verification": {
+    "manifest": "local-state/validations/whole-compiler-20261107/final-sources.sha256",
+    "sha256": "7a34ad5af82ecde9e5ca4c4dbb3731acb3e771a9766301daf0196e52084555c8",
+    "files": 742,
+    "contents_and_membership_match_final_replay": true
+  },
+  "archives_created": false
+}

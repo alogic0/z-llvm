@@ -4586,6 +4586,17 @@ One line per completed cycle, append-only, newest last. This is the
   The lowest additional disk sample is 40.53 GB. Evidence:
   `docs/evidence/compiler_core_memory_width_acceptance_20261107.json`.
 
+- 2026-11-07 (whole-compiler diagnostic; no capability or ratchet closure)
+  The complete pinned LLVM-enabled compiler produces 443.6 MB of optimized IR
+  with 8,928 definition lines. Local parsing rejects packed aggregate globals;
+  independent syntax census identifies 111 rejected global/alias records.
+  The executable build separately fails runtime verification on vector fptrunc
+  in sincos_f32. A separate compiler-module attempt preserves that runtime
+  failure and earns no link credit. Focused diagnostics and preservation checks
+  pass; production sources, accepted binaries, cohorts and counters are
+  unchanged. All raw inputs/configuration remain, with no archives. Evidence:
+  `docs/evidence/whole_compiler_diagnostic_20261107.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).

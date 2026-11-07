@@ -25,6 +25,17 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md) is
+complete without changing accepted counters. The pinned LLVM-enabled
+ReleaseFast compiler produces 443.6 MB of optimized IR containing 8,928
+definition lines, then local parsing rejects a packed aggregate global.
+Independent global syntax census records 111 such rejections. The executable
+build separately rejects vector floating-point truncation during runtime
+verification. No whole-compiler object, executable, startup or self-rebuild
+success is claimed. Packed aggregate support is the next recommended slice;
+the [diagnostic record](evidence/whole_compiler_diagnostic_20261107.json) retains
+both populations and their limits.
+
 The accepted [compiler-core memory and width checkpoint](evidence/compiler_core_memory_width_acceptance_20261107.json)
 at `c08b98d1` passes all 17 gates on a verified 2,983-file snapshot. The fixed
 100-row prefix now executes twelve functions per mode: event reset and two
@@ -41,10 +52,10 @@ retaining 1,767,660 local and 883,830 reference native observations.
 
 The [completed plan](plans/2026-11-07-compiler-core-execution-breadth.md) and
 [evidence](evidence/compiler_core_memory_width.md) record the exact scope.
-The next gap is the callable `error!u8` contract exposed by `fmt.charToDigit`,
+Another deferred gap is the callable `error!u8` contract exposed by `fmt.charToDigit`,
 including payload layout, error codes and ABI. Event tests are single-threaded
-and the packed conversions remain small functions. The lowest additional disk
-sample is 40.53 GB; final recorded free space is 41.10 GB. Original probes remain
+and the packed conversions remain small functions. At that checkpoint the lowest
+additional disk sample was 40.53 GB; final recorded free space was 41.10 GB. Original probes remain
 and no archives were created.
 
 The entries below are historical. Their counts and remaining failures describe
