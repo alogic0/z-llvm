@@ -1,7 +1,8 @@
 # Large-function selection performance
 
-Status: active; authorized by the user's instruction to implement the next
-compiler-performance milestone. Successor to the completed
+Status: complete at `82f485c0`; all 17 integration gates and postchecks pass.
+Authorized by the user's instruction to implement the next compiler-performance
+milestone. Successor to the completed
 [unchanged Zig input program](2026-11-06-unchanged-zig-input-program.md).
 
 ## Intended result
@@ -78,6 +79,9 @@ resolution. Debug/Safe units (1,915 each), policy (30 each), structural checks,
 captured objects, ABI, compilation routes and readiness pass. Both whole programs
 pass all three modes with independent ownership replay; migration retains all
 87 input/mode pairs and 603 observation controls. The frozen focused snapshot
-and thirteen original probes verify. Full acceptance on the committed source
-is next. See the
+and thirteen original probes verify. All 17 gates pass on the frozen committed
+source. The 36 compiler-core records match prior fresh execution, and all
+45 native populations retain 1,767,660 local and 883,830 reference observations.
+Both input corpora and the fixed programs remain green. Minimum sampled free
+space is 49.42 GB; no archives were created. See the
 [implementation evidence](../evidence/large_function_selection_performance.md).

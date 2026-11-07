@@ -1,9 +1,11 @@
 # Large-function selection performance
 
-Status: implementation, repeated measurements and focused validation pass;
-full acceptance is pending. The active
+Accepted at `82f485c0d81b1ed3a40087a785332346ef09cf42`, tree
+`1cbe9aa26d40acfa1b84a839cfb819b015f63a68`: all 17 integration gates pass.
+The [acceptance record](large_function_selection_performance_acceptance_20261107.json)
+retains measurements, source identities and artifact hashes. The completed
 [plan](../plans/2026-11-07-large-function-selection-performance.md) uses the
-accepted Fibonacci and language-reference migration programs. Raw evidence is
+unchanged Fibonacci and language-reference migration programs. Raw evidence is
 under `local-state/validations/large-function-performance-20261107/`.
 
 ## Change and semantic contract
@@ -110,4 +112,31 @@ Both unchanged programs pass Fast, Safe and Small, with independent ownership
 replay in all six program/mode combinations. Migration passes all 87 input/mode
 pairs and 603 observation controls. Its independent observations and selection
 counters also match the previous accepted corpus. All thirteen original scratch
-files are unchanged. The full 17-gate run is still required before promotion.
+files are unchanged.
+
+## Full acceptance
+
+All 17 gates pass on the same committed production, tool, build and test bytes
+as the focused run. The frozen 2,971-file snapshot and both compiler identities
+verify after the run. The canonical log has 1,475 records. All 36 compiler-core
+records match the earlier fresh execution: 100 lowered/emitted/linked rows and
+nine executed functions per mode, with zero failures. The bypass ratchet remains
+130; this performance change adds no new execution population or capability.
+
+The seven original executable cases, five fixed Zig programs, migration corpus
+and C parser all pass. Migration retains 87 input/mode pairs and 603 observation
+controls; the C parser retains 138 pairs and 552 controls. Independent migration
+ownership replay matches in the full run. Both primary programs also passed
+independent replay in all modes during focused validation. All 45 native
+populations pass 1,767,660 local observations against 883,830 references.
+
+Minimum free space observed at gate boundaries is 49.42 GB, above the unchanged
+24.36 GB reserve. Final recorded free space is 51.22 GB. These are samples,
+not a continuous filesystem minimum. Original probes, baseline compilers,
+diagnostic worktrees, prior evidence and current AIR remain; no archives were
+created.
+
+Selection itself remains the largest Safe-profile cost. Temporary-name scans,
+ordered legalizer retries and independent ownership replay retain their existing
+work. Broader callable compiler-core execution is the next coverage priority;
+generated-code optimization quality remains a separate measured milestone.

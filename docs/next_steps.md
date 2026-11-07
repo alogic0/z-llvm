@@ -1,21 +1,28 @@
 # Active direction
 
-The active [large-function selection performance plan](plans/2026-11-07-large-function-selection-performance.md)
-implements the user's requested next milestone. Measure both retained Zig
-workloads, isolate shared costs in successful rewrites and selection, and accept
-an optimization only with preserved object bytes, ownership and execution.
-Finish with full validation and a frozen accepted checkpoint. The earlier
-cohort-v3 inbox directive is historical (its parent precedes the accepted
-nine-function cohort); the current user instruction authorizes this performance
-work. Preserve the original probes and create no archives.
+The [large-function selection performance plan](plans/2026-11-07-large-function-selection-performance.md)
+is complete at `82f485c0`. The shared identifier comparator avoids repeated
+parsing while preserving the existing grammar, numeric namespaces and temporary
+names. Five alternating Safe comparisons reduce median compiler time from
+26.59 to 16.91 seconds for Fibonacci (36.4%) and from 29.13 to 18.68 seconds for
+migration (35.9%). Fast/Small migration also improves; the short Fibonacci
+measurements remain unresolved. All timed object/owner bytes and all non-timing
+profile fields match. See the
+[acceptance record](evidence/large_function_selection_performance_acceptance_20261107.json)
+and [measurements](evidence/large_function_selection_performance.md).
 
-The focused implementation and all six workload/mode measurement comparisons
-pass. The shared identifier comparator avoids repeated parsing while preserving
-the existing grammar and namespace rules. Safe compiler medians fall 36.4% for
-Fibonacci and 35.9% for migration, with identical object and ownership bytes.
-Debug/Safe units, policy, ABI, readiness and both whole-program corpora pass.
-Full acceptance on the frozen committed source is pending; the accepted record
-below remains the preceding checkpoint until all 17 gates and postchecks pass.
+All 17 gates pass on the verified frozen source. Debug and ReleaseSafe each pass
+1,915 unit tests and 30 policy checks; ABI, structural, captured-object, route and
+readiness checks pass. Both input corpora, the five fixed Zig programs and all
+45 native populations remain green. The 36 core records match prior fresh
+execution, retaining 100 lowered/emitted/linked and nine executed per mode.
+
+The recommended next milestone is broader callable compiler-core execution,
+emphasizing input-dependent memory, mutation and error paths. This performance
+slice does not expand the cohort. Selection itself remains the largest Safe
+profile cost; further performance work should measure inside that phase.
+The older cohort-v3 inbox directive remains historical: it predates the accepted
+nine-function cohort. Preserve the original probes and create no archives.
 
 The [unchanged Zig input-program plan](plans/2026-11-06-unchanged-zig-input-program.md)
 is complete at `9cc31c38`. The pinned language-reference migration tool runs
@@ -36,7 +43,8 @@ The [project cleanup](evidence/project_space_cleanup_20261106.json) removes
 7.24 GB of allocated data across three audited intervals, including 185.56 MB
 of cache regenerated during full validation. This is not a net project-size
 change. Current AIR, compiler binaries and prior evidence remain; no archives
-were created. Final recorded free space is 53.30 GB.
+were created. That cleanup checkpoint recorded 53.30 GB free; the subsequent
+performance acceptance records 51.22 GB free after builds and retained evidence.
 
 The preceding [compiler selection performance plan](plans/2026-11-06-compiler-selection-performance.md)
 completed at `fbb249a7`. Profile v2 attributes
@@ -52,14 +60,12 @@ ownership manifest is byte-identical, with unchanged per-function/per-stage
 counters. Profiling overhead is unresolved within sample variation. Twenty-five
 parser comparisons per compiler show no regression at 10 ms timing resolution.
 
-For the next compiler-performance investigation, use both Fibonacci and the
-new document-input corpus. Retained Safe profiles identify block-sort
-specializations and the DWARF stack-machine interpreter among the expensive
-functions; measure the shared costs before choosing a repair. Ownership replay
-still duplicates selection work. These are single observations, not speedup
-measurements. Ordered scans and original-form retries remain. Keep extending
-the common transfer contract when addressing
-pair/vector PHIs and spill destinations; those cases and ordinary CLI structural
+Both Fibonacci and the document-input corpus remain useful performance inputs.
+Block-sort specializations and the DWARF stack-machine interpreter remain among
+the expensive functions after the shared comparison repair. Ownership replay
+still duplicates selection work. Ordered scans and original-form retries remain.
+Keep extending the common transfer contract when addressing pair/vector PHIs
+and spill destinations; those cases and ordinary CLI structural
 selection still use their existing paths. Generated-code optimization quality
 remains a separate measured milestone.
 

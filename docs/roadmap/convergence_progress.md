@@ -4559,6 +4559,21 @@ One line per completed cycle, append-only, newest last. This is the
   compilers, evidence, worktrees and probes remain. No archives were created.
   Evidence: `docs/evidence/zig_input_program_acceptance_20261106.json`.
 
+- 2026-11-07 (large-function selection performance, `82f485c0`) All 17 gates
+  pass on the frozen 2,971-file source snapshot. Shared identifier comparisons
+  avoid repeated parsing without changing grammar, numeric namespaces or
+  temporary names. Five alternating Safe comparisons reduce median compiler
+  time 36.4% for Fibonacci and 35.9% for migration. All 44 timed outputs and
+  twelve profiles preserve object/owner bytes and non-timing fields. Debug and
+  ReleaseSafe each pass 1,915 units and 30 policy tests; structural, captured
+  objects, ABI, routes, readiness and both whole-program replay checks pass.
+  Both input corpora, five fixed Zig programs and all 45 native populations
+  remain green. Core counts stay 100 lowered/emitted/linked and nine executed
+  per mode, with all 36 records matching prior fresh execution. Minimum sampled
+  free space is 49.42 GB. Original probes, compilers and evidence remain; no
+  archives were created. Evidence:
+  `docs/evidence/large_function_selection_performance_acceptance_20261107.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4566,7 +4581,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9cc31c38c449142ad3d25f9576702afb4a1ad9de`; tree: `69a240c79902f55c7b81872824026f30cd69f238`.
+Accepted revision: `82f485c0d81b1ed3a40087a785332346ef09cf42`; tree: `1cbe9aa26d40acfa1b84a839cfb819b015f63a68`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

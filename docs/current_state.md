@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9cc31c38c449142ad3d25f9576702afb4a1ad9de`; tree: `69a240c79902f55c7b81872824026f30cd69f238`.
+Accepted revision: `82f485c0d81b1ed3a40087a785332346ef09cf42`; tree: `1cbe9aa26d40acfa1b84a839cfb819b015f63a68`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,7 +25,39 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The accepted [unchanged Zig input-program checkpoint](evidence/zig_input_program_acceptance_20261106.json)
+The accepted [large-function performance checkpoint](evidence/large_function_selection_performance_acceptance_20261107.json)
+at `82f485c0` passes all 17 integration gates on a verified frozen 2,971-file
+snapshot. Shared identifier comparisons avoid repeated parsing while preserving
+quoted/escaped identities, numeric namespaces, malformed-input behavior and
+temporary naming.
+
+Five alternating comparisons per Safe workload reduce median object-emission
+compiler time from 26.59 to 16.91 seconds for Fibonacci (36.4%) and from 29.13 to
+18.68 seconds for migration (35.9%). Both compilers use ReleaseFast. Migration
+also improves in Fast and Small; short Fibonacci timings remain unresolved at
+10 ms resolution. All 44 timed outputs and twelve profiles preserve object and
+ownership bytes and non-timing fields. Memory use is essentially unchanged.
+These are local compiler-throughput results, not generated-code speedups.
+
+Debug and ReleaseSafe each pass 1,915 units and 30 policy tests, plus structural,
+captured-object, ABI, compilation-route and readiness checks. Both primary
+programs pass independent ownership replay in all modes. All fixed programs,
+87 Zig input/mode pairs, 138 C pairs and their 603/552 observation controls pass.
+All 45 native populations retain 1,767,660 local observations against 883,830
+references. The core cohort remains 100 lowered/emitted/linked and nine executed
+per mode, with all 36 records matching prior fresh execution. Minimum sampled
+free space is 49.42 GB; final recorded free space is 51.22 GB. No archives were
+created, and original probes and prior evidence remain.
+
+The [completed plan](plans/2026-11-07-large-function-selection-performance.md)
+and [measurements](evidence/large_function_selection_performance.md) retain the
+scope and raw evidence. Broader callable compiler-core execution is the next
+coverage priority. Selection and independent replay remain performance costs.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
+
+The preceding [unchanged Zig input-program checkpoint](evidence/zig_input_program_acceptance_20261106.json)
 at `9cc31c38` passes all 17 integration gates. The pinned 457-line
 `tools/migrate_langref.zig` runs unchanged with runtime filenames, allocated
 document data, mutable lists and tokenizer state, generated files, and parser
@@ -57,9 +89,6 @@ regenerated during validation. Current AIR, compiler binaries, prior evidence,
 diagnostic worktrees and the thirteen original probes remain. Final recorded
 free space is 53.30 GB; admission and reserve remain 32.95 GB and 24.36 GB.
 No archives were created.
-
-The entries below are historical. Their counts and remaining failures describe
-those checkpoints, not the current frontier.
 
 The earlier [selection-performance checkpoint](evidence/selection_performance_acceptance_20261106.json)
 at `fbb249a7` passes all 17 integration gates. Profile v2 records per-function
