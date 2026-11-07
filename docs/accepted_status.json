@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "c08b98d11009c6967997448c88fa073a27f27152",
-  "accepted_tree": "2719df654b821fce43205bd97a614e00ea77330e",
+  "accepted_revision": "1bf7b0205526994679331da3bf2b50975b6929fd",
+  "accepted_tree": "6e150a44b22446146d9f3079e21afa058590cfc7",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "c08b98d1",
+  "declaration_revision": "1bf7b020",
   "evidence": [
+    "docs/evidence/packed_aggregate_acceptance_20261107.json",
+    "docs/evidence/packed_aggregate_support.md",
     "docs/evidence/compiler_core_memory_width_acceptance_20261107.json",
     "docs/evidence/compiler_core_memory_width.md",
     "docs/evidence/large_function_selection_performance_acceptance_20261107.json",

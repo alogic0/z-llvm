@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `c08b98d11009c6967997448c88fa073a27f27152`; tree: `2719df654b821fce43205bd97a614e00ea77330e`.
+Accepted revision: `1bf7b0205526994679331da3bf2b50975b6929fd`; tree: `6e150a44b22446146d9f3079e21afa058590cfc7`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,14 +25,24 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md) is
+The [packed aggregate repair](evidence/packed_aggregate_support.md) is accepted:
+all 17 integration gates and 46 native populations pass. Its regression passes
+all three modes and both local routes in Debug and ReleaseFast compiler builds;
+the unchanged complete compiler now parses every global/alias line independently.
+Function parsing still rejects seven of 8,928 independently examined definitions.
+The first boundary is a quoted switch label containing `[`. These diagnostic
+counts do not establish verification, selection or execution of those functions.
+The separate runtime vector-cast verifier failure remains. Compiler-core counts
+stay at 100 lowered/emitted/linked and 12 executed functions per mode.
+
+The preceding [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md) is
 complete without changing accepted counters. The pinned LLVM-enabled
 ReleaseFast compiler produces 443.6 MB of optimized IR containing 8,928
 definition lines, then local parsing rejects a packed aggregate global.
 Independent global syntax census records 111 such rejections. The executable
 build separately rejects vector floating-point truncation during runtime
 verification. No whole-compiler object, executable, startup or self-rebuild
-success is claimed. Packed aggregate support is the next recommended slice;
+success is claimed. Packed aggregate support was its recommended next slice;
 the [diagnostic record](evidence/whole_compiler_diagnostic_20261107.json) retains
 both populations and their limits.
 

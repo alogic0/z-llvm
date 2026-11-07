@@ -4597,6 +4597,24 @@ One line per completed cycle, append-only, newest last. This is the
   unchanged. All raw inputs/configuration remain, with no archives. Evidence:
   `docs/evidence/whole_compiler_diagnostic_20261107.json`.
 
+- 2026-11-07 (shared packed aggregate repair, `1bf7b020`) All 17 integration gates pass on
+  the frozen 1,725-file compiler/tool/test/build snapshot. Shared structure
+  fields preserve packed allocation layout, nested ordinary padding and
+  unaligned global relocations; common address normalization composes runtime
+  strides with nested field offsets. Debug and ReleaseSafe pass 1,921 units;
+  structural and readiness checks pass. The new six-function native population
+  passes all modes/routes in Debug and ReleaseFast compiler builds; full native
+  coverage is 46 populations with 1,772,268 local observations. Both input
+  corpora and fixed Zig programs pass. Core counts remain 100 lowered/emitted/
+  linked and 12 executed per mode. The 36 core records preserve selected objects
+  and observations; 24 reference wrappers differ by 104 bytes, so strict
+  reference-byte equivalence is not claimed. The exact compiler input now has
+  zero global syntax rejections, then stops in function parsing: independent
+  census finds seven rejected definitions among 8,928. Runtime vector fptrunc
+  still fails verification. No whole-compiler object or execution credit is
+  claimed. Original probes and prior compiler remain; no archives were created.
+  Evidence: `docs/evidence/packed_aggregate_acceptance_20261107.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4604,7 +4622,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `c08b98d11009c6967997448c88fa073a27f27152`; tree: `2719df654b821fce43205bd97a614e00ea77330e`.
+Accepted revision: `1bf7b0205526994679331da3bf2b50975b6929fd`; tree: `6e150a44b22446146d9f3079e21afa058590cfc7`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

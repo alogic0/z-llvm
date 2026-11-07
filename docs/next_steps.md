@@ -1,5 +1,22 @@
 # Active direction
 
+The [packed aggregate repair](plans/2026-11-07-packed-aggregate-support.md) is
+complete. Shared structure parsing, layout, constant emission and address
+composition pass focused checks and all 17 integration gates. All 46 native
+populations pass; the new population also passes independently in Debug and
+ReleaseFast compiler builds across all three modes and both local routes. See the
+[evidence](evidence/packed_aggregate_support.md).
+
+The retained whole compiler now parses all 36,959 global/alias lines. It still
+stops in function parsing: the independent census finds seven rejections among
+8,928 definitions (five `InvalidLabel`, one `UnsupportedType`, one
+`UnsupportedInstructionMetadata`). The first is a switch whose quoted default
+label contains `[`. These are the next compiler-input boundaries to resolve;
+runtime vector floating-point casts remain a separate required repair.
+No whole-compiler execution or compiler-core counter increase is claimed.
+
+The entries below describe preceding checkpoints.
+
 The [whole-compiler diagnostic plan](plans/2026-11-07-whole-compiler-diagnostic.md)
 is complete as a diagnostic; compiler emission remains blocked. The pinned
 LLVM-enabled ReleaseFast configuration produces 443.6 MB of optimized compiler
@@ -11,12 +28,11 @@ with `InvalidCast`. No compiler object, executable or self-rebuild is accepted.
 See the [report](evidence/whole_compiler_diagnostic.md) and
 [record](evidence/whole_compiler_diagnostic_20261107.json).
 
-The recommended next slice is shared packed aggregate support, including
-layout and constant emission, using `test/whole_compiler/packed_global.ll` and
-the retained complete compiler IR. Replay that input to discover subsequent
-barriers; do not assume the 111 syntax failures describe all remaining work.
-Vector floating-point casts are the separate runtime slice. Preserve the
-twelve-member cohort and all accepted populations. This priority supersedes
+That diagnostic selected shared packed aggregate support, using
+`test/whole_compiler/packed_global.ll` and the retained complete compiler IR.
+The completed repair and subsequent parser boundaries are recorded above.
+Vector floating-point casts remain the separate runtime slice. The twelve-member
+cohort and all accepted populations are preserved. This direction supersedes
 the earlier isolated AIR error-returning function recommendation.
 
 Raw diagnostics and exact configuration are under
