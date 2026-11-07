@@ -77,6 +77,9 @@ Step 5 has profiles and identical independent ownership replay for every mode.
 Debug and Safe unit/policy tests, structural, captured-object, ABI, compilation
 routes, readiness and three-mode Fibonacci pass. Full acceptance is still open.
 After retiring 2.64 GB of idle project/task caches, initial admission measured
-14.19 GB available and was short by 18.76 GB. The 17 gates have not started. Preserve
+14.19 GB available and was short by 18.76 GB. The subsequent
+[project-only cleanup](../evidence/project_space_cleanup_20261106.json) recovers
+another 4.42 GB. Other filesystem activity also releases space; 58.71 GB is now
+available, satisfying admission. The 17 gates have not started. Preserve
 the accepted checkpoint and run the prepared full-acceptance command once the
 existing headroom requirement is satisfied; do not move to another milestone.

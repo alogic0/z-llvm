@@ -1,0 +1,159 @@
+{
+  "schema": "project-space-cleanup-v1",
+  "recorded_utc": "2026-11-07T00:15:54Z",
+  "scope": "project only",
+  "status": "completed",
+  "initial_project_task_cache_cleanup": {
+    "schema": 1,
+    "scope": "idle project build cache and this task’s compiler caches",
+    "cache_roots": 32,
+    "allocated_bytes_before": 2637828096,
+    "free_bytes_before": 11550953472,
+    "free_bytes_after": 14188773376,
+    "measured_free_increase": 2637819904,
+    "retained_files_verified": true,
+    "original_probes_verified": 13,
+    "shared_caches_removed": false,
+    "archives_created": false,
+    "limitation": "Filesystem free-space change includes unrelated activity; caches are regenerable and may grow again."
+  },
+  "project_audit_cleanup": {
+    "schema": 1,
+    "retired_air_payloads": 3,
+    "retired_air_allocated_bytes": 3923906560,
+    "complete_idle_cache_roots": 5,
+    "cache_allocated_bytes": 160616448,
+    "duplicate_capture_paths_relinked": 120,
+    "duplicate_groups": 74,
+    "capture_allocated_bytes_reclaimed": 335884288,
+    "free_bytes_before": 54290436096,
+    "free_bytes_after": 58710802432,
+    "measured_free_increase": 4420366336,
+    "retained_capture_files_hash_verified": 261,
+    "current_air_payloads_hash_verified": 3,
+    "original_probes_verified": 13,
+    "source_snapshot_verified": true,
+    "shared_cache_removed": false,
+    "archives_created": false
+  },
+  "total_allocated_bytes_recovered": 7058235392,
+  "space_attribution": "About 40 GB became available before the second deletion interval through activity outside this cleanup. Only the measured interval increase is attributed to this operation.",
+  "replacement": {
+    "accepted_revision": "f68ab145d3f5efc4f4a4f01d30012dc3e4db0eac",
+    "proof": "docs/evidence/execution_breadth_acceptance_20261106.json",
+    "proof_sha256": "6f281b162c415266b9beca22e6190ade07996104b8e28ee4d0c2df20b862985b",
+    "fresh_modes": 3,
+    "cached_full_gates": 17,
+    "canonical_records_equal": 36
+  },
+  "retired_payloads": [
+    {
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseFast/export/08f3ddbd97d8962485471e3c14c93540a5dd752118142a014c4328276d245fea.bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5.air",
+      "sha256": "bd9335a3d813b0f15442f9aec8408d69c083bacadc916c97be93e8563a8bf4f5"
+    },
+    {
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSafe/export/24e16fa8c054b1cf279c86b02ef4a7e9bf705ab8517bbaee10192982a3c61ec2.53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c.air",
+      "sha256": "53d6aeeeb77f4536ba2c3e7b2f6a578dbd25a5b585af9610ca9e8cf583e3490c"
+    },
+    {
+      "path": "local-state/caches/ir-headroom-20261103/ReleaseSmall/export/b136a8f59694d534146cee3c4dca3e0ca006a61dedce61c1be7a937e1069b20e.e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809.air",
+      "sha256": "e6d8cd7295c4691cbf97f3898c83e321555d225d30fd9f40f9bfd0f64d7fc809"
+    }
+  ],
+  "retained_current_payloads": [
+    {
+      "path": "local-state/caches/execution-breadth-20261106/ReleaseFast/export/c9c82507b354f7d9d05c78abb44ec140c67bd80e2ec90c90ceac1a6f627701ea.e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995.air",
+      "sha256": "e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995"
+    },
+    {
+      "path": "local-state/caches/execution-breadth-20261106/ReleaseSafe/export/ed4223764d0a676b7f25fb6a6e64efeab0eff34bcedec2db05a9b110ee523362.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air",
+      "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429"
+    },
+    {
+      "path": "local-state/caches/execution-breadth-20261106/ReleaseSmall/export/b4b68dc91b87fde101e6e1c2fbe655980008f1e35b2c59cbc8096302cae73178.30f38ab3bc72f079931079598b1c97cfc3a53a0fce0a11ca25f5649a7aded489.air",
+      "sha256": "30f38ab3bc72f079931079598b1c97cfc3a53a0fce0a11ca25f5649a7aded489"
+    }
+  ],
+  "retention": {
+    "old_metadata_preserved": true,
+    "old_logs_and_snapshots_preserved": true,
+    "cache_neighbor_files_hash_verified": 862,
+    "capture_file_paths_and_hashes_preserved": 261,
+    "immutable_capture_groups": 74,
+    "capture_paths_relinked": 120,
+    "artifact_store_gc_candidates": 0,
+    "original_probes_preserved": 13,
+    "diagnostic_worktrees_preserved": true,
+    "compiler_binaries_preserved": true,
+    "shared_caches_removed": false,
+    "archives_created": false
+  },
+  "deduplication_scope": "Only immutable capture/preopt.ll, capture/optimized.ll and capture/object-input.ll observations. Equal content, size and permissions required; groups with links outside the audited set excluded. Existing source/probe paths, binaries and artifact-store objects are not hardlinked by this cleanup.",
+  "full_acceptance": {
+    "admission_bytes": 32949672960,
+    "reserve_bytes": 24359738368,
+    "headroom_sufficient_after_cleanup": true
+  },
+  "artifacts": [
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/result.json",
+      "sha256": "3c0d74ed9e094bd10798b477f383e69dd85d016f31fc857205fa244a94c43926"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/source-before.json",
+      "sha256": "fb410d5c31cdde42d8146f61c98df115191e053cd35f69b6daa0588811489787"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/source-verified.log",
+      "sha256": "0a58caab00a4d7e8bdcae1b61c6e410b5fdc3f97bb461e5939d22a091b7f5bae"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/replacement-equivalence.log",
+      "sha256": "3c23852255e4534261d6a5eb72edc44681a06c3c4a7a94e27d98eb5a3127534a"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/duplicate-groups.json",
+      "sha256": "ee9499bf032a0d268975916403f1e649c93c4ad4534363bc4e59d42b09caf2a9"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/captures.tsv",
+      "sha256": "fa2208a9e59db5addbaa7fc03fbfac276202a8624164d0ccdedf6a0879be71c9"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/link-plan.tsv",
+      "sha256": "4939cb28a72bd4f92bb453d2538061d16584ede87e737632c3222c48ae772a64"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/payload-identities.txt",
+      "sha256": "ae81e83b9582fd17259f4defa77db8ceaf0f36b4dc4bae703442c4495850bc33"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/current-payloads.sha256",
+      "sha256": "d14a12071df8bcbec7b4daedff23bb5974fb8df99dc32a28f7fd6a964f1e195f"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/metadata.sha256",
+      "sha256": "c98bc6fb853776498bec14aba5e503b6e10b8d13686012bb4ca0fde8f529f600"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/compilers.sha256",
+      "sha256": "2342e0439509991b04c6fdd8f73a95cc57111b71a4ceb70d58857eda6ecb2f1f"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/retained-neighbors.sha256",
+      "sha256": "a3ded1fc2fbc080943aa16c1b1fd0e0c6f354a63954bb617d67a6197d6942b7f"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/cache-roots.txt",
+      "sha256": "95d865a9b1c434c846f1fd1ae72c92c758b2dc13462ea13e5dc5e75c8dc085f7"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/consumers.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-state/validations/zig-input-20261106/project-space/consumers.stderr",
+      "sha256": "588d070de4531ffb1f34af238ebde81ebee1f4c534189077762e54494e70ce39"
+    }
+  ]
+}

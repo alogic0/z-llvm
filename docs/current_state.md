@@ -528,8 +528,10 @@ turn 100 native links into 100 executions.
 
 AIR publication atomically writes schema-4 metadata and transfers the verified
 payload into the cache. The IR/headroom pair authenticates three fresh exports,
-then verifies three cache hits while rerunning execution checks. Current exports
-use `local-state/caches/ir-headroom-20261103`. The user reduced serial admission
+then verifies three cache hits while rerunning execution checks. That checkpoint
+used `local-state/caches/ir-headroom-20261103`; current exports use
+`local-state/caches/execution-breadth-20261106`. The [project cleanup](evidence/project_space_cleanup_20261106.json)
+retires the superseded payloads and retains their historical evidence. The user reduced serial admission
 and its runtime reserve by 10 decimal GB: policy schema 3 requires
 32,949,672,960 bytes (about 32.95 GB)
 at the start and reserves 24,359,738,368 bytes (about 24.36 GB) during execution.

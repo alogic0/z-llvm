@@ -20,8 +20,10 @@ allocation, mutable directives, extracted files and error paths. Implementation
 and focused execution pass: 87 input/mode pairs, 603 observation controls and
 identical ownership replay. Three Safe backend gaps are repaired with executable
 regressions. See the [evidence](evidence/zig_input_program.md). Full 17-gate
-acceptance remains the next action. Initial admission after idle-cache cleanup
-measured 14.19 GB available and was short by 18.76 GB. The prepared command is
+acceptance remains the next action. The [project cleanup](evidence/project_space_cleanup_20261106.json)
+recovers 7.06 GB across two deletion intervals; other filesystem activity also
+releases space, bringing availability to 58.71 GB. Admission is now sufficient.
+The prepared command is
 `bash local-state/validations/zig-input-20261106/full-acceptance.sh`.
 The plan remains open and the accepted checkpoint is unchanged.
 The existing
@@ -536,9 +538,11 @@ The [generation cleanup](evidence/global_memory_cleanup_20261103.json) retires
 That checkpoint used `global-memory-headroom-20261103`. The later
 [IR generation cleanup](evidence/ir_headroom_cleanup_20261103.json) retires those
 payloads after the complete fresh replacement proof and before cached validation
-to meet its admission threshold. Both replacement runs now pass. Current exports
-and their paired work selection use `ir-headroom-20261103`; historical metadata,
-hashes, proofs and source probes remain, with no archives.
+to meet its admission threshold. Both replacement runs pass. That checkpoint's
+exports and paired work selection used `ir-headroom-20261103`; the later
+execution-breadth checkpoint supersedes them. The [project cleanup](evidence/project_space_cleanup_20261106.json)
+retires the old payloads while retaining their metadata, hashes, proofs and
+source probes, with no archives.
 
 The [bounded memory slice](evidence/startup_word_pair_memory_20261102.json)
 reuses existing 128-bit frame storage for an exact 16-byte pointer/length object

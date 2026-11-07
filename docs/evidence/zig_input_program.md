@@ -126,6 +126,11 @@ the authoritative 17 gates once space is available. The
 [plan](../plans/2026-11-06-unchanged-zig-input-program.md) stays open until that
 run passes and its evidence is reviewed.
 
+The subsequent user-requested [project cleanup](project_space_cleanup_20261106.json)
+recovers another 4.42 GB from superseded AIR, idle caches and identical captured
+IR while preserving current inputs and evidence. Other filesystem activity also
+releases space; availability reaches 58.71 GB, so full admission is now satisfied.
+
 To rerun the bounded corpus:
 
 ```sh

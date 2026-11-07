@@ -69,6 +69,11 @@ successfully. Final run v3 reuses the authenticated cache, and all 36 canonical
 records match v2's fresh compiler-core results. The compiler and
 cohort implementation are unchanged between those two runs.
 
+The later [project cleanup](project_space_cleanup_20261106.json) retires the
+superseded `ir-headroom-20261103` payloads after reverifying this replacement's
+accepted metadata, payload hashes and 36-record fresh/cached comparison.
+Historical metadata and acceptance evidence remain.
+
 This expansion exposed a real atomic lowering error. `atomic.Mutex` is `enum(u8)`
 but the previous exchange recognizer emitted a hardcoded 32-bit operation.
 The guarded harness failed its first lock attempt. Lowering now proves width,

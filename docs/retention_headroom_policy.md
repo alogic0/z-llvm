@@ -29,6 +29,32 @@ name in the manifests and retrieved with `artifact-store get`.
 
 ## Generated run cleanup
 
+The [unchanged Zig input-program checkpoint](evidence/zig_input_program_focused_20261106.json)
+retires 32 complete idle project/task compiler-cache roots after focused
+validation. The interval reclaims 2.64 GB; all 4,359 retained task files,
+compiler identities and thirteen original probes are verified unchanged.
+Captured inputs, executables, profiles and logs remain under
+`local-state/validations/zig-input-20261106`. Shared caches, current AIR and
+accepted evidence are retained. No archives are created; regenerated caches
+are not net retention savings.
+
+The subsequent user-requested [project-only audit](evidence/project_space_cleanup_20261106.json)
+recovers another 4.42 GB: 3.92 GB of superseded `ir-headroom-20261103` AIR
+payloads, 0.16 GB of idle caches and 0.34 GB of identical captured IR allocation.
+The replacement `execution-breadth-20261106` cache has accepted fresh/cached
+proofs with 36 matching canonical records; all six old/new payload hashes and
+the accepted metadata are checked before retirement. Old metadata, hashes and
+historical acceptance records remain. Current AIR payloads are reverified.
+Hardlinks preserve every captured file path and byte; no source, original
+probe or compiler binary participates in that deduplication. Artifact-store
+collection finds no unpinned objects. Diagnostic worktrees and shared caches
+are preserved, and no archives are made.
+
+Available space reaches 58.71 GB, sufficient for the unchanged full-run
+threshold. About 40 GB became available before this second deletion interval
+through activity outside this cleanup; it is not attributed to the project
+audit. The two project deletion intervals recover 7.06 GB of allocated space.
+
 The [Fibonacci completion cleanup](evidence/fibonacci_completion_cleanup_20261106.json)
 removes 150 complete idle compiler-cache roots, reclaiming 10.56 GB and increasing
 available filesystem space from 49.50 GB to 60.06 GB. All 169,792 retained regular
