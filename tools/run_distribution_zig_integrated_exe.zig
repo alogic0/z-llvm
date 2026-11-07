@@ -313,7 +313,7 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.writeAll(program_result.stdout);
     try stdout_writer.interface.flush();
     if (!common.termOk(program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream hello libc", program_result);
-    for ([_][]const u8{ "recursive_fibonacci", "optionals", "taking_pointer_of_global_tagged_union", "array_in_anon_struct", "while_loops" }) |program| {
+    for ([_][]const u8{ "recursive_fibonacci", "optionals", "taking_pointer_of_global_tagged_union", "array_in_anon_struct", "while_loops", "migrate_langref" }) |program| {
         const label = try std.fmt.allocPrint(allocator, "unchanged upstream {s}", .{program});
         defer allocator.free(label);
         const stem = try std.fmt.allocPrint(allocator, "unchanged-{s}", .{program});
@@ -322,12 +322,14 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(root);
         const manifest = try std.fmt.allocPrint(allocator, "test/real_programs/{s}.json", .{program});
         defer allocator.free(manifest);
-        const unchanged_result = try common.runCapture(allocator, io, &.{
+        const command = try std.mem.concat(allocator, []const u8, &.{ &.{
             "zig",           "run",       "tools/run_real_program.zig", "--",
             "--output-root", root,        "--manifest",                 manifest,
             "--zig-emitter", zig_emitter, "--zig-source",               zig_source_dir,
             "--zllvm",       zllvm_exe,   "--codegen-reachable",
-        }, label);
+        }, if (std.mem.eql(u8, program, "migrate_langref")) &.{"--replay-owners"} else &.{} });
+        defer allocator.free(command);
+        const unchanged_result = try common.runCapture(allocator, io, command, label);
         defer common.freeRunResult(allocator, unchanged_result);
         try stdout_writer.interface.writeAll(unchanged_result.stdout);
         try stdout_writer.interface.flush();

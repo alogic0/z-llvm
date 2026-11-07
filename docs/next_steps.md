@@ -14,8 +14,11 @@ ownership manifest is byte-identical, with unchanged per-function/per-stage
 counters. Profiling overhead is unresolved within sample variation. Twenty-five
 parser comparisons per compiler show no regression at 10 ms timing resolution.
 
-The next proposed coverage milestone is a larger unchanged Zig program that
-combines runtime input, allocation, mutation and error paths. The existing
+The active [unchanged Zig input-program plan](plans/2026-11-06-unchanged-zig-input-program.md)
+adds the pinned language-reference migration tool with runtime document input,
+allocation, mutable directives, extracted files and error paths. Implementation
+and qualification are in progress; the accepted checkpoint remains unchanged.
+The existing
 [input-driven C corpus](evidence/input_driven_execution.md) passes 138 input/mode
 pairs and 552 observation-mutation controls; it does not add Zig frontend
 coverage or compiler mutation tests. All five unchanged Zig programs pass in

@@ -14,6 +14,7 @@ pub const Runner = struct {
         timeout_ms: u32 = 120_000,
         stdout_file: ?[]const u8 = null,
         stdin_file: ?[]const u8 = null,
+        cwd: ?[]const u8 = null,
         group: u.process.Group = .owned,
     };
     pub const Result = struct { code: i64, wall_ns: u64, completed: bool };
@@ -31,7 +32,7 @@ pub const Runner = struct {
         const report = try u.file_command.run(c.gpa, c.io, .{
             .spawn = .{
                 .argv = argv,
-                .cwd = .{ .path = c.root },
+                .cwd = .{ .path = options.cwd orelse c.root },
                 .environ_map = env,
                 .search_path = true,
                 .stdout = .{ .file = out },
@@ -67,6 +68,7 @@ pub const Runner = struct {
         };
         var record = u.object(c.a);
         try u.put(c.a, &record, "argv", try u.strings(c.a, argv));
+        try u.put(c.a, &record, "cwd", u.s(options.cwd orelse c.root));
         try u.put(c.a, &record, "returncode", u.n(code));
         try u.put(c.a, &record, "wall_ns", u.n(report.wall_ns));
         try u.put(c.a, &record, "timeout_ms", u.n(options.timeout_ms));

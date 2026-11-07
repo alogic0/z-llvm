@@ -3,6 +3,7 @@ const u = @import("common.zig");
 const Runner = @import("runner.zig").Runner;
 const elf = @import("object_contract.zig");
 const provenance = @import("provenance.zig");
+const cases = @import("program_cases.zig");
 
 pub fn identity(c: *u.Context) !std.StringHashMap([]const u8) {
     var fields = std.StringHashMap([]const u8).init(c.a);
@@ -147,6 +148,9 @@ fn run(c: *u.Context, arguments: []const []const u8) !u8 {
         (try u.get(report, "local_executions")).integer, (try u.get(report, "matched_program_modes")).integer,       @intFromBool(!passed),
     });
     try c.print("{s}\n", .{try summaryJson(c, report)});
+    if (report.object.get("inputs")) |inputs| try c.print("summary zig-input-program program={s} inputs={d} matched_inputs={d} negative_controls={d} local_fail={d}\n", .{
+        program, inputs.integer, (try u.get(report, "matched_inputs")).integer, (try u.get(report, "negative_controls")).integer, @intFromBool(!passed),
+    });
     try c.print("evidence: {s}/report.json\n", .{output});
     if (report.object.get("error")) |err| try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("{s}\n", .{err.string}));
     return if (passed) 0 else 1;
@@ -167,6 +171,15 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
     const procedure = try provenance.tools(c);
     try u.put(c.a, report, "tool_provenance", procedure);
     const manifest = try c.load(try c.join(&.{manifest_path}));
+    const manifest_hash = try c.digest(try c.join(&.{manifest_path}));
+    try u.put(c.a, report, "manifest_sha256", u.s(manifest_hash));
+    if (manifest.object.contains("cases")) {
+        try cases.validate(c, manifest);
+        try u.put(c.a, report, "inputs", u.n((try u.get(manifest, "cases")).array.items.len));
+        try u.put(c.a, report, "matched_inputs", u.n(0));
+        try u.put(c.a, report, "negative_controls", u.n(0));
+        try u.put(c.a, report, "oracle", try u.get(manifest, "oracle"));
+    }
     _ = try linkDriver(args, manifest);
     try u.put(c.a, report, "compile_timeout_ms", u.n(try compileTimeoutMs(manifest)));
     const modes = try selectedModes(c, args, manifest);
@@ -215,6 +228,9 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
         try runMode(c, args, directory, mode, source, zig, zllvm, proxy, global_cache, manifest, &base_env, runner, report, &rows.array.items[rows.array.items.len - 1]);
     }
     try provenance.verifyTools(c, procedure);
+    if (!std.mem.eql(u8, manifest_hash, try c.digest(try c.join(&.{manifest_path})))) return error.InputCorpusChanged;
+    if (!std.mem.eql(u8, try c.digest(source), try u.str(manifest, "source_sha256"))) return error.UpstreamSourceChanged;
+    if (!std.mem.eql(u8, try c.digest(zig), try u.str(report.*, "zig_emitter_sha256")) or !std.mem.eql(u8, try c.digest(zllvm), try u.str(report.*, "zllvm_sha256"))) return error.CompilerBinaryChanged;
     try u.put(c.a, report, "status", u.s(if ((try u.get(report.*, "matched_program_modes")).integer == modes.len) "passed" else "blocked"));
 }
 
@@ -228,12 +244,16 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     const linker = args.get("linker") orelse "cc";
     const reference_exe = try c.join(&.{ directory, "reference" });
     if (!try runStage(c, runner, row, "reference-link", try linkCommand(c, args, manifest, zig, linker, mode, reference, reference_exe, global_cache), try c.join(&.{ directory, "reference-link" }), base_env, .{})) return;
-    try u.increment(c.a, report, "reference_executions", 1);
     try u.put(c.a, row, "failure_stage", u.s("reference-execution"));
-    runner.observe(reference_exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try u.str(manifest, "stdout"), try c.join(&.{ directory, "reference-run" }), base_env) catch |err| {
-        if (err == error.ValidationFailed) return;
-        return err;
-    };
+    if (manifest.object.contains("cases")) {
+        try cases.observe(c, runner, manifest, reference_exe, directory, .reference, base_env, report, row);
+    } else {
+        try u.increment(c.a, report, "reference_executions", 1);
+        runner.observe(reference_exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try u.str(manifest, "stdout"), try c.join(&.{ directory, "reference-run" }), base_env) catch |err| {
+            if (err == error.ValidationFailed) return;
+            return err;
+        };
+    }
     const candidate = try c.join(&.{ directory, "candidate.o" });
     const marker = try c.join(&.{ directory, "candidate.marker" });
     const capture_dir = try c.join(&.{ directory, "capture" });
@@ -290,13 +310,17 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     try u.put(c.a, row, "object_sha256", u.s(try c.digest(candidate)));
     const candidate_exe = try c.join(&.{ directory, "candidate" });
     if (!try runStage(c, runner, row, "local-link", try linkCommand(c, args, manifest, zig, linker, mode, candidate, candidate_exe, global_cache), try c.join(&.{ directory, "local-link" }), base_env, .{})) return;
-    try u.increment(c.a, row, "local_executions", 1);
-    try u.increment(c.a, report, "local_executions", 1);
     try u.put(c.a, row, "failure_stage", u.s("local-execution"));
-    runner.observe(candidate_exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try c.read(try c.join(&.{ directory, "reference-run.stdout" })), try c.join(&.{ directory, "local-run" }), base_env) catch |err| {
-        if (err == error.ValidationFailed) return;
-        return err;
-    };
+    if (manifest.object.contains("cases")) {
+        try cases.observe(c, runner, manifest, candidate_exe, directory, .local, base_env, report, row);
+    } else {
+        try u.increment(c.a, row, "local_executions", 1);
+        try u.increment(c.a, report, "local_executions", 1);
+        runner.observe(candidate_exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try c.read(try c.join(&.{ directory, "reference-run.stdout" })), try c.join(&.{ directory, "local-run" }), base_env) catch |err| {
+            if (err == error.ValidationFailed) return;
+            return err;
+        };
+    }
     try u.put(c.a, row, "status", u.s("matched"));
     try u.put(c.a, row, "failure_stage", .null);
     try u.increment(c.a, report, "matched_program_modes", 1);

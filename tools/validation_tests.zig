@@ -13,6 +13,45 @@ const expect = std.testing.expect;
 const equal = std.testing.expectEqualStrings;
 const io = std.testing.io;
 const zero_hash = &@as([64]u8, @splat('0'));
+test "file corpus isolates working directories and checks files and error observations" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const cases = @import("validation/program_cases.zig");
+    const manifest = try u.toValue(f.c.a, .{
+        .output_directory = "out",
+        .cases = .{
+            .{ .id = "copy", .args = .{ "-c", "cat input > out/result; printf warning >&2; exit 3" }, .input_files = .{ .input = "a\x00b\n" }, .expected = .{ .completed = true, .exit_status = 3, .stdout = "", .stderr = "warning", .files = .{ .result = "a\x00b\n" } } },
+            .{ .id = "empty", .args = .{ "-c", "test ! -e out/result && test ! -e input" }, .input_files = u.object(f.c.a), .expected = .{ .completed = true, .exit_status = 0, .stdout = "", .stderr = "", .files = u.object(f.c.a) } },
+        },
+    });
+    try cases.validate(&f.c, manifest);
+    var runner = Runner.init(&f.c, f.directory);
+    var report = u.object(f.c.a);
+    var row = u.object(f.c.a);
+    try cases.observe(&f.c, &runner, manifest, "/bin/sh", f.directory, .reference, &f.c.env, &report, &row);
+    try cases.observe(&f.c, &runner, manifest, "/bin/sh", f.directory, .local, &f.c.env, &report, &row);
+    try std.testing.expectEqual(@as(i64, 2), (try u.get(report, "matched_inputs")).integer);
+    try std.testing.expectEqual(@as(i64, 12), (try u.get(report, "negative_controls")).integer);
+    for (runner.commands.array.items) |command| try expect(u.isWithin(f.directory, try u.str(command, "cwd")));
+}
+test "file corpus rejects traversal, overlapping inputs, duplicate cases and symlink outputs" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const cases = @import("validation/program_cases.zig");
+    for ([_][]const u8{ "", "/tmp/file", "../file", "a/../b", "a//b", "./a", "a/", "a\\b", "a\x00b" }) |path| try std.testing.expectError(error.InvalidCasePath, cases.relativePath(path));
+    try cases.relativePath("nested/input.html");
+    var manifest = try u.toValue(f.c.a, .{ .output_directory = "out", .cases = .{.{ .id = "duplicate", .args = .{}, .input_files = .{ .@"out/file" = "" }, .expected = .{ .completed = true, .exit_status = 0, .stdout = "", .stderr = "", .files = u.object(f.c.a) } }} });
+    try std.testing.expectError(error.OverlappingCasePaths, cases.validate(&f.c, manifest));
+    try u.put(f.c.a, &manifest.object.getPtr("cases").?.array.items[0], "input_files", u.object(f.c.a));
+    try u.add(manifest.object.getPtr("cases").?, (try u.get(manifest, "cases")).array.items[0]);
+    try std.testing.expectError(error.InvalidCaseId, cases.validate(&f.c, manifest));
+    const out = try f.path("out");
+    try f.c.mkdir(out);
+    _ = try f.c.capture(&.{ "ln", "-s", "/dev/null", try f.c.join(&.{ out, "escape" }) });
+    try std.testing.expectError(error.UnexpectedOutputFileType, cases.fileTree(&f.c, out));
+}
 test "input corpus requires ordinary exit and exact stdout and stderr" {
     const matches = @import("validation/input_program.zig").matches;
     try expect(matches(true, 2, "", "incomplete\n", 2, "", "incomplete\n"));

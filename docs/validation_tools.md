@@ -29,7 +29,8 @@ remain in this repository.
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Upstream C program and 45 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
 | Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
-| Fibonacci plus four additional unchanged programs in three modes | `tools/run_distribution_zig_integrated_exe.zig` / `distribution-all` |
+| Unchanged Zig tool with runtime document inputs and exact file outputs | `tools/run_real_program.zig` / `zig-input-program` |
+| Fibonacci, four fixed programs and the document-input tool in three modes | `tools/run_distribution_zig_integrated_exe.zig` / `distribution-all` |
 | Added compiler-core execution and 27 negative controls | `src/distribution_execution_breadth_gate.zig` / `execution-breadth-controls` |
 | Fixed candidate selector | `tools/build_real_candidates_v3.zig` / `real-candidates-v3` |
 | Checked semantic facts | `tools/validation/candidate_facts.zig` library |
@@ -52,8 +53,8 @@ millisecond budget. It applies to reference/local compilation, selector-owner
 replay and diagnostic re-emission; the default is 120,000 ms. Fibonacci and the
 four execution-breadth manifests use 900,000 ms so a Debug compiler can process
 the Safe runtime. Links retain the
-default command budget and executable observations retain their five-second
-limit. Failed compilation, link and owner-replay stages preserve the command
+default command budget and single executable observations retain their five-second
+limit. File-corpus cases have ten seconds each. Failed compilation, link and owner-replay stages preserve the command
 outcome and actual termination even when the compiler produces no stderr;
 command records include the budget.
 
@@ -79,6 +80,17 @@ replay, phase profiles and 552 observation-mutation controls. These controls tes
 the oracle's rejection of wrong status/output and abnormal termination; they
 are not compiler mutation or allocation-failure tests. File-backed stdin is
 reopened for each execution and its hash is recorded with the command.
+
+`zig build zig-input-program -- --output-root DIR` compiles the unchanged pinned
+language-reference migration tool once per release mode and runs the
+[29-case file corpus](../test/real_programs/migrate_langref.md). Each execution
+has a fresh working directory. Both routes must match independently specified
+status, streams and the exact output files; inputs must remain unchanged.
+The gate requires independent ownership replay and retains compilation profiles.
+Its negative controls mutate completion, status, streams and file observations.
+The manifest is authenticated before and after execution, alongside the source,
+tools and compiler binaries. This is a separate input/mode population from the
+fixed Zig examples, C corpus and compiler-core cohort.
 
 The native population registry now lives in
 [`test/real_programs/native_canaries.json`](../test/real_programs/native_canaries.json).
