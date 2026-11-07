@@ -442,7 +442,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFcmp", .body_sha256 = "fa502ad214048f3afb55e11dd87872af687fef9816470ea4c59ee34840665484" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfOeqZero", .body_sha256 = "de1f42d09aebc6de4e9f5c35aeb59330f2e6871443d66e0b870eb46df603aeb5" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFcmp", .body_sha256 = "e429cc984c62e169d1d294144f8fb330aa6c4fc6b2fc8e7aec4ab2b40bdf194b" },
-    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .body_sha256 = "c61a003b01b13fe1921fd0d8acbb28b504f99e379f9328a29a73df09d4480f66" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .body_sha256 = "6b3f326f8c797eaa1b2c559ab0c1d944df96d2dced725d1bcc1477aba7c7b5f0" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 

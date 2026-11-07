@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "runtime_memory",
+      "prefix": "runtime-memory",
+      "fixture": "runtime_memory",
+      "functions": ["runtime_memory_f32", "runtime_memory_f64", "runtime_memory_returned", "runtime_memory_pressure", "runtime_memory_memset", "runtime_memory_allocation", "runtime_memory_nneg"],
+      "observations": 1411,
+      "stdout": "runtime-memory observations=1411 widths=exact aliases=preserved allocation-errors=checked guards=preserved\n"
+    },
+    {
       "population": "vector_fp_casts",
       "prefix": "vector-fp-casts",
       "fixture": "vector_fp_casts",

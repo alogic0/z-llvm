@@ -497,9 +497,14 @@ fn lowerFpIntBitcast(selector: *ComposedBlockSelector, result_name: []const u8, 
     } else {
         selector_state.emitValueIntoEax(selector, cast.value) catch return .{ .unsupported_value = "composed-block-fp-bitcast-source" };
     }
-    try selector_state.clobberXmmReg(selector, .xmm0);
-    try selector.machine.instructions.append(selector.allocator, if (bits == 64) .{ .movq_rax_xmm = .xmm0 } else .{ .movd_eax_xmm = .xmm0 });
-    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
+    // Bit moves have an explicit destination. Use the shared owner/liveness
+    // authority instead of forcing a live XMM0 value into an unneeded spill.
+    const dst: XmmReg = for (scalar_xmm_regs) |reg| {
+        if (try selector_state.xmmRegAvailable(selector, reg)) break reg;
+    } else .xmm0;
+    try selector_state.clobberXmmReg(selector, dst);
+    try selector.machine.instructions.append(selector.allocator, if (bits == 64) .{ .movq_rax_xmm = dst } else .{ .movd_eax_xmm = dst });
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
     return null;
 }
 

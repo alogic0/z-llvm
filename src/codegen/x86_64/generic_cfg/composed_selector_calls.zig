@@ -695,9 +695,10 @@ fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.C
     if (dst.ty != .ptr or !fill.ty.eql(.{ .int = 8 }) or !len.ty.eql(.{ .int = 64 }) or
         !vol.ty.eql(.{ .int = 1 }) or !vol.value.eql(.{ .int = 0 }))
         return .{ .no_emitter = "composed-block-memset-args" };
-    // Pointer address spaces and ABI-changing argument attributes are opaque
-    // in CallArg. Admit only the alignment annotation used by this intrinsic.
-    if (!memsetAlignmentAttribute(dst.attrs) or fill.attrs != null or len.attrs != null or vol.attrs != null)
+    // Use the same validated advisory facts as ordinary pointer calls. The
+    // byte loop does not need the promises, and never widens the memory access.
+    if ((if (dst.attrs) |attrs| !sysv_abi.pointerCallAttrsAreAdvisory(attrs) else false) or
+        fill.attrs != null or len.attrs != null or vol.attrs != null)
         return .{ .no_emitter = "composed-block-memset-attrs" };
     // Undef permits any concrete byte; select zero. Poison and all memory/ABI
     // envelope restrictions retain their existing fail-closed behavior.
@@ -745,13 +746,6 @@ fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.C
     return null;
 }
 
-fn memsetAlignmentAttribute(attrs: ?[]const u8) bool {
-    const text = attrs orelse return true;
-    if (!std.mem.startsWith(u8, text, "align ")) return false;
-    const alignment = std.fmt.parseUnsigned(u32, text[6..], 10) catch return false;
-    return std.math.isPowerOfTwo(alignment);
-}
-
 fn memsetDiagnostic(authority: *const ValueUseTransaction, err: anyerror) ?Diagnostic {
     if (err == error.ValueUseActionDiagnostic) return authority.actionDiagnostic();
     return switch (err) {
@@ -767,6 +761,13 @@ fn memsetDiagnostic(authority: *const ValueUseTransaction, err: anyerror) ?Diagn
         => .{ .unsupported_value = "composed-block-memset-value" },
         else => null,
     };
+}
+
+fn alignmentOnlyAttribute(attrs: ?[]const u8) bool {
+    const text = attrs orelse return true;
+    if (!std.mem.startsWith(u8, text, "align ")) return false;
+    const alignment = std.fmt.parseUnsigned(u32, text[6..], 10) catch return false;
+    return std.math.isPowerOfTwo(alignment);
 }
 
 pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
@@ -791,7 +792,7 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
     // ordinary intrinsic accepts only the exact retained pointer annotations.
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) {
         if (call.callee_function_ty != null or call.calling_conv != null or
-            !memsetAlignmentAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
+            !alignmentOnlyAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
             len.attrs != null or is_volatile.attrs != null)
             return .{ .no_emitter = "composed-block-memcpy-attrs" };
     }
@@ -888,7 +889,7 @@ pub fn lowerInlineMemmove(selector: *ComposedBlockSelector, result: ?[]const u8,
     }
 
     if (call.callee_function_ty != null or call.calling_conv != null or
-        !memsetAlignmentAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
+        !alignmentOnlyAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
         len.attrs != null or is_volatile.attrs != null)
         return .{ .no_emitter = "composed-block-memmove-attrs" };
     return lowerMemoryCopyOperands(selector, dst, src, len, true);
@@ -947,8 +948,8 @@ pub fn lowerInlineStrnlen(selector: *ComposedBlockSelector, result: ?[]const u8,
 fn memcpySourceAttributes(attrs: ?[]const u8) bool {
     const text = attrs orelse return true;
     if (std.mem.eql(u8, text, "readonly")) return true;
-    if (std.mem.startsWith(u8, text, "readonly ")) return memsetAlignmentAttribute(text[9..]);
-    return memsetAlignmentAttribute(text);
+    if (std.mem.startsWith(u8, text, "readonly ")) return alignmentOnlyAttribute(text[9..]);
+    return alignmentOnlyAttribute(text);
 }
 
 fn inlineMemcpyValueUseDiagnostic(
