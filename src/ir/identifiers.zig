@@ -67,6 +67,13 @@ pub fn isValid(text: []const u8) bool {
 /// A false result establishes different identities only when both spellings
 /// are supported. Reference walkers must report other input as unknown.
 pub fn eql(left: []const u8, right: []const u8) bool {
+    // Equal spellings still need validation: malformed input has no identity.
+    if (std.mem.eql(u8, left, right)) return isValid(left);
+    if (left.len == 0 or right.len == 0) return false;
+    // Different unquoted named spellings cannot alias. Only quotes/escapes or
+    // two numeric slots (which may have leading zeroes) need decoded comparison.
+    if (left[0] != '"' and right[0] != '"' and
+        !(std.ascii.isDigit(left[0]) and std.ascii.isDigit(right[0]))) return false;
     const a = parse(left) orelse return false;
     const b = parse(right) orelse return false;
     if (a == .numbered) return b == .numbered and a.numbered == b.numbered;

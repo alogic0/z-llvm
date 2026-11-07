@@ -1,5 +1,22 @@
 # Active direction
 
+The active [large-function selection performance plan](plans/2026-11-07-large-function-selection-performance.md)
+implements the user's requested next milestone. Measure both retained Zig
+workloads, isolate shared costs in successful rewrites and selection, and accept
+an optimization only with preserved object bytes, ownership and execution.
+Finish with full validation and a frozen accepted checkpoint. The earlier
+cohort-v3 inbox directive is historical (its parent precedes the accepted
+nine-function cohort); the current user instruction authorizes this performance
+work. Preserve the original probes and create no archives.
+
+The focused implementation and all six workload/mode measurement comparisons
+pass. The shared identifier comparator avoids repeated parsing while preserving
+the existing grammar and namespace rules. Safe compiler medians fall 36.4% for
+Fibonacci and 35.9% for migration, with identical object and ownership bytes.
+Debug/Safe units, policy, ABI, readiness and both whole-program corpora pass.
+Full acceptance on the frozen committed source is pending; the accepted record
+below remains the preceding checkpoint until all 17 gates and postchecks pass.
+
 The [unchanged Zig input-program plan](plans/2026-11-06-unchanged-zig-input-program.md)
 is complete at `9cc31c38`. The pinned language-reference migration tool runs
 unchanged with runtime document input, allocation, mutable directives, generated
