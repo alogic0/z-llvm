@@ -27,6 +27,7 @@ remain in this repository.
 | Validation role | Zig entry point / build step |
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
+| Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
 | Upstream C program and 45 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
 | Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
 | Unchanged Zig tool with runtime document inputs and exact file outputs | `tools/run_real_program.zig` / `zig-input-program` |
@@ -47,6 +48,61 @@ existing proof/manifest paths. Candidate replay retains its explicit output
 replacement behavior. Historical Python helpers in ignored validation evidence
 remain historical records; they are not dependencies of the active workflow.
 No archives were made.
+
+The [whole-compiler diagnostic plan](plans/2026-11-07-whole-compiler-diagnostic.md)
+adds an opt-in runner outside the accepted gate inventory. It attempts the
+pinned LLVM-enabled Zig compiler, x86_64 Linux GNU, baseline CPU, ReleaseFast,
+through the postopt hook. LLVM still performs optimization. Original and
+resolved CMake provider configurations, library hashes, closed hook environment,
+commands and each exact backend input are retained. Explicit multiarch provider
+paths avoid relying on native library discovery for the selected GNU target.
+
+```sh
+zig run -O ReleaseFast tools/run_whole_compiler.zig -- \
+  --output-root local-state/validations/my-whole-compiler \
+  --zllvm /absolute/path/to/ReleaseFast/z_llvm
+zig test tools/run_whole_compiler.zig
+```
+
+`--zig-source`, `--zig-emitter` and `--config-h` select the pinned checkout and
+its existing frontend/CMake inputs. `--timeout-ms` defaults to 3,600,000 per
+build/backend command. `--input-ir FILE` runs a separately labelled captured-IR
+diagnostic without claiming a compiler build. All runs require new output
+directories. Admission and sampled runtime reserve use the existing serial
+space policy; the runner cancels its process group on a reserve violation.
+
+Exit zero means the requested route passed; a reproducible compiler rejection
+still returns nonzero and is recorded as a blocked diagnostic, without changing
+accepted counters. Report-all selection failures are grouped by diagnostic and
+selector tag. Missing selection records after an earlier failure mean no census
+was completed. Successful object delivery requires consistent counts, matching
+profile/ownership names and a valid x86_64 ELF object. Hook capture retains raw
+logs and GNU time measurements, whose maximum RSS is a process/descendant
+high-water value rather than a sum of simultaneous memory use. Linking,
+`zig version`, behavior checks and self-rebuild are conditional later stages.
+If runtime compilation fails before the main compiler reaches the hook, a
+separate compiler-module diagnostic reuses the recorded build-exe arguments,
+disables binary/runtime emission, exports optimized LLVM IR and attempts local
+object emission. The original runtime rejection remains a build blocker; this
+continuation provides no link or self-hosting credit.
+
+Two read-only census tools provide additional attribution after an early
+failure. Global syntax census parses every complete global/alias line
+independently and saves the first rejected line to a new file. Function
+verification census preserves declarations, global data and function headers,
+requires an all-unreachable-body baseline to verify, then restores each
+original body in turn. These projections never emit or execute code and cannot
+establish full-module verification or selection. A missing final count means
+the census did not finish.
+
+```sh
+zig run -O ReleaseFast --dep ir \
+  -Mroot=tools/whole_compiler_global_census.zig -Mir=src/ir.zig -- \
+  captured-compiler.ll new-first-global.ll
+zig run -O ReleaseFast --dep ir \
+  -Mroot=tools/whole_compiler_verification_census.zig -Mir=src/ir.zig -- \
+  captured-runtime.ll
+```
 
 Unchanged-program manifests can set `compile_timeout_ms` to a positive 32-bit
 millisecond budget. It applies to reference/local compilation, selector-owner
