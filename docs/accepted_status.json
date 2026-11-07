@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "9d3f24b3707c2b86523872a1554bd5469b91ef53",
-  "accepted_tree": "68b766c536c594f44c93885d199ab89341ff65a1",
+  "accepted_revision": "5ad6c51c8a9c50e23fa0aa1a208174f66472a5e9",
+  "accepted_tree": "53462efaedeb06be3e2a3ad9d144911d93d0ec9c",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "9d3f24b3",
+  "declaration_revision": "5ad6c51c",
   "evidence": [
+    "docs/evidence/selection_census_completion_acceptance_20261107.json",
+    "docs/evidence/selection_census_completion.md",
     "docs/evidence/allocation_runtime_memory_acceptance_20261107.json",
     "docs/evidence/allocation_runtime_memory.md",
     "docs/evidence/compiler_parser_vector_casts_acceptance_20261107.json",

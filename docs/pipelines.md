@@ -48,6 +48,14 @@ These do not require optimizer pass timing and never write into object stdout.
 Independent replay remains `--emit=selection-owner-manifest` with the same
 input, target, pass and selection options.
 
+Add `--profile-events=progress.jsonl` to flush progress after each function,
+phase, normalization activity, legalizer attempt and original-form retry. It
+works independently of `--profile` and preserves the final profile schema.
+After interruption, complete JSONL records identify the active work; a partial
+last line can be ignored. Progress records alone do not establish a completed
+selection census. The whole-compiler diagnostic runner exposes this option as
+`--profile-events` and retains the stream beside its final profile and failures.
+
 The patched Zig preopt textual hook chooses an accepted mode alias. The postopt
 hook leaves module optimization with LLVM. The separate structured writer helper
 in [main_flow_ir_writer.zig](../src/main_flow_ir_writer.zig) conditionally runs

@@ -118,6 +118,16 @@ to a compilation; the JSON report is separate from binary stdout. `other` includ
 uninstrumented setup and cleanup. Timings describe compiler work, not runtime
 performance of emitted code.
 
+Optional `--profile-events=PATH` writes `compilation-events-v1` JSONL records,
+flushing each record with its sequence, elapsed time, function and phase. The
+stream records begin/end pairs for functions, normalization activities,
+legalizers and retries, so interruption leaves useful progress without claiming
+completion. Event output is independent of the unchanged final
+`compilation-profile-v2` summary. A rejected but complete diagnostic census has
+balanced function outcomes and `succeeded: false`; the bounded tail retained by
+the diagnostic runner is explicitly not a whole-stream audit. Timings with events
+enabled include their output overhead.
+
 ## Correctness contracts at the AIR/backend boundary
 
 Aggregate AIR loads capture scalar field values at the load instruction. A later

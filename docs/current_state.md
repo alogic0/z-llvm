@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9d3f24b3707c2b86523872a1554bd5469b91ef53`; tree: `68b766c536c594f44c93885d199ab89341ff65a1`.
+Accepted revision: `5ad6c51c8a9c50e23fa0aa1a208174f66472a5e9`; tree: `53462efaedeb06be3e2a3ad9d144911d93d0ec9c`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,30 +25,34 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
-is accepted at `9d3f24b3`: all 17 integration gates and 48 native populations pass.
-The complete unchanged compiler module now verifies all 8,928 definitions.
-Allocation attributes, `uitofp nneg` and scalar-base vector GEP result typing
-are supported in the IR contract; native vector GEP selection remains unsupported.
-The seven-function runtime-memory population checks 8,466 local observations
-against 4,233 LLVM references in all three modes and both routes, with Debug and
-ReleaseFast compilers. Debug/ReleaseSafe unit suites pass with 1,937 tests and
-20 structural checks per mode; readiness, both corpora and fixed programs pass.
+The [complete selection-census checkpoint](evidence/selection_census_completion.md)
+is accepted at `5ad6c51c`: all 17 integration gates and 49 native populations pass.
+Debug and ReleaseSafe each pass 1,944 units and 21 structural checks; profiling
+process tests, readiness, both input corpora and fixed programs pass. Native
+coverage totals 1,803,204 local observations against 901,602 LLVM references.
 
-The whole-compiler selection replay reaches its one-hour deadline after reporting
-5,949 rejected functions. It has no completed selection totals or final profile.
-Among reported failures, 1,798 concern memcpy attributes and 1,648 call ABI
-attributes. Large-function progress/timing diagnostics and these shared gaps are
-the next work. No complete compiler object, startup or self-rebuild is claimed.
-The unchanged runtime selects 272 of 455 functions and rejects 183, with no
-regression among previously selected functions. `sincos_f32` now reaches
-`composed-vector-shuffle-form`; no complete runtime object is published.
+The unchanged compiler replay now attempts all 8,928 definitions, selecting
+3,524 and rejecting 5,404 in 759.67 seconds. The runtime selects 274 of 455,
+preserving all previous 272 successes. Both complete event streams are audited.
+Dependency coverage remains conservative; these are selection results, with no
+complete compiler/runtime object, startup or self-rebuild success claimed.
+
+Opt-in flushed progress events expose active functions, normalization, legalizers
+and retries after interruption. Shared indexes remove repeated temporary-name
+and per-allocation use scans. The previously blocking large-function diagnostic
+now finishes in 33.87 seconds with an explicit block-count rejection.
+Validated call facts are shared with nonvolatile memcpy/memmove, including
+integer length ranges. The full census's largest remaining first-failure groups
+are call argument/return widths, intrinsics and memcpy source ownership/forms;
+the retained profile also identifies remaining reachability and legalization costs.
 
 Core counts stay at 100 lowered/emitted/linked and 12 executed functions per mode;
 bypass ratchet 130 is unchanged. All 36 core records preserve selected objects
 and observations. Reference-wrapper size/hash differences are recorded separately,
-without a strict byte-identity claim. The preceding
-[parser and runtime-cast checkpoint](evidence/compiler_parser_vector_casts.md)
+without a blanket executable byte-identity claim. The preceding
+[allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
+established complete module verification, scalar FP memory rewriting and the
+allocation-attribute contract. The [parser and runtime-cast checkpoint](evidence/compiler_parser_vector_casts.md)
 established complete compiler parsing and the two-lane FP width-cast contract.
 
 The preceding [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md)
