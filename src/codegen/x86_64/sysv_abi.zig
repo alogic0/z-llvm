@@ -597,9 +597,28 @@ fn isAttributeGroupReference(attrs: []const u8) bool {
 
 pub fn callReturnAttrsSupported(call: ir.CallInst) bool {
     const attrs = call.ret_attrs orelse return true;
-    // `noalias` constrains a returned pointer's provenance; it does not change
-    // its register representation. Do not admit sign/zero extension or sret.
-    return call.ret_ty == .ptr and std.mem.eql(u8, std.mem.trim(u8, attrs, " \t"), "noalias");
+    // Return facts do not change the register representation. Parameter-only
+    // promises (capture, memory effects, allocptr) are excluded here.
+    ir.verifyParameterAttrs(call.ret_ty, attrs) catch return false;
+    var rest = std.mem.trim(u8, attrs, " \t");
+    while (rest.len != 0) {
+        const end = syntax.findTopLevelTokenEnd(rest) orelse return false;
+        if (end == 0) return false;
+        const token = rest[0..end];
+        rest = std.mem.trim(u8, rest[end..], " \t");
+        if (std.mem.eql(u8, token, "noundef") and call.ret_ty != .void) continue;
+        if (call.ret_ty == .int and std.mem.startsWith(u8, token, "range(")) continue;
+        if (call.ret_ty == .ptr and (std.mem.eql(u8, token, "noalias") or std.mem.eql(u8, token, "nonnull") or
+            std.mem.startsWith(u8, token, "dereferenceable("))) continue;
+        if (call.ret_ty == .ptr and std.mem.eql(u8, token, "align")) {
+            const alignment_end = syntax.findTopLevelTokenEnd(rest) orelse return false;
+            if (alignment_end == 0) return false;
+            rest = std.mem.trim(u8, rest[alignment_end..], " \t");
+            continue;
+        }
+        return false;
+    }
+    return true;
 }
 
 pub fn isVariadicCall(call: ir.CallInst) bool {
@@ -682,6 +701,7 @@ pub fn rejectUnsupportedCallArgAttrs(arg: ir.CallArg) !void {
     }
     if (std.mem.eql(u8, std.mem.trim(u8, text, " \t"), "noundef")) return;
     if (arg.ty == .ptr and pointerCallAttrsAreAdvisory(text)) return;
+    if (arg.ty == .int and callReturnAttrsSupported(.{ .callee = "", .ret_ty = arg.ty, .ret_attrs = text, .args = .empty })) return;
     return error.UnsupportedCallAttributeAbi;
 }
 
@@ -703,6 +723,7 @@ pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
         if (std.mem.eql(u8, token, "writeonly")) continue;
         if (std.mem.eql(u8, token, "noalias")) continue;
         if (std.mem.eql(u8, token, "allocptr")) continue;
+        if (std.mem.eql(u8, token, "dead_on_unwind")) continue;
         if (std.mem.eql(u8, token, "captures(none)")) continue;
         if (std.mem.startsWith(u8, token, "dereferenceable(")) continue;
         if (!std.mem.eql(u8, token, "align")) return false;
@@ -718,6 +739,7 @@ test "pointer advisory attributes validate allocation and memory promises withou
         "allocptr noundef align 1 captures(none)",
         "noundef nonnull align 16 dereferenceable(16)",
         "writeonly captures(none) align 1",
+        "dead_on_unwind noalias writeonly align 4 captures(none)",
     }) |attrs| {
         try std.testing.expect(pointerCallAttrsAreAdvisory(attrs));
         try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .value = .{ .named = "p" }, .attrs = attrs });
@@ -728,6 +750,31 @@ test "pointer advisory attributes validate allocation and memory promises withou
         "addrspace(1)",
     }) |attrs| try std.testing.expect(!pointerCallAttrsAreAdvisory(attrs));
     try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = .{ .int = 64 }, .value = .{ .int = 0 }, .attrs = "allocptr" }));
+}
+
+test "call value facts validate typed wrapped ranges without extending the ABI" {
+    var call: ir.CallInst = .{ .callee = "callee", .ret_ty = .{ .int = 8 }, .args = .empty };
+    for ([_][]const u8{ "noundef", "range(i8 0, 128)", "noundef range(i8 -128, 0)", "range(i8 250, 5)", "range(i8 0, 0)" }) |attrs| {
+        call.ret_attrs = attrs;
+        try rejectUnsupportedCallEnvelope(call);
+        try rejectUnsupportedCallArgAttrs(.{ .ty = call.ret_ty, .attrs = attrs, .value = .{ .named = "v" } });
+    }
+    for ([_][]const u8{
+        "zeroext",                       "signext",                "noundef zeroext",   "range(i16 0, 128)", "range(i8 0 128)",
+        "range(i8 0,,128)",              "range(i8 0, 256)",       "range(i8 -129, 0)", "range(i8 255, -1)", "range(i8 5, 5)",
+        "range(i8 0, 5) range(i8 0, 5)", "range(i8 0, 5) unknown", "noundef noundef",
+    }) |attrs| {
+        call.ret_attrs = attrs;
+        try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallEnvelope(call));
+        try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = call.ret_ty, .attrs = attrs, .value = .{ .named = "v" } }));
+    }
+    call.ret_ty = .ptr;
+    call.ret_attrs = "noundef noalias nonnull align 8 dereferenceable(8)";
+    try rejectUnsupportedCallEnvelope(call);
+    for ([_][]const u8{ "dead_on_unwind", "captures(none)", "allocptr", "writeonly", "sret(i64)", "byval(i64)" }) |attrs| {
+        call.ret_attrs = attrs;
+        try std.testing.expect(!callReturnAttrsSupported(call));
+    }
 }
 
 pub fn callArgByvalType(arg: ir.CallArg) ?ir.Type {

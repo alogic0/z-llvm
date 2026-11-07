@@ -1324,12 +1324,25 @@ fn verifyRangeAttrPayload(ty: core.Type, payload: []const u8) !void {
         .int => {},
         else => return error.UnsupportedCallAttribute,
     }
-    var parts = std.mem.tokenizeAny(u8, payload, " \t,");
-    const range_ty = parseType(parts.next() orelse return error.UnsupportedCallAttribute) catch return error.UnsupportedCallAttribute;
+    var bounds = std.mem.splitScalar(u8, payload, ',');
+    var lower_tokens = std.mem.tokenizeAny(u8, bounds.next() orelse return error.UnsupportedCallAttribute, " \t");
+    const range_ty = parseType(lower_tokens.next() orelse return error.UnsupportedCallAttribute) catch return error.UnsupportedCallAttribute;
     if (!range_ty.eql(ty)) return error.UnsupportedCallAttribute;
-    _ = try std.fmt.parseInt(i128, parts.next() orelse return error.UnsupportedCallAttribute, 10);
-    _ = try std.fmt.parseInt(i128, parts.next() orelse return error.UnsupportedCallAttribute, 10);
-    if (parts.next() != null) return error.UnsupportedCallAttribute;
+    const lower = try std.fmt.parseInt(i128, lower_tokens.next() orelse return error.UnsupportedCallAttribute, 10);
+    if (lower_tokens.next() != null) return error.UnsupportedCallAttribute;
+    const upper = try std.fmt.parseInt(i128, std.mem.trim(u8, bounds.next() orelse return error.UnsupportedCallAttribute, " \t"), 10);
+    if (bounds.next() != null or ty.int == 0) return error.UnsupportedCallAttribute;
+    if (ty.int < 128) {
+        const bits: u7 = @intCast(ty.int);
+        const minimum = -(@as(i128, 1) << (bits - 1));
+        const maximum = (@as(u128, 1) << bits) - 1;
+        for ([_]i128{ lower, upper }) |value| {
+            if (value < minimum or (value >= 0 and @as(u128, @intCast(value)) > maximum)) return error.UnsupportedCallAttribute;
+        }
+        const lo = @as(u128, @bitCast(lower)) & maximum;
+        const hi = @as(u128, @bitCast(upper)) & maximum;
+        if (lo == hi and lo != 0) return error.UnsupportedCallAttribute;
+    } else if (lower == upper and lower != 0) return error.UnsupportedCallAttribute;
 }
 
 fn verifyNamedTypes(module: core.Module) !void {

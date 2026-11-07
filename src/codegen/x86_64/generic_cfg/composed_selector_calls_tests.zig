@@ -140,6 +140,31 @@ test "production inline memcpy maps unresolved destination through request prove
     try expectUnresolvedInlineMemcpyDiagnostic(.destination, "composed-block-memcpy-dst");
 }
 
+test "ordinary memory copies reject malformed and ABI attributes before mutating selection" {
+    for ([_][]const u8{ "llvm.memcpy.p0.p0.i64", "llvm.memmove.p0.p0.i64" }) |callee| {
+        for ([_][]const u8{ "align 3", "align", "noundef noundef", "captures(unknown)", "byval(i64)", "sret(i64)", "addrspace(1)", "zeroext", "initializes(bad)", "range(i32 0, 65)", "range(i64 1, 1)", "range(i64 0, bad)", "range(i64 0, 65, 66)" }) |attrs| {
+            var machine = MachineFunction.init("copy-attributes", .void);
+            defer machine.deinit(std.testing.allocator);
+            var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+            defer selector.deinit();
+            var call: ir.CallInst = .{ .ret_ty = .void, .callee = callee, .args = .empty };
+            defer call.deinit(std.testing.allocator);
+            try appendInlineMemcpyArgs(&call, .{ .named = "dst" }, .{ .named = "src" }, .{ .int = 4 }, .{ .int = 0 });
+            for (0..3) |index| {
+                call.args.items[index].attrs = attrs;
+                const diagnostic = if (std.mem.eql(u8, callee, "llvm.memcpy.p0.p0.i64"))
+                    (try selector_calls.lowerInlineMemcpy(&selector, null, call)).?
+                else
+                    (try selector_calls.lowerInlineMemmove(&selector, null, call)).?;
+                try std.testing.expectEqualStrings(if (std.mem.eql(u8, callee, "llvm.memcpy.p0.p0.i64")) "composed-block-memcpy-attrs" else "composed-block-memmove-attrs", diagnostic.detail());
+                try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+                try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+                call.args.items[index].attrs = null;
+            }
+        }
+    }
+}
+
 test "production inline memcpy maps unresolved source through request provenance" {
     try expectUnresolvedInlineMemcpyDiagnostic(.source, "composed-block-memcpy-src");
 }

@@ -763,11 +763,14 @@ fn memsetDiagnostic(authority: *const ValueUseTransaction, err: anyerror) ?Diagn
     };
 }
 
-fn alignmentOnlyAttribute(attrs: ?[]const u8) bool {
-    const text = attrs orelse return true;
-    if (!std.mem.startsWith(u8, text, "align ")) return false;
-    const alignment = std.fmt.parseUnsigned(u32, text[6..], 10) catch return false;
-    return std.math.isPowerOfTwo(alignment);
+fn pointerAdvisoryAttributes(attrs: ?[]const u8) bool {
+    return if (attrs) |text| sysv_abi.pointerCallAttrsAreAdvisory(text) else true;
+}
+
+fn integerAdvisoryAttributes(arg: ir.CallArg) bool {
+    if (arg.ty != .int) return false;
+    sysv_abi.rejectUnsupportedCallArgAttrs(arg) catch return false;
+    return true;
 }
 
 pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
@@ -788,12 +791,12 @@ pub fn lowerInlineMemcpy(selector: *ComposedBlockSelector, result: ?[]const u8, 
     {
         return .{ .no_emitter = "composed-block-memcpy-args" };
     }
-    // Keep the pre-existing inline intrinsic contract; the newly admitted
-    // ordinary intrinsic accepts only the exact retained pointer annotations.
+    // The ordinary intrinsic shares validated pointer and integer facts with
+    // calls. Its exact-width copy and volatile boundaries remain.
     if (std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) {
         if (call.callee_function_ty != null or call.calling_conv != null or
-            !alignmentOnlyAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
-            len.attrs != null or is_volatile.attrs != null)
+            !pointerAdvisoryAttributes(dst.attrs) or !pointerAdvisoryAttributes(src.attrs) or
+            !integerAdvisoryAttributes(len) or is_volatile.attrs != null)
             return .{ .no_emitter = "composed-block-memcpy-attrs" };
     }
 
@@ -889,8 +892,8 @@ pub fn lowerInlineMemmove(selector: *ComposedBlockSelector, result: ?[]const u8,
     }
 
     if (call.callee_function_ty != null or call.calling_conv != null or
-        !alignmentOnlyAttribute(dst.attrs) or !memcpySourceAttributes(src.attrs) or
-        len.attrs != null or is_volatile.attrs != null)
+        !pointerAdvisoryAttributes(dst.attrs) or !pointerAdvisoryAttributes(src.attrs) or
+        !integerAdvisoryAttributes(len) or is_volatile.attrs != null)
         return .{ .no_emitter = "composed-block-memmove-attrs" };
     return lowerMemoryCopyOperands(selector, dst, src, len, true);
 }
@@ -943,13 +946,6 @@ pub fn lowerInlineStrnlen(selector: *ComposedBlockSelector, result: ?[]const u8,
     try transaction.define(result_name, .fullRax());
     try transaction.commit();
     return null;
-}
-
-fn memcpySourceAttributes(attrs: ?[]const u8) bool {
-    const text = attrs orelse return true;
-    if (std.mem.eql(u8, text, "readonly")) return true;
-    if (std.mem.startsWith(u8, text, "readonly ")) return alignmentOnlyAttribute(text[9..]);
-    return alignmentOnlyAttribute(text);
 }
 
 fn inlineMemcpyValueUseDiagnostic(

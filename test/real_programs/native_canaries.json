@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "call_attributes",
+      "prefix": "call-attributes",
+      "fixture": "call_attributes",
+      "functions": ["attributes_copy", "attributes_move", "attributes_write", "attributes_range32", "attributes_range64"],
+      "observations": 2465,
+      "stdout": "call-attributes observations=2465 ranges=wrapped calls=preserved overlap=checked guards=preserved\n"
+    },
+    {
       "population": "runtime_memory",
       "prefix": "runtime-memory",
       "fixture": "runtime_memory",
