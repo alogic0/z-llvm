@@ -106,7 +106,7 @@ pub const DataLayout = struct {
         var offset: u64 = 0;
         while (nextAggregateField(&fields)) |field_text| : (index += 1) {
             const field_ty = parseTypeLiteral(field_text) orelse return error.UnsupportedDataLayoutQuery;
-            offset = try alignForward(offset, bitsToBytes(try layout.typeAbiAlignmentBits(field_ty)));
+            if (!fields.packed_type) offset = try alignForward(offset, bitsToBytes(try layout.typeAbiAlignmentBits(field_ty)));
             if (index == field_index) return @intCast(offset);
             offset = std.math.add(u64, offset, try layout.typeAllocSizeBytes(field_ty)) catch return error.UnsupportedDataLayoutQuery;
         }
@@ -125,7 +125,7 @@ pub const DataLayout = struct {
         var max_align: u64 = 1;
         while (nextAggregateField(&fields)) |field_text| {
             const field_ty = parseTypeLiteral(field_text) orelse return error.UnsupportedDataLayoutQuery;
-            const field_align = bitsToBytes(try layout.typeAbiAlignmentBits(field_ty));
+            const field_align = if (fields.packed_type) 1 else bitsToBytes(try layout.typeAbiAlignmentBits(field_ty));
             max_align = @max(max_align, field_align);
             size = try alignForward(size, field_align);
             size = std.math.add(u64, size, try layout.typeAllocSizeBytes(field_ty)) catch return error.UnsupportedDataLayoutQuery;
@@ -144,6 +144,7 @@ pub const DataLayout = struct {
         };
 
         var fields = aggregateFields(text) orelse return error.UnsupportedDataLayoutQuery;
+        if (fields.packed_type) return 8;
         var max_align: u16 = 8;
         while (nextAggregateField(&fields)) |field_text| {
             const field_ty = parseTypeLiteral(field_text) orelse return error.UnsupportedDataLayoutQuery;
@@ -235,16 +236,8 @@ fn alignForward(value: u64, alignment: u64) !u64 {
     return std.math.add(u64, value, alignment - remainder) catch error.UnsupportedDataLayoutQuery;
 }
 
-const AggregateFields = struct {
-    text: []const u8,
-    cursor: usize = 0,
-};
-
-fn aggregateFields(text: []const u8) ?AggregateFields {
-    const trimmed = std.mem.trim(u8, text, " \t");
-    if (trimmed.len < 2 or trimmed[0] != '{' or trimmed[trimmed.len - 1] != '}') return null;
-    return .{ .text = std.mem.trim(u8, trimmed[1 .. trimmed.len - 1], " \t") };
-}
+const AggregateFields = @import("../ir/structure.zig").Fields;
+const aggregateFields = AggregateFields.init;
 
 const ArrayInfo = struct {
     count: u64,
@@ -262,55 +255,11 @@ fn arrayInfo(text: []const u8) ?ArrayInfo {
 }
 
 fn nextAggregateField(fields: *AggregateFields) ?[]const u8 {
-    if (fields.cursor >= fields.text.len) return null;
-    const rest = fields.text[fields.cursor..];
-    const comma = findTopLevelComma(rest);
-    const field = std.mem.trim(u8, if (comma) |index| rest[0..index] else rest, " \t");
-    fields.cursor = if (comma) |index| fields.cursor + index + 1 else fields.text.len;
-    return field;
+    return fields.next();
 }
 
 fn parseTypeLiteral(text: []const u8) ?ir.Type {
-    const trimmed = std.mem.trim(u8, text, " \t");
-    if (std.mem.eql(u8, trimmed, "void")) return .void;
-    if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
-    if (std.mem.eql(u8, trimmed, "float")) return .float;
-    if (std.mem.eql(u8, trimmed, "double")) return .double;
-    if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;
-    if (std.mem.eql(u8, trimmed, "fp128")) return .fp128;
-    if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
-        (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
-    if (trimmed.len < 2 or trimmed[0] != 'i') return null;
-    const bits = std.fmt.parseInt(u16, trimmed[1..], 10) catch return null;
-    return .{ .int = bits };
-}
-
-fn findTopLevelComma(text: []const u8) ?usize {
-    var brace_depth: usize = 0;
-    var bracket_depth: usize = 0;
-    var angle_depth: usize = 0;
-    for (text, 0..) |byte, index| {
-        switch (byte) {
-            '{' => brace_depth += 1,
-            '}' => {
-                if (brace_depth == 0) return null;
-                brace_depth -= 1;
-            },
-            '[' => bracket_depth += 1,
-            ']' => {
-                if (bracket_depth == 0) return null;
-                bracket_depth -= 1;
-            },
-            '<' => angle_depth += 1,
-            '>' => {
-                if (angle_depth == 0) return null;
-                angle_depth -= 1;
-            },
-            ',' => if (brace_depth == 0 and bracket_depth == 0 and angle_depth == 0) return index,
-            else => {},
-        }
-    }
-    return null;
+    return @import("../ir/parser_types_values.zig").parseType(text) catch null;
 }
 
 test "aggregate fields advance by allocation size including scalar tail padding" {

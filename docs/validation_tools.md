@@ -86,9 +86,12 @@ disables binary/runtime emission, exports optimized LLVM IR and attempts local
 object emission. The original runtime rejection remains a build blocker; this
 continuation provides no link or self-hosting credit.
 
-Two read-only census tools provide additional attribution after an early
+Three read-only census tools provide additional attribution after an early
 failure. Global syntax census parses every complete global/alias line
-independently and saves the first rejected line to a new file. Function
+independently and saves the first rejected line to a new file. Definition syntax
+census parses each complete `define` body independently, records its original
+line/header and saves the first rejected definition. It rejects unfinished
+inventories, and never overwrites an existing extraction destination. Function
 verification census preserves declarations, global data and function headers,
 requires an all-unreachable-body baseline to verify, then restores each
 original body in turn. These projections never emit or execute code and cannot
@@ -99,6 +102,9 @@ the census did not finish.
 zig run -O ReleaseFast --dep ir \
   -Mroot=tools/whole_compiler_global_census.zig -Mir=src/ir.zig -- \
   captured-compiler.ll new-first-global.ll
+zig run -O ReleaseFast --dep ir \
+  -Mroot=tools/whole_compiler_function_census.zig -Mir=src/ir.zig -- \
+  captured-compiler.ll new-first-definition.ll
 zig run -O ReleaseFast --dep ir \
   -Mroot=tools/whole_compiler_verification_census.zig -Mir=src/ir.zig -- \
   captured-runtime.ll

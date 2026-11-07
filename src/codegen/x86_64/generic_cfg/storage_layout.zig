@@ -7,6 +7,7 @@ const syntax = @import("../../../ir/parser_syntax.zig");
 const target = @import("../../../target.zig");
 const machine = @import("../machine.zig");
 const pairs = @import("word_pair_memory.zig");
+const Fields = @import("../../../ir/structure.zig").Fields;
 
 pub const Layout = struct { bytes: u32, alignment: u32 };
 pub const max_bytes: u32 = @import("selector_types.zig").max_stack_object_bytes;
@@ -14,6 +15,12 @@ pub const max_bytes: u32 = @import("selector_types.zig").max_stack_object_bytes;
 /// Exact field displacement, with the same complete-layout admission as frame
 /// storage and pointer strides. Resolve names only from the current module.
 pub fn fieldOffset(context: ?*const machine.ReadOnlyModuleContext, source: ir.Type, index: usize) ?u32 {
+    return (fieldInfo(context, source, index) orelse return null).offset;
+}
+
+pub const Field = struct { ty: ir.Type, offset: u32 };
+
+pub fn fieldInfo(context: ?*const machine.ReadOnlyModuleContext, source: ir.Type, index: usize) ?Field {
     _ = query(context, source) orelse return null;
     var ty = source;
     var depth: usize = 0;
@@ -31,20 +38,15 @@ pub fn fieldOffset(context: ?*const machine.ReadOnlyModuleContext, source: ir.Ty
             ty = parse(resolved orelse return null) orelse return null;
             continue;
         }
-        const packed_type = std.mem.startsWith(u8, text, "<{") and std.mem.endsWith(u8, text, "}>");
-        if (!packed_type and !(text[0] == '{' and text[text.len - 1] == '}')) return null;
-        const edge: usize = if (packed_type) 2 else 1;
-        var rest = trim(text[edge .. text.len - edge]);
+        var fields = Fields.init(text) orelse return null;
         var offset: u32 = 0;
         var field_index: usize = 0;
-        while (rest.len != 0) : (field_index += 1) {
-            const comma = syntax.findTopLevelComma(rest);
-            const field = trim(if (comma) |at| rest[0..at] else rest);
-            const child = query(context, parse(field) orelse return null) orelse return null;
-            if (!packed_type) offset = std.mem.alignForward(u32, offset, child.alignment);
-            if (field_index == index) return offset;
+        while (fields.next()) |field_text| : (field_index += 1) {
+            const child_ty = parse(field_text) orelse return null;
+            const child = query(context, child_ty) orelse return null;
+            if (!fields.packed_type) offset = std.mem.alignForward(u32, offset, child.alignment);
+            if (field_index == index) return .{ .ty = child_ty, .offset = offset };
             offset = std.math.add(u32, offset, child.bytes) catch return null;
-            rest = if (comma) |at| trim(rest[at + 1 ..]) else "";
         }
         return null;
     }
@@ -56,9 +58,7 @@ fn trim(text: []const u8) []const u8 {
 }
 
 fn parse(text: []const u8) ?ir.Type {
-    const body = trim(text);
-    if (std.mem.startsWith(u8, body, "<{")) return .{ .aggregate = body };
-    return parser.parseType(body) catch null;
+    return parser.parseType(trim(text)) catch null;
 }
 
 pub fn query(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) ?Layout {
@@ -145,24 +145,17 @@ fn queryDepth(context: ?*const machine.ReadOnlyModuleContext, dl: target.DataLay
         if (bytes > max_bytes) return null;
         return .{ .bytes = bytes, .alignment = child.alignment };
     }
-    const packed_type = std.mem.startsWith(u8, text, "<{") and std.mem.endsWith(u8, text, "}>");
-    if (!packed_type and !(text[0] == '{' and text[text.len - 1] == '}')) return null;
-    const edge: usize = if (packed_type) 2 else 1;
-    var rest = trim(text[edge .. text.len - edge]);
+    var fields = Fields.init(text) orelse return null;
     var bytes: u32 = 0;
-    var alignment: u32 = if (packed_type) 1 else aggregate_alignment;
-    while (rest.len != 0) {
-        const comma = syntax.findTopLevelComma(rest);
-        const field = trim(if (comma) |index| rest[0..index] else rest);
+    var alignment: u32 = if (fields.packed_type) 1 else aggregate_alignment;
+    while (fields.next()) |field| {
         const child = queryDepth(context, dl, aggregate_alignment, parse(field) orelse return null, depth + 1) orelse return null;
-        if (!packed_type) {
+        if (!fields.packed_type) {
             alignment = @max(alignment, child.alignment);
             bytes = std.mem.alignForward(u32, bytes, child.alignment);
         }
         bytes = std.math.add(u32, bytes, child.bytes) catch return null;
         if (bytes > max_bytes) return null;
-        rest = if (comma) |index| trim(rest[index + 1 ..]) else "";
-        if (comma != null and rest.len == 0) return null;
     }
     bytes = std.mem.alignForward(u32, bytes, alignment);
     if (bytes > max_bytes) return null;

@@ -1355,8 +1355,12 @@ fn verifyDebugVariableLocationCall(module: core.Module, call: core.CallInst) !vo
 }
 
 fn verifyConstantExprValue(ty: core.Type, text: []const u8) anyerror!void {
-    if (std.mem.startsWith(u8, text, "{") and std.mem.endsWith(u8, text, "}")) {
-        return if (ty == .aggregate) {} else error.TypeMismatch;
+    if (@import("structure.zig").Fields.init(text)) |values| {
+        if (ty != .aggregate) return error.TypeMismatch;
+        if (@import("structure.zig").Fields.init(ty.aggregate)) |types| {
+            if (values.packed_type != types.packed_type) return error.TypeMismatch;
+        }
+        return;
     }
     if (std.mem.startsWith(u8, text, "sub (")) {
         switch (ty) {
@@ -1504,46 +1508,7 @@ fn parseArrayType(ty: core.Type) ?ParsedArrayType {
     return .{ .len = len, .elem_ty = elem_ty };
 }
 
-fn parseType(text: []const u8) !core.Type {
-    const trimmed = std.mem.trim(u8, text, " \t");
-    if (std.mem.eql(u8, trimmed, "void")) return .void;
-    if (std.mem.eql(u8, trimmed, "ptr")) return .ptr;
-    if (std.mem.eql(u8, trimmed, "half")) return .half;
-    if (std.mem.eql(u8, trimmed, "float")) return .float;
-    if (std.mem.eql(u8, trimmed, "double")) return .double;
-    if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;
-    if (std.mem.eql(u8, trimmed, "fp128")) return .fp128;
-    if (std.mem.eql(u8, trimmed, "metadata")) return .metadata;
-    if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
-    if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
-        (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
-    if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
-    const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
-    if (bits == 0) return error.UnsupportedType;
-    return .{ .int = bits };
-}
-
-fn parseVectorType(text: []const u8) !core.VectorType {
-    const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
-    if (std.mem.startsWith(u8, body, "vscale")) return error.UnsupportedType;
-    const x_index = std.mem.indexOf(u8, body, " x ") orelse return error.UnsupportedType;
-    const len = try std.fmt.parseInt(u32, std.mem.trim(u8, body[0..x_index], " \t"), 10);
-    if (len == 0) return error.UnsupportedType;
-    const elem_ty = try parseVectorElementType(std.mem.trim(u8, body[x_index + 3 ..], " \t"));
-    return .{ .len = len, .elem_ty = elem_ty };
-}
-
-fn parseVectorElementType(text: []const u8) !core.VectorElementType {
-    if (std.mem.eql(u8, text, "ptr")) return .ptr;
-    if (std.mem.eql(u8, text, "half")) return .half;
-    if (std.mem.eql(u8, text, "float")) return .float;
-    if (std.mem.eql(u8, text, "double")) return .double;
-    if (std.mem.eql(u8, text, "fp128")) return .fp128;
-    if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
-    const bits = try std.fmt.parseInt(u16, text[1..], 10);
-    if (bits == 0) return error.UnsupportedType;
-    return .{ .int = bits };
-}
+const parseType = @import("parser_types_values.zig").parseType;
 
 fn verifyVectorLiteral(ty: core.Type, text: []const u8) !void {
     if (ty != .vector) return error.TypeMismatch;

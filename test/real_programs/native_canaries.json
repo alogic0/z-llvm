@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "packed_globals",
+      "prefix": "packed-globals",
+      "fixture": "packed_globals",
+      "functions": ["packed_address", "packed_cell", "packed_nested", "packed_i24", "packed_fp80", "packed_store"],
+      "observations": 768,
+      "stdout": "packed-globals observations=768 layout=relocations=strides=mutation=checked\n"
+    },
+    {
       "population": "parallel_transfer",
       "prefix": "parallel-transfer",
       "fixture": "parallel_transfer",

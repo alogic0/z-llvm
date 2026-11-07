@@ -23,19 +23,7 @@ pub const Decoded = struct {
 
 const Layout = struct { size: u32, alignment: u32 };
 const Array = struct { count: u32, element: ir.Type };
-const Fields = struct {
-    rest: []const u8,
-    packed_type: bool = false,
-
-    fn next(iterator: *Fields) ?[]const u8 {
-        const text = trim(iterator.rest);
-        if (text.len == 0) return null;
-        const comma = parser.findTopLevelComma(text);
-        const result = trim(if (comma) |index| text[0..index] else text);
-        iterator.rest = if (comma) |index| text[index + 1 ..] else "";
-        return result;
-    }
-};
+const Fields = @import("../ir/structure.zig").Fields;
 
 fn trim(text: []const u8) []const u8 {
     return std.mem.trim(u8, text, " \t");
@@ -51,20 +39,11 @@ fn aligned(size: u32, alignment: u32) !u32 {
 }
 
 fn dataType(text: []const u8) !ir.Type {
-    const input = trim(text);
-    if (std.mem.startsWith(u8, input, "<{")) {
-        if (!std.mem.endsWith(u8, input, "}>")) return error.UnsupportedGlobalData;
-        return .{ .aggregate = input };
-    }
-    return parser.parseType(input) catch error.UnsupportedGlobalData;
+    return parser.parseType(trim(text)) catch error.UnsupportedGlobalData;
 }
 
 fn typedField(text: []const u8) !struct { ty: ir.Type, after: []const u8 } {
     const input = trim(text);
-    if (std.mem.startsWith(u8, input, "<{")) {
-        const close = parser.findMatchingAngle(input, 0) orelse return error.UnsupportedGlobalData;
-        return .{ .ty = try dataType(input[0 .. close + 1]), .after = trim(input[close + 1 ..]) };
-    }
     const parsed = parser.parseLeadingType(input) catch return error.UnsupportedGlobalData;
     return .{ .ty = parsed.ty, .after = parsed.after };
 }
@@ -81,13 +60,7 @@ fn arrayType(ty: ir.Type) !Array {
 }
 
 fn fields(text: []const u8) !Fields {
-    const body = trim(text);
-    if (std.mem.startsWith(u8, body, "<{")) {
-        if (!std.mem.endsWith(u8, body, "}>")) return error.UnsupportedGlobalData;
-        return .{ .rest = body[2 .. body.len - 2], .packed_type = true };
-    }
-    if (body.len < 2 or body[0] != '{' or body[body.len - 1] != '}') return error.UnsupportedGlobalData;
-    return .{ .rest = body[1 .. body.len - 1] };
+    return Fields.init(text) orelse error.UnsupportedGlobalData;
 }
 
 const Encoder = struct {
@@ -216,7 +189,7 @@ const Encoder = struct {
                 return;
             }
             if (input.len < 2 or input[0] != '[' or input[input.len - 1] != ']') return error.UnsupportedGlobalData;
-            var values: Fields = .{ .rest = input[1 .. input.len - 1] };
+            var values: Fields = .{ .rest = input[1 .. input.len - 1], .packed_type = false };
             for (0..array.count) |index| {
                 const field = try typedField(values.next() orelse return error.UnsupportedGlobalData);
                 if (!field.ty.eql(array.element)) return error.UnsupportedGlobalData;

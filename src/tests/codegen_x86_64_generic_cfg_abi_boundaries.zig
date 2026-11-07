@@ -457,7 +457,7 @@ test "x86_64 SysV call planner rejects X87-containing aggregate ABI boundary" {
     );
 }
 
-test "parser rejects packed aggregate ABI signatures before x86_64 codegen" {
+test "packed aggregate signatures parse but retain the explicit ABI boundary" {
     const input =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -470,7 +470,12 @@ test "parser rejects packed aggregate ABI signatures before x86_64 codegen" {
         \\}
         \\
     ;
-    try std.testing.expectError(error.UnsupportedType, ir.Module.parse(std.testing.allocator, input));
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+    const call = function.blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectError(error.UnsupportedPackedAggregateAbi, codegen.x86_64.sysvCallPlanCountsForTest(std.testing.allocator, function, call));
 }
 
 test "x86_64 SysV call planner rejects packed aggregate call args directly" {

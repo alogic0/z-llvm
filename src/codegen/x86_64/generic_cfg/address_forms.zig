@@ -19,21 +19,34 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         for (original.instructions.items) |inst| {
             if (!inst.removed and inst.result != null and inst.kind == .gep) {
                 const gep = inst.kind.gep;
-                if (gep.ptr_addrspace == null and gep.indices.items.len == 2 and
+                if (gep.ptr_addrspace == null and gep.indices.items.len >= 2 and
                     gep.indices.items[0].ty == .int and gep.indices.items[0].ty.int <= 64 and
-                    gep.indices.items[0].value.eql(.{ .int = 0 }) and
-                    gep.indices.items[1].ty.eql(.{ .int = 32 }) and gep.indices.items[1].value == .int)
+                    (gep.indices.items[0].value.eql(.{ .int = 0 }) or
+                        (gep.indices.items[0].ty.int == 64 and
+                            (gep.indices.items[0].value == .int or gep.indices.items[0].value == .named))))
                 {
-                    if (std.math.cast(usize, gep.indices.items[1].value.int)) |field| {
-                        if (storage.fieldOffset(context, gep.source_ty, field)) |offset| {
-                            var copy = inst;
-                            copy.kind.gep.source_ty = .{ .int = 8 };
-                            copy.kind.gep.indices = .empty;
-                            try copy.kind.gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
-                            try block.instructions.append(allocator, copy);
-                            changed = true;
-                            continue;
+                    if (structureOffset(context, gep)) |offset| {
+                        var base = gep.ptr;
+                        if (!gep.indices.items[0].value.eql(.{ .int = 0 })) {
+                            // Keep allocation stride and member placement as
+                            // separate proven GEPs. The normal byte-offset
+                            // path below owns scaling on the next iteration.
+                            const name = try forms.temporary(allocator, function, &serial);
+                            var step = inst;
+                            step.result = name;
+                            step.kind.gep.indices = .empty;
+                            try step.kind.gep.indices.append(allocator, gep.indices.items[0]);
+                            try block.instructions.append(allocator, step);
+                            base = .{ .named = name };
                         }
+                        var copy = inst;
+                        copy.kind.gep.ptr = base;
+                        copy.kind.gep.source_ty = .{ .int = 8 };
+                        copy.kind.gep.indices = .empty;
+                        try copy.kind.gep.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = offset } });
+                        try block.instructions.append(allocator, copy);
+                        changed = true;
+                        continue;
                     }
                 }
                 // A leading zero steps within the same array; the second
@@ -91,6 +104,19 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         try result.blocks.append(allocator, block);
     }
     return if (changed) result else null;
+}
+
+fn structureOffset(context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) ?u32 {
+    if (gep.indices.items.len > 32) return null;
+    var ty = gep.source_ty;
+    var offset: u32 = 0;
+    for (gep.indices.items[1..]) |index| {
+        if (!index.ty.eql(.{ .int = 32 }) or index.value != .int) return null;
+        const member = storage.fieldInfo(context, ty, std.math.cast(usize, index.value.int) orelse return null) orelse return null;
+        offset = std.math.add(u32, offset, member.offset) catch return null;
+        ty = member.ty;
+    }
+    return offset;
 }
 
 fn isByteArray(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) bool {

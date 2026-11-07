@@ -1,6 +1,7 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("tests/ir_packed_structures.zig");
     _ = @import("compilation_profile.zig");
     _ = @import("codegen/x86_64/generic_cfg/optional_legalization.zig");
     _ = @import("codegen/x86_64/generic_cfg/rewrite_candidate_tests.zig");

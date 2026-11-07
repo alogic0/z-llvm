@@ -41,6 +41,43 @@ test "address flow named struct fields use complete padded and packed layouts" {
     }
 }
 
+test "packed structures compose runtime strides and nested member offsets" {
+    for ([_][]const u8{ "<{ i8, { i8, i64 }, i16 }>", "{ i8, { i8, i64 }, i16 }" }, [_]u64{ 19, 32 }, [_]u64{ 9, 16 }) |body, stride, offset| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @field(ptr %p, i64 %index) {{\nentry:\n %q = getelementptr {s}, ptr %p, i64 %index, i32 1, i32 1\n %bits = ptrtoint ptr %q to i64\n ret i64 %bits\n}}\n", .{body});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u64{ 0, 1000, std.math.maxInt(u64) - 3 }) |base| {
+            for ([_]u64{ 0, 1, 3, 0x8000000000000000, std.math.maxInt(u64) }) |index|
+                try std.testing.expectEqual(base +% index *% stride +% offset, run(base, index));
+        }
+        try module.verify();
+        try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].blocks.items[0].instructions.items.len);
+    }
+}
+
+test "packed structures keep unresolved and invalid member addressing unsupported" {
+    for ([_][]const u8{
+        "getelementptr <{}>, ptr %p, i64 %index, i32 0",
+        "getelementptr <{ i8, %Missing }>, ptr %p, i64 %index, i32 0",
+        "getelementptr <{ i8, i64 }>, ptr %p, i64 %index, i32 -1",
+        "getelementptr <{ i8, i64 }>, ptr %p, i64 %index, i32 2",
+        "getelementptr <{ i8, i64 }>, ptr %p, i64 %index, i64 1",
+    }) |gep| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define ptr @field(ptr %p, i64 %index) {{\nentry:\n %q = {s}\n ret ptr %q\n}}\n", .{gep});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try addresses.legalize(arena.allocator(), module.functions.items[0], null) == null);
+    }
+}
+
 test "address flow schedules late dominators and retains every unreachable block" {
     const text =
         \\define i64 @f(i64 %a, i64 %b) {

@@ -1,5 +1,6 @@
 const std = @import("std");
 const core = @import("core.zig");
+const structure = @import("structure.zig");
 const fp_semantics = @import("../analysis/fp_semantics.zig");
 const syntax = @import("parser_syntax.zig");
 const findClosingQuote = syntax.findClosingQuote;
@@ -39,6 +40,7 @@ pub fn parseType(text: []const u8) !core.Type {
     if (std.mem.eql(u8, trimmed, "x86_fp80")) return .x86_fp80;
     if (std.mem.eql(u8, trimmed, "fp128")) return .fp128;
     if (std.mem.eql(u8, trimmed, "metadata")) return .metadata;
+    if (structure.Fields.init(trimmed) != null) return .{ .aggregate = trimmed };
     if (trimmed.len >= 2 and trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') return .{ .vector = try parseVectorType(trimmed) };
     if (trimmed.len >= 2 and ((trimmed[0] == '{' and trimmed[trimmed.len - 1] == '}') or
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
@@ -187,6 +189,7 @@ pub fn parseValue(text: []const u8) !core.Value {
     if (std.mem.eql(u8, trimmed, "zeroinitializer")) return .zero_initializer;
     if (std.mem.eql(u8, trimmed, "true")) return .{ .int = 1 };
     if (std.mem.eql(u8, trimmed, "false")) return .{ .int = 0 };
+    if (structure.Fields.init(trimmed) != null) return .{ .constant_expr = trimmed };
     if ((trimmed[0] == '<' and trimmed[trimmed.len - 1] == '>') or
         (std.mem.startsWith(u8, trimmed, "splat (") and std.mem.endsWith(u8, trimmed, ")")))
     {
@@ -210,7 +213,7 @@ pub fn parseValue(text: []const u8) !core.Value {
 }
 
 pub fn isSupportedConstantExpr(text: []const u8) bool {
-    if (std.mem.startsWith(u8, text, "{") and std.mem.endsWith(u8, text, "}")) return true;
+    if (structure.Fields.init(text) != null) return true;
     return (std.mem.startsWith(u8, text, "inttoptr (") or
         std.mem.startsWith(u8, text, "ptrtoint (") or
         std.mem.startsWith(u8, text, "sub (") or

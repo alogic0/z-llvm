@@ -262,7 +262,7 @@ pub fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text:
         return .{ .array = array };
     }
 
-    if (ty == .aggregate and std.mem.indexOfAny(u8, text, " \t") != null) return .{ .@"opaque" = text };
+    if (ty == .aggregate and (std.mem.indexOfAny(u8, text, " \t") != null or @import("structure.zig").Fields.init(text) != null)) return .{ .@"opaque" = text };
     if (isSupportedConstantExpr(text)) return .{ .scalar = .{ .constant_expr = text } };
     if (ty == .vector and std.mem.startsWith(u8, text, "<") and std.mem.endsWith(u8, text, ">")) {
         return .{ .scalar = .{ .vector = text } };
