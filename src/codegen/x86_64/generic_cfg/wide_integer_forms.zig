@@ -66,7 +66,7 @@ const Builder = struct {
     allocator: std.mem.Allocator,
     function: ir.Function,
     block: *ir.BasicBlock,
-    serial: *usize,
+    serial: *forms.TemporaryNames,
     fn emit(self: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
         const name = try forms.temporary(self.allocator, self.function, self.serial);
         try self.block.instructions.append(self.allocator, .{ .result = name, .kind = kind });
@@ -133,7 +133,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     result.params = try function.params.clone(allocator);
     result.blocks = .empty;
     if (wide(result.ret_ty)) result.ret_ty = pair;
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (result.params.items) |*param| if (wide(param.ty)) {
         param.ty = pair;
         param.name = try forms.temporary(allocator, function, &serial);

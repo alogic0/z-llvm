@@ -12,13 +12,13 @@ fn minimumMaximum(op: Operation) bool {
     return op == .umin or op == .umax or op == .smin or op == .smax;
 }
 
-fn emit(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
+fn emit(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
     const name = try forms.temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = name, .kind = kind });
     return .{ .named = name };
 }
 
-fn extend(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
+fn extend(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
     if (value == .int) return emit(allocator, function, block, serial, .{ .binary = .{
         .op = .add,
         .ty = wide,
@@ -56,7 +56,8 @@ fn operation(call: ir.CallInst) ?Operation {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

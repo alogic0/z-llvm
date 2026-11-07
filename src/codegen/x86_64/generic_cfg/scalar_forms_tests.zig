@@ -7,6 +7,42 @@ const encoding = @import("../../../mc/encoding.zig");
 const forms = @import("scalar_forms.zig");
 const edges = @import("switch_phi_edges.zig");
 
+test "scalar temporary index preserves scan order across sparse collisions without rescanning" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var module = try ir.Module.parse(a,
+        \\define i32 @names(i32 %__zllvm_scalar_form_0) {
+        \\entry:
+        \\ ret i32 0
+        \\}
+    );
+    defer module.deinit();
+    const function = &module.functions.items[0];
+    for (1..2048) |i| {
+        const name = if (i % 3 == 0)
+            try std.fmt.allocPrint(a, "\"\\5F_zllvm_scalar_form_{d}\"", .{i * 2})
+        else
+            try std.fmt.allocPrint(a, "__zllvm_scalar_form_{d}", .{i * 2});
+        try function.blocks.items[0].instructions.append(a, .{ .result = name, .removed = i % 5 == 0, .kind = .{ .binary = .{
+            .op = .add,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .int = 0 },
+            .rhs = .{ .int = 0 },
+        } } });
+    }
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(a);
+    // The old scan reserves removed results too. Sparse slots and escaped
+    // aliases must yield exactly the same first available sequence.
+    for (0..4096) |i| {
+        const name = try forms.temporary(a, function.*, &serial);
+        const expected = if (i < 2048) i * 2 + 1 else i + 2048;
+        try std.testing.expectEqualStrings(try std.fmt.allocPrint(a, "__zllvm_scalar_form_{d}", .{expected}), name);
+        try std.testing.expectEqual(@as(usize, 2049), serial.names_visited);
+    }
+}
+
 test "scalar temporary names release collisions with parameters blocks and results" {
     const source =
         \\define i32 @names(i32 %__zllvm_scalar_form_0) {
@@ -18,11 +54,12 @@ test "scalar temporary names release collisions with parameters blocks and resul
     var module = try ir.Module.parse(std.testing.allocator, source);
     defer module.deinit();
     try module.verify();
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(std.testing.allocator);
     const name = try forms.temporary(std.testing.allocator, module.functions.items[0], &serial);
     defer std.testing.allocator.free(name);
     try std.testing.expectEqualStrings("__zllvm_scalar_form_3", name);
-    try std.testing.expectEqual(@as(usize, 4), serial);
+    try std.testing.expectEqual(@as(usize, 4), serial.next);
 }
 
 test "scalar temporary names skip quoted aliases while preserving the first available serial" {
@@ -36,13 +73,14 @@ test "scalar temporary names skip quoted aliases while preserving the first avai
     var module = try ir.Module.parse(std.testing.allocator, source);
     defer module.deinit();
     try module.verify();
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(std.testing.allocator);
     for ([_][]const u8{ "__zllvm_scalar_form_2", "__zllvm_scalar_form_4" }) |expected| {
         const name = try forms.temporary(std.testing.allocator, module.functions.items[0], &serial);
         defer std.testing.allocator.free(name);
         try std.testing.expectEqualStrings(expected, name);
     }
-    try std.testing.expectEqual(@as(usize, 5), serial);
+    try std.testing.expectEqual(@as(usize, 5), serial.next);
     try module.verify();
 }
 

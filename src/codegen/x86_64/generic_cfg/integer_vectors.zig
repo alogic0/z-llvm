@@ -50,7 +50,7 @@ const Builder = struct {
     allocator: std.mem.Allocator,
     function: ir.Function,
     block: *ir.BasicBlock,
-    serial: *usize,
+    serial: *forms.TemporaryNames,
     vectors: *std.StringHashMap(Lanes),
 
     fn emit(b: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
@@ -177,7 +177,8 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
     result.blocks = .empty;
     var vectors = std.StringHashMap(Lanes).init(allocator);
     defer vectors.deinit();
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     var changed = false;
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;

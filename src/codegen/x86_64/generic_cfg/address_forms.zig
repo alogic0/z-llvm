@@ -11,7 +11,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
     if (!addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null)) return null;
     var result = function;
     result.blocks = .empty;
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     var changed = false;
     for (function.blocks.items) |original| {
         var block = original;

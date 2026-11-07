@@ -5,23 +5,48 @@ const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const sysv = @import("../sysv_abi.zig");
 
-pub fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize) ![]const u8 {
-    while (true) {
-        const name = try std.fmt.allocPrint(allocator, "__zllvm_scalar_form_{d}", .{serial.*});
-        serial.* += 1;
-        var collision = false;
-        for (function.params.items) |param| if (ir.identifiers.eql(param.name, name)) {
-            collision = true;
-        };
-        for (function.blocks.items) |block| {
-            if (ir.identifiers.eql(block.name, name)) collision = true;
-            for (block.instructions.items) |inst| if (inst.result) |result| {
-                if (ir.identifiers.eql(result, name)) collision = true;
-            };
-        }
-        if (!collision) return name;
-        allocator.free(name);
+const temporary_prefix = "__zllvm_scalar_form_";
+
+/// One state per immutable source function, prefix and rewrite attempt. Build the
+/// collision index only on the first requested temporary; unsuccessful scans
+/// still allocate nothing. Monotonic serials also exclude generated names.
+pub const TemporaryNames = struct {
+    prefix: []const u8 = temporary_prefix,
+    next: usize = 0,
+    initialized: bool = false,
+    names_visited: usize = 0,
+    occupied: std.AutoHashMapUnmanaged(usize, void) = .empty,
+
+    pub fn deinit(self: *TemporaryNames, allocator: std.mem.Allocator) void {
+        self.occupied.deinit(allocator);
     }
+
+    fn visit(self: *TemporaryNames, allocator: std.mem.Allocator, name: []const u8) !void {
+        self.names_visited += 1;
+        // Most source names cannot collide. Avoid decoding ordinary names
+        // unless their spelling starts with our prefix.
+        if (name.len == 0 or (name[0] != '"' and !std.mem.startsWith(u8, name, self.prefix))) return;
+        if (ir.identifiers.indexedSuffix(name, self.prefix)) |suffix| try self.occupied.put(allocator, suffix, {});
+    }
+
+    fn index(self: *TemporaryNames, allocator: std.mem.Allocator, function: ir.Function) !void {
+        if (self.initialized) return;
+        for (function.params.items) |param| try self.visit(allocator, param.name);
+        for (function.blocks.items) |block| {
+            try self.visit(allocator, block.name);
+            for (block.instructions.items) |inst| if (inst.result) |result| try self.visit(allocator, result);
+        }
+        self.initialized = true;
+    }
+};
+
+pub fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *TemporaryNames) ![]const u8 {
+    try serial.index(allocator, function);
+    while (serial.occupied.contains(serial.next)) serial.next = try std.math.add(usize, serial.next, 1);
+    const name = try std.fmt.allocPrint(allocator, "{s}{d}", .{ serial.prefix, serial.next });
+    errdefer allocator.free(name);
+    serial.next = try std.math.add(usize, serial.next, 1);
+    return name;
 }
 
 fn unsignedMin(call: ir.CallInst) bool {
@@ -53,7 +78,8 @@ fn unsignedSaturatingSub(call: ir.CallInst) bool {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

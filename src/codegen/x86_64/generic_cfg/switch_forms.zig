@@ -49,7 +49,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     if (!changed) return null;
     var result = function;
     result.blocks = try function.blocks.clone(allocator);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         const term = original.terminator orelse continue;
         if (term != .@"switch" or !needsRewrite(term.@"switch")) continue;

@@ -48,7 +48,7 @@ const Builder = struct {
     allocator: std.mem.Allocator,
     function: ir.Function,
     block: *ir.BasicBlock,
-    serial: *usize,
+    serial: *forms.TemporaryNames,
     carrier: ir.Type = word,
 
     fn emit(self: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
@@ -102,7 +102,8 @@ const Builder = struct {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var names = std.StringHashMap(Entry).init(allocator);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.result == null or inst.kind != .call) continue;
         const op = operation(inst.kind.call) orelse continue;

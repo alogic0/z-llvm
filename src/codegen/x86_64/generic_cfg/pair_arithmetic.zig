@@ -16,7 +16,7 @@ const Builder = struct {
     allocator: std.mem.Allocator,
     function: ir.Function,
     block: *ir.BasicBlock,
-    serial: *usize,
+    serial: *forms.TemporaryNames,
     known_parts: *std.StringHashMap(Parts),
 
     fn emit(self: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
@@ -149,7 +149,8 @@ fn divisor(value: ir.BinaryInst) ?u32 {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     var known_parts = std.StringHashMap(Parts).init(allocator);
     defer known_parts.deinit();
     for (function.blocks.items, 0..) |original, block_index| {

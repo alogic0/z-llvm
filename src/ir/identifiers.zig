@@ -64,6 +64,46 @@ pub fn isValid(text: []const u8) bool {
     return parse(text) != null;
 }
 
+/// Match a named identifier made from a prefix and the canonical decimal
+/// spelling of an index. Quoted/escaped aliases retain the same identity;
+/// numbered slots, leading zeroes and malformed spellings do not match.
+pub fn indexedSuffix(text: []const u8, prefix: []const u8) ?usize {
+    const name = parse(text) orelse return null;
+    if (name != .named) return null;
+    var bytes = name.named;
+    for (prefix) |expected| if (bytes.next() != expected) return null;
+    const first = bytes.next() orelse return null;
+    if (!std.ascii.isDigit(first)) return null;
+    var result: usize = first - '0';
+    while (bytes.next()) |byte| {
+        if (first == '0' or !std.ascii.isDigit(byte)) return null;
+        result = std.math.mul(usize, result, 10) catch return null;
+        result = std.math.add(usize, result, byte - '0') catch return null;
+    }
+    return result;
+}
+
+/// Hash maps over verified identifiers must use the same decoded identity as
+/// reference comparisons, including the separate numbered-slot namespace.
+pub const Context = struct {
+    pub fn hash(_: Context, text: []const u8) u64 {
+        const name = parse(text) orelse return std.hash.Wyhash.hash(2, text);
+        var h = std.hash.Wyhash.init(if (name == .numbered) 0 else 1);
+        switch (name) {
+            .numbered => |number| h.update(std.mem.asBytes(&number)),
+            .named => |value| {
+                var bytes = value;
+                while (bytes.next()) |byte| h.update(&.{byte});
+            },
+        }
+        return h.final();
+    }
+
+    pub fn eql(_: Context, left: []const u8, right: []const u8) bool {
+        return @import("identifiers.zig").eql(left, right);
+    }
+};
+
 /// A false result establishes different identities only when both spellings
 /// are supported. Reference walkers must report other input as unknown.
 pub fn eql(left: []const u8, right: []const u8) bool {

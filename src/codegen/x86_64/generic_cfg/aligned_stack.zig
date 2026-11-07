@@ -9,7 +9,8 @@ const forms = @import("scalar_forms.zig");
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

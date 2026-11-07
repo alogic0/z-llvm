@@ -16,7 +16,7 @@ fn operand(value: ir.Value, bits: u16) bool {
         value.int < (@as(i128, 1) << @as(u7, @intCast(bits)));
 }
 
-fn literal(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, value: ir.Value) !ir.Value {
+fn literal(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, value: ir.Value) !ir.Value {
     if (value == .named) return value;
     const name = try forms.temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = name, .kind = .{ .binary = .{ .op = .add, .ty = ty, .lhs = value, .rhs = .{ .int = 0 } } } });
@@ -49,7 +49,8 @@ fn constantProduct(call: ir.CallInst) bool {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

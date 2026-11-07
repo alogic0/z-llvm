@@ -1,6 +1,14 @@
 const std = @import("std");
 const identifiers = @import("../ir/identifiers.zig");
 
+test "indexed identifier suffixes preserve canonical spelling and escaped identity" {
+    for ([_][]const u8{ "tmp_12", "\"tmp_12\"", "\"\\74mp_\\31\\32\"" }) |name|
+        try std.testing.expectEqual(@as(?usize, 12), identifiers.indexedSuffix(name, "tmp_"));
+    try std.testing.expectEqual(@as(?usize, 0), identifiers.indexedSuffix("tmp_0", "tmp_"));
+    for ([_][]const u8{ "tmp_", "tmp_00", "tmp_01", "tmp_-1", "tmp_+1", "tmp_1x", "tmp_1 ", "\"tmp_\\00\"", "\"tmp_\\q1\"", "\"tmp_1\"x", "tmp_184467440737095516160", "12" }) |name|
+        try std.testing.expectEqual(@as(?usize, null), identifiers.indexedSuffix(name, "tmp_"));
+}
+
 test "identifier identity decodes complete quoted and escaped names" {
     const pairs = [_][2][]const u8{
         .{ "helper", "\"hel\\70er\"" },
@@ -18,6 +26,8 @@ test "identifier identity decodes complete quoted and escaped names" {
         try std.testing.expect(identifiers.isValid(pair[1]));
         try std.testing.expect(identifiers.eql(pair[0], pair[1]));
         try std.testing.expect(identifiers.eql(pair[1], pair[0]));
+        const context: identifiers.Context = .{};
+        try std.testing.expectEqual(context.hash(pair[0]), context.hash(pair[1]));
     }
 }
 

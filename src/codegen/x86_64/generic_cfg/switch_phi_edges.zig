@@ -26,7 +26,8 @@ pub fn retainLabels(allocator: std.mem.Allocator, output: *machine.MachineFuncti
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var edges: std.ArrayList(Edge) = .empty;
-    var serial: usize = 0;
+    var serial: names.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |block, from| {
         const term = block.terminator orelse continue;
         if (term != .@"switch") continue;

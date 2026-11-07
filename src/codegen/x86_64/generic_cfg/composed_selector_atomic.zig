@@ -151,7 +151,8 @@ pub fn lowerRmw(selector: *Selector, result: ?[]const u8, rmw: core_ir.AtomicRmw
 const Slot = struct { name: []const u8, frame: types.FrameIndex };
 fn slot(selector: *Selector) !Slot {
     const function = selector.function orelse return error.UnsupportedCodegenValue;
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(selector.allocator);
     while (true) {
         const name = try forms.temporary(selector.allocator, function.*, &serial);
         // temporary excludes every SSA name in the legalized function. Every

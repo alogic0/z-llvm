@@ -7,77 +7,130 @@ const storage = @import("storage_layout.zig");
 const helpers = @import("composed_helpers.zig");
 const forms = @import("scalar_forms.zig");
 
-fn named(value: ir.Value, name: []const u8) bool {
-    return value == .named and ir.identifiers.eql(value.named, name);
+const Use = struct { bytes: u32, scalar: bool = false, bounded: bool = true };
+const Uses = std.HashMap([]const u8, Use, ir.identifiers.Context, std.hash_map.default_max_load_percentage);
+
+fn use(uses: *Uses, value: ir.Value) ?*Use {
+    return if (value == .named) uses.getPtr(value.named) else null;
 }
 
-fn boundedMemoryUses(function: ir.Function, name: []const u8, bytes: u32) bool {
-    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
-        if (inst.removed or inst.kind != .call) continue;
-        const call = inst.kind.call;
-        const memory = std.mem.startsWith(u8, call.callee, "llvm.memcpy.") or
-            std.mem.startsWith(u8, call.callee, "llvm.memmove.") or
-            std.mem.startsWith(u8, call.callee, "llvm.memset.");
-        if (!memory) continue;
-        for (call.args.items) |arg| if (arg.ty == .ptr and named(arg.value, name)) {
-            if (call.args.items.len != 4) return false;
-            const length = call.args.items[2].value;
-            if (length != .int or length.int < 0 or length.int > bytes) return false;
-        };
-    };
-    return true;
+fn scalar(uses: *Uses, value: ir.Value, width: u32) void {
+    if (use(uses, value)) |entry| {
+        if (width <= entry.bytes) entry.scalar = true;
+    }
 }
 
-fn scalarUse(function: ir.Function, name: []const u8, bytes: u32) bool {
+// Observe every use once for all candidate allocations. Preserve the exact
+// scalar-use and bounded-memory contracts, including escaped identifier aliases.
+fn collectUses(uses: *Uses, function: ir.Function) void {
     for (function.blocks.items) |block| {
         for (block.instructions.items) |inst| {
             if (inst.removed) continue;
             switch (inst.kind) {
                 .phi => |phi| if (phi.ty == .ptr) {
-                    for (phi.incoming.items) |incoming| if (named(incoming.value, name)) return true;
+                    for (phi.incoming.items) |incoming| scalar(uses, incoming.value, 0);
                 },
-                .select => |select| if (select.ty == .ptr and (named(select.true_value, name) or named(select.false_value, name))) return true,
+                .select => |select| if (select.ty == .ptr) {
+                    scalar(uses, select.true_value, 0);
+                    scalar(uses, select.false_value, 0);
+                },
                 .store => |store| {
-                    if (store.ty == .ptr and named(store.value, name)) return true;
+                    if (store.ty == .ptr) scalar(uses, store.value, 0);
                     const width: u32 = if (store.ty == .ptr) 64 else if (store.ty == .int) store.ty.int else 0;
-                    if (named(store.ptr, name) and width > 0 and width <= 64 and (width + 7) / 8 <= bytes) return true;
+                    if (width > 0 and width <= 64) scalar(uses, store.ptr, (width + 7) / 8);
                 },
                 .load => |load| {
                     const width: u32 = if (load.ty == .ptr) 64 else if (load.ty == .int) load.ty.int else 0;
-                    if (named(load.ptr, name) and width > 0 and width <= 64 and (width + 7) / 8 <= bytes) return true;
+                    if (width > 0 and width <= 64) scalar(uses, load.ptr, (width + 7) / 8);
                 },
-                .call => |call| if (call.inline_asm == null and call.raw_args == null) {
+                .call => |call| {
                     const memory = std.mem.startsWith(u8, call.callee, "llvm.memcpy.") or
                         std.mem.startsWith(u8, call.callee, "llvm.memmove.") or
                         std.mem.startsWith(u8, call.callee, "llvm.memset.");
                     for (call.args.items, 0..) |arg, index| {
-                        if (arg.ty != .ptr or !named(arg.value, name)) continue;
+                        if (arg.ty != .ptr) continue;
+                        const entry = use(uses, arg.value) orelse continue;
+                        var bounded = true;
                         if (memory) {
-                            if (index > 1 or call.args.items.len != 4) continue;
-                            const length = call.args.items[2].value;
-                            if (length != .int or length.int < 0 or length.int > bytes) continue;
+                            bounded = call.args.items.len == 4;
+                            if (bounded) {
+                                const length = call.args.items[2].value;
+                                bounded = length == .int and length.int >= 0 and length.int <= entry.bytes;
+                            }
+                            if (!bounded) entry.bounded = false;
                         }
-                        return true;
+                        if (call.inline_asm == null and call.raw_args == null and
+                            (!memory or (index <= 1 and bounded))) entry.scalar = true;
                     }
                 },
-                .cast => |cast| if (cast.from_ty == .ptr and named(cast.value, name)) return true,
-                .icmp => |icmp| if (icmp.operand_ty == .ptr and (named(icmp.lhs, name) or named(icmp.rhs, name))) return true,
-                .gep => |gep| if (named(gep.ptr, name)) {
-                    for (gep.indices.items) |index| if (index.value == .named) return true;
+                .cast => |cast| if (cast.from_ty == .ptr) scalar(uses, cast.value, 0),
+                .icmp => |icmp| if (icmp.operand_ty == .ptr) {
+                    scalar(uses, icmp.lhs, 0);
+                    scalar(uses, icmp.rhs, 0);
+                },
+                .gep => |gep| {
+                    for (gep.indices.items) |index| if (index.value == .named) {
+                        scalar(uses, gep.ptr, 0);
+                        break;
+                    };
                 },
                 else => {},
             }
         }
-        if (block.terminator) |term| if (term == .ret and term.ret.ty == .ptr and term.ret.value != null and named(term.ret.value.?, name)) return true;
+        if (block.terminator) |term| if (term == .ret and term.ret.ty == .ptr and term.ret.value != null) scalar(uses, term.ret.value.?, 0);
     }
-    return false;
+}
+
+test "stack use index preserves quoted aliases width bounds and invalid memory uses" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    for ([_]struct { width: u8, length: []const u8, scalar_use: bool, bounded: bool }{
+        .{ .width = 32, .length = "4", .scalar_use = true, .bounded = true },
+        .{ .width = 32, .length = "5", .scalar_use = true, .bounded = false },
+        .{ .width = 32, .length = "%n", .scalar_use = true, .bounded = false },
+        .{ .width = 64, .length = "5", .scalar_use = false, .bounded = false },
+    }) |case| {
+        const source = try std.fmt.allocPrint(a,
+            \\declare void @llvm.memset.p0.i64(ptr, i8, i64, i1)
+            \\define void @uses(i64 %n) {{
+            \\entry:
+            \\ %"\73lot" = alloca i32
+            \\ %v = load i{d}, ptr %"\73lot", align 1
+            \\ call void @llvm.memset.p0.i64(ptr %"\73lot", i8 0, i64 {s}, i1 false)
+            \\ ret void
+            \\}}
+        , .{ case.width, case.length });
+        var module = try ir.Module.parse(a, source);
+        defer module.deinit();
+        try module.verify();
+        var uses = Uses.init(a);
+        defer uses.deinit();
+        try uses.put("slot", .{ .bytes = 4 });
+        collectUses(&uses, module.functions.items[0]);
+        const actual = uses.get("\"\\73lot\"").?;
+        try std.testing.expectEqual(case.scalar_use, actual.scalar);
+        try std.testing.expectEqual(case.bounded, actual.bounded);
+    }
 }
 
 const Slot = struct { backing: []const u8, bytes: u32, alignment: u32 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    var uses = Uses.init(allocator);
+    defer uses.deinit();
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.result == null or inst.kind != .alloca) continue;
+        const ty = inst.kind.alloca.allocated_ty;
+        if (ty == .aggregate and helpers.parseI32ArrayType(ty) == null) continue;
+        const layout = storage.query(context, ty) orelse continue;
+        try uses.put(inst.result.?, .{ .bytes = layout.bytes });
+    };
+    if (uses.count() == 0) return null;
+    collectUses(&uses, function);
     var slots = std.StringHashMap(Slot).init(allocator);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.result == null or inst.kind != .alloca) continue;
         const alloca = inst.kind.alloca;
@@ -85,8 +138,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         // concrete array carrier and native scalar objects enter this view.
         if (alloca.allocated_ty == .aggregate and helpers.parseI32ArrayType(alloca.allocated_ty) == null) continue;
         const layout = storage.query(context, alloca.allocated_ty) orelse continue;
-        if (!scalarUse(function, inst.result.?, layout.bytes)) continue;
-        if (!boundedMemoryUses(function, inst.result.?, layout.bytes)) return null;
+        const usage = uses.get(inst.result.?) orelse continue;
+        if (!usage.scalar) continue;
+        if (!usage.bounded) return null;
         if (!alloca.isSingleObject() or alloca.allocated_ty_addrspace != null) return null;
         var alignment = layout.alignment;
         if (alloca.attrs) |attrs| {

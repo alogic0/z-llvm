@@ -43,7 +43,7 @@ fn pointerValue(value: ir.Value) bool {
     return value == .null_value or (value == .named and !std.mem.startsWith(u8, value.named, "@"));
 }
 
-fn literal(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, bits: u16, value: i128) !ir.Value {
+fn literal(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, bits: u16, value: i128) !ir.Value {
     const name = try forms.temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = name, .kind = .{ .binary = .{
         .op = .add,
@@ -54,7 +54,7 @@ fn literal(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Basic
     return .{ .named = name };
 }
 
-fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, value: ir.Value, signed: bool) !ir.Value {
+fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, value: ir.Value, signed: bool) !ir.Value {
     const bits: u16 = if (ty == .ptr) 64 else ty.int;
     const wide: u16 = if (bits <= 32) 32 else 64;
     if (value == .null_value) return literal(allocator, function, block, serial, 64, 0);
@@ -142,7 +142,8 @@ pub fn requiresNarrowNormalization(function: ir.Function) bool {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

@@ -16,27 +16,27 @@ fn operand(value: ir.Value, bits: u16) bool {
         else => false,
     };
 }
-fn emit(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
+fn emit(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
     const name = try forms.temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = name, .kind = kind });
     return .{ .named = name };
 }
-fn binary(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, op: ir.BinaryOp, lhs: ir.Value, rhs: ir.Value) !ir.Value {
+fn binary(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, op: ir.BinaryOp, lhs: ir.Value, rhs: ir.Value) !ir.Value {
     return emit(allocator, function, block, serial, .{ .binary = .{ .op = op, .ty = ty, .lhs = lhs, .rhs = rhs } });
 }
-fn unsigned(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
+fn unsigned(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
     if (value == .int) return binary(allocator, function, block, serial, wide, .add, .{ .int = value.int & ((@as(i128, 1) << @as(u7, @intCast(ty.int))) - 1) }, .{ .int = 0 });
     if (ty.eql(wide)) return value;
     return emit(allocator, function, block, serial, .{ .cast = .{ .op = .zext, .from_ty = ty, .to_ty = wide, .value = value } });
 }
-fn signed(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
+fn signed(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
     const bits = try unsigned(allocator, function, block, serial, ty, wide, value);
     if (ty.eql(wide)) return bits;
     const amount: ir.Value = .{ .int = wide.int - ty.int };
     const shifted = try binary(allocator, function, block, serial, wide, .shl, bits, amount);
     return binary(allocator, function, block, serial, wide, .ashr, shifted, amount);
 }
-fn signedDivision(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, op: ir.BinaryOp, lhs: ir.Value, rhs: ir.Value) !ir.Value {
+fn signedDivision(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, op: ir.BinaryOp, lhs: ir.Value, rhs: ir.Value) !ir.Value {
     const sign_a = try binary(allocator, function, block, serial, ty, .ashr, lhs, .{ .int = ty.int - 1 });
     const sign_b = try binary(allocator, function, block, serial, ty, .ashr, rhs, .{ .int = ty.int - 1 });
     const flip_a = try binary(allocator, function, block, serial, ty, .xor, lhs, sign_a);
@@ -95,7 +95,8 @@ pub fn requiresNormalization(function: ir.Function) bool {
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

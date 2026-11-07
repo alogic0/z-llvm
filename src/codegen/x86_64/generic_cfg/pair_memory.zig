@@ -15,7 +15,7 @@ const Builder = struct {
     allocator: std.mem.Allocator,
     function: ir.Function,
     block: *ir.BasicBlock,
-    serial: *usize,
+    serial: *forms.TemporaryNames,
 
     fn emit(b: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
         const name = try forms.temporary(b.allocator, b.function, b.serial);
@@ -211,7 +211,8 @@ fn finalStackRead(function: ir.Function, block: ir.BasicBlock, index: usize, ptr
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
     if (!addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null)) return null;
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     var preserved = PreservedPointers.init(allocator);
     defer preserved.deinit();
     for (function.blocks.items, 0..) |original, block_index| {

@@ -5,7 +5,7 @@ const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 
-fn normalize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, value: ir.Value, bits: u16, result: []const u8) !void {
+fn normalize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, value: ir.Value, bits: u16, result: []const u8) !void {
     var low = value;
     if (value == .int) {
         low = .{ .int = value.int & 1 };
@@ -36,7 +36,8 @@ fn normalize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;

@@ -9,6 +9,7 @@ const machine = @import("../machine.zig");
 const pairs = @import("word_pair_memory.zig");
 const storage = @import("storage_layout.zig");
 const helpers = @import("composed_helpers.zig");
+const forms = @import("scalar_forms.zig");
 
 fn trim(text: []const u8) []const u8 {
     return std.mem.trim(u8, text, " \t\r\n");
@@ -55,28 +56,8 @@ fn alignment(alloca: ir.AllocaInst) ?u32 {
     return @max(value, 8);
 }
 
-fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize) ![]const u8 {
-    while (true) {
-        const name = try std.fmt.allocPrint(allocator, "__zllvm_padded_frame_{d}", .{serial.*});
-        serial.* += 1;
-        var collision = false;
-        for (function.params.items) |param| if (ir.identifiers.eql(param.name, name)) {
-            collision = true;
-        };
-        for (function.blocks.items) |block| if (ir.identifiers.eql(block.name, name)) {
-            collision = true;
-        };
-        for (function.blocks.items) |block| for (block.instructions.items) |inst| {
-            if (inst.result) |result| if (ir.identifiers.eql(result, name)) {
-                collision = true;
-            };
-        };
-        if (!collision) return name;
-    }
-}
-
-fn address(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, value: ir.Value) !ir.Value {
-    const name = try temporary(allocator, function, serial);
+fn address(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, value: ir.Value) !ir.Value {
+    const name = try forms.temporary(allocator, function, serial);
     var indices: std.ArrayList(ir.GepIndex) = .empty;
     try indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
     try block.instructions.append(allocator, .{ .result = name, .kind = .{ .gep = .{
@@ -136,7 +117,8 @@ fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, context: ?*
 
     var result = function;
     result.blocks = .empty;
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{ .prefix = "__zllvm_padded_frame_" };
+    defer serial.deinit(allocator);
     for (function.blocks.items) |original| {
         var block = original;
         block.instructions = .empty;

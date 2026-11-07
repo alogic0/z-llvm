@@ -13,7 +13,7 @@ fn constant(value: ir.Value) bool {
     return addresses.fromValue(value) != null or addresses.pointerBits(value) != null;
 }
 
-fn materialize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, value: ir.Value) !ir.Value {
+fn materialize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, value: ir.Value) !ir.Value {
     if (!constant(value)) return value;
     const name = try forms.temporary(allocator, function, serial);
     if (addresses.fromValue(value)) |address| {
@@ -59,7 +59,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
     if (!addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null)) return null;
     var result = function;
     result.blocks = .empty;
-    var serial: usize = 0;
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
     var changed = false;
     for (function.blocks.items) |original| {
         var block = original;
