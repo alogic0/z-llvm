@@ -1,6 +1,39 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
 
+test "compiler uitofp nneg flag permits only its defined cast forms" {
+    for ([_]struct { op: []const u8, flags: []const u8, err: ?anyerror = null }{
+        .{ .op = "uitofp", .flags = "nneg" },
+        .{ .op = "uitofp", .flags = "nuw", .err = error.InvalidInstructionFlag },
+        .{ .op = "uitofp", .flags = "nsw", .err = error.InvalidInstructionFlag },
+        .{ .op = "sitofp", .flags = "nneg", .err = error.InvalidInstructionFlag },
+    }) |case| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define float @f(i8 %v) {{\nentry:\n %r = {s} {s} i8 %v to float\n ret float %r\n}}", .{ case.op, case.flags });
+        defer std.testing.allocator.free(source);
+        var module = try roundTrip(source);
+        defer module.deinit();
+        if (case.err) |err| try std.testing.expectError(err, module.verify()) else try module.verify();
+    }
+}
+
+test "compiler vector GEP validates result uses integer lanes and matching lane counts" {
+    for ([_]struct { indices: []const u8, result: []const u8 = "<2 x ptr>", err: ?anyerror = null }{
+        .{ .indices = "<2 x i64> <i64 0, i64 1>" },
+        .{ .indices = "i64 0, <2 x i32> <i32 0, i32 1>" },
+        .{ .indices = "<2 x i64> <i64 0, i64 1>, <2 x i32> zeroinitializer" },
+        .{ .indices = "<2 x i64> <i64 0, i64 1>", .result = "ptr", .err = error.TypeMismatch },
+        .{ .indices = "<2 x i64> <i64 0, i64 1>", .result = "<4 x ptr>", .err = error.TypeMismatch },
+        .{ .indices = "<2 x float> zeroinitializer", .err = error.ExpectedIntegerType },
+        .{ .indices = "<2 x i64> zeroinitializer, <4 x i32> zeroinitializer", .err = error.TypeMismatch },
+    }) |case| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define {s} @f(ptr %p) {{\nentry:\n %r = getelementptr [4 x i8], ptr %p, {s}\n ret {s} %r\n}}", .{ case.result, case.indices, case.result });
+        defer std.testing.allocator.free(source);
+        var module = try roundTrip(source);
+        defer module.deinit();
+        if (case.err) |err| try std.testing.expectError(err, module.verify()) else try module.verify();
+    }
+}
+
 test "runtime vector floating casts verify lane counts element types and width direction" {
     for ([_]struct { op: []const u8, from: []const u8, to: []const u8, err: ?anyerror = null }{
         .{ .op = "fpext", .from = "<2 x float>", .to = "<2 x double>" },
@@ -86,7 +119,7 @@ test "compiler parser preserves switch loop metadata and rejects unknown attachm
     try std.testing.expectError(error.UnsupportedInstructionMetadata, ir.Module.parse(std.testing.allocator, unknown));
 }
 
-test "compiler parser preserves vector GEP syntax without granting scalar verification" {
+test "compiler vector GEP indices produce pointer vectors" {
     const source =
         \\define void @vector_index(ptr %base) {
         \\entry:
@@ -99,7 +132,8 @@ test "compiler parser preserves vector GEP syntax without granting scalar verifi
     const index = module.functions.items[0].blocks.items[0].instructions.items[0].kind.gep.indices.items[0];
     try std.testing.expect(index.ty.eql(.{ .vector = .{ .len = 4, .elem_ty = .{ .int = 64 } } }));
     try std.testing.expectEqualStrings("<i64 856, i64 680, i64 1216, i64 728>", index.value.vector);
-    try std.testing.expectError(error.UnsupportedVectorGetElementPtr, module.verify());
+    try module.verify();
+    try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[0].resultType().?.eql(.{ .vector = .{ .len = 4, .elem_ty = .ptr } }));
 }
 
 test "compiler parser indirect branch targets preserve quoted spaces commas and brackets" {

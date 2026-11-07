@@ -56,3 +56,5 @@ pub const vector_constant = @import("ir/vector_constant.zig");
 pub const operands = @import("ir/operands.zig");
 pub const identifiers = @import("ir/identifiers.zig");
 pub const printer = @import("ir/printer.zig");
+/// Shared validation for declaration, definition and call-argument attributes.
+pub const verifyParameterAttrs = @import("ir/verifier.zig").verifyParameterAttrs;

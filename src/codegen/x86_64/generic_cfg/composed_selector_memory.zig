@@ -1018,6 +1018,7 @@ fn isStructAggregateType(ty: ir.Type) bool {
 }
 
 pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.GepInst) !?Diagnostic {
+    if (gep.resultType() == .vector) return .{ .unsupported_type = "vector-gep" };
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (symbol_address.fromGep(gep)) |address| {
         const context = selector.module_context orelse return .{ .no_emitter = "composed-block-gep-global-context" };

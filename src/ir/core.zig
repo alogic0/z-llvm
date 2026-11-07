@@ -741,6 +741,15 @@ pub const GepInst = struct {
     ptr_addrspace: ?[]const u8 = null,
     indices: std.ArrayList(GepIndex),
 
+    /// A scalar base is broadcast when an index is a vector. Verification
+    /// requires all vector indices to have the same number of integer lanes.
+    pub fn resultType(gep: GepInst) Type {
+        for (gep.indices.items) |index| {
+            if (index.ty == .vector) return .{ .vector = .{ .len = index.ty.vector.len, .elem_ty = .ptr } };
+        }
+        return .ptr;
+    }
+
     pub fn deinit(gep: *GepInst, allocator: std.mem.Allocator) void {
         gep.indices.deinit(allocator);
     }
@@ -860,7 +869,7 @@ pub const Instruction = struct {
             },
             .extractvalue => |extract| extract.result_ty,
             .insertvalue => |insert| insert.aggregate_ty,
-            .gep => .ptr,
+            .gep => |gep| gep.resultType(),
             .call => |call| if (call.ret_ty == .void) null else call.ret_ty,
             .store, .fence => null,
         };

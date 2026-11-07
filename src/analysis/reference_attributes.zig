@@ -109,7 +109,7 @@ fn simpleAttribute(word: []const u8) bool {
         "dso_preemptable",    "signext",        "zeroext",               "inreg",
         "immarg",             "nocallback",     "nocreateundeforpoison", "nosanitize_coverage",
         "skipprofile",        "speculatable",   "norecurse",             "mustprogress",
-        "returned",           "dead_on_unwind",
+        "returned",           "dead_on_unwind", "allocptr",
     };
     for (known) |candidate| if (std.mem.eql(u8, word, candidate)) return true;
     return false;

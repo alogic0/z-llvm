@@ -4,6 +4,7 @@ const ir = @import("../../ir.zig");
 const target = @import("../../target.zig");
 const type_layout = @import("../../zig_air_type_layout.zig");
 const types = @import("types.zig");
+const syntax = @import("../../ir/parser_syntax.zig");
 
 const ArgReg = types.ArgReg;
 const XmmReg = types.XmmReg;
@@ -684,21 +685,49 @@ pub fn rejectUnsupportedCallArgAttrs(arg: ir.CallArg) !void {
     return error.UnsupportedCallAttributeAbi;
 }
 
-fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
-    var tokens = std.mem.tokenizeAny(u8, attrs, " \t,");
+/// Validated pointer facts that require no change to the machine call or
+/// ordinary memory operation. ABI payloads and address spaces stay excluded.
+pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
+    ir.verifyParameterAttrs(.ptr, attrs) catch return false;
+    var rest = std.mem.trim(u8, attrs, " \t");
     var saw_attr = false;
-    while (tokens.next()) |token| {
+    while (rest.len != 0) {
+        const end = syntax.findTopLevelTokenEnd(rest) orelse return false;
+        if (end == 0) return false;
+        const token = rest[0..end];
+        rest = std.mem.trim(u8, rest[end..], " \t");
         saw_attr = true;
         if (std.mem.eql(u8, token, "noundef")) continue;
         if (std.mem.eql(u8, token, "nonnull")) continue;
         if (std.mem.eql(u8, token, "readonly")) continue;
+        if (std.mem.eql(u8, token, "writeonly")) continue;
         if (std.mem.eql(u8, token, "noalias")) continue;
+        if (std.mem.eql(u8, token, "allocptr")) continue;
+        if (std.mem.eql(u8, token, "captures(none)")) continue;
+        if (std.mem.startsWith(u8, token, "dereferenceable(")) continue;
         if (!std.mem.eql(u8, token, "align")) return false;
-        const alignment_text = tokens.next() orelse return false;
-        const alignment = std.fmt.parseUnsigned(u64, alignment_text, 10) catch return false;
-        if (alignment == 0 or !std.math.isPowerOfTwo(alignment)) return false;
+        const alignment_end = syntax.findTopLevelTokenEnd(rest) orelse return false;
+        if (alignment_end == 0) return false;
+        rest = std.mem.trim(u8, rest[alignment_end..], " \t");
     }
     return saw_attr;
+}
+
+test "pointer advisory attributes validate allocation and memory promises without admitting ABI changes" {
+    for ([_][]const u8{
+        "allocptr noundef align 1 captures(none)",
+        "noundef nonnull align 16 dereferenceable(16)",
+        "writeonly captures(none) align 1",
+    }) |attrs| {
+        try std.testing.expect(pointerCallAttrsAreAdvisory(attrs));
+        try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .value = .{ .named = "p" }, .attrs = attrs });
+    }
+    for ([_][]const u8{
+        "allocptr allocptr", "align 3",           "align",      "dereferenceable(no)",
+        "captures(unknown)", "allocptr, noundef", "byval(i32)", "sret(i32)",
+        "addrspace(1)",
+    }) |attrs| try std.testing.expect(!pointerCallAttrsAreAdvisory(attrs));
+    try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = .{ .int = 64 }, .value = .{ .int = 0 }, .attrs = "allocptr" }));
 }
 
 pub fn callArgByvalType(arg: ir.CallArg) ?ir.Type {
@@ -1029,11 +1058,11 @@ test "SysV call planner admits only advisory local-pointer argument attributes" 
         .attrs = "nonnull align 8",
         .value = .{ .named = "slot" },
     });
-    try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{
+    try rejectUnsupportedCallArgAttrs(.{
         .ty = .ptr,
         .attrs = "nonnull dereferenceable(8)",
         .value = .{ .named = "slot" },
-    }));
+    });
     try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{
         .ty = .{ .int = 64 },
         .attrs = "align 8",

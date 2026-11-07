@@ -676,11 +676,13 @@ pub fn verify(module: core.Module) !void {
                         if (instruction.result == null) return error.InstructionNeedsResult;
                         try ctx.verifyValue(.ptr, gep.ptr, block_index, instruction_index);
                         if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
+                        const result_ty = gep.resultType();
                         for (gep.indices.items) |index| {
-                            // Parsing preserves vector GEP indices, but the
-                            // current result/address contract is scalar-only.
-                            if (index.ty == .vector) return error.UnsupportedVectorGetElementPtr;
-                            if (index.ty != .int) return error.ExpectedIntegerType;
+                            if (index.ty == .vector) {
+                                try verifyVectorType(index.ty);
+                                if (index.ty.vector.elem_ty != .int) return error.ExpectedIntegerType;
+                                if (index.ty.vector.len != result_ty.vector.len) return error.TypeMismatch;
+                            } else if (index.ty != .int) return error.ExpectedIntegerType;
                             try ctx.verifyValue(index.ty, index.value, block_index, instruction_index);
                         }
                     },
@@ -1131,7 +1133,7 @@ fn verifyCallArgAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     try verifyParameterAttrs(ty, attrs);
 }
 
-fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
+pub fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     var rest = std.mem.trim(u8, attrs orelse return, " \t");
     if (rest.len == 0) return error.UnsupportedCallAttribute;
 
@@ -1150,12 +1152,18 @@ fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     var saw_byval = false;
     var saw_addrspace = false;
     var saw_dead_on_unwind = false;
+    var saw_allocptr = false;
 
     while (rest.len != 0) {
         const token = firstAttrToken(rest);
         if (token.len == 0) return error.UnsupportedCallAttribute;
         rest = std.mem.trim(u8, rest[token.len..], " \t");
 
+        if (std.mem.eql(u8, token, "allocptr")) {
+            if (saw_allocptr or ty != .ptr) return error.UnsupportedCallAttribute;
+            saw_allocptr = true;
+            continue;
+        }
         if (std.mem.eql(u8, token, "dead_on_unwind")) {
             if (saw_dead_on_unwind) return error.UnsupportedCallAttribute;
             saw_dead_on_unwind = true;
@@ -1903,10 +1911,10 @@ fn verifyCastFlags(cast: core.CastInst) !void {
         .trunc => {
             if (cast.flags.nneg) return error.InvalidInstructionFlag;
         },
-        .zext => {
+        .zext, .uitofp => {
             if (cast.flags.nsw or cast.flags.nuw) return error.InvalidInstructionFlag;
         },
-        .sext, .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp, .bitcast, .ptrtoint, .inttoptr => {
+        .sext, .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .bitcast, .ptrtoint, .inttoptr => {
             if (cast.flags.any()) return error.InvalidInstructionFlag;
         },
     }

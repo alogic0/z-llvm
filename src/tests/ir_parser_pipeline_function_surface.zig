@@ -36,6 +36,60 @@ const sccp = ir_common.sccp;
 const simplifycfg = ir_common.simplifycfg;
 const slp_vectorizer = ir_common.slp_vectorizer;
 const sroa = ir_common.sroa;
+
+test "allocptr preserves allocator attributes through parsing and release optimization" {
+    const input =
+        \\declare void @free(ptr allocptr noundef align 1 captures(none)) local_unnamed_addr #54
+        \\define void @release(ptr allocptr %p) {
+        \\entry:
+        \\  call void @free(ptr allocptr noundef align 1 captures(none) %p)
+        \\  ret void
+        \\}
+        \\attributes #54 = { mustprogress nounwind willreturn allockind("free") memory(argmem: readwrite, inaccessiblemem: readwrite) "alloc-family"="malloc" }
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    var round_trip = try ir.Module.parse(std.testing.allocator, output.writer.buffered());
+    defer round_trip.deinit();
+    try round_trip.verify();
+    var pm = pass_manager.ModulePassManager.init(std.testing.allocator);
+    defer pm.deinit();
+    try pipelines.addPasses(&pm, "release-o3");
+    var context: pass_manager.Context = .{ .allocator = std.testing.allocator };
+    _ = try pm.run(&module, &context, &output.writer, false);
+    try module.verify();
+    try std.testing.expectEqualStrings("allocptr noundef align 1 captures(none)", module.declarations.items[0].params.items[0].attrs.?);
+    try std.testing.expect(std.mem.indexOf(u8, module.attribute_groups.items[0], "allockind(\"free\")") != null);
+    try std.testing.expect(std.mem.indexOf(u8, module.attribute_groups.items[0], "\"alloc-family\"=\"malloc\"") != null);
+    var calls: usize = 0;
+    for (module.functions.items[0].blocks.items) |block| for (block.instructions.items) |inst| {
+        if (!inst.removed and inst.kind == .call) {
+            calls += 1;
+            try std.testing.expectEqualStrings("free", inst.kind.call.callee);
+            try std.testing.expectEqualStrings("allocptr noundef align 1 captures(none)", inst.kind.call.args.items[0].attrs.?);
+        }
+    };
+    try std.testing.expectEqual(@as(usize, 1), calls);
+}
+
+test "allocptr rejects nonpointer duplicate and malformed parameter and call attributes" {
+    for ([_][]const u8{
+        "declare void @bad(i64 allocptr)",
+        "declare void @bad(<2 x ptr> allocptr)",
+        "declare void @bad(ptr allocptr allocptr)",
+        "declare void @bad(ptr allocptr(1))",
+        "define void @bad(i32 allocptr %p) {\nentry:\n ret void\n}",
+        "declare void @free(ptr)\ndefine void @bad(ptr %p) {\nentry:\n call void @free(ptr allocptr allocptr %p)\n ret void\n}",
+    }) |source| {
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try std.testing.expectError(error.UnsupportedCallAttribute, module.verify());
+    }
+}
 test "parser preserves module target records and void return" {
     const input =
         \\source_filename = "tiny.zig"

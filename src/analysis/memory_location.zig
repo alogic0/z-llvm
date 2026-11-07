@@ -161,6 +161,7 @@ fn gepOffsetMaybeLayout(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
 }
 
 fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
+    if (gep.resultType() == .vector) return null;
     var current_ty = gep.source_ty;
     var offset: i128 = 0;
     for (gep.indices.items, 0..) |index, index_position| {

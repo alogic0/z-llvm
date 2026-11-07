@@ -76,7 +76,7 @@ fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types
         .alloca => |alloca| if (isSelectorScalarType(alloca.allocated_ty) or parseI32ArrayType(alloca.allocated_ty) != null or aggregate_object.isF32PairType(context, alloca.allocated_ty)) null else .{ .unsupported_type = "alloca" },
         .load => |load| if (isSelectorScalarType(load.ty) or isPackedF32x2(load.ty) or isByteVector128(load.ty)) null else .{ .unsupported_type = "load" },
         .store => |store| if (isSelectorScalarType(store.ty) or isByteVector128(store.ty)) null else .{ .unsupported_type = "store" },
-        .gep => null,
+        .gep => |gep| if (gep.resultType() == .vector) .{ .unsupported_type = "vector-gep" } else null,
         .call => |call| inspectCall(call),
         .phi => |phi| if (isSelectorScalarType(phi.ty) or phi.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .double } })) null else .{ .unsupported_type = "phi" },
         .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },

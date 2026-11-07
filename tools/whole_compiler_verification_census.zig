@@ -32,19 +32,81 @@ pub fn main(init: std.process.Init) !void {
     view.functions.capacity = functions.len;
     // Refuse a census if module/header context itself already fails.
     try view.verify();
+    const diagnostics = try a.alloc(?[]const u8, functions.len);
+    @memset(diagnostics, null);
+    // Successful ranges certify every body in that range with the same module
+    // context. Split only failing ranges, instead of rebuilding all module
+    // lookups once per definition in a large compiler input.
+    if (full_error != null) try diagnoseBodies(module, view, blocks, diagnostics, 0, functions.len);
     var failed: usize = 0;
     for (module.functions.items, 0..) |f, i| {
-        functions[i] = f;
-        const diagnostic: ?[]const u8 = if (view.verify()) |_| null else |err| blk: {
-            if (err == error.OutOfMemory) return err;
-            failed += 1;
-            break :blk @errorName(err);
-        };
+        const diagnostic = diagnostics[i];
+        if (diagnostic != null) failed += 1;
         try std.json.Stringify.value(.{ .function = f.name, .error_name = diagnostic }, .{}, w);
         try w.writeByte('\n');
-        functions[i].blocks = blocks;
     }
     try std.json.Stringify.value(.{ .definitions = functions.len, .passed_verification_in_context = functions.len - failed, .rejected = failed, .codegen_attempted = false }, .{}, w);
     try w.writeByte('\n');
     try w.flush();
+}
+
+fn diagnoseBodies(original: ir.Module, view: ir.Module, placeholder: std.ArrayList(ir.BasicBlock), diagnostics: []?[]const u8, start: usize, end: usize) !void {
+    if (start == end) return;
+    for (start..end) |i| view.functions.items[i].blocks = original.functions.items[i].blocks;
+    const failure: ?anyerror = if (view.verify()) |_| null else |err| err;
+    for (start..end) |i| view.functions.items[i].blocks = placeholder;
+    const err = failure orelse return;
+    if (err == error.OutOfMemory) return err;
+    if (end - start == 1) {
+        diagnostics[start] = @errorName(err);
+        return;
+    }
+    const mid = start + (end - start) / 2;
+    try diagnoseBodies(original, view, placeholder, diagnostics, start, mid);
+    try diagnoseBodies(original, view, placeholder, diagnostics, mid, end);
+}
+
+test "body census splits independent failures and preserves cross-function context" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare i32 @external(i32)
+        \\define i32 @good(i32 %x) {
+        \\entry:
+        \\ %v = call i32 @external(i32 %x)
+        \\ ret i32 %v
+        \\}
+        \\define i32 @bad_type(float %x) {
+        \\entry:
+        \\ ret i32 %x
+        \\}
+        \\define i32 @good_call(i32 %x) {
+        \\entry:
+        \\ %v = call i32 @good(i32 %x)
+        \\ ret i32 %v
+        \\}
+        \\define i32 @bad_value() {
+        \\entry:
+        \\ ret i32 %unknown
+        \\}
+    );
+    defer module.deinit();
+    var entry = [_]ir.BasicBlock{ir.BasicBlock.init("diagnostic_entry")};
+    entry[0].terminator = .{ .@"unreachable" = {} };
+    var placeholder: std.ArrayList(ir.BasicBlock) = .empty;
+    placeholder.items = &entry;
+    placeholder.capacity = entry.len;
+    const functions = try std.testing.allocator.dupe(ir.Function, module.functions.items);
+    defer std.testing.allocator.free(functions);
+    for (functions) |*f| f.blocks = placeholder;
+    var view = module;
+    view.functions = .empty;
+    view.functions.items = functions;
+    view.functions.capacity = functions.len;
+    try view.verify();
+    var diagnostics = [_]?[]const u8{ null, null, null, null };
+    try diagnoseBodies(module, view, placeholder, &diagnostics, 0, 4);
+    try std.testing.expect(diagnostics[0] == null and diagnostics[2] == null);
+    try std.testing.expectEqualStrings("TypeMismatch", diagnostics[1].?);
+    try std.testing.expectEqualStrings("UnknownValue", diagnostics[3].?);
+    try view.verify();
+    try std.testing.expectError(error.TypeMismatch, module.verify());
 }
