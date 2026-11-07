@@ -66,7 +66,11 @@ pub fn findClosingQuote(text: []const u8, quote_index: usize) ?usize {
 }
 
 pub fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
-    if (open_index >= text.len or text[open_index] != '(') return null;
+    return findMatchingDelimiter(text, open_index, '(', ')');
+}
+
+fn findMatchingDelimiter(text: []const u8, open_index: usize, open: u8, close: u8) ?usize {
+    if (open_index >= text.len or text[open_index] != open) return null;
     var depth: usize = 0;
     var in_string = false;
     var escaped = false;
@@ -85,9 +89,9 @@ pub fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
             in_string = true;
             continue;
         }
-        if (byte == '(') {
+        if (byte == open) {
             depth += 1;
-        } else if (byte == ')') {
+        } else if (byte == close) {
             depth -= 1;
             if (depth == 0) return index;
         }
@@ -96,6 +100,10 @@ pub fn findMatchingParen(text: []const u8, open_index: usize) ?usize {
 }
 
 pub fn findOpenParenOutsideString(text: []const u8, start_index: usize) ?usize {
+    return findByteOutsideString(text, start_index, '(');
+}
+
+pub fn findByteOutsideString(text: []const u8, start_index: usize, wanted: u8) ?usize {
     var in_string = false;
     var escaped = false;
     var index = start_index;
@@ -115,23 +123,13 @@ pub fn findOpenParenOutsideString(text: []const u8, start_index: usize) ?usize {
             in_string = true;
             continue;
         }
-        if (byte == '(') return index;
+        if (byte == wanted) return index;
     }
     return null;
 }
 
 pub fn findMatchingBracket(text: []const u8, open_index: usize) ?usize {
-    if (open_index >= text.len or text[open_index] != '[') return null;
-    var depth: usize = 0;
-    for (text[open_index..], open_index..) |byte, index| {
-        if (byte == '[') {
-            depth += 1;
-        } else if (byte == ']') {
-            depth -= 1;
-            if (depth == 0) return index;
-        }
-    }
-    return null;
+    return findMatchingDelimiter(text, open_index, '[', ']');
 }
 
 pub fn findMatchingBrace(text: []const u8, open_index: usize) ?usize {

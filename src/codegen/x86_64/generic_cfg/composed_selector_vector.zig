@@ -201,6 +201,46 @@ fn lowerFabs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Cal
     return null;
 }
 
+pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
+    if (cast.op == .fpext or cast.op == .fptrunc) return lowerFloatWidthCast(selector, result, cast);
+    return lowerBitcast(selector, result, cast);
+}
+
+fn lowerFloatWidthCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
+    if (!inspection.isPackedFpWidthCast(cast)) return .{ .no_emitter = "composed-vector-fp-cast-form" };
+    const result_name = result orelse return .{ .unsupported_value = "composed-vector-fp-cast-result" };
+    const operand = describeVectorValue(selector, cast.value, cast.from_ty) orelse return .{ .unsupported_value = "composed-vector-fp-cast-source" };
+    const defined = std.math.cast(u4, operand.shape.defined_lanes) orelse return .{ .unsupported_value = "composed-vector-fp-cast-shape" };
+    const expected = shapeForType(cast.from_ty, defined).?;
+    if (!operand.shape.eql(expected)) return .{ .unsupported_value = "composed-vector-fp-cast-shape" };
+    const source_reg = vectorValueReg(selector, cast.value);
+    const dst = try resultXmmReg(selector, result_name, cast.value, null) orelse return .{ .no_spill_envelope = "composed-vector-fp-cast-dst" };
+    if (try materializeVectorValue(selector, cast.value, operand, dst, source_reg)) |diagnostic| return diagnostic;
+    const high = try scratchXmmReg(selector, dst, source_reg);
+    try selector_state.clobberXmmReg(selector, high);
+    try selector.machine.instructions.append(selector.allocator, .{ .movapd_xmm = .{ .dst = high, .src = dst } });
+    // Preserve live aliases through the common register owner before changing
+    // either lane. Scalar conversions access only the two represented lanes.
+    try selector_state.clobberXmmReg(selector, dst);
+    if (cast.op == .fptrunc) {
+        try selector.machine.instructions.appendSlice(selector.allocator, &.{
+            .{ .unpckhpd_xmm = .{ .dst = high, .src = high } },
+            .{ .cvtsd2ss_xmm = .{ .dst = high, .src = high } },
+            .{ .cvtsd2ss_xmm = .{ .dst = dst, .src = dst } },
+            .{ .unpcklps_xmm = .{ .dst = dst, .src = high } },
+        });
+    } else {
+        try selector.machine.instructions.appendSlice(selector.allocator, &.{
+            .{ .shufps_xmm = .{ .dst = high, .src = high, .imm = 0x55 } },
+            .{ .cvtss2sd_xmm = .{ .dst = high, .src = high } },
+            .{ .cvtss2sd_xmm = .{ .dst = dst, .src = dst } },
+            .{ .unpcklpd_xmm = .{ .dst = dst, .src = high } },
+        });
+    }
+    try bindVectorResult(selector, result_name, dst, shapeForType(cast.to_ty, defined).?);
+    return null;
+}
+
 pub fn lowerBitcast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir.CastInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-vector-bitcast-result" };
     if (cast.op == .bitcast and isMask4(cast.from_ty) and cast.to_ty.eql(.{ .int = 4 })) {

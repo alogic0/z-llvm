@@ -578,5 +578,6 @@ pub fn isSupportedInstructionMetadataAttachment(attachment: []const u8) bool {
         std.mem.eql(u8, key, "!noalias") or
         std.mem.eql(u8, key, "!nonnull") or
         std.mem.eql(u8, key, "!noundef") or
+        std.mem.eql(u8, key, "!llvm.loop") or
         std.mem.eql(u8, key, "!unpredictable");
 }

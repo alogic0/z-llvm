@@ -677,6 +677,10 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(.ptr, gep.ptr, block_index, instruction_index);
                         if (gep.indices.items.len == 0) return error.InvalidGetElementPtr;
                         for (gep.indices.items) |index| {
+                            // Parsing preserves vector GEP indices, but the
+                            // current result/address contract is scalar-only.
+                            if (index.ty == .vector) return error.UnsupportedVectorGetElementPtr;
+                            if (index.ty != .int) return error.ExpectedIntegerType;
                             try ctx.verifyValue(index.ty, index.value, block_index, instruction_index);
                         }
                     },
@@ -1792,18 +1796,7 @@ fn verifyCast(cast: core.CastInst) !void {
             if (from_bits != to_bits) return error.InvalidCast;
             return;
         },
-        .fpext => {
-            const from_bits = floatBits(cast.from_ty) orelse return error.InvalidCast;
-            const to_bits = floatBits(cast.to_ty) orelse return error.InvalidCast;
-            if (from_bits >= to_bits) return error.InvalidCast;
-            return;
-        },
-        .fptrunc => {
-            const from_bits = floatBits(cast.from_ty) orelse return error.InvalidCast;
-            const to_bits = floatBits(cast.to_ty) orelse return error.InvalidCast;
-            if (from_bits <= to_bits) return error.InvalidCast;
-            return;
-        },
+        .fpext, .fptrunc => return verifyFloatWidthCast(cast),
         .sitofp, .uitofp => {
             switch (cast.from_ty) {
                 .int => {},
@@ -1865,6 +1858,23 @@ fn verifyCast(cast: core.CastInst) !void {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
         .fpext, .fptrunc, .fptosi, .fptoui, .sitofp, .uitofp, .bitcast, .ptrtoint, .inttoptr => unreachable,
+    }
+}
+
+fn verifyFloatWidthCast(cast: core.CastInst) !void {
+    var from = cast.from_ty;
+    var to = cast.to_ty;
+    if (from == .vector or to == .vector) {
+        if (from != .vector or to != .vector or from.vector.len != to.vector.len) return error.TypeMismatch;
+        from = from.vector.elem_ty.toType();
+        to = to.vector.elem_ty.toType();
+    }
+    const from_bits = floatBits(from) orelse return error.InvalidCast;
+    const to_bits = floatBits(to) orelse return error.InvalidCast;
+    if (cast.op == .fpext) {
+        if (from_bits >= to_bits) return error.InvalidCast;
+    } else {
+        if (from_bits <= to_bits) return error.InvalidCast;
     }
 }
 

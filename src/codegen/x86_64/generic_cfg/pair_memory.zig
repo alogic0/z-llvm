@@ -1,4 +1,4 @@
-//! Split ordinary i128 memory operations into two little-endian words. Loads
+//! Split ordinary i128 and two-lane FP memory operations into exact-width words. Loads
 //! capture both words at the original instruction, rather than aliasing a slot
 //! that a later store or call could change. Atomic and volatile accesses stay
 //! outside this expansion.
@@ -23,14 +23,68 @@ const Builder = struct {
         return .{ .named = name };
     }
     fn upper(b: Builder, ptr: ir.Value) !ir.Value {
+        return b.offset(ptr, 8);
+    }
+    fn offset(b: Builder, ptr: ir.Value, bytes: u16) !ir.Value {
         var indices: std.ArrayList(ir.GepIndex) = .empty;
-        try indices.append(b.allocator, .{ .ty = word, .value = .{ .int = 8 } });
+        try indices.append(b.allocator, .{ .ty = word, .value = .{ .int = bytes } });
         return b.emit(.{ .gep = .{ .source_ty = .{ .int = 8 }, .ptr = ptr, .indices = indices } });
     }
     fn cast(b: Builder, op: ir.CastOp, from: ir.Type, value: ir.Value, to: ir.Type) !ir.Value {
         return b.emit(.{ .cast = .{ .op = op, .from_ty = from, .value = value, .to_ty = to } });
     }
+
+    fn floatPair(b: Builder, inst: ir.Instruction) !void {
+        const load = inst.kind == .load;
+        const ty = if (load) inst.kind.load.ty else inst.kind.store.ty;
+        const ptr = if (load) inst.kind.load.ptr else inst.kind.store.ptr;
+        const attrs = if (load) inst.kind.load.attrs else inst.kind.store.attrs;
+        const scalar = ty.vector.elem_ty.toType();
+        const stride: u16 = if (scalar == .float) 4 else 8;
+        const integer: ir.Type = .{ .int = stride * 8 };
+        const high_ptr = try b.offset(ptr, stride);
+        var value: ir.Value = .poison;
+        for (0..2) |lane| {
+            var access = inst;
+            var lane_attrs = attrs;
+            if (lane == 1) lane_attrs.@"align" = @min(attrs.@"align" orelse stride, stride);
+            const lane_ptr = if (lane == 0) ptr else high_ptr;
+            if (load) {
+                access.result = try forms.temporary(b.allocator, b.function, b.serial);
+                access.kind.load = .{ .ty = integer, .ptr = lane_ptr, .attrs = lane_attrs };
+                try b.block.instructions.append(b.allocator, access);
+                const part = try b.cast(.bitcast, integer, .{ .named = access.result.? }, scalar);
+                const name = if (lane == 1) inst.result.? else try forms.temporary(b.allocator, b.function, b.serial);
+                try b.block.instructions.append(b.allocator, .{ .result = name, .kind = .{ .insertelement = .{
+                    .vector_ty = ty,
+                    .vector = value,
+                    .value_ty = scalar,
+                    .value = part,
+                    .index_ty = word,
+                    .index = .{ .int = @intCast(lane) },
+                } } });
+                value = .{ .named = name };
+            } else {
+                const part = try b.emit(.{ .extractelement = .{
+                    .vector_ty = ty,
+                    .vector = inst.kind.store.value,
+                    .index_ty = word,
+                    .index = .{ .int = @intCast(lane) },
+                } });
+                const bits = try b.cast(.bitcast, scalar, part, integer);
+                access.kind.store = .{ .ty = integer, .value = bits, .ptr = lane_ptr, .attrs = lane_attrs };
+                try b.block.instructions.append(b.allocator, access);
+            }
+        }
+    }
 };
+
+fn supportedFloatPair(access: anytype) bool {
+    return access.ty == .vector and access.ty.vector.len == 2 and
+        (access.ty.vector.elem_ty == .float or access.ty.vector.elem_ty == .double) and
+        access.ty_addrspace == null and access.ptr_addrspace == null and
+        !access.attrs.isBarrier() and access.attrs.syncscope == null;
+}
 
 fn supported(access: anytype) bool {
     return access.ty.eql(pair) and access.ty_addrspace == null and access.ptr_addrspace == null and
@@ -67,7 +121,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         block.instructions = .empty;
         const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
         for (original.instructions.items, 0..) |inst, instruction_index| {
-            if (!inst.removed and inst.kind == .load and inst.result != null and supported(inst.kind.load) and
+            if (!inst.removed and ((inst.kind == .load and inst.result != null and supportedFloatPair(inst.kind.load)) or
+                (inst.kind == .store and supportedFloatPair(inst.kind.store))))
+            {
+                try candidate.begin(&block, block_index, instruction_index);
+                try b.floatPair(inst);
+            } else if (!inst.removed and inst.kind == .load and inst.result != null and supported(inst.kind.load) and
                 !finalStackRead(function, original, instruction_index, inst.kind.load.ptr))
             {
                 try candidate.begin(&block, block_index, instruction_index);

@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "vector_fp_casts",
+      "prefix": "vector-fp-casts",
+      "fixture": "vector_fp_casts",
+      "functions": ["vector_cast_narrow", "vector_cast_widen", "vector_cast_phi", "vector_cast_pressure", "vector_cast_partial"],
+      "observations": 1280,
+      "stdout": "vector-fp-casts observations=1280 rounding=special-values=checked aliases=phi=calls=preserved memory=guarded\n"
+    },
+    {
       "population": "packed_globals",
       "prefix": "packed-globals",
       "fixture": "packed_globals",

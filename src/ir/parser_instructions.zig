@@ -456,12 +456,13 @@ pub fn parseGep(allocator: std.mem.Allocator, text: []const u8) !core.GepInst {
     while (rest.len != 0) {
         const next_comma = findTopLevelComma(rest);
         const item = std.mem.trim(u8, if (next_comma) |index| rest[0..index] else rest, " \t");
-        var index_parts = std.mem.tokenizeAny(u8, item, " \t");
-        const index_ty = try parseType(index_parts.next() orelse return error.InvalidGetElementPtr);
-        const index_value = try parseValue(index_parts.next() orelse return error.InvalidGetElementPtr);
-        if (index_parts.next() != null) return error.InvalidGetElementPtr;
+        const index_arg = try parseLeadingType(item);
+        const index_value = try parseValue(index_arg.after);
+        if (index_value != .constant_expr and index_value != .vector and
+            (syntax.findTopLevelTokenEnd(index_arg.after) orelse return error.InvalidGetElementPtr) != index_arg.after.len)
+            return error.InvalidGetElementPtr;
         try gep.indices.append(allocator, .{
-            .ty = index_ty,
+            .ty = index_arg.ty,
             .value = index_value,
         });
 

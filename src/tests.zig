@@ -1,6 +1,8 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/generic_cfg/vector_fp_cast_tests.zig");
+    _ = @import("tests/ir_compiler_boundaries.zig");
     _ = @import("tests/ir_packed_structures.zig");
     _ = @import("compilation_profile.zig");
     _ = @import("codegen/x86_64/generic_cfg/optional_legalization.zig");

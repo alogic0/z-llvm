@@ -439,7 +439,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
             selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-binary-value"),
         .alloca => |alloca| selector_memory.lowerAlloca(selector, instruction.result, alloca) catch |err| return instructionValueError(selector, err, "stage2-alloca-value"),
         .cast => |cast| if (cast.from_ty == .vector or cast.to_ty == .vector)
-            selector_vector.lowerBitcast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-vector-cast-value")
+            selector_vector.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-vector-cast-value")
         else if (cast.op == .sitofp or cast.op == .uitofp)
             selector_conversion.lowerIntToFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-fp-cast-value")
         else if (selector_conversion.isFpToSignedI32Cast(cast))

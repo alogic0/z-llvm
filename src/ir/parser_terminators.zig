@@ -109,7 +109,7 @@ pub fn parseBr(line: []const u8) !core.Terminator {
 }
 
 pub fn parseSwitch(allocator: std.mem.Allocator, first_line: []const u8, lines: *std.mem.SplitIterator(u8, .scalar)) !core.Terminator {
-    const open = std.mem.indexOfScalar(u8, first_line, '[') orelse return error.InvalidSwitch;
+    const open = syntax.findByteOutsideString(first_line, 0, '[') orelse return error.InvalidSwitch;
     const header = std.mem.trim(u8, first_line["switch ".len..open], " \t");
     const comma = findTopLevelComma(header) orelse return error.InvalidSwitch;
     const cond_arg = try parseTypedValue(std.mem.trim(u8, header[0..comma], " \t"));
@@ -157,26 +157,7 @@ pub fn parseSwitchCasesLine(allocator: std.mem.Allocator, switch_term: *core.Swi
 }
 
 pub fn findSwitchCasesClose(line: []const u8) ?usize {
-    var in_string = false;
-    var escaped = false;
-    for (line, 0..) |byte, index| {
-        if (in_string) {
-            if (escaped) {
-                escaped = false;
-            } else if (byte == '\\') {
-                escaped = true;
-            } else if (byte == '"') {
-                in_string = false;
-            }
-            continue;
-        }
-        if (byte == '"') {
-            in_string = true;
-        } else if (byte == ']') {
-            return index;
-        }
-    }
-    return null;
+    return syntax.findByteOutsideString(line, 0, ']');
 }
 
 pub fn parseSwitchCase(allocator: std.mem.Allocator, switch_term: *core.SwitchTerminator, text: []const u8) !void {
@@ -236,11 +217,7 @@ pub fn parseIndirectBr(allocator: std.mem.Allocator, line: []const u8) !core.Ter
 }
 
 pub fn parseIndirectBrTarget(allocator: std.mem.Allocator, indirectbr: *core.IndirectBrTerminator, text: []const u8) !void {
-    var parts = std.mem.tokenizeAny(u8, text, " \t");
-    if (!std.mem.eql(u8, parts.next() orelse return error.InvalidBr, "label")) return error.InvalidBr;
-    const target = try parseLabel(parts.next() orelse return error.InvalidBr);
-    if (parts.next() != null) return error.InvalidBr;
-    try indirectbr.targets.append(allocator, target);
+    try indirectbr.targets.append(allocator, try parseLabelOperand(text, error.InvalidBr));
 }
 
 const TypeOrLabel = union(enum) {

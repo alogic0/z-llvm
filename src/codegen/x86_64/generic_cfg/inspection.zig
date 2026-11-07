@@ -78,7 +78,7 @@ fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types
         .store => |store| if (isSelectorScalarType(store.ty) or isByteVector128(store.ty)) null else .{ .unsupported_type = "store" },
         .gep => null,
         .call => |call| inspectCall(call),
-        .phi => |phi| if (isSelectorScalarType(phi.ty)) null else .{ .unsupported_type = "phi" },
+        .phi => |phi| if (isSelectorScalarType(phi.ty) or phi.ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .double } })) null else .{ .unsupported_type = "phi" },
         .freeze => |freeze| if (isSelectorScalarType(freeze.ty)) null else .{ .unsupported_type = "freeze" },
         .fcmp => |fcmp| inspectFcmp(fcmp),
         .atomicrmw => |rmw| @import("composed_selector_atomic.zig").inspectRmw(rmw),
@@ -221,6 +221,7 @@ fn isVectorOperand(value: ir.Value, ty: ir.Type) bool {
 }
 
 fn inspectCast(cast: ir.CastInst) ?Diagnostic {
+    if (isPackedFpWidthCast(cast)) return null;
     if (cast.op == .bitcast and sysv_abi.isVector128AbiType(cast.from_ty) and sysv_abi.isVector128AbiType(cast.to_ty)) return null;
     if (cast.op == .bitcast and isMask4(cast.from_ty) and cast.to_ty.eql(.{ .int = 4 })) return null;
     if (cast.op == .bitcast and isPackedFp2(cast.from_ty) and cast.to_ty == .vector and
@@ -242,6 +243,15 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
         },
         .fptosi => if ((cast.from_ty == .float or cast.from_ty == .double) and cast.to_ty.eql(.{ .int = 32 })) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .fptoui => .{ .unsupported_instruction = @tagName(cast.op) },
+    };
+}
+
+pub fn isPackedFpWidthCast(cast: ir.CastInst) bool {
+    if (!isPackedFp2(cast.from_ty) or !isPackedFp2(cast.to_ty)) return false;
+    return switch (cast.op) {
+        .fpext => cast.from_ty.vector.elem_ty == .float and cast.to_ty.vector.elem_ty == .double,
+        .fptrunc => cast.from_ty.vector.elem_ty == .double and cast.to_ty.vector.elem_ty == .float,
+        else => false,
     };
 }
 
