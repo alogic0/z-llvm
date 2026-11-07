@@ -57,7 +57,7 @@ pub fn tryLowerProfiled(
         const normalized = blk: {
             const scope = profiling.enter(profile, .normalize);
             defer scope.end();
-            break :blk try semantic_normalization.normalize(arena.allocator(), function, module_context);
+            break :blk try semantic_normalization.normalizeProfiled(arena.allocator(), function, module_context, profile);
         };
         function = normalized.ir_function;
         const result: SelectionResult = blk: {

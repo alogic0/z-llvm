@@ -80,6 +80,9 @@ pub const Profile = struct {
     functions: std.ArrayList(Function) = .empty,
     current_function: ?usize = null,
     original_form_ns: u64 = 0,
+    events_file: ?std.Io.File = null,
+    events_error: ?anyerror = null,
+    event_sequence: u64 = 0,
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io) Profile {
         const now = std.Io.Timestamp.now(io, .awake);
@@ -87,8 +90,56 @@ pub const Profile = struct {
     }
 
     pub fn deinit(p: *Profile) void {
+        if (p.events_file) |file| file.close(p.io);
         for (p.functions.items) |function| p.allocator.free(function.name);
         p.functions.deinit(p.allocator);
+    }
+
+    /// Each JSONL record is flushed independently. A killed process leaves a
+    /// useful prefix, without pretending that its current function completed.
+    pub fn startEvents(p: *Profile, path: []const u8) !void {
+        try p.startEventsFile(try std.Io.Dir.cwd().createFile(p.io, path, .{}));
+    }
+
+    fn startEventsFile(p: *Profile, file: std.Io.File) !void {
+        std.debug.assert(p.events_file == null);
+        p.events_file = file;
+        p.event("profile_begin", .{ .clock = "awake", .timing = "includes opt-in event output overhead" });
+        if (p.events_error != null) return error.ProfileEventWriteFailed;
+    }
+
+    pub fn finishEvents(p: *Profile, succeeded: bool) !void {
+        std.debug.assert(p.current_function == null);
+        p.event("profile_end", .{ .succeeded = succeeded, .counters = p.counters });
+        if (p.events_error != null) return error.ProfileEventWriteFailed;
+    }
+
+    fn event(p: *Profile, kind: []const u8, details: anytype) void {
+        const file = p.events_file orelse return;
+        if (p.events_error != null) return;
+        p.writeEvent(file, kind, details) catch |err| {
+            p.events_error = err;
+            return;
+        };
+        p.event_sequence += 1;
+    }
+
+    fn writeEvent(p: *Profile, file: std.Io.File, kind: []const u8, details: anytype) !void {
+        var buffer: [4096]u8 = undefined;
+        // Streaming writers advance the file position across independent
+        // records. A fresh positional writer would overwrite the prefix.
+        var writer = file.writerStreaming(p.io, &buffer);
+        try std.json.Stringify.value(.{
+            .schema = "compilation-events-v1",
+            .sequence = p.event_sequence,
+            .elapsed_ns = elapsedNs(p.started, .now(p.io, .awake)),
+            .event = kind,
+            .function = if (p.current_function) |index| p.functions.items[index].name else @as(?[]const u8, null),
+            .phase = @tagName(p.active),
+            .details = details,
+        }, .{}, &writer.interface);
+        try writer.interface.writeByte('\n');
+        try writer.interface.flush();
     }
 
     pub fn beginFunction(p: *Profile, name: []const u8, blocks: usize, instructions: usize) !FunctionScope {
@@ -98,6 +149,7 @@ pub const Profile = struct {
         try p.functions.append(p.allocator, .{ .name = owned_name, .input_blocks = blocks, .input_instructions = instructions });
         p.transition(p.active);
         p.current_function = p.functions.items.len - 1;
+        p.event("function_begin", .{ .blocks = blocks, .instructions = instructions, .index = p.current_function.? });
         return .{ .profile = p, .before = p.counters, .elapsed = p.elapsed, .original_form_ns = p.original_form_ns };
     }
 
@@ -109,6 +161,7 @@ pub const Profile = struct {
             const counters = &p.functions.items[index].counters;
             counters.max_selection_iterations = @max(counters.max_selection_iterations, count);
         }
+        p.event("iteration", .{ .iteration = count });
     }
 
     pub fn discardCandidate(p: *Profile, stage: usize, bytes: u64) void {
@@ -118,9 +171,11 @@ pub const Profile = struct {
     }
 
     fn transitionAt(p: *Profile, next: Phase, now: std.Io.Timestamp) void {
+        const previous = p.active;
         p.elapsed[@backingInt(p.active)] += elapsedNs(p.last, now);
         p.last = now;
         p.active = next;
+        if (previous != next) p.event("phase", .{ .from = @tagName(previous), .to = @tagName(next) });
     }
 
     fn transition(p: *Profile, next: Phase) void {
@@ -184,6 +239,7 @@ pub const FunctionScope = struct {
                 @field(function.counters, name) = @field(p.counters, name) - @field(scope.before, name);
         }
         function.original_form_ns = p.original_form_ns - scope.original_form_ns;
+        p.event("function_end", function.*);
         p.current_function = null;
     }
 };
@@ -205,14 +261,38 @@ pub fn enter(profile: ?*Profile, phase: Phase) Scope {
     return .{ .profile = null };
 }
 
+/// Diagnostic substeps do not change the final profile's phase or legalizer
+/// counters. No clocks or writes are added when the event stream is disabled.
+pub const Activity = struct {
+    profile: ?*Profile = null,
+    name: []const u8 = "",
+    started: std.Io.Timestamp = undefined,
+
+    pub fn end(scope: Activity) void {
+        if (scope.profile) |p| p.event("activity_end", .{ .name = scope.name, .elapsed_ns = elapsedNs(scope.started, .now(p.io, .awake)) });
+    }
+};
+
+pub fn activity(profile: ?*Profile, name: []const u8) Activity {
+    const p = profile orelse return .{};
+    if (p.events_file == null or p.events_error != null) return .{};
+    p.event("activity_begin", .{ .name = name });
+    return .{ .profile = p, .name = name, .started = .now(p.io, .awake) };
+}
+
 pub const RetryScope = struct {
     profile: ?*Profile,
     started: std.Io.Timestamp = undefined,
     pub fn end(scope: RetryScope) void {
-        if (scope.profile) |p| p.original_form_ns += elapsedNs(scope.started, .now(p.io, .awake));
+        if (scope.profile) |p| {
+            const ns = elapsedNs(scope.started, .now(p.io, .awake));
+            p.original_form_ns += ns;
+            p.event("retry_end", .{ .elapsed_ns = ns });
+        }
     }
 };
 pub fn retry(profile: ?*Profile) RetryScope {
+    if (profile) |p| p.event("retry_begin", .{});
     return .{ .profile = profile, .started = if (profile) |p| .now(p.io, .awake) else undefined };
 }
 
@@ -236,6 +316,7 @@ pub const Attempt = struct {
             item.attempts += 1;
             p.counters.legalizer_attempts += 1;
             p.legalizer_count = @max(p.legalizer_count, stage + 1);
+            p.event("legalizer_begin", .{ .stage = name });
         }
         return .{ .profile = profile, .stage = stage, .parent = parent, .started = if (profile) |p| .now(p.io, .awake) else undefined };
     }
@@ -272,6 +353,7 @@ pub const Attempt = struct {
         item.allocations.add(a.allocations);
         p.legalizer_allocations.add(a.allocations);
         if (p.current_function) |index| p.functions.items[index].legalizer_allocations.add(a.allocations);
+        p.event("legalizer_end", .{ .stage = item.stage, .outcome = @tagName(a.outcome), .elapsed_ns = ns, .allocations = a.allocations });
     }
 
     fn allocate(ctx: *anyopaque, len: usize, alignment: std.mem.Alignment, ret: usize) ?[*]u8 {
@@ -381,4 +463,68 @@ test "function profiles retain names and separate successful and failed selectio
         for (function.phases) |phase| total += phase.exclusive_ns;
         try std.testing.expectEqual(function.total_ns, total);
     }
+}
+
+test "progress records are readable before completion and preserve event order" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var p = Profile.init(std.testing.allocator, std.testing.io);
+    defer p.deinit();
+    try p.startEventsFile(try tmp.dir.createFile(std.testing.io, "events.jsonl", .{}));
+    const function = try p.beginFunction("quoted\"name\n", 2, 3);
+    const phase = enter(&p, .legalize);
+    p.iteration(1);
+    var attempt = Attempt.init(&p, 0, "pending-stage", std.testing.allocator);
+    const prefix = try tmp.dir.readFileAlloc(std.testing.io, "events.jsonl", std.testing.allocator, .limited(65536));
+    defer std.testing.allocator.free(prefix);
+    try std.testing.expect(std.mem.endsWith(u8, prefix, "\n"));
+    try std.testing.expect(std.mem.indexOf(u8, prefix, "profile_end") == null);
+    var lines = std.mem.tokenizeScalar(u8, prefix, '\n');
+    var records: usize = 0;
+    while (lines.next()) |line| {
+        const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, line, .{});
+        defer parsed.deinit();
+        try std.testing.expectEqual(@as(i64, @intCast(records)), parsed.value.object.get("sequence").?.integer);
+        records += 1;
+        if (lines.peek() == null) {
+            try std.testing.expectEqualStrings("legalizer_begin", parsed.value.object.get("event").?.string);
+            try std.testing.expectEqualStrings("quoted\"name\n", parsed.value.object.get("function").?.string);
+        }
+    }
+    attempt.outcome = .unchanged;
+    attempt.end();
+    phase.end();
+    p.counters.selected_functions += 1;
+    function.end();
+    try p.finishEvents(true);
+    const completed = try tmp.dir.readFileAlloc(std.testing.io, "events.jsonl", std.testing.allocator, .limited(65536));
+    defer std.testing.allocator.free(completed);
+    try std.testing.expect(std.mem.startsWith(u8, completed, prefix));
+    var complete_lines = std.mem.tokenizeScalar(u8, completed, '\n');
+    var count: usize = 0;
+    while (complete_lines.next()) |line| {
+        const parsed = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, line, .{});
+        defer parsed.deinit();
+        try std.testing.expectEqual(@as(i64, @intCast(count)), parsed.value.object.get("sequence").?.integer);
+        count += 1;
+        if (complete_lines.peek() == null) {
+            try std.testing.expectEqualStrings("profile_end", parsed.value.object.get("event").?.string);
+            try std.testing.expect(parsed.value.object.get("details").?.object.get("succeeded").?.bool);
+        }
+    }
+    try std.testing.expect(count > records);
+}
+
+test "progress output failures cannot produce a successful completion record" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "readonly", .data = "original" });
+    var p = Profile.init(std.testing.allocator, std.testing.io);
+    defer p.deinit();
+    try std.testing.expectError(error.ProfileEventWriteFailed, p.startEventsFile(try tmp.dir.openFile(std.testing.io, "readonly", .{})));
+    try std.testing.expectError(error.ProfileEventWriteFailed, p.finishEvents(true));
+    try std.testing.expectEqual(0, p.event_sequence);
+    const retained = try tmp.dir.readFileAlloc(std.testing.io, "readonly", std.testing.allocator, .limited(100));
+    defer std.testing.allocator.free(retained);
+    try std.testing.expectEqualStrings("original", retained);
 }

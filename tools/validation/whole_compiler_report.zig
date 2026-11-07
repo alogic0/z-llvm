@@ -4,6 +4,41 @@ const u = @import("common.zig");
 
 pub const Counts = struct { selected: u64, emitted: u64, failed: u64 };
 
+/// A bounded tail provides progress after termination, never census credit.
+/// Ignore a partial first/last line; a killed write need not end at a record.
+pub fn eventTail(a: std.mem.Allocator, bytes: []const u8, partial_prefix: bool) !u.Value {
+    var report = u.object(a);
+    try u.put(a, &report, "whole_stream_verified", u.b(false));
+    try u.put(a, &report, "last_record", .null);
+    const begin = if (partial_prefix) (std.mem.indexOfScalar(u8, bytes, '\n') orelse return report) + 1 else 0;
+    const end = std.mem.lastIndexOfScalar(u8, bytes, '\n') orelse return report;
+    try u.put(a, &report, "unflushed_tail_bytes", u.n(bytes.len - end - 1));
+    if (end < begin) return report;
+    const start = if (std.mem.lastIndexOfScalar(u8, bytes[begin..end], '\n')) |i| begin + i + 1 else begin;
+    const value = (try u.json.parse(a, bytes[start..end])).value;
+    if (!u.json.is(try u.get(value, "schema"), "compilation-events-v1") or
+        (try u.get(value, "sequence")) != .integer or (try u.get(value, "sequence")).integer < 0 or
+        (try u.get(value, "event")) != .string) return error.InvalidProgressRecord;
+    try u.put(a, &report, "last_record", value);
+    return report;
+}
+
+test "whole compiler progress retains only complete tail records without census credit" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const record = "{\"schema\":\"compilation-events-v1\",\"sequence\":7,\"event\":\"activity_begin\",\"function\":\"large\"}\n";
+    for ([_]bool{ false, true }) |partial| {
+        const bytes = try std.mem.concat(a, u8, &.{ if (partial) "partial\n" else "", record, "{\"broken" });
+        const result = try eventTail(a, bytes, partial);
+        try std.testing.expectEqualStrings("large", try u.str(try u.get(result, "last_record"), "function"));
+        try std.testing.expectEqual(@as(i64, 8), (try u.get(result, "unflushed_tail_bytes")).integer);
+        try std.testing.expect(!(try u.get(result, "whole_stream_verified")).bool);
+    }
+    try std.testing.expect((try u.get(try eventTail(a, "partial", true), "last_record")) == .null);
+    try std.testing.expectError(error.InvalidProgressRecord, eventTail(a, "{\"schema\":\"other\",\"event\":\"profile_end\",\"sequence\":0}\n", false));
+}
+
 fn field(line: []const u8, name: []const u8) ?[]const u8 {
     var tokens = std.mem.tokenizeScalar(u8, line, ' ');
     while (tokens.next()) |token| {

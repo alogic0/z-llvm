@@ -56,6 +56,29 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
+    const profile_probe = b.addExecutable(.{ .name = "profile-events-probe", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/profile_events_probe.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    profile_probe.root_module.addImport("profile", b.createModule(.{
+        .root_source_file = b.path("src/compilation_profile.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }));
+    const profile_options = b.addOptions();
+    profile_options.addOptionPath("compiler", exe.getEmittedBin());
+    profile_options.addOptionPath("probe", profile_probe.getEmittedBin());
+    const profile_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/profile_events_test.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }), .filters = &.{ "profiling preserves", "owned process timeout retains" } });
+    profile_tests.root_module.addOptions("test_options", profile_options);
+    const profile_run = b.addRunArtifact(profile_tests);
+    profile_run.has_side_effects = true;
+    b.step("test-profile-events", "Check profiling output and interrupted owned processes").dependOn(&profile_run.step);
+
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     run_cmd.addPassthruArgs();

@@ -8,7 +8,7 @@ const provenance = @import("provenance.zig");
 const elf = @import("object_contract.zig");
 const policy = @import("../distribution_headroom_policy.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
-const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--timeout-ms N] [--input-ir FILE]\n";
+const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--timeout-ms N] [--input-ir FILE] [--profile-events]\n";
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(code);
     }
     if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("{s}", .{usage});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "timeout-ms", "input-ir" }, &.{});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "timeout-ms", "input-ir" }, &.{"profile-events"});
     const output = try c.newOutput(try args.require("output-root"));
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("whole-compiler-diagnostic-v1"));
@@ -95,6 +95,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     try u.put(c.a, report, "source_snapshot", source_snapshot);
     try u.put(c.a, report, "runner", try fileIdentity(c, "/proc/self/exe"));
     var env = try environment(c, output);
+    if (args.flag("profile-events")) try env.put("ZLLVM_WHOLE_PROFILE_EVENTS", "1");
     try saveEnvironment(c, &env, try c.join(&.{ output, "base-environment.json" }));
     const first = try freeSpace(c.io, output);
     if (first < policy.serial_reserve_floor_bytes + policy.serial_projected_peak_bytes) return error.InsufficientAdmissionSpace;
@@ -391,11 +392,15 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     const bytes = (try std.Io.Dir.cwd().statFile(c.io, input, .{})).size;
     const profile_path = try c.join(&.{ directory, "profile.json" });
     const owners_path = try c.join(&.{ directory, "owners.tsv" });
+    const events_path = try c.join(&.{ directory, "profile.events.jsonl" });
     // Leave room for readFileAlloc's EOF probe at an exact byte boundary.
-    const command = [_][]const u8{ compiler, "--emit=obj", "--generic-cfg-selector", "--codegen-reachable", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{try std.math.add(u64, bytes, 1)}), try c.fmt("--profile={s}", .{profile_path}), try c.fmt("--selection-owner-output={s}", .{owners_path}), input };
-    try c.writeJson(try c.join(&.{ directory, "effective-argv.json" }), command);
+    var command: std.ArrayList([]const u8) = .empty;
+    try command.appendSlice(c.a, &.{ compiler, "--emit=obj", "--generic-cfg-selector", "--codegen-reachable", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{try std.math.add(u64, bytes, 1)}), try c.fmt("--profile={s}", .{profile_path}), try c.fmt("--selection-owner-output={s}", .{owners_path}) });
+    if (env.get("ZLLVM_WHOLE_PROFILE_EVENTS") != null) try command.append(c.a, try c.fmt("--profile-events={s}", .{events_path}));
+    try command.append(c.a, input);
+    try c.writeJson(try c.join(&.{ directory, "effective-argv.json" }), command.items);
     var runner = Runner.init(c, directory);
-    const result = try timed(c, &runner, &command, try c.join(&.{ directory, "backend" }), env, .{ .timeout_ms = deadline, .stdout_file = try c.join(&.{ directory, "local.o" }), .group = group });
+    const result = try timed(c, &runner, command.items, try c.join(&.{ directory, "backend" }), env, .{ .timeout_ms = deadline, .stdout_file = try c.join(&.{ directory, "local.o" }), .group = group });
     try u.put(c.a, &report, "returncode", u.n(result.code));
     const time_path = try c.join(&.{ directory, "backend.time" });
     const time_text = if (u.exists(c.io, time_path)) try c.read(time_path) else "";
@@ -410,6 +415,16 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     const profile: ?u.Value = if (u.exists(c.io, profile_path)) try c.load(profile_path) else null;
     try u.put(c.a, &report, "failure_stage", u.s(try reports.stage(profile, analysis, result.code, completed)));
     if (profile != null) try u.put(c.a, &report, "profile", u.s(profile_path));
+    if (u.exists(c.io, events_path)) {
+        try u.put(c.a, &report, "profile_events", try fileIdentity(c, events_path));
+        const file = try std.Io.Dir.cwd().openFile(c.io, events_path, .{});
+        defer file.close(c.io);
+        const size = (try file.stat(c.io)).size;
+        var tail: [65536]u8 = undefined;
+        const offset = size -| tail.len;
+        const count = try file.readPositionalAll(c.io, &tail, offset);
+        try u.put(c.a, &report, "profile_progress", try reports.eventTail(c.a, tail[0..count], offset != 0));
+    }
     if (result.code == 0 and completed) {
         try reports.validateSuccess(c.a, analysis, profile orelse return error.MissingProfile, try c.read(owners_path));
         const object_path = try c.join(&.{ directory, "local.o" });

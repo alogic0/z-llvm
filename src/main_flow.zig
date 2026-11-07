@@ -33,6 +33,7 @@ const usage =
     \\Explicit --passes/--pipeline run before IR, object, assembly and owner output. Object emission defaults to no optimization. Codegen traces and timing go to stderr.
     \\Structured adapter envelopes carry explicit passes for execution when their typed module is built; --emit=ir preserves this deferred recipe.
     \\--profile=PATH writes exclusive phase timings and counters as JSON, independently of pass timing.
+    \\--profile-events=PATH flushes function, phase and legalizer progress as JSONL, including incomplete runs.
     \\--selection-owner-output=PATH writes ownership from the same successful --emit=obj selection run.
     \\
 ;
@@ -62,6 +63,7 @@ pub fn main(init: std.process.Init) !void {
     var target_datalayout: ?[]const u8 = null;
     var input_path: ?[]const u8 = null;
     var profile_path: ?[]const u8 = null;
+    var profile_events_path: ?[]const u8 = null;
     var owner_path: ?[]const u8 = null;
 
     while (args.next()) |arg| {
@@ -86,6 +88,9 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.startsWith(u8, arg, "--profile=")) {
             profile_path = arg["--profile=".len..];
             if (profile_path.?.len == 0) return error.EmptyProfilePath;
+        } else if (std.mem.startsWith(u8, arg, "--profile-events=")) {
+            profile_events_path = arg["--profile-events=".len..];
+            if (profile_events_path.?.len == 0) return error.EmptyProfileEventsPath;
         } else if (std.mem.startsWith(u8, arg, "--selection-owner-output=")) {
             owner_path = arg["--selection-owner-output=".len..];
             if (owner_path.?.len == 0) return error.EmptyOwnerPath;
@@ -137,13 +142,24 @@ pub fn main(init: std.process.Init) !void {
         if (input_path) |i| if (std.mem.eql(u8, p, i)) return error.ConflictingOutputPaths;
     }
     if (owner_path) |o| if (input_path) |i| if (std.mem.eql(u8, o, i)) return error.ConflictingOutputPaths;
-    var profile_state: ?profiling.Profile = if (profile_path != null) .init(allocator, io) else null;
+    if (profile_events_path) |events| {
+        for ([_]?[]const u8{ input_path, profile_path, owner_path }) |path|
+            if (path) |other| if (try sameOutputPath(allocator, io, events, other)) return error.ConflictingOutputPaths;
+    }
+    var profile_state: ?profiling.Profile = if (profile_path != null or profile_events_path != null) .init(allocator, io) else null;
     const profile: ?*profiling.Profile = if (profile_state) |*p| p else null;
     defer if (profile) |p| p.deinit();
+    if (profile_events_path) |path| try profile.?.startEvents(path);
     var succeeded = true;
-    defer if (profile) |p| p.write(profile_path.?, succeeded) catch |err| {
-        std.debug.print("profile write failed: {s}\n", .{@errorName(err)});
-        std.process.exit(2);
+    defer if (profile) |p| {
+        if (profile_path) |path| p.write(path, succeeded and p.events_error == null) catch |err| {
+            std.debug.print("profile write failed: {s}\n", .{@errorName(err)});
+            std.process.exit(2);
+        };
+        p.finishEvents(succeeded) catch |err| {
+            std.debug.print("profile events write failed: {s}\n", .{@errorName(err)});
+            std.process.exit(2);
+        };
     };
     errdefer succeeded = false;
     const optimization: compilation.Options = .{
@@ -338,6 +354,25 @@ pub fn main(init: std.process.Init) !void {
     try compilation.prepare(allocator, io, &module, stdout, ir_options);
     if (!trace and !quiet) try module.print(stdout);
     try stdout.flush();
+}
+
+fn canonicalOutputPath(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![:0]u8 {
+    return std.Io.Dir.cwd().realPathFileAlloc(io, path, allocator) catch |err| switch (err) {
+        error.FileNotFound => blk: {
+            const parent = try std.Io.Dir.cwd().realPathFileAlloc(io, std.fs.path.dirname(path) orelse ".", allocator);
+            defer allocator.free(parent);
+            break :blk try std.fs.path.joinZ(allocator, &.{ parent, std.fs.path.basename(path) });
+        },
+        else => return err,
+    };
+}
+
+fn sameOutputPath(allocator: std.mem.Allocator, io: std.Io, left: []const u8, right: []const u8) !bool {
+    const a = try canonicalOutputPath(allocator, io, left);
+    defer allocator.free(a);
+    const b = try canonicalOutputPath(allocator, io, right);
+    defer allocator.free(b);
+    return std.mem.eql(u8, a, b);
 }
 
 fn prepareArtifact(allocator: std.mem.Allocator, io: std.Io, module: *ir.Module, input: []const u8) !void {

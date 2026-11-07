@@ -9,6 +9,7 @@ const integers = @import("integer_forms.zig");
 const comparisons = @import("comparison_forms.zig");
 const legacy = @import("legacy_forms.zig");
 const phi_values = @import("phi_values.zig");
+const profiling = @import("../../../compilation_profile.zig");
 
 pub const Function = struct {
     ir_function: ir.Function,
@@ -24,14 +25,38 @@ pub fn check(function: ir.Function) !void {
 /// the function's ABI remain borrowed and unchanged. Three bounded stages avoid a
 /// recursive fixed-point search and make failure to normalize explicit.
 pub fn normalize(allocator: std.mem.Allocator, source: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !Function {
+    return normalizeProfiled(allocator, source, context, null);
+}
+
+pub fn normalizeProfiled(allocator: std.mem.Allocator, source: ir.Function, context: ?*const machine.ReadOnlyModuleContext, profile: ?*profiling.Profile) !Function {
     var function = source;
-    if (phi_values.requiresNormalization(function)) function = try phi_values.normalize(allocator, function);
-    if (legacy.recognize(function)) |form| return .{ .ir_function = function, .whole_function = form };
-    if (comparisons.requiresNarrowNormalization(function))
-        function = (try comparisons.legalize(allocator, function, context)) orelse return error.UnsupportedSemanticNormalization;
-    if (integers.requiresNormalization(function))
-        function = (try integers.legalize(allocator, function)) orelse return error.UnsupportedSemanticNormalization;
-    try check(function);
+    {
+        const activity = profiling.activity(profile, "normalize-phi-values");
+        defer activity.end();
+        if (phi_values.requiresNormalization(function)) function = try phi_values.normalize(allocator, function);
+    }
+    {
+        const activity = profiling.activity(profile, "recognize-legacy-envelope");
+        defer activity.end();
+        if (legacy.recognize(function)) |form| return .{ .ir_function = function, .whole_function = form };
+    }
+    {
+        const activity = profiling.activity(profile, "normalize-narrow-comparisons");
+        defer activity.end();
+        if (comparisons.requiresNarrowNormalization(function))
+            function = (try comparisons.legalize(allocator, function, context)) orelse return error.UnsupportedSemanticNormalization;
+    }
+    {
+        const activity = profiling.activity(profile, "normalize-integers");
+        defer activity.end();
+        if (integers.requiresNormalization(function))
+            function = (try integers.legalize(allocator, function)) orelse return error.UnsupportedSemanticNormalization;
+    }
+    {
+        const activity = profiling.activity(profile, "check-normalized-invariants");
+        defer activity.end();
+        try check(function);
+    }
     if (!function.ret_ty.eql(source.ret_ty) or function.params.items.ptr != source.params.items.ptr)
         return error.SemanticNormalizationChangedAbi;
     return .{ .ir_function = function };
