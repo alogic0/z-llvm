@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `1bf7b0205526994679331da3bf2b50975b6929fd`; tree: `6e150a44b22446146d9f3079e21afa058590cfc7`.
+Accepted revision: `57a78095583980db2f0489e3b1b410c518313d6f`; tree: `d62cb1eba673e0998d191225c906cc7b78c3a8b2`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,24 +25,33 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [packed aggregate repair](evidence/packed_aggregate_support.md) is accepted:
-all 17 integration gates and 46 native populations pass. Its regression passes
-all three modes and both local routes in Debug and ReleaseFast compiler builds;
-the unchanged complete compiler now parses every global/alias line independently.
-Function parsing still rejects seven of 8,928 independently examined definitions.
-The first boundary is a quoted switch label containing `[`. These diagnostic
-counts do not establish verification, selection or execution of those functions.
-The separate runtime vector-cast verifier failure remains. Compiler-core counts
-stay at 100 lowered/emitted/linked and 12 executed functions per mode.
+The [compiler parser and runtime cast repair](evidence/compiler_parser_vector_casts.md)
+is accepted at `57a78095`: all 17 integration gates and 47 native populations
+pass. All 8,928 compiler definitions and the complete unchanged compiler IR now
+parse. All 455 runtime definitions verify. The new five-function vector-cast
+population checks 7,680 local observations against 3,840 LLVM references in all
+three modes and both routes, with Debug and ReleaseFast compiler builds.
+Debug and ReleaseSafe each pass 1,930 units and 19 structural checks; readiness,
+both input corpora and the existing fixed programs pass.
 
-The preceding [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md) is
-complete without changing accepted counters. The pinned LLVM-enabled
-ReleaseFast compiler produces 443.6 MB of optimized IR containing 8,928
-definition lines, then local parsing rejects a packed aggregate global.
-Independent global syntax census records 111 such rejections. The executable
-build separately rejects vector floating-point truncation during runtime
+Compiler verification next rejects `allocptr` on `free`'s declaration; the exact
+LLVM-valid reproducer is retained. Runtime selection succeeds for 265 functions
+and rejects 190 without publishing a complete object. `sincos_f32` next reaches
+an ordinary scalar FP pointer-load boundary. Vector GEP syntax is preserved,
+while its result semantics remain explicitly unsupported. No whole-compiler
+object, startup or self-rebuild is claimed. Core counts stay at 100 lowered/
+emitted/linked and 12 executed functions per mode; bypass ratchet 130 is unchanged.
+All 36 core records preserve selected objects and observations. Reference-wrapper
+size/hash differences are recorded separately, without a strict byte-identity claim.
+
+The preceding [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md)
+completed without changing accepted counters. At that checkpoint the pinned
+LLVM-enabled ReleaseFast compiler produced 443.6 MB of optimized IR containing
+8,928 definition lines, then local parsing rejected a packed aggregate global.
+Independent global syntax census recorded 111 such rejections. The executable
+build separately rejected vector floating-point truncation during runtime
 verification. No whole-compiler object, executable, startup or self-rebuild
-success is claimed. Packed aggregate support was its recommended next slice;
+success was claimed. Packed aggregate support was its recommended next slice;
 the [diagnostic record](evidence/whole_compiler_diagnostic_20261107.json) retains
 both populations and their limits.
 

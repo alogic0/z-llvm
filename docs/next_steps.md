@@ -1,19 +1,27 @@
 # Active direction
 
-The [packed aggregate repair](plans/2026-11-07-packed-aggregate-support.md) is
-complete. Shared structure parsing, layout, constant emission and address
-composition pass focused checks and all 17 integration gates. All 46 native
-populations pass; the new population also passes independently in Debug and
-ReleaseFast compiler builds across all three modes and both local routes. See the
-[evidence](evidence/packed_aggregate_support.md).
+The [compiler parser and runtime cast plan](plans/2026-11-07-compiler-parser-vector-casts.md)
+is complete at `57a78095`. All 8,928 compiler definitions and the full unchanged
+compiler module parse; all 455 runtime definitions verify. All 17 integration
+gates and 47 native populations pass. See the
+[evidence](evidence/compiler_parser_vector_casts.md) and
+[acceptance record](evidence/compiler_parser_vector_casts_acceptance_20261107.json).
 
-The retained whole compiler now parses all 36,959 global/alias lines. It still
-stops in function parsing: the independent census finds seven rejections among
-8,928 definitions (five `InvalidLabel`, one `UnsupportedType`, one
-`UnsupportedInstructionMetadata`). The first is a switch whose quoted default
-label contains `[`. These are the next compiler-input boundaries to resolve;
-runtime vector floating-point casts remain a separate required repair.
-No whole-compiler execution or compiler-core counter increase is claimed.
+The next compiler slice is allocation-related parameter attributes. Verification
+first rejects `allocptr` on `free`'s declaration at input line 737421. Use the
+LLVM-valid `local-state/validations/parser-vector-20261107/next-allocptr.ll`
+reproducer, preserve ABI/optimization semantics and negative checks, then replay
+the exact full input to expose the next boundary. Vector GEP result semantics
+remain a known separate gap after their syntax repair.
+
+Runtime selection now examines all 455 definitions: 265 succeed and 190 reject,
+with complete diagnostics and capability grouping retained under
+`local-state/validations/parser-vector-20261107/`. The first failure is memset
+attributes; `sincos_f32` next rejects ordinary scalar FP pointer loads. Continue
+through shared memory/register contracts when extending that runtime family.
+No complete compiler or runtime object, compiler startup or self-rebuild is
+claimed. Preserve the 12-function core cohort, ratchet 130 and all existing
+populations. Admission and runtime reserve remain 32.95 GB and 24.36 GB.
 
 The entries below describe preceding checkpoints.
 
@@ -30,10 +38,10 @@ See the [report](evidence/whole_compiler_diagnostic.md) and
 
 That diagnostic selected shared packed aggregate support, using
 `test/whole_compiler/packed_global.ll` and the retained complete compiler IR.
-The completed repair and subsequent parser boundaries are recorded above.
-Vector floating-point casts remain the separate runtime slice. The twelve-member
-cohort and all accepted populations are preserved. This direction supersedes
-the earlier isolated AIR error-returning function recommendation.
+Packed aggregate support, the subsequent parser repair and the runtime vector
+cast slice are now complete. The twelve-member cohort and all accepted
+populations are preserved. This direction superseded the earlier isolated AIR
+error-returning function recommendation.
 
 Raw diagnostics and exact configuration are under
 `local-state/validations/whole-compiler-20261107/attempt-4/`. Use the new runner's

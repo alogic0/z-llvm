@@ -4615,6 +4615,27 @@ One line per completed cycle, append-only, newest last. This is the
   claimed. Original probes and prior compiler remain; no archives were created.
   Evidence: `docs/evidence/packed_aggregate_acceptance_20261107.json`.
 
+- 2026-11-07 (compiler function parsing and runtime vector casts, `57a78095`)
+  All 17 integration gates pass on the frozen 1,729-file source snapshot.
+  Quote-aware switch/indirect-branch labels, vector GEP syntax and switch loop
+  metadata close all seven function-parser failures: 8,928 definitions and the
+  complete unchanged compiler IR parse. Equal-lane FP width verification and
+  two-lane float/double selection use existing register ownership, exact-width
+  pair memory and the fully defined f64x2 PHI contract. All 455 runtime
+  definitions verify. The new five-function population passes 7,680 local
+  observations against 3,840 LLVM references; all 47 native populations pass
+  1,779,948 local observations. Debug and ReleaseSafe pass 1,930 units and 19
+  structural checks; readiness, both input corpora and all fixed programs pass.
+  Core counts remain 100 lowered/emitted/linked and 12 executed per mode, with
+  identical selected objects and observations across 36 records. Wrapper size/
+  hash differences remain explicitly excluded from that semantic comparison.
+  Compiler verification next rejects `allocptr` on `free`; runtime selection
+  succeeds for 265 functions and rejects 190 without publishing a complete
+  object. `sincos_f32` next reaches ordinary scalar FP pointer loads. No whole
+  compiler startup or self-rebuild credit is claimed. Original probes and prior
+  compilers remain; no archives were created. Evidence:
+  `docs/evidence/compiler_parser_vector_casts_acceptance_20261107.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4622,7 +4643,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `1bf7b0205526994679331da3bf2b50975b6929fd`; tree: `6e150a44b22446146d9f3079e21afa058590cfc7`.
+Accepted revision: `57a78095583980db2f0489e3b1b410c518313d6f`; tree: `d62cb1eba673e0998d191225c906cc7b78c3a8b2`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
