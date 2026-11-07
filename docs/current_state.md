@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `57a78095583980db2f0489e3b1b410c518313d6f`; tree: `d62cb1eba673e0998d191225c906cc7b78c3a8b2`.
+Accepted revision: `9d3f24b3707c2b86523872a1554bd5469b91ef53`; tree: `68b766c536c594f44c93885d199ab89341ff65a1`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,24 +25,31 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [compiler parser and runtime cast repair](evidence/compiler_parser_vector_casts.md)
-is accepted at `57a78095`: all 17 integration gates and 47 native populations
-pass. All 8,928 compiler definitions and the complete unchanged compiler IR now
-parse. All 455 runtime definitions verify. The new five-function vector-cast
-population checks 7,680 local observations against 3,840 LLVM references in all
-three modes and both routes, with Debug and ReleaseFast compiler builds.
-Debug and ReleaseSafe each pass 1,930 units and 19 structural checks; readiness,
-both input corpora and the existing fixed programs pass.
+The [allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
+is accepted at `9d3f24b3`: all 17 integration gates and 48 native populations pass.
+The complete unchanged compiler module now verifies all 8,928 definitions.
+Allocation attributes, `uitofp nneg` and scalar-base vector GEP result typing
+are supported in the IR contract; native vector GEP selection remains unsupported.
+The seven-function runtime-memory population checks 8,466 local observations
+against 4,233 LLVM references in all three modes and both routes, with Debug and
+ReleaseFast compilers. Debug/ReleaseSafe unit suites pass with 1,937 tests and
+20 structural checks per mode; readiness, both corpora and fixed programs pass.
 
-Compiler verification next rejects `allocptr` on `free`'s declaration; the exact
-LLVM-valid reproducer is retained. Runtime selection succeeds for 265 functions
-and rejects 190 without publishing a complete object. `sincos_f32` next reaches
-an ordinary scalar FP pointer-load boundary. Vector GEP syntax is preserved,
-while its result semantics remain explicitly unsupported. No whole-compiler
-object, startup or self-rebuild is claimed. Core counts stay at 100 lowered/
-emitted/linked and 12 executed functions per mode; bypass ratchet 130 is unchanged.
-All 36 core records preserve selected objects and observations. Reference-wrapper
-size/hash differences are recorded separately, without a strict byte-identity claim.
+The whole-compiler selection replay reaches its one-hour deadline after reporting
+5,949 rejected functions. It has no completed selection totals or final profile.
+Among reported failures, 1,798 concern memcpy attributes and 1,648 call ABI
+attributes. Large-function progress/timing diagnostics and these shared gaps are
+the next work. No complete compiler object, startup or self-rebuild is claimed.
+The unchanged runtime selects 272 of 455 functions and rejects 183, with no
+regression among previously selected functions. `sincos_f32` now reaches
+`composed-vector-shuffle-form`; no complete runtime object is published.
+
+Core counts stay at 100 lowered/emitted/linked and 12 executed functions per mode;
+bypass ratchet 130 is unchanged. All 36 core records preserve selected objects
+and observations. Reference-wrapper size/hash differences are recorded separately,
+without a strict byte-identity claim. The preceding
+[parser and runtime-cast checkpoint](evidence/compiler_parser_vector_casts.md)
+established complete compiler parsing and the two-lane FP width-cast contract.
 
 The preceding [whole-compiler diagnostic](evidence/whole_compiler_diagnostic.md)
 completed without changing accepted counters. At that checkpoint the pinned

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "57a78095583980db2f0489e3b1b410c518313d6f",
-  "accepted_tree": "d62cb1eba673e0998d191225c906cc7b78c3a8b2",
+  "accepted_revision": "9d3f24b3707c2b86523872a1554bd5469b91ef53",
+  "accepted_tree": "68b766c536c594f44c93885d199ab89341ff65a1",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "57a78095",
+  "declaration_revision": "9d3f24b3",
   "evidence": [
+    "docs/evidence/allocation_runtime_memory_acceptance_20261107.json",
+    "docs/evidence/allocation_runtime_memory.md",
     "docs/evidence/compiler_parser_vector_casts_acceptance_20261107.json",
     "docs/evidence/compiler_parser_vector_casts.md",
     "docs/evidence/packed_aggregate_acceptance_20261107.json",
