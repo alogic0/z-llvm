@@ -7,12 +7,15 @@ const air = @import("zig_air_export.zig");
 
 const metadata = "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata";
 const boundary_indexes = [_]usize{ 0, 1, 63, 64, 65, 127, 128, 129, 65535, 65536, std.math.maxInt(usize) / 2, std.math.maxInt(usize) };
+const packed_patterns = [_]u64{ 0, 1, 2, 255, 256, 65535, 65536, 0x7fffffff, 0x80000000, 0xffffffff, 0x100000000, 0x100000001, 0x8000000000000000, 0xffffffffffffffff, 0x5555555555555555, 0xaaaaaaaaaaaaaaaa };
 
-pub const source_paths = [_][]const u8{ "lib/std/bit_set.zig", "lib/std/atomic.zig", "lib/std/hash_map.zig" };
+pub const source_paths = [_][]const u8{ "lib/std/bit_set.zig", "lib/std/atomic.zig", "lib/std/hash_map.zig", "lib/std/Io.zig", "src/InternPool.zig" };
 const source_hashes = [_][]const u8{
     "ff5c6ac810343dcb1b80e91d31783df8adfdaa718776fdc23a3890a6cd6d44d9",
     "85b467837478ff64aba29bf52cf9eef9b973ddb3ec6b5472901500a8e4a925c5",
     "da14a2401ab5c12d6ca25bbf49e950596859ffc9e4b6d7726ade7ea8fd4a1b34",
+    "382a4e343017183eff88e311f983066f88306e7bfcd85a890723b3697f4b2732",
+    "8cd9ff53f96fbf9206c8f37fd1045b6a572617858fd0ba76bda28df44e0630a7",
 };
 
 pub fn validateSources(sources: [source_paths.len][]const u8) !void {
@@ -28,6 +31,9 @@ pub const Member = enum {
     mutex_try_lock,
     metadata_is_free,
     metadata_is_tombstone,
+    event_reset,
+    packed_u64_get,
+    packed_u64_init,
 
     pub fn functionName(member: Member) []const u8 {
         return switch (member) {
@@ -35,6 +41,9 @@ pub const Member = enum {
             .mutex_try_lock => "atomic.Mutex.tryLock",
             .metadata_is_free => metadata ++ ".isFree",
             .metadata_is_tombstone => metadata ++ ".isTombstone",
+            .event_reset => "Io.Event.reset",
+            .packed_u64_get => "InternPool.PackedU64.get",
+            .packed_u64_init => "InternPool.PackedU64.init",
         };
     }
     pub fn descriptorType(member: Member) []const u8 {
@@ -42,16 +51,27 @@ pub const Member = enum {
             .dynamic_mask_index => "fn (usize) usize",
             .mutex_try_lock => "fn (*atomic.Mutex) bool",
             .metadata_is_free, .metadata_is_tombstone => "fn (" ++ metadata ++ ") bool",
+            .event_reset => "fn (*Io.Event) void",
+            .packed_u64_get => "fn (InternPool.PackedU64) u64",
+            .packed_u64_init => "fn (u64) InternPool.PackedU64",
         };
     }
     pub fn descriptorReturnType(member: Member) []const u8 {
-        return if (member == .dynamic_mask_index) "usize" else "bool";
+        return switch (member) {
+            .dynamic_mask_index => "usize",
+            .event_reset => "void",
+            .packed_u64_get => "u64",
+            .packed_u64_init => "InternPool.PackedU64",
+            else => "bool",
+        };
     }
     pub fn observations(member: Member) usize {
         return switch (member) {
             .dynamic_mask_index => 4096 + boundary_indexes.len,
             .mutex_try_lock => 384,
             .metadata_is_free, .metadata_is_tombstone => 256,
+            .event_reset => 512,
+            .packed_u64_get, .packed_u64_init => 1024 + packed_patterns.len,
         };
     }
     pub fn expectedResult(member: Member) usize {
@@ -59,6 +79,7 @@ pub const Member = enum {
             .dynamic_mask_index => member.observations(),
             .mutex_try_lock => 256,
             .metadata_is_free, .metadata_is_tombstone => 1,
+            .event_reset, .packed_u64_get, .packed_u64_init => member.observations(),
         };
     }
     pub fn expectedWitness(member: Member) usize {
@@ -67,6 +88,8 @@ pub const Member = enum {
             .mutex_try_lock => 512,
             .metadata_is_free => 1,
             .metadata_is_tombstone => 2,
+            .event_reset => 98688,
+            .packed_u64_get, .packed_u64_init => comptime packedWitness(),
         };
     }
     pub fn expectedStdout(member: Member) []const u8 {
@@ -90,7 +113,18 @@ pub const Member = enum {
             .mutex_try_lock => @embedFile("distribution_execution_breadth/fixtures/mutex_" ++ mode ++ ".air"),
             .metadata_is_free => @embedFile("distribution_execution_breadth/fixtures/metadata_free_" ++ mode ++ ".air"),
             .metadata_is_tombstone => @embedFile("distribution_execution_breadth/fixtures/metadata_tombstone_" ++ mode ++ ".air"),
+            .event_reset => @embedFile("distribution_execution_breadth/fixtures/event_reset_" ++ mode ++ ".air"),
+            .packed_u64_get => @embedFile("distribution_execution_breadth/fixtures/packed_get_" ++ mode ++ ".air"),
+            .packed_u64_init => @embedFile("distribution_execution_breadth/fixtures/packed_init_" ++ mode ++ ".air"),
         };
+    }
+
+    pub fn hasMemoryGuard(member: Member) bool {
+        return member == .mutex_try_lock or member == .event_reset;
+    }
+
+    pub fn isPacked(member: Member) bool {
+        return member == .packed_u64_get or member == .packed_u64_init;
     }
 };
 
@@ -106,16 +140,63 @@ fn maskWitness() usize {
     return witness;
 }
 
+fn packedWitness() usize {
+    @setEvalBranchQuota(100_000);
+    var state: u64 = 0x6a09e667f3bcc909;
+    var witness: u64 = 0;
+    for (0..1040) |case| {
+        state = state *% 6364136223846793005 +% 1442695040888963407;
+        const input = if (case < packed_patterns.len) packed_patterns[case] else state;
+        witness +%= input ^ case;
+    }
+    return witness;
+}
+
 fn makeHarness(comptime member: Member, comptime linked: bool) []const u8 {
     const signature = switch (member) {
         .dynamic_mask_index => "fn (usize) callconv(.{ .x86_64_sysv = .{} }) usize",
         .mutex_try_lock => "fn (*u8) callconv(.{ .x86_64_sysv = .{} }) bool",
         .metadata_is_free, .metadata_is_tombstone => "fn (u8) callconv(.{ .x86_64_sysv = .{} }) bool",
+        .event_reset => "fn (*u32) callconv(.{ .x86_64_sysv = .{} }) void",
+        .packed_u64_get, .packed_u64_init => "fn (u64) callconv(.{ .x86_64_sysv = .{} }) u64",
     };
     const prefix = "const std = @import(\"std\");\n" ++
         (if (linked) "const subject = @extern(*const " ++ signature ++ ", .{ .name = \"" ++ member.functionName() ++ "\" });\n" else "") ++
         "pub fn main(init: std.process.Init) !void {\n    var result: usize = 0;\n    var witness: usize = 0;\n";
     const body = switch (member) {
+        .event_reset =>
+        \\    for (0..256) |case| {
+        \\        var guarded = [_]u32{ 0xa5a55a5a, 0x12345678, 0x87654321, 0x55aaaa55, 0x5a5aa5a5 };
+        \\        const slot = 1 + case % 3;
+        \\        guarded[slot] = if (case % 2 == 0) 2 else 0;
+        \\        var expected = guarded;
+        \\        expected[slot] = 0;
+        \\        for (0..2) |attempt| {
+        \\
+        ++ (if (linked) "            subject(&guarded[slot]);\n" else "            guarded[slot] = 0;\n") ++
+            \\            if (!std.mem.eql(u32, &guarded, &expected)) return error.EventOracleMismatch;
+            \\            result += 1;
+            \\            witness += (case + 1) * (attempt + 1);
+            \\        }
+            \\    }
+            \\
+        ,
+        .packed_u64_get, .packed_u64_init =>
+        \\    const patterns = [_]u64{ 0, 1, 2, 255, 256, 65535, 65536, 0x7fffffff, 0x80000000, 0xffffffff, 0x100000000, 0x100000001, 0x8000000000000000, 0xffffffffffffffff, 0x5555555555555555, 0xaaaaaaaaaaaaaaaa };
+        \\    var state: u64 = 0x6a09e667f3bcc909;
+        \\    for (0..1040) |case| {
+        \\        state = state *% 6364136223846793005 +% 1442695040888963407;
+        \\        const input = if (case < patterns.len) patterns[case] else state;
+        \\        const low: u32 = @truncate(input);
+        \\        const high: u32 = @truncate(input >> 32);
+        \\
+        ++ (if (linked) "        const actual = subject(input);\n" else "        const actual = @as(u64, high) * 0x100000000 + low;\n") ++
+            \\        if (@as(u32, @truncate(actual)) != low or actual >> 32 != high) return error.PackedOracleMismatch;
+            \\        result += 1;
+            \\        witness +%= actual ^ case;
+            \\    }
+            \\
+        ,
         .dynamic_mask_index =>
         \\    const boundaries = [_]usize{ 0, 1, 63, 64, 65, 127, 128, 129, 65535, 65536, std.math.maxInt(usize) / 2, std.math.maxInt(usize) };
         \\    for (0..4108) |case| {
@@ -163,7 +244,7 @@ pub fn validateHarnesses(member: Member) !void {
     const linked = member.linkedHarness();
     const reference = member.referenceHarness();
     if (std.mem.count(u8, linked, member.functionName()) != 1 or
-        std.mem.count(u8, linked, "const actual = subject(") != 1 or
+        std.mem.count(u8, linked, "subject(") != 1 or
         std.mem.count(u8, reference, "subject(") != 0 or
         std.mem.count(u8, reference, "@extern") != 0) return error.HarnessBindingMismatch;
 }

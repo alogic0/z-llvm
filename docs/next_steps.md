@@ -1,5 +1,13 @@
 # Active direction
 
+The user's “Do the next” authorizes the
+[compiler-core memory and width execution plan](plans/2026-11-07-compiler-core-execution-breadth.md).
+Implement guarded event resets and packed 64-bit conversions, extending the
+fixed-prefix cohort from nine to twelve after fresh/cache and full acceptance.
+The error-returning `fmt.charToDigit` probe identifies an unsupported `error!u8`
+typed AIR contract for the following slice; it earns no execution credit.
+The older worker-inbox directive is historical and remains superseded.
+
 The [large-function selection performance plan](plans/2026-11-07-large-function-selection-performance.md)
 is complete at `82f485c0`. The shared identifier comparator avoids repeated
 parsing while preserving the existing grammar, numeric namespaces and temporary

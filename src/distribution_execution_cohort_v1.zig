@@ -4,7 +4,7 @@ const breadth = @import("distribution_execution_breadth.zig");
 
 const Sha256 = std.crypto.hash.sha2.Sha256;
 
-pub const schema = "distribution-execution-cohort-v4";
+pub const schema = "distribution-execution-cohort-v5";
 pub const repository_root = "/home/oleg/prog/z_llvm";
 pub const external_repository_root = "/home/oleg/prog/ziglang";
 pub const external_revision = "1c08b09d1c847f4f02c8216e3b62df323861a437";
@@ -37,6 +37,9 @@ pub const Program = enum {
     mutex_try_lock,
     metadata_is_free,
     metadata_is_tombstone,
+    event_reset,
+    packed_u64_get,
+    packed_u64_init,
 
     pub fn functionName(program: Program) []const u8 {
         if (breadth.fromProgram(program)) |member| return member.functionName();
@@ -145,6 +148,9 @@ pub const programs = [_]Program{
     .mutex_try_lock,
     .metadata_is_free,
     .metadata_is_tombstone,
+    .event_reset,
+    .packed_u64_get,
+    .packed_u64_init,
 };
 
 // Only harnesses are generated here. Every called definition is authenticated
@@ -1030,7 +1036,7 @@ fn semanticDescriptorForTest(allocator: std.mem.Allocator, fixture: SemanticDesc
 }
 
 test "fixed cohort identities and harnesses are exact" {
-    try std.testing.expectEqual(@as(usize, 9), programs.len);
+    try std.testing.expectEqual(@as(usize, 12), programs.len);
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Signature.size", programs[0].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Signature.slotType", programs[1].functionName());
     try std.testing.expectEqualStrings("link.MachO.CodeSignature.Requirements.size", programs[2].functionName());

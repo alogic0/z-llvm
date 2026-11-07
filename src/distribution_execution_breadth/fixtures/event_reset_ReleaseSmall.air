@@ -1,0 +1,45 @@
+zllvm-air-export-v1
+contract_version=1
+payload=zig-air-print-v1
+producer=patched-zig-llvm-update-func
+root_source=main.zig
+wrapper=main.zig
+mode=ReleaseSmall
+target=x86_64-unknown-linux5.10.0-gnu2.31.0
+function_count=1
+global_count=0
+function_begin
+name_bytes=14
+Io.Event.reset
+type_bytes=19
+fn (*Io.Event) void
+instruction_count=3
+main_body_count=3
+liveness=present
+air_bytes=322
+# Total AIR+Liveness bytes: 159B
+# AIR Instructions:         3 (27B)
+# AIR Extra Data:           5 (20B)
+# Liveness tomb_bits:       8B
+# Liveness Extra Data:      0 (0B)
+# Liveness special table:   0 (0B)
+  %0 = arg(*Io.Event, 0)
+  %1!= atomic_store_monotonic(%0!, <Io.Event, .unset>, monotonic)
+  %2!= ret(@.void_value)
+
+structured_air_bytes=121
+structured_air-v1
+body|main|-|3|0|1|2
+inst|0|arg|1|-
+inst|1|atomic_store_monotonic|1|-
+inst|2|ret|1|-
+structured_air_end
+
+structured_air_v2_bytes=223
+structured_air-v2
+typed_inst|0|arg|9|*Io.Event|arg|0
+typed_inst|1|atomic_store_monotonic|12|typed-result|opaque|0
+typed_inst|2|ret|8|noreturn|un_op|1|const|3|122|4|void|1|operand0_text|12|@.void_value
+structured_air_v2_end
+
+function_end

@@ -1,0 +1,45 @@
+zllvm-air-export-v1
+contract_version=1
+payload=zig-air-print-v1
+producer=patched-zig-llvm-update-func
+root_source=main.zig
+wrapper=main.zig
+mode=ReleaseSmall
+target=x86_64-unknown-linux5.10.0-gnu2.31.0
+function_count=1
+global_count=0
+function_begin
+name_bytes=25
+InternPool.PackedU64.init
+type_bytes=29
+fn (u64) InternPool.PackedU64
+instruction_count=3
+main_body_count=3
+liveness=present
+air_bytes=284
+# Total AIR+Liveness bytes: 159B
+# AIR Instructions:         3 (27B)
+# AIR Extra Data:           5 (20B)
+# Liveness tomb_bits:       8B
+# Liveness Extra Data:      0 (0B)
+# Liveness special table:   0 (0B)
+  %0 = arg(u64, 0)
+  %1 = bit_cast(InternPool.PackedU64, %0!)
+  %2!= ret(%1!)
+
+structured_air_bytes=107
+structured_air-v1
+body|main|-|3|0|1|2
+inst|0|arg|1|-
+inst|1|bit_cast|1|-
+inst|2|ret|1|-
+structured_air_end
+
+structured_air_v2_bytes=249
+structured_air-v2
+typed_inst|0|arg|3|u64|arg|0
+typed_inst|1|bit_cast|20|InternPool.PackedU64|ty_op|1|inst|1|0|3|u64|1|operand0_text|2|%0
+typed_inst|2|ret|8|noreturn|un_op|1|inst|1|1|20|InternPool.PackedU64|1|operand0_text|2|%1
+structured_air_v2_end
+
+function_end

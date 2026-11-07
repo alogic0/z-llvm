@@ -1902,7 +1902,7 @@ test "successful fixed group buffers and returns outputs in manifest order" {
         defer result.deinit(allocator);
         for (result.completed, modes) |completed, mode| {
             try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, mode) != null);
-            try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "real_executed=9 real_programs_ok=9") != null);
+            try std.testing.expect(std.mem.indexOf(u8, completed.result.stdout, "real_executed=12 real_programs_ok=12") != null);
         }
         for (0..mode_count) |index| {
             try std.testing.expectEqual(@as(usize, 1), audit.reaped[index]);
