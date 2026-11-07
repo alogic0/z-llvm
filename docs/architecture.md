@@ -268,12 +268,13 @@ these folds so newly constant safety branches disappear before codegen.
 | Integrated preopt/postopt/writer gates | The selected route and wrappers declared by each runner. | Different routes exercise different optimization owners and selector paths. |
 | `distribution-all` | The tracked 17-subgate inventory and its declared populations. | Success does not cover every development pass, input shape, or separate frontier gate. |
 
-The [execution-breadth acceptance](evidence/execution_breadth_acceptance_20261106.json)
-records 100 compiler-core functions lowered, emitted and linked, with nine cohort
-executions in every release mode. The cohort checks 5,264 observations per mode:
+The [memory and width acceptance](evidence/compiler_core_memory_width_acceptance_20261107.json)
+records 100 compiler-core functions lowered, emitted and linked, with twelve
+cohort executions in every release mode. The cohort checks 7,856 observations per mode:
 four constant methods, ASCII, index boundaries, guarded atomic state transitions
-and exhaustive packed-byte predicates. The 17-subgate run, unchanged programs,
-45 native populations and compiler-rt comparisons retain separate denominators.
+and exhaustive packed-byte predicates, guarded event resets and packed 64-bit
+conversions. The event checks are single-threaded. The 17-subgate run, unchanged
+programs, 45 native populations and compiler-rt comparisons retain separate denominators.
 Fresh AIR generation and cached execution replay authenticate the expanded source
 identity. The fixed 100-row candidate prefix remains unchanged.
 

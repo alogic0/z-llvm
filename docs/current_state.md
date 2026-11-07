@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `82f485c0d81b1ed3a40087a785332346ef09cf42`; tree: `1cbe9aa26d40acfa1b84a839cfb819b015f63a68`.
+Accepted revision: `c08b98d11009c6967997448c88fa073a27f27152`; tree: `2719df654b821fce43205bd97a614e00ea77330e`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -17,13 +17,38 @@ Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 9 | Fixed execution cohort |
-| Paired harnesses accepted | 9 | Legacy real_programs_ok cohort metric |
+| Functions executed | 12 | Fixed execution cohort |
+| Paired harnesses accepted | 12 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
+
+The accepted [compiler-core memory and width checkpoint](evidence/compiler_core_memory_width_acceptance_20261107.json)
+at `c08b98d1` passes all 17 gates on a verified 2,983-file snapshot. The fixed
+100-row prefix now executes twelve functions per mode: event reset and two
+packed 64-bit conversions join the original nine. All 45 fresh/cache records
+match; the complete cohort checks 7,856 observations per route and mode.
+
+The permanent controls pass 21 function/mode pairs and 54 fault rejections,
+including neighboring-memory corruption and loss of upper bits. Dedicated
+cohort/row/runner units pass 32/42/37 checks in both Debug and ReleaseSafe;
+policy and comparison checks pass. Compiler production sources and binaries
+are unchanged; compiler unit/structural checks reuse valid cached results.
+Both input corpora, all five fixed Zig programs and 45 native populations pass,
+retaining 1,767,660 local and 883,830 reference native observations.
+
+The [completed plan](plans/2026-11-07-compiler-core-execution-breadth.md) and
+[evidence](evidence/compiler_core_memory_width.md) record the exact scope.
+The next gap is the callable `error!u8` contract exposed by `fmt.charToDigit`,
+including payload layout, error codes and ABI. Event tests are single-threaded
+and the packed conversions remain small functions. The lowest additional disk
+sample is 40.53 GB; final recorded free space is 41.10 GB. Original probes remain
+and no archives were created.
+
+The entries below are historical. Their counts and remaining failures describe
+those checkpoints, not the current frontier.
 
 The accepted [large-function performance checkpoint](evidence/large_function_selection_performance_acceptance_20261107.json)
 at `82f485c0` passes all 17 integration gates on a verified frozen 2,971-file
@@ -53,9 +78,6 @@ The [completed plan](plans/2026-11-07-large-function-selection-performance.md)
 and [measurements](evidence/large_function_selection_performance.md) retain the
 scope and raw evidence. Broader callable compiler-core execution is the next
 coverage priority. Selection and independent replay remain performance costs.
-
-The entries below are historical. Their counts and remaining failures describe
-those checkpoints, not the current frontier.
 
 The preceding [unchanged Zig input-program checkpoint](evidence/zig_input_program_acceptance_20261106.json)
 at `9cc31c38` passes all 17 integration gates. The pinned 457-line

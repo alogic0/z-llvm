@@ -1,12 +1,30 @@
 # Active direction
 
-The user's “Do the next” authorizes the
-[compiler-core memory and width execution plan](plans/2026-11-07-compiler-core-execution-breadth.md).
-Implement guarded event resets and packed 64-bit conversions, extending the
-fixed-prefix cohort from nine to twelve after fresh/cache and full acceptance.
-The error-returning `fmt.charToDigit` probe identifies an unsupported `error!u8`
-typed AIR contract for the following slice; it earns no execution credit.
-The older worker-inbox directive is historical and remains superseded.
+The [compiler-core memory and width execution plan](plans/2026-11-07-compiler-core-execution-breadth.md)
+is complete at `c08b98d1`. Guarded event resets and packed 64-bit conversions
+extend the fixed-prefix cohort from nine to twelve executed functions per mode.
+All 45 fresh/cache records match, and all 17 integration gates pass on the
+verified frozen source. The 54 fault controls, both input corpora, five fixed
+Zig programs and all 45 native populations pass. See the
+[acceptance record](evidence/compiler_core_memory_width_acceptance_20261107.json)
+and [evidence](evidence/compiler_core_memory_width.md).
+
+The recommended next capability is callable error-returning compiler-core
+execution. `fmt.charToDigit` fails typed AIR lowering on its `error!u8` contract.
+Establish Zig-owned payload layout, error-code and calling-convention facts,
+then execute the unchanged function on valid and invalid character/base pairs.
+It lies outside the 100-row prefix, so declare any additional execution
+population separately. Preserve the twelve-member cohort and existing programs.
+The retained diagnostic does not prove that payload width is its only gap.
+
+Use `local-state/validations/core-execution-20261107/` and
+`local-state/caches/core-execution-20261107/` for current core evidence/AIR.
+Admission remains 32,949,672,960 bytes; execution reserve is 24,359,738,368 bytes.
+The lowest additional disk sample is 40.53 GB and final recorded free space
+41.10 GB. Original probes, prior evidence and compilers remain; no archives were
+created. The older worker-inbox directive is historical and remains superseded.
+
+The entries below describe preceding checkpoints.
 
 The [large-function selection performance plan](plans/2026-11-07-large-function-selection-performance.md)
 is complete at `82f485c0`. The shared identifier comparator avoids repeated
@@ -25,10 +43,8 @@ readiness checks pass. Both input corpora, the five fixed Zig programs and all
 45 native populations remain green. The 36 core records match prior fresh
 execution, retaining 100 lowered/emitted/linked and nine executed per mode.
 
-The recommended next milestone is broader callable compiler-core execution,
-emphasizing input-dependent memory, mutation and error paths. This performance
-slice does not expand the cohort. Selection itself remains the largest Safe
-profile cost; further performance work should measure inside that phase.
+That performance slice did not expand the cohort. Selection itself remains the
+largest Safe profile cost; further performance work should measure inside that phase.
 The older cohort-v3 inbox directive remains historical: it predates the accepted
 nine-function cohort. Preserve the original probes and create no archives.
 

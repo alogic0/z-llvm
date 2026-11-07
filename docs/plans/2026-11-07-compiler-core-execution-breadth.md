@@ -1,6 +1,6 @@
 # Compiler-core memory and width execution
 
-Status: focused implementation complete; full acceptance pending.
+Status: complete at `c08b98d1`; all 17 gates and postchecks pass.
 Authorized by the user's “Do the next”.
 Successor to the accepted large-function selection performance checkpoint.
 
@@ -71,5 +71,14 @@ The original 27 member/mode records preserve descriptors, selected objects,
 linked sizes, results and observation counts. Rebuilt reference-wrapper sizes
 differ slightly in eighteen records; the raw deltas are retained. This is not a
 claim that prior reference binaries are byte-identical. The standard comparator
-will require fresh/cache byte-count equality within the new root. Full acceptance
-is pending; the accepted status remains at the prior nine-member checkpoint.
+passes all 45 fresh/cache records, including byte counts within the new root.
+
+All 17 integration gates pass on the frozen 2,983-file snapshot. The full
+21-pair/54-control run matches focused objects and observations. Both input
+corpora, all five fixed Zig programs, the legacy canaries and all 45 native
+populations pass. The original probes and compiler hashes verify unchanged.
+The accepted status now records twelve executed and paired functions per mode;
+100 lowered/emitted/linked and bypass ratchet 130 remain unchanged. See the
+[acceptance record](../evidence/compiler_core_memory_width_acceptance_20261107.json)
+and [evidence](../evidence/compiler_core_memory_width.md). The lowest additional
+interactive disk sample is 40.53 GB, above the 24.36 GB execution reserve.

@@ -4574,6 +4574,18 @@ One line per completed cycle, append-only, newest last. This is the
   archives were created. Evidence:
   `docs/evidence/large_function_selection_performance_acceptance_20261107.json`.
 
+- 2026-11-07 (compiler-core memory and width execution, `c08b98d1`) All 17 gates
+  pass on the frozen 2,983-file snapshot. Event reset and packed u64 get/init
+  expand the fixed cohort from nine to twelve executed/paired functions per
+  mode; 100 lowered/emitted/linked and bypass ratchet 130 remain unchanged.
+  All 45 fresh/cache records match. The 21 function/mode control pairs and
+  54 fault rejections pass. Dedicated cohort/row/runner units pass in Debug and
+  ReleaseSafe, and comparison/policy checks pass. Both input corpora, five fixed
+  Zig programs and all 45 native populations pass. Production compiler sources
+  and binaries are unchanged. Original probes remain; no archives were created.
+  The lowest additional disk sample is 40.53 GB. Evidence:
+  `docs/evidence/compiler_core_memory_width_acceptance_20261107.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4581,7 +4593,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `82f485c0d81b1ed3a40087a785332346ef09cf42`; tree: `1cbe9aa26d40acfa1b84a839cfb819b015f63a68`.
+Accepted revision: `c08b98d11009c6967997448c88fa073a27f27152`; tree: `2719df654b821fce43205bd97a614e00ea77330e`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -4592,8 +4604,8 @@ Candidate SHA-256: `847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe
 | Functions lowered | 100 | Compiler-core prefix |
 | Objects emitted | 100 | Compiler-core prefix |
 | Native links | 100 | Compiler-core prefix |
-| Functions executed | 9 | Fixed execution cohort |
-| Paired harnesses accepted | 9 | Legacy real_programs_ok cohort metric |
+| Functions executed | 12 | Fixed execution cohort |
+| Paired harnesses accepted | 12 | Legacy real_programs_ok cohort metric |
 | Local failures | 0 | Compiler-core gate |
 
 Compiler-rt bypass ratchet: 130 (separate 285-function population).
