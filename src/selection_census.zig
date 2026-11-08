@@ -45,6 +45,7 @@ const Capture = struct {
         };
         capture.payload = try std.json.Stringify.valueAlloc(a, .{
             .position = rejection.position,
+            .pressure = rejection.pressure,
             .selector_tag = rejection.tag,
             .selector_detail = rejection.detail,
             .function_return_type = try std.fmt.allocPrint(a, "{f}", .{rejection.function.ret_ty}),

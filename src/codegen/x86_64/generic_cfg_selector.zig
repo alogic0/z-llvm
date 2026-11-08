@@ -142,7 +142,7 @@ fn selectReady(
             .unsupported_control_flow => {
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
-                    if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
+                    if (stage_two.exceedsSpillEnvelope()) return rejectPressure(function, stage_two, observer);
                     return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context, observer);
                 }
                 return inspected;
@@ -152,7 +152,7 @@ fn selectReady(
     }
     if (function.blocks.items.len > 1) {
         const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
-        if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
+        if (stage_two.exceedsSpillEnvelope()) return rejectPressure(function, stage_two, observer);
         return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context, observer);
     }
     switch (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context, observer)) {
@@ -167,6 +167,12 @@ fn selectReady(
         },
     }
     return inspected;
+}
+
+fn rejectPressure(function: ir.Function, pressure: StageTwoSummary, observer: ?*Observer) !SelectionResult {
+    const failure: Diagnostic = .{ .no_spill_envelope = "stage2-register-pressure" };
+    if (observer) |value| try value.reject(.{ .function = function, .position = 0, .tag = failure.tagName(), .detail = failure.detail(), .pressure = pressure });
+    return .{ .unsupported = failure };
 }
 
 fn shouldReportComposedNoEmitter(inspected: SelectionResult) bool {

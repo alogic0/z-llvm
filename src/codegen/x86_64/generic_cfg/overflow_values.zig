@@ -22,7 +22,8 @@ fn operation(call: ir.CallInst) ?Operation {
     if (!pairs.spelling(call.ret_ty.aggregate, pair)) return null;
     sysv.rejectUnsupportedCallEnvelope(call) catch return null;
     for (call.args.items) |arg| {
-        if (!arg.ty.eql(ty) or arg.attrs != null or (arg.value != .named and arg.value != .int)) return null;
+        if (!arg.ty.eql(ty) or (arg.value != .named and arg.value != .int)) return null;
+        sysv.rejectUnsupportedCallArgAttrs(arg) catch return null;
         if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
         if (arg.value == .int and ty.int < 128 and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(ty.int - 1))) or
             arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(ty.int))))) return null;

@@ -1,0 +1,143 @@
+//! Scalar bit intrinsics expanded into native-width operations. All shifts are
+//! defined even at zero and at multiples of the logical width; private calls
+//! omit advisory facts that do not describe their widened result.
+const std = @import("std");
+const ir = @import("../../../ir.zig");
+const forms = @import("scalar_forms.zig");
+const attrs = @import("intrinsic_attrs.zig");
+
+pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl };
+
+pub fn operation(call: ir.CallInst) ?Operation {
+    if (!std.mem.startsWith(u8, call.callee, "llvm.") or call.ret_ty != .int or call.ret_ty.int == 0 or call.ret_ty.int > 64) return null;
+    const bits = call.ret_ty.int;
+    var buffer: [48]u8 = undefined;
+    inline for (std.meta.tags(Operation)) |op| {
+        const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
+        if (std.mem.eql(u8, call.callee, name)) {
+            if (!attrs.scalarIntegerCallSupported(call)) return null;
+            const flag = op == .cttz or op == .ctlz or op == .abs;
+            if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl) @as(usize, 3) else @as(usize, 1))) return null;
+            for (call.args.items, 0..) |arg, index| {
+                const expected: ir.Type = if (flag and index == 1) .{ .int = 1 } else call.ret_ty;
+                if (!arg.ty.eql(expected) or (arg.value != .named and arg.value != .int)) return null;
+                if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
+                if (arg.value == .int and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(expected.int - 1))) or
+                    arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(expected.int))))) return null;
+                if (flag and index == 1 and (arg.value != .int or (arg.value.int != 0 and arg.value.int != 1))) return null;
+            }
+            // Keep existing native instruction paths. The general expansion
+            // handles missing widths and variable funnel counts.
+            if (op == .ctpop and bits == 64) return null;
+            if (op == .cttz and (bits == 32 or bits == 64)) return null;
+            if (op == .ctlz and (bits == 32 or bits == 64)) return null;
+            if (op == .abs and (bits == 32 or bits == 64)) return null;
+            if (op == .bswap and (bits % 16 != 0 or bits == 16 or bits == 32 or bits == 64)) return null;
+            if (op == .fshl and bits == 32 and call.args.items[2].value == .int and call.ret_attrs == null) {
+                var plain = true;
+                for (call.args.items) |arg| plain = plain and arg.attrs == null;
+                if (plain) return null;
+            }
+            return op;
+        }
+    }
+    return null;
+}
+
+const Builder = struct {
+    allocator: std.mem.Allocator,
+    function: ir.Function,
+    block: *ir.BasicBlock,
+    serial: *forms.TemporaryNames,
+    wide: ir.Type,
+
+    fn emit(b: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
+        const name = try forms.temporary(b.allocator, b.function, b.serial);
+        try b.block.instructions.append(b.allocator, .{ .result = name, .kind = kind });
+        return .{ .named = name };
+    }
+
+    fn binary(b: Builder, op: ir.BinaryOp, lhs: ir.Value, rhs: ir.Value) !ir.Value {
+        return b.emit(.{ .binary = .{ .op = op, .ty = b.wide, .lhs = lhs, .rhs = rhs } });
+    }
+
+    fn widen(b: Builder, bits: u16, value: ir.Value) !ir.Value {
+        if (value == .int) return b.binary(.add, .{ .int = value.int & ((@as(i128, 1) << @as(u7, @intCast(bits))) - 1) }, .{ .int = 0 });
+        if (bits == b.wide.int) return value;
+        return b.emit(.{ .cast = .{ .op = .zext, .from_ty = .{ .int = bits }, .value = value, .to_ty = b.wide } });
+    }
+
+    fn call(b: Builder, op: Operation, value: ir.Value, flag: bool) !ir.Value {
+        var intrinsic: ir.CallInst = .{ .callee = try std.fmt.allocPrint(b.allocator, "llvm.{s}.i{d}", .{ @tagName(op), b.wide.int }), .ret_ty = b.wide, .args = .empty };
+        try intrinsic.args.append(b.allocator, .{ .ty = b.wide, .value = value });
+        if (flag) try intrinsic.args.append(b.allocator, .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } });
+        return b.emit(.{ .call = intrinsic });
+    }
+
+    fn select(b: Builder, condition: ir.Value, yes: ir.Value, no: ir.Value) !ir.Value {
+        return b.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = condition, .ty = b.wide, .true_value = yes, .false_value = no } });
+    }
+
+    fn compare(b: Builder, predicate: ir.IcmpPredicate, lhs: ir.Value, rhs: ir.Value) !ir.Value {
+        return b.emit(.{ .icmp = .{ .predicate = predicate, .operand_ty = b.wide, .lhs = lhs, .rhs = rhs } });
+    }
+};
+
+pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, inst: ir.Instruction, op: Operation) !void {
+    const call = inst.kind.call;
+    const bits = call.ret_ty.int;
+    const b: Builder = .{ .allocator = allocator, .function = function, .block = block, .serial = serial, .wide = .{ .int = if (op == .ctpop or bits >= 32) 64 else 32 } };
+    const input = try b.widen(bits, call.args.items[0].value);
+    const value = switch (op) {
+        .ctpop => try b.call(.ctpop, input, false),
+        .cttz => try b.call(.cttz, try b.binary(.@"or", input, .{ .int = @as(i128, 1) << @as(u7, @intCast(bits)) }), true),
+        .ctlz => try b.binary(.sub, try b.call(.ctlz, input, true), .{ .int = b.wide.int - bits }),
+        .bswap => try b.binary(.lshr, try b.call(.bswap, input, false), .{ .int = b.wide.int - bits }),
+        .abs => try b.select(try b.compare(.uge, input, .{ .int = @as(i128, 1) << @as(u7, @intCast(bits - 1)) }), try b.binary(.sub, .{ .int = 0 }, input), input),
+        .fshl => blk: {
+            const rhs = try b.widen(bits, call.args.items[1].value);
+            const amount = call.args.items[2].value;
+            if (amount == .int) {
+                const shift = @mod(amount.int & ((@as(i128, 1) << @as(u7, @intCast(bits))) - 1), bits);
+                if (shift == 0) break :blk input;
+                break :blk try b.binary(.@"or", try b.binary(.shl, input, .{ .int = shift }), try b.binary(.lshr, rhs, .{ .int = bits - shift }));
+            }
+            const count = try b.widen(bits, amount);
+            const reduced = try b.binary(if (std.math.isPowerOfTwo(bits)) .@"and" else .urem, count, .{ .int = if (std.math.isPowerOfTwo(bits)) bits - 1 else bits });
+            const inverse = try b.binary(.@"and", try b.binary(.sub, .{ .int = bits }, reduced), .{ .int = b.wide.int - 1 });
+            const left = try b.binary(.shl, input, reduced);
+            const right = try b.binary(.lshr, rhs, inverse);
+            // At zero the rhs contribution is zero, including a native-width
+            // count where the masked inverse is also zero.
+            const tail = try b.select(try b.compare(.ne, reduced, .{ .int = 0 }), right, .{ .int = 0 });
+            break :blk try b.binary(.@"or", left, tail);
+        },
+    };
+    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = if (bits == b.wide.int)
+        .{ .binary = .{ .op = .add, .ty = b.wide, .lhs = value, .rhs = .{ .int = 0 } } }
+    else
+        .{ .cast = .{ .op = .trunc, .from_ty = b.wide, .value = value, .to_ty = call.ret_ty } } });
+}
+
+test "integer bit intrinsic admission rejects unsupported signatures and semantic envelopes" {
+    for ([_][]const u8{
+        "musttail call i16 @llvm.ctpop.i16(i16 %value)",
+        "call fastcc i16 @llvm.ctpop.i16(i16 %value)",
+        "call signext i16 @llvm.ctpop.i16(i16 %value)",
+        "call range(i32 0, 17) i16 @llvm.ctpop.i16(i16 %value)",
+        "call i16 @llvm.ctpop.i32(i16 %value)",
+        "call i16 @llvm.ctpop.i16(i16 inreg %value)",
+        "call i16 @llvm.cttz.i16(i16 %value, i1 %flag)",
+        "call i16 @llvm.abs.i16(i16 %value, i1 2)",
+        "call i16 @llvm.fshl.i16(i16 %value, i16 %value, i32 2)",
+        "call i16 @llvm.fshl.i16(i16 %value, i16 %value, i16 65536)",
+        "call i16 @llvm.fshl.i16(i16 %value, i16 %value)",
+        "call i8 @llvm.bswap.i8(i8 1)",
+    }) |source| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i16 @probe(i16 %value, i1 %flag) {{\nentry:\n %result = {s}\n ret i16 %result\n}}\n", .{source});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try std.testing.expect(operation(module.functions.items[0].blocks.items[0].instructions.items[0].kind.call) == null);
+    }
+}

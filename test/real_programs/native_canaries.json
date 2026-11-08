@@ -2,6 +2,22 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "integer_bit_intrinsics",
+      "prefix": "integer-bit-intrinsics",
+      "fixture": "integer_bit_intrinsics",
+      "functions": ["bit_pop32", "bit_pop16", "bit_pop64", "bit_funnel64", "bit_funnel16", "bit_funnel6", "bit_cttz37", "bit_cttz23", "bit_ctlz23", "bit_ctlz8", "bit_abs25", "bit_abs29", "bit_bswap48", "bit_extrema64", "bit_overflow64"],
+      "observations": 7680,
+      "stdout": "integer-bit-intrinsics observations=7680 widths=counts=facts=aliases=calls=preserved\n"
+    },
+    {
+      "population": "relative_load",
+      "prefix": "relative-load",
+      "fixture": "relative_load",
+      "functions": ["relative_load", "relative_load_live"],
+      "observations": 512,
+      "stdout": "relative-load observations=512 signed=base=live=preserved\n"
+    },
+    {
       "population": "tls_address",
       "codegen_args": ["--codegen-reachable"],
       "prefix": "tls-address",

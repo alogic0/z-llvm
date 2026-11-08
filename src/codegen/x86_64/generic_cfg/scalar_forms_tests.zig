@@ -7,6 +7,56 @@ const encoding = @import("../../../mc/encoding.zig");
 const forms = @import("scalar_forms.zig");
 const edges = @import("switch_phi_edges.zig");
 
+test "integer bit intrinsics execute logical widths with dirty padding live values and funnel boundaries" {
+    for ([_]u16{ 1, 6, 8, 16, 23, 25, 29, 31, 32, 33, 37, 48, 63, 64 }) |bits| {
+        for ([_][]const u8{ "ctpop", "cttz", "ctlz", "abs", "bswap", "fshl" }, 0..) |op, op_index| {
+            if (op_index == 4 and bits % 16 != 0) continue;
+            for ([_]bool{ false, true }) |constant| {
+                if (constant and op_index != 5) continue;
+                const a = std.testing.allocator;
+                const inputs = if (bits == 64) try a.dupe(u8, " %x = add i64 %a, 0\n %y = add i64 %b, 0\n %c = add i64 %count, 0\n") else try std.fmt.allocPrint(a, " %x = trunc i64 %a to i{0d}\n %y = trunc i64 %b to i{0d}\n %c = trunc i64 %count to i{0d}\n", .{bits});
+                defer a.free(inputs);
+                const extra = if (op_index == 5) try std.fmt.allocPrint(a, ", i{d} %y, i{d} {s}", .{ bits, bits, if (constant) "-1" else "%c" }) else try a.dupe(u8, if (op_index == 1 or op_index == 2 or op_index == 3) ", i1 false" else "");
+                defer a.free(extra);
+                const widen = if (bits == 64) try a.dupe(u8, " %wide = add i64 %value, 0\n") else try std.fmt.allocPrint(a, " %wide = zext i{d} %value to i64\n", .{bits});
+                defer a.free(widen);
+                const types = if (op_index == 5) try std.fmt.allocPrint(a, ", i{0d}, i{0d}", .{bits}) else try a.dupe(u8, if (op_index == 1 or op_index == 2 or op_index == 3) ", i1" else "");
+                defer a.free(types);
+                const text = try std.fmt.allocPrint(a, "declare i{0d} @llvm.{1s}.i{0d}(i{0d}{2s})\ndefine i64 @bits(i64 %a, i64 %b, i64 %count) {{\nentry:\n{3s} %value = call i{0d} @llvm.{1s}.i{0d}(i{0d} %x{4s})\n{5s} %left = xor i64 %wide, %a\n %result = xor i64 %left, %b\n ret i64 %result\n}}\n", .{ bits, op, types, inputs, extra, widen });
+                defer a.free(text);
+                var module = try ir.Module.parse(a, text);
+                defer module.deinit();
+                try module.verify();
+                const code = executable(module) catch |err| {
+                    std.debug.print("bit intrinsic {s} i{d} constant={}: {s}\n{s}\n", .{ op, bits, constant, @errorName(err), text });
+                    return err;
+                };
+                defer std.posix.munmap(code);
+                const run: *const fn (u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                const mask: u64 = @intCast((@as(u128, 1) << @as(u7, @intCast(bits))) - 1);
+                const sign = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+                const samples = [_]u64{ 0, 1, sign - 1, sign, mask, 0x123456789abcdef0, 0xaaaaaaaa55555555, std.math.maxInt(u64) };
+                for (samples, 0..) |left, index| for ([_]u64{ 0, 1, bits - 1, bits, bits + 1, bits * 2, 127, std.math.maxInt(u64) }) |amount| {
+                    const right = samples[(index + 3) % samples.len];
+                    const x = left & mask;
+                    const y = right & mask;
+                    const shift: u6 = @intCast((if (constant) mask else amount & mask) % bits);
+                    const expected: u64 = switch (op_index) {
+                        0 => @popCount(x),
+                        1 => if (x == 0) bits else @ctz(x),
+                        2 => @clz(x) - (64 - bits),
+                        3 => if (x & sign != 0) (0 -% x) & mask else x,
+                        4 => if (bits == 64) @byteSwap(x) else @byteSwap(x) >> @as(u6, @intCast(64 - bits)),
+                        5 => if (shift == 0) x else (x << shift | y >> @as(u6, @intCast(bits - shift))) & mask,
+                        else => unreachable,
+                    };
+                    try std.testing.expectEqual(expected ^ left ^ right, run(left, right, amount));
+                };
+            }
+        }
+    }
+}
+
 test "scalar temporary index preserves scan order across sparse collisions without rescanning" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

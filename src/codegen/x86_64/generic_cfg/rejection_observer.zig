@@ -23,6 +23,7 @@ pub const Rejection = struct {
     result: ?[]const u8 = null,
     parameter: ?ir.Param = null,
     global_address: ?GlobalAddress = null,
+    pressure: ?@import("stage2_planning.zig").StageTwoSummary = null,
     operands: []const Operand = &.{},
 };
 

@@ -60,6 +60,19 @@ fn unsignedMin(call: ir.CallInst) bool {
     return call.args.items[0].value == .named or call.args.items[1].value == .named;
 }
 
+fn relativeLoad(call: ir.CallInst) bool {
+    if (!std.mem.eql(u8, call.callee, "llvm.load.relative.i64") or call.ret_ty != .ptr or
+        call.args.items.len != 2 or call.args.items[0].ty != .ptr or !call.args.items[1].ty.eql(.{ .int = 64 }) or
+        call.callee_value != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or
+        call.callee_function_ty != null or call.calling_conv != null) return false;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return false;
+    for (call.args.items) |arg| {
+        sysv.rejectUnsupportedCallArgAttrs(arg) catch return false;
+        if (arg.value != .named and arg.value != .int) return false;
+    }
+    return call.args.items[0].value == .named;
+}
+
 fn signedLe(icmp: ir.IcmpInst) bool {
     return !icmp.samesign and icmp.predicate == .sle and
         (icmp.operand_ty.eql(.{ .int = 32 }) or icmp.operand_ty.eql(.{ .int = 64 })) and
@@ -104,6 +117,22 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .true_value = lhs,
                         .false_value = rhs,
                     } } });
+                    continue;
+                } else if (relativeLoad(call)) {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const address = try temporary(allocator, function, &serial);
+                    const offset = try temporary(allocator, function, &serial);
+                    const wide = try temporary(allocator, function, &serial);
+                    var entry: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = call.args.items[0].value, .indices = .empty };
+                    try entry.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = call.args.items[1].value });
+                    try block.instructions.append(allocator, .{ .result = address, .kind = .{ .gep = entry } });
+                    try block.instructions.append(allocator, .{ .result = offset, .kind = .{ .load = .{ .ty = .{ .int = 32 }, .ptr = .{ .named = address }, .attrs = .{ .@"align" = 1 } } } });
+                    try block.instructions.append(allocator, .{ .result = wide, .kind = .{ .cast = .{ .op = .sext, .from_ty = .{ .int = 32 }, .to_ty = .{ .int = 64 }, .value = .{ .named = offset } } } });
+                    // The signed displacement is relative to the original base,
+                    // not to the table entry from which it was loaded.
+                    var result: ir.GepInst = .{ .source_ty = .{ .int = 8 }, .ptr = call.args.items[0].value, .indices = .empty };
+                    try result.indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = wide } });
+                    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .gep = result } });
                     continue;
                 } else if (unsignedSaturatingSub(call)) {
                     try candidate.begin(&block, block_index, instruction_index);

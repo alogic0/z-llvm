@@ -17,6 +17,15 @@ pub fn scalarIntegerCallSupported(call: ir.CallInst) bool {
     return true;
 }
 
+// The existing native population-count path also accepts fastcc. Intrinsic
+// expansion makes no ABI call, but still checks every other semantic promise.
+pub fn scalarCtpopCallSupported(call: ir.CallInst) bool {
+    if (call.calling_conv) |cc| if (!std.mem.eql(u8, cc, "fastcc")) return false;
+    var normalized = call;
+    normalized.calling_conv = null;
+    return scalarIntegerCallSupported(normalized);
+}
+
 test "scalar integer intrinsic facts validate ranges without admitting ABI promises" {
     var args = [_]ir.CallArg{.{ .ty = .{ .int = 64 }, .value = .{ .named = "value" } }};
     var call: ir.CallInst = .{ .callee = "llvm.bitreverse.i64", .ret_ty = .{ .int = 64 }, .args = .fromOwnedSlice(&args) };

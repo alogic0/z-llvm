@@ -1175,11 +1175,12 @@ fn lowerCtpop(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
     const upper: u128 = @as(u128, bits) + 1;
     // The result range follows from ctpop's semantics; a frontend need not
     // repeat it as a call-site attribute.
-    if (call.ret_attrs != null and !intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, upper)) {
+    if (bits == 64 and !intrinsic_attrs.scalarCtpopCallSupported(call)) return .{ .no_emitter = "composed-block-ctpop-call-facts" };
+    if (bits == 128 and call.ret_attrs != null and !intrinsic_attrs.matchesIntegerRange(call.ret_attrs, bits, 0, upper)) {
         return .{ .no_emitter = "composed-block-ctpop-range" };
     }
     const ty: ir.Type = .{ .int = bits };
-    if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or call.args.items[0].attrs != null) {
+    if (!call.ret_ty.eql(ty) or call.args.items.len != 1 or !call.args.items[0].ty.eql(ty) or (bits == 128 and call.args.items[0].attrs != null)) {
         return .{ .no_emitter = "composed-block-ctpop-signature" };
     }
 

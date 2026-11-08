@@ -5,6 +5,7 @@ const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const intrinsic_attrs = @import("intrinsic_attrs.zig");
+const bit_intrinsics = @import("integer_bit_intrinsics.zig");
 
 const Operation = enum { uadd_sat, usub_sat, reverse, umin, umax, smin, smax };
 
@@ -25,6 +26,7 @@ fn extend(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicB
         .lhs = .{ .int = value.int & ((@as(i128, 1) << @as(u7, @intCast(ty.int))) - 1) },
         .rhs = .{ .int = 0 },
     } });
+    if (ty.eql(wide)) return value;
     return emit(allocator, function, block, serial, .{ .cast = .{ .op = .zext, .from_ty = ty, .value = value, .to_ty = wide } });
 }
 
@@ -45,7 +47,12 @@ fn operation(call: ir.CallInst) ?Operation {
         if (op == .reverse) {
             if (bits == 32 or bits == 64 or call.args.items.len != 1) return null;
         } else if (minimumMaximum(op)) {
-            if (bits == 32 or bits == 64 or call.args.items.len != 2) return null;
+            if (call.args.items.len != 2) return null;
+            if (bits == 32 or bits == 64) {
+                var facts = call.ret_attrs != null;
+                for (call.args.items) |arg| facts = facts or arg.attrs != null;
+                if (!facts) return null;
+            }
         } else if ((bits > 32 and bits != 64) or call.args.items.len != 2) return null;
         return op;
     }
@@ -60,6 +67,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .call) if (bit_intrinsics.operation(inst.kind.call)) |op| {
+                try candidate.begin(&block, block_index, instruction_index);
+                try bit_intrinsics.expand(allocator, function, &block, &serial, inst, op);
+                continue;
+            };
             if (!inst.removed and inst.result != null and inst.kind == .call) if (operation(inst.kind.call)) |op| {
                 try candidate.begin(&block, block_index, instruction_index);
                 const call = inst.kind.call;
@@ -88,12 +100,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .true_value = lhs,
                         .false_value = rhs,
                     } });
-                    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{
-                        .op = .trunc,
-                        .from_ty = wide,
-                        .value = selected,
-                        .to_ty = call.ret_ty,
-                    } } });
+                    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = if (wide.eql(call.ret_ty))
+                        .{ .binary = .{ .op = .add, .ty = wide, .lhs = selected, .rhs = .{ .int = 0 } } }
+                    else
+                        .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = selected, .to_ty = call.ret_ty } } });
                 } else if (op == .reverse) {
                     const wide: ir.Type = .{ .int = if (bits < 32) 32 else 64 };
                     const input = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);

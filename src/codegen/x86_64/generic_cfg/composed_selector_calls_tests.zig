@@ -1562,7 +1562,7 @@ test "generic cfg selector executes boolean calls with loaded and live pointer a
 
 test "generic cfg selector keeps range-attributed popcount near misses fail closed" {
     inline for (.{
-        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 0, 64)"), .tail_kind = @as(?[]const u8, "tail") },
+        .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 1, 1)"), .tail_kind = @as(?[]const u8, "tail") },
         .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i32 0, 65)"), .tail_kind = @as(?[]const u8, "tail") },
         .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 64, .ret_attrs = @as(?[]const u8, "range(i64 0, 65), zeroext"), .tail_kind = @as(?[]const u8, "tail") },
         .{ .callee = "llvm.ctpop.i64", .ret_bits = 64, .arg_bits = 32, .ret_attrs = @as(?[]const u8, "range(i64 0, 65)"), .tail_kind = @as(?[]const u8, "tail") },
@@ -1656,4 +1656,30 @@ test "generic cfg selector executes i64 and i128 popcount with optional range at
         const plain: *const fn (u128) callconv(.c) u128 = @ptrCast(mappings[3].?.ptr);
         try std.testing.expectEqual(case[1], plain(case[0]));
     }
+}
+
+test "native ctpop preserves fastcc intrinsic admission" {
+    const input =
+        \\declare fastcc i64 @llvm.ctpop.i64(i64)
+        \\define i64 @fastcc_popcount(i64 %value) {
+        \\entry:
+        \\  %result = call fastcc i64 @llvm.ctpop.i64(i64 %value)
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+    var machine = MachineFunction.init(function.name, function.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const run: *const fn (u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    try std.testing.expectEqual(@as(u64, 32), run(0x0123456789abcdef));
 }
