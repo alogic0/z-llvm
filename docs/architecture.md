@@ -108,6 +108,21 @@ The [behavioral runner](../tools/run_behavioral_diff.zig) checks the ownership
 manifest and rejects every owner except `composed_block` and `composed_cfg`.
 An aggregate `generic_codegen` counter is not a substitute for that assertion.
 
+Register pressure is admitted through the shared allocation plan and concrete
+frame layout. The six-register/32-spill summary describes the minimum reservation;
+it is not a 38-value selection limit. Planned and emergency homes are sized
+dynamically, with checked frame indices, page probing and a one-MiB frame ceiling.
+The independent 1,024-block boundary remains. Rejected frame construction rolls
+back machine state and can report its pressure context through the observer.
+
+Scalar bit intrinsics use the existing integer legalizer and shared native-width
+operations. Logical widths, funnel counts and advisory facts are validated before
+private widening; source IR retains its types and attributes. General-dynamic
+TLS addresses use an explicit resolver-call instruction with caller-saved register
+and flags effects. Shared call-preservation transactions protect live GPR/SSE
+values, and ELF emission checks TLS symbol types, section alignment and aliases.
+Relocated TLS initializers remain outside this address contract.
+
 `--selection-owner-output=PATH` writes the same sorted ownership manifest from
 the successful object-emission selection run. It sorts references to machine
 functions, preserving object order and bytes. The standalone manifest route

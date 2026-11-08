@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "761ea1991a3d8f65d2031302fc868afb3cd7fc7e",
-  "accepted_tree": "a3e4eb84c3696f3c72d2716d71b7cb9dd75fdff3",
+  "accepted_revision": "4b8eac2a1add1b29d92c11b7aec47b8166aa9e8a",
+  "accepted_tree": "b3b558b647bb0d765fa5c4cb5257d9d528500295",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "761ea199",
+  "declaration_revision": "4b8eac2a",
   "evidence": [
+    "docs/evidence/global_intrinsics_pressure_acceptance_20261108.json",
+    "docs/evidence/global_intrinsics_pressure.md",
     "docs/evidence/address_intrinsic_wide_abi_acceptance_20261108.json",
     "docs/evidence/address_intrinsic_wide_abi.md",
     "docs/evidence/census_integer_abi_acceptance_20261107.json",

@@ -1,36 +1,32 @@
 # Active direction
 
-The [constant-address, intrinsic-fact and wide ABI plan](plans/2026-11-08-address-intrinsic-wide-abi.md)
-is complete at `761ea199`. The unchanged compiler selects 6,752 of 8,928
-definitions and rejects 2,176: 2,411 new successes, with all 4,341 prior successes
-preserved. Runtime selection remains 274 of 455 with no lost successes. All 17
-integration gates and 53 native populations pass. See the
-[evidence](evidence/address_intrinsic_wide_abi.md) and
-[acceptance record](evidence/address_intrinsic_wide_abi_acceptance_20261108.json).
+The [global TLS, scalar intrinsic and pressure plan](plans/2026-11-08-global-intrinsics-pressure.md)
+is complete and accepted at `4b8eac2a`. Both complete diagnostic inputs have
+replayed: compiler selection is 7,040 of 8,928 and runtime selection 284 of 455,
+preserving all 6,752 and 274 baseline successes. Debug and ReleaseSafe each pass
+1,962 units and 21 structural checks. All 17 integration gates and 58 native
+populations pass. The five new populations also pass with both Debug and
+ReleaseFast compilers. See the [evidence](evidence/global_intrinsics_pressure.md)
+and [acceptance record](evidence/global_intrinsics_pressure_acceptance_20261108.json).
 
-The next slice should classify the 372 first rejections at
-`composed-block-gep-global-properties`: identify the actual globals and rejected
-properties in the final private function, then choose a shared address-contract
-repair. Preserve alias identity, dependency coverage, layout and address-space
-checks. Add positive and negative contract tests plus native differential cases,
-then replay both complete original inputs and preserve every current success.
-The group size is not an estimate of completed functions.
+The original 217 main intrinsic failures all advance: 177 select after that slice
+and forty expose later failures. The original 184 main pressure failures all
+advance: 61 select and 123 expose other boundaries. Shared general-dynamic TLS
+addresses use checked call preservation and ELF relocations. Scalar bit intrinsics
+cover logical widths and funnel-count boundaries. Register pressure uses the
+existing dynamic allocation/frame authority, retaining its one-MiB frame and
+1,024-block limits.
 
-The following concrete lead is the 217-function main intrinsic group. Its largest
-names are `llvm.ctpop.i32` (54), `llvm.fshl.i64` (47) and `llvm.fshl.i16` (40).
-Inspect the rejected signatures, facts and operand forms before choosing a repair.
-These are first failures; one more intrinsic rejection has a different outer
-diagnostic. Register pressure accounts for 184 first rejections and should keep
-using the shared transfer and register-effect contracts.
-
-Known constant GEP flags and resolved data aliases, validated scalar-integer
-intrinsic facts, and non-native 1–63-bit ABI carriers are accepted. There are no
-remaining call argument/return width or `uadd.sat` first failures. The one
-remaining memcpy-source rejection uses a dynamic length from a stack allocation,
-outside the completed constant-address repair.
+Next, classify the 327 first rejections at
+`composed-block-inline-asm-result`: inspect the actual assembly, constraints,
+types and clobbers, then choose a shared instruction-effect repair. Keep arbitrary
+assembly text outside that contract. The next large groups are comparison RHS
+forms (179), general stage-two values (133), alloca types (123), and unknown call
+arguments and readonly-table globals (113 each). Replay both complete inputs
+after any shared repair; group sizes do not predict completed functions.
 
 Current raw evidence is under
-`local-state/validations/address-intrinsic-wide-abi-20261108/`. No complete
+`local-state/validations/global-intrinsics-pressure-20261108/`. No complete
 compiler/runtime object, startup or self-rebuild is claimed. Preserve the
 12-function core cohort, ratchet 130 and every existing execution population.
 Admission and runtime reserve remain 32.95 GB and 24.36 GB. Finish cache cleanup
@@ -38,6 +34,12 @@ before validation starts: absence of open cache files does not prove that later
 steps will not reuse them. Preserve original inputs and evidence; create no archives.
 
 ## Preceding checkpoints
+
+The [constant-address, intrinsic-fact and wide ABI checkpoint](evidence/address_intrinsic_wide_abi.md)
+at `761ea199` selects 6,752 of 8,928 compiler definitions and 274 of 455 runtime
+definitions. All 17 integration gates and 53 native populations pass. Its
+global-property, intrinsic and pressure recommendations are implemented by the
+accepted `4b8eac2a` checkpoint above.
 
 The [census classification and integer ABI checkpoint](evidence/census_integer_abi.md)
 at `baf7a767` selected 4,341 of 8,928 compiler definitions and 274 of 455 runtime

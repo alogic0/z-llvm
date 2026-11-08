@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `761ea1991a3d8f65d2031302fc868afb3cd7fc7e`; tree: `a3e4eb84c3696f3c72d2716d71b7cb9dd75fdff3`.
+Accepted revision: `4b8eac2a1add1b29d92c11b7aec47b8166aa9e8a`; tree: `b3b558b647bb0d765fa5c4cb5257d9d528500295`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,32 +25,37 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [constant-address, intrinsic-fact and wide ABI checkpoint](evidence/address_intrinsic_wide_abi.md)
-is accepted at `761ea199`: all 17 integration gates and 53 native populations pass.
-Debug and ReleaseSafe each pass 1,955 units and 21 structural checks; profiling
+The [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
+is accepted at `4b8eac2a`: all 17 integration gates and 58 native populations pass.
+Debug and ReleaseSafe each pass 1,962 units and 21 structural checks; profiling
 process tests, readiness, both input corpora and fixed programs pass. Native
-coverage totals 1,829,892 local observations against 914,946 LLVM references.
+coverage totals 1,914,372 local observations against 957,186 LLVM references.
 
-The unchanged compiler replay attempts all 8,928 definitions, selecting 6,752
-and rejecting 2,176. All 4,341 previous successes remain, with 2,411 additions.
-The runtime preserves all 274 previous selections among 455 definitions. Both
+The unchanged compiler replay attempts all 8,928 definitions, selecting 7,040
+and rejecting 1,888. All 6,752 previous successes remain, with 288 additions.
+Runtime selection rises from 274 to 284 of 455 definitions without losses. Both
 complete event streams are audited. Dependency coverage remains conservative;
 no complete compiler/runtime object, startup or self-rebuild is claimed.
 
-Shared address handling accepts known constant GEP flags and resolved data
-aliases while preserving relocation identity and dependency checks. Scalar
-integer intrinsic expansion accepts validated advisory facts and omits them
-from private overflow aggregates or widened results. The existing ABI carrier
-contract now covers every non-native integer width from 1 through 63, with
-receive masks before publication and unsupported ABI promises still rejected.
-Original IR types and attributes remain unchanged.
+Shared general-dynamic TLS addresses preserve alias and dependency identity,
+use explicit resolver-call effects and shared live-register preservation, and
+emit checked ELF TLS relocations. Scalar bit intrinsics cover logical widths,
+dirty padding and funnel-count boundaries through shared native operations.
+Register pressure now uses the existing dynamic allocation/frame authority;
+the obsolete 38-value admission rule is removed while the one-MiB frame and
+1,024-block limits remain. Original IR types and attributes remain unchanged.
 
-The next slice should classify the concrete globals and properties behind 372
-`composed-block-gep-global-properties` first rejections before extending the
-shared address contract. The main intrinsic group retains 217 first failures,
-led by `ctpop.i32`, `fshl.i64` and `fshl.i16`; register pressure accounts for 184.
-No call argument/return width or `uadd.sat` first failures remain. One dynamic
-stack-source memcpy remains outside the completed constant-address contract.
+All 217 original main intrinsic failures advance: 177 select and forty expose
+later failures. All 184 original main pressure failures advance: 61 select and
+123 expose other boundaries. The next priority is to classify the actual
+operations, constraints and clobbers behind 327 result-bearing inline-assembly
+first rejections before extending shared instruction effects. See
+[the active handoff](next_steps.md).
+
+The preceding [constant-address, intrinsic-fact and wide ABI checkpoint](evidence/address_intrinsic_wide_abi.md)
+established constant GEP flags, resolved data aliases, validated intrinsic facts
+and non-native integer ABI carriers. It selected 6,752 compiler definitions and
+274 runtime definitions, with all 17 gates and 53 native populations passing.
 
 The preceding [census classification and integer ABI checkpoint](evidence/census_integer_abi.md)
 established final private-call/parameter observations and validated narrow ABI
@@ -58,9 +63,9 @@ facts. The [complete census](evidence/selection_census_completion.md) establishe
 flushed progress events, shared temporary/allocation indexes and validated
 call/memory facts. Core counts stay at 100 lowered/emitted/linked and twelve
 executed functions per mode; bypass ratchet 130 is unchanged. All 36 core records
-preserve selected objects, observations and linked sizes. Reference-wrapper
-size/hash differences are recorded separately, without a blanket executable
-byte-identity claim. The preceding
+preserve selected objects, observations, reference sizes and linked sizes.
+Reference-wrapper and linked hash differences are recorded separately, without
+a blanket executable byte-identity claim. The preceding
 [allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
 established complete module verification, scalar FP memory rewriting and the
 allocation-attribute contract. The [parser and runtime-cast checkpoint](evidence/compiler_parser_vector_casts.md)
