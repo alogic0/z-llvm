@@ -1,35 +1,49 @@
 # Active direction
 
-The [census classification and integer ABI plan](plans/2026-11-07-census-integer-abi.md)
-is complete at `baf7a767`. The unchanged compiler selects 4,341 of 8,928
-definitions and rejects 4,587: 817 new successes, with all 3,524 prior successes
-preserved. Runtime selection remains 274 of 455, with no lost successes. All 17
-integration gates and 50 native populations pass. See the
-[evidence](evidence/census_integer_abi.md) and
-[acceptance record](evidence/census_integer_abi_acceptance_20261107.json).
+The [constant-address, intrinsic-fact and wide ABI plan](plans/2026-11-08-address-intrinsic-wide-abi.md)
+is complete at `761ea199`. The unchanged compiler selects 6,752 of 8,928
+definitions and rejects 2,176: 2,411 new successes, with all 4,341 prior successes
+preserved. Runtime selection remains 274 of 455 with no lost successes. All 17
+integration gates and 53 native populations pass. See the
+[evidence](evidence/address_intrinsic_wide_abi.md) and
+[acceptance record](evidence/address_intrinsic_wide_abi_acceptance_20261108.json).
 
-The next slice is constant-pointer source handling through the shared address
-and dependency contracts. Of 1,772 first memcpy-source rejections, 1,771 are
-constant `getelementptr` expressions without a resolved location; one is a stack
-allocation. Preserve global properties, aliases, exact copy widths and rollback.
-Add native differential cases and replay both complete original inputs, retaining
-every current success. Removing this rejection can expose another boundary.
+The next slice should classify the 372 first rejections at
+`composed-block-gep-global-properties`: identify the actual globals and rejected
+properties in the final private function, then choose a shared address-contract
+repair. Preserve alias identity, dependency coverage, layout and address-space
+checks. Add positive and negative contract tests plus native differential cases,
+then replay both complete original inputs and preserve every current success.
+The group size is not an estimate of completed functions.
 
-The next intrinsic lead is also concrete: 757 `llvm.uadd.sat.i64` calls carry
-advisory facts rejected by the existing matcher. Validate these facts through a
-shared intrinsic contract; do not transfer scalar range facts onto the generated
-overflow aggregate. The entire intrinsic first-failure group is 976 functions.
-The 22 remaining call-argument-width failures involve i33/i37/i49/i63 carriers,
-outside the completed 1–31-bit ABI slice. Retained observations describe the
-final private call or parameter; unrelated rejection kinds remain unattributed.
+The following concrete lead is the 217-function main intrinsic group. Its largest
+names are `llvm.ctpop.i32` (54), `llvm.fshl.i64` (47) and `llvm.fshl.i16` (40).
+Inspect the rejected signatures, facts and operand forms before choosing a repair.
+These are first failures; one more intrinsic rejection has a different outer
+diagnostic. Register pressure accounts for 184 first rejections and should keep
+using the shared transfer and register-effect contracts.
 
-Allocation attributes, parser/vector casts and narrow ABI facts are accepted.
-Current raw evidence is under `local-state/validations/census-integer-abi-20261107/`.
-No complete compiler/runtime object, startup or self-rebuild is claimed. Preserve
-the 12-function core cohort, ratchet 130 and every existing execution population.
-Admission and runtime reserve remain 32.95 GB and 24.36 GB. Create no archives.
+Known constant GEP flags and resolved data aliases, validated scalar-integer
+intrinsic facts, and non-native 1–63-bit ABI carriers are accepted. There are no
+remaining call argument/return width or `uadd.sat` first failures. The one
+remaining memcpy-source rejection uses a dynamic length from a stack allocation,
+outside the completed constant-address repair.
+
+Current raw evidence is under
+`local-state/validations/address-intrinsic-wide-abi-20261108/`. No complete
+compiler/runtime object, startup or self-rebuild is claimed. Preserve the
+12-function core cohort, ratchet 130 and every existing execution population.
+Admission and runtime reserve remain 32.95 GB and 24.36 GB. Finish cache cleanup
+before validation starts: absence of open cache files does not prove that later
+steps will not reuse them. Preserve original inputs and evidence; create no archives.
 
 ## Preceding checkpoints
+
+The [census classification and integer ABI checkpoint](evidence/census_integer_abi.md)
+at `baf7a767` selected 4,341 of 8,928 compiler definitions and 274 of 455 runtime
+definitions. All 17 integration gates and 50 native populations passed. Its
+constant-pointer, advisory-intrinsic and wider-carrier recommendations are now
+completed by `761ea199`.
 
 The [compiler parser and runtime cast plan](plans/2026-11-07-compiler-parser-vector-casts.md)
 is complete at `57a78095`. All 8,928 compiler definitions and the full unchanged

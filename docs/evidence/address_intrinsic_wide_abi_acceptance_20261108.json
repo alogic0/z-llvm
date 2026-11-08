@@ -1,0 +1,5612 @@
+{
+  "gates": [
+    {
+      "id": "selected-object-suite",
+      "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+      "exit_status": "0",
+      "duration_ms": "62095",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "1909",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "3408",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "3355",
+      "cache_status": "none"
+    },
+    {
+      "id": "zig-source-native-link",
+      "tool": "tools/run_distribution_zig_source_native_link.zig",
+      "exit_status": "0",
+      "duration_ms": "18273",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-postopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "70937",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-preopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "--pipeline": "preopt",
+      "exit_status": "0",
+      "duration_ms": "40435",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-ir-writer",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "15959",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-release",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "10833",
+      "cache_status": "none"
+    },
+    {
+      "id": "real-rows-release-fast",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseFast",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "719417",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-safe",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSafe",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "750353",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-small",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSmall",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "416913",
+      "cache_status": "hit"
+    },
+    {
+      "id": "integrated-executable",
+      "tool": "tools/run_distribution_zig_integrated_exe.zig",
+      "exit_status": "0",
+      "duration_ms": "2542273",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "499",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "1144",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "1096",
+      "cache_status": "none"
+    },
+    {
+      "id": "boundary-gates",
+      "tool": "tools/run_distribution_boundary_gates.zig",
+      "exit_status": "0",
+      "duration_ms": "8457",
+      "cache_status": "none"
+    }
+  ],
+  "compiler_core": [
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseFast",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSafe",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSmall",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    }
+  ],
+  "execution_cohort": [
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "771c812fe0df706e15fecc90163c3918a16f4b8b1bf3efcc001f3dfdda9e63cb",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4148152",
+      "reference_sha256": "946045164cb6bb9d0bf1b5dc6522d842af0fc368aa3f17aad79430de93558a2a",
+      "linked_bytes": "6291806",
+      "linked_sha256": "07e3e4fb11418a56b73c035251a822c21753a540d2709e66c5445ec69c93ac0b",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "b438f39a0529f7137c83a4282b7cb8f1d830a73fff9ac11233852dfc98b9a890",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4148240",
+      "reference_sha256": "c9a1f9f4feb78ee81af2421811683a2bfcc569d8f37e01b7e57c20314eb33ead",
+      "linked_bytes": "6291806",
+      "linked_sha256": "6ec85cbe1badb3bf628b49e840282db50f6997b26f706721b8758c8ae54905f4",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "e7226becbcf2d8c362726684777a76e4cef8e09ef39b8e19044097f7dc60433d",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4148208",
+      "reference_sha256": "22b10bdf5f389f455a2c8c3ffc97df0d46dd19c04d3dfc75484d6f544bd53aff",
+      "linked_bytes": "6291806",
+      "linked_sha256": "246c84020bd884d2ccb2ce62dff09e9e45774ed71bfe2506f848171429aa1f05",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0757ed24dd920f69a1dd0f4a4f8bf8b40f97ef21f9dd52b4dbe6d46b7c71cbe0",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4148504",
+      "reference_sha256": "e46123c3efad9a5e85fa29e15330a1e3d121d9d45daab34b40c74d7e702d99c7",
+      "linked_bytes": "6291806",
+      "linked_sha256": "ca8ba4fb8671eee35992b0311b0b7bfd51dbe1168241a75cc473862900aca39e",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "096d9472ae183cfa3719c65a5594248c8d527463f93342de612faf74b3eb8de7",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4151464",
+      "reference_sha256": "ac185149687b01999166087a9cae5d9b71117a2428decb79bcc15d346c33ed10",
+      "linked_bytes": "6288265",
+      "linked_sha256": "faa4cc692d77abcf15e338ed0c29c8685ae09fd3bda8b7ff690d7a0a79206b25",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "d37472effb4bd393891542a999edbe11f89eea30771f288c51a3091d50585e09",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4153680",
+      "reference_sha256": "31135de8b5f18cefc9fde92ee996acac4c1cea8fbfd0ee50ba7aa8cf4034dfdd",
+      "linked_bytes": "6287668",
+      "linked_sha256": "4a1b35532e5620c3531c94c9e01f5ccb036eee08097bcc711ed15768a90fd1d5",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "61a61fe05c25f9f28cd23c0826ad17410738360b00a6686c55e36b5ef112eb10",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4153680",
+      "reference_sha256": "8e763ba3ca2cf7ae0cc0595fa6fbc35656b66ff061e2690bcbb5fb17123276ad",
+      "linked_bytes": "6287668",
+      "linked_sha256": "4ba5921079086f4c1f579c01f6e88a629f5b99263dfc0e068bd0c52e2431e65d",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4154232",
+      "reference_sha256": "6178b7191dbe1a6505df58a9b310ae067dbdd67f11d02b205ecca197c568d0f2",
+      "linked_bytes": "6292446",
+      "linked_sha256": "38bae446dabd5bf192341f7325a8cc5b4d7d8e889353506c7f40641f11ec295b",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "67dfabcf131de792bd4b8c9c8b4276e8c16bbe5a23cb534fdda95782e84527d0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4153832",
+      "reference_sha256": "ca0d2b9016f2bf84bf6e3bba581c5ef5b7a7d9bab3c6ab8f672d528698017e7b",
+      "linked_bytes": "6287625",
+      "linked_sha256": "c5b992cd98c8f72947c72af169bd0b3c556372a4030434a3488124ffa4032204",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "4dbb2cb74487df4ec7164dd64a99cef5e4cdb798149003035e81f4c23446970f",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4148296",
+      "reference_sha256": "177666d8bb2d38141d125b9f3a5b3e3ccfc6f957be1ad37b36ee354353fc2d19",
+      "linked_bytes": "6283657",
+      "linked_sha256": "ddd55184de75a431f87cd38a3234130e5939f08b3975fc5b8739009e900fae6f",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "cec703a7cc929cf1399c85bb23682a3932ff2937c4aa17f4575f1e6a127da857",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4152320",
+      "reference_sha256": "469241a58797c40d870a8543c408cc14af63f305d499a437ecc7a8d44d9ac60a",
+      "linked_bytes": "6291977",
+      "linked_sha256": "6766833e1cbbac1023522c56440deb2923ce600bc4279afd71c0176fad29d45c",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "05b7decf31bfa3f305b59b80c43f6f1203a14bcdba17aa78b789363ca6f4b334",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4147728",
+      "reference_sha256": "06dcf628deca1129f535808f960c917bd0d2ba1c4f73d0dbef8d0289d7c11e86",
+      "linked_bytes": "6291977",
+      "linked_sha256": "f138b673ff22ebf0be0ecc29fef6f557a81d910424cd031a6e88f1616470da94",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "ec4c7a087cc6fb0bfc4302bbeb9e2f729322ff2152f4f1b2a4f8eb266303a24d",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4034240",
+      "reference_sha256": "e6301d3f6c28305303875fc747c745e0232efec14d5545e34e6a628589a8683a",
+      "linked_bytes": "6147062",
+      "linked_sha256": "b475d55d9222b19bc5fd8ed8813a5c9edba33ae347aebb049a322f8e38b670b7",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "673975f12bc2f12983539c9fceb7987e957a9af1b480e35c2af400d2070a5109",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4034288",
+      "reference_sha256": "1c5bdfd6603ccac4aab43566132b0fa1d4f088cb7e94fb6b44e0147b9b7d64bc",
+      "linked_bytes": "6147062",
+      "linked_sha256": "b20fbd63344abf0bc96e8ead784c974ad225c6bd222a17e38d62ab965924e821",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "f4d9f0cce93a6a792ec4a31124708e49b79e3c72bdda6bc6eba7df4336819ab2",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4034264",
+      "reference_sha256": "e5147f14afdee0a751c39fcf81a1bfd59a1389dc2540f7f332f32283d89e2eee",
+      "linked_bytes": "6147062",
+      "linked_sha256": "7bea4fdb81bd64c604d27cdd57581eb8cd5973e365b6d4dcb5a4e302dab66f18",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0f0e86316bfb932fd92a27b50d213d251439538c0700ac70e5eda5654dee373f",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4034344",
+      "reference_sha256": "84dda957d0b915baa872c84cc5ff469a086b9d1b6e3c3347bc51af4cdc60d08a",
+      "linked_bytes": "6147062",
+      "linked_sha256": "8d764e893ea7f0af14982d974cfcb0968b08091381bd26b292cb35a5fe6b6f04",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "f6d0b8ccfd56bf25d342984dd53c64dfa3ed7e733c79c8382ea8106d859139d4",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4035608",
+      "reference_sha256": "e30ea48ded9f3dfe5c12f89905002b86f4ff2d85e406fe52a017b00ce2f0dc2d",
+      "linked_bytes": "6142732",
+      "linked_sha256": "56b101d17cd856efaf7da20f67a2280f3df2a6d2715146faa61bc68131d71a5a",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "4d1fe939c4cf95156e3f1b8b53e0c2a224a2221a1ddc3cf09acab00785b7deb0",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4039528",
+      "reference_sha256": "c314e1095a1ad46b55aa53afa00c59ab9cbac0c4823b2d37b7fbaa916fae8547",
+      "linked_bytes": "6142796",
+      "linked_sha256": "0db139b95ae6feddbca70ef47806b71d405eb5c5e5b43f1c3b93fc987e8463e8",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "0c4f15638e021ab253fb2fe0fd0c343a09ff9e06890910b76d2f4c085edd5743",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4039536",
+      "reference_sha256": "4a34349d304669a1378c85da3cadafa6b9726778b54f34503a343b336f6a6145",
+      "linked_bytes": "6142796",
+      "linked_sha256": "296fd0057c9c418d89460ef98190d5847de146a9dfeabe0640a7ede97b860f1f",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4040248",
+      "reference_sha256": "cb7b94822d7528733e632f499b7e342e160c5835b3bdf5f18cc94edf4670ed84",
+      "linked_bytes": "6147638",
+      "linked_sha256": "f657f7424295c65d5c3396392416ec007f00f3f176c2a82f47e539fe16e38c00",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "779b502b10695d9d1e81bf7122b0d50882ab5e6c75e8fa011fd87e7167b64ec6",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4039720",
+      "reference_sha256": "7b7dc897603a59f5c24259ec809d26d7049da49b65604d7e4264676bb610ecad",
+      "linked_bytes": "6142732",
+      "linked_sha256": "2b93dcc0b315757b2c37a9b081aed700124c4404e3f45faebc022a20be562fe8",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "81641a4e0b55b09f7e522a15636d7cfe97c5e046222b430c1e49402929d00c52",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4034104",
+      "reference_sha256": "2b5fb252632f45abe9a1ec70e932e80505b77d0f9757a89af896e241fb29a5f8",
+      "linked_bytes": "6142646",
+      "linked_sha256": "d706ef0dcfa747324d51514450135eddbe7d237d9bb60e54d76b4b3d1d15e45d",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "58b67ba6931f90a1854142a7989f32094edeff8fa416a841ffac653b7c3cd233",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4038424",
+      "reference_sha256": "791c088c54047dc5e98970e4ba2685fd5216deafad8c70204767d67a373608c1",
+      "linked_bytes": "6147318",
+      "linked_sha256": "8c528a821fab05fde40168bb62c67aebf96eed44738d29f2f769622ceeb2b724",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "f3ed1a8136b5d2fc6ff566354d364e99078dac14fc918df8dc8d39d0ec04e57e",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4034376",
+      "reference_sha256": "61346e62150ce81eb058dc764b42d410671a7550f2cbdcf4973a6d4b7b9a050d",
+      "linked_bytes": "6147318",
+      "linked_sha256": "67a4dcbdcc287f54c43efcd3fa16fc2a1f7842b638f48347269b64ca14824eba",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "a2a97ff3e5bd48a80f721303693b269112227fd7ef5fc96a4526d72f06c9343e",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "149664",
+      "reference_sha256": "517296ad1fd60856ab22e843f46132e985d92247d21b2c6e23e2eb55c6fa5625",
+      "linked_bytes": "355886",
+      "linked_sha256": "27b3ece3f14bc7da0eb06d6f73a689c9f43e0e614f12abd9b891d427bd4ac846",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "5969dece1d04131c7fc77db02d5b7ba7e35d53c72cb73053f3218a403a53638e",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "149664",
+      "reference_sha256": "e50a6c386ae71b6da538d1cd15a27be2f4d70dbbd450bade592d09a1b978c774",
+      "linked_bytes": "355886",
+      "linked_sha256": "583ed22be135874beccf58a41421cc957572a0026d75c6099f6f13c46986b509",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "afc10d2b53f59145c9585fa576994f831169b48344efc8b71b50c449388eb439",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "149664",
+      "reference_sha256": "981c89cda9bb178597bf907fdc9ca4a4d96225b0b8ded4bcbf9564e626526a8a",
+      "linked_bytes": "355886",
+      "linked_sha256": "7f7ef30437410f478f3dc9ff5493e03cac0cb4ed6e576e049bbc5b64b0dd352e",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "429bfd019f347369b5fa197515435b0ddde1d3304a342b7131ed32e1175a11ff",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "149696",
+      "reference_sha256": "b8e2be571cafd55f9d19259e137c27866fee71be1d45040d038ac8abe9b78402",
+      "linked_bytes": "355886",
+      "linked_sha256": "b83965a3a36dfe5abea79336f9c9c73b85d06d2eec9eb22d1657b435337d4f83",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "9bde311d7a2276fd1d855635eb3f9a3aecd44609a1199362e45e405154d413b2",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "149992",
+      "reference_sha256": "e4ca544afaf896553f640ae6d9c8ba888c723ed004a600696e3cd0cb90537666",
+      "linked_bytes": "356217",
+      "linked_sha256": "35e2d7ab6639afeee93212e2020f42f882d0cc1122f569698db67d1d0e67554d",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "b90f3029c1a86c3e284c3f6b64e2f95191644d7c832395f9eed036bddb542e70",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "82e7fee902b89f4759d163f29a7f9d26862ced09cc2b8cad32c4675411cfa0ff",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "d612a4a4d3090ef336ed6df433b50de3dd5c1a51cb0d677dcbff307a972faa3f",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "fbe43fa70a3e53f59508cc1c03b16245672101fb9650059c653fb29c82d1c18e",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "149824",
+      "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+      "linked_bytes": "356198",
+      "linked_sha256": "14ab19f82c68b1c12e58cba1892f3e4a26b4b61ce501d85b9a67f58c80fd025f",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "7e7f85ea61fd2f396425cee8a64b7f32fe4e0bf193dffc27c9e8697e10f530e0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "149872",
+      "reference_sha256": "2fd34967a38babe25d3ab728000c7f7a44b7b38b32caa9670d684f4fa63bc609",
+      "linked_bytes": "356005",
+      "linked_sha256": "02d52a039405a263b7a14b4ac40b873590181d6461f30b280eea76bef93f8a76",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "28a053d41f368edda8b4a4385fb48b10e3f2152bbb7851060dff9529d58a0093",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "149712",
+      "reference_sha256": "83240aba201a066d7992f6a2e17a80c1317747c5e608d9793c01093ca08172d8",
+      "linked_bytes": "356205",
+      "linked_sha256": "d555081562425b005ff5dbc4b853b55b4d504c8569a1c652b93ebce0b6118621",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "985f961062e1be2560deabefbca27b243be360298f89db15da08eeec80648843",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "149768",
+      "reference_sha256": "ac759d10d2000fdc39a6ed57414035e275261adbaef8cdb366c30e54dd87baa1",
+      "linked_bytes": "356041",
+      "linked_sha256": "5dd3a49b0f87a418394f70e1994efb3bb54fcc6a90420ef2b41b1bed4bd125db",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "9fd2c46b5b3bb636bf1a0ca90695e93d075ad39332c90f96ba4ce2ee40abe025",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "149768",
+      "reference_sha256": "71de76cacc973a3644ee5257ed0d184bb036d0e2c3df77826a8b534fec5f0b46",
+      "linked_bytes": "356042",
+      "linked_sha256": "4e22cdf41f556d547542dbe667974016c8bb261cb83522c609da60c4894cd746",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    }
+  ],
+  "native_populations": [
+    {
+      "population": "standalone-two-word-stack-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "384",
+      "reference_observations": "192",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-pointer-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "486",
+      "reference_observations": "243",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-pointer-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-signed-nonnegative",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-type-allocation-padding",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-attributes",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14790",
+      "reference_observations": "7395",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "8466",
+      "reference_observations": "4233",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-fp-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-packed-globals",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-parallel-transfer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-scalar",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "110592",
+      "reference_observations": "55296",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-branches",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "18432",
+      "reference_observations": "9216",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aligned-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "36864",
+      "reference_observations": "18432",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-vectors",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "795648",
+      "reference_observations": "397824",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "32256",
+      "reference_observations": "16128",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-integer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "73728",
+      "reference_observations": "36864",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-system-assembly",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "70656",
+      "reference_observations": "35328",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "78336",
+      "reference_observations": "39168",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-accumulator-store",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-contracts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-address-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14208",
+      "reference_observations": "7104",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-atomics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "112908",
+      "reference_observations": "56454",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "87552",
+      "reference_observations": "43776",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-switch-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "26112",
+      "reference_observations": "13056",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-word-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "29568",
+      "reference_observations": "14784",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-integers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46464",
+      "reference_observations": "23232",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-stack-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3456",
+      "reference_observations": "1728",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "5760",
+      "reference_observations": "2880",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "guard_checks": "18"
+    },
+    {
+      "population": "standalone-safe-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-safe-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-stack-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9984",
+      "reference_observations": "4992",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3840",
+      "reference_observations": "1920",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aggregate-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-remainder",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-rax-pointer-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "2688",
+      "reference_observations": "1344",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-general-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1920",
+      "reference_observations": "960",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-frame",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-module-dependencies",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "330",
+      "reference_observations": "165",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "negative_controls": "30",
+      "environment_checks": "3"
+    },
+    {
+      "population": "standalone-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-boolean-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "192",
+      "reference_observations": "96",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-abi-carriers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-intrinsic-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pointer-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "576",
+      "reference_observations": "288",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "240",
+      "reference_observations": "120",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    }
+  ],
+  "disk": {
+    "schema_version": "1",
+    "run_id": "1e3ce8522c642446988ac2812b522ac7",
+    "scratch_path": "tmp/address-intrinsic-wide-abi-20261108-final-r2",
+    "bundle_path": "tmp/address-intrinsic-wide-abi-20261108-final-r2/release_source_object_bundle",
+    "target": "x86_64-unknown-linux-gnu",
+    "mode": "serial",
+    "real_rows_concurrency": "3",
+    "subgates": "17",
+    "wall_ms": "3654756",
+    "starting_free_bytes": "33477910528",
+    "minimum_observed_free_bytes": "29818310656",
+    "final_free_bytes": "29818310656",
+    "observed_peak_bytes": "3659599872",
+    "reserve_bytes": "24359738368",
+    "required_start_bytes": "32949672960",
+    "local_fail": "0"
+  },
+  "cache": [
+    {
+      "mode": "ReleaseFast",
+      "status": "hit",
+      "duration_ms": "15194",
+      "cache_key": "71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6",
+      "descriptor_bytes": "1343891552"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "status": "hit",
+      "duration_ms": "16782",
+      "cache_key": "c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de",
+      "descriptor_bytes": "1473501276"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "status": "hit",
+      "duration_ms": "12411",
+      "cache_key": "db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7",
+      "descriptor_bytes": "1106433056"
+    }
+  ],
+  "native_population_count": 53,
+  "native_local_observations": 1829892,
+  "native_reference_observations": 914946,
+  "schema": "address-intrinsic-wide-abi-acceptance-v1",
+  "status": "passed",
+  "returncode": 0,
+  "recorded_utc": "2026-11-08T08:33:51Z",
+  "accepted_revision": "761ea1991a3d8f65d2031302fc868afb3cd7fc7e",
+  "accepted_tree": "a3e4eb84c3696f3c72d2716d71b7cb9dd75fdff3",
+  "source_binding": {
+    "accepted_revision": "761ea1991a3d8f65d2031302fc868afb3cd7fc7e",
+    "accepted_tree": "a3e4eb84c3696f3c72d2716d71b7cb9dd75fdff3",
+    "working_base": "c471c743",
+    "baseline_accepted_revision": "baf7a767e45c52f21eeafcb67cd01b4cb155a4c4",
+    "implementation_commits": [
+      "8f803cc5",
+      "421be498",
+      "761ea199"
+    ],
+    "source_files": 1747,
+    "source_hash_manifest": "local-state/validations/address-intrinsic-wide-abi-20261108/final-sources.sha256",
+    "compiler_hash_manifest": "local-state/validations/address-intrinsic-wide-abi-20261108/compilers.sha256",
+    "scope": "Compiler, tools, tests and build inputs frozen before final builds and validation; documentation is finalized afterward",
+    "hashes_verified": true,
+    "membership_verified": true
+  },
+  "source_snapshot_verified": true,
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "implementation": {
+    "known_constant_gep_flags_admitted": true,
+    "checked_offsets_and_address_spaces_preserved": true,
+    "data_alias_proof_preserves_original_relocation_symbol": true,
+    "alias_admission_requires_dependency_route": true,
+    "validated_scalar_integer_intrinsic_facts": true,
+    "private_overflow_aggregates_omit_scalar_return_facts": true,
+    "nonnative_integer_abi_carriers_32_and_64_bits": true,
+    "logical_payload_masks_before_publication": true,
+    "original_ir_types_and_attributes_preserved": true,
+    "wide_carriers_omit_payload_facts": true,
+    "unsupported_abi_boundaries_preserved": true,
+    "frontend_unchanged": true,
+    "execution_cohort_unchanged": true,
+    "candidate_prefix_unchanged": true
+  },
+  "validation": {
+    "unit_tests_per_build_mode": 1955,
+    "unit_build_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "structural_checks_per_mode": 21,
+    "profile_process_tests": 2,
+    "whole_compiler_report_tests": 5,
+    "readiness_passed": true,
+    "full_gates": 17,
+    "new_native_functions": 19,
+    "new_native_populations": 3,
+    "new_native_local_observations_per_compiler_build": 19008,
+    "new_native_reference_observations_per_compiler_build": 9504,
+    "new_native_compiler_builds": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "cohort_observations_per_route": 23568,
+    "behavioral_observations": 6528,
+    "zig_input_mode_pairs": 87,
+    "zig_observation_controls": 603,
+    "json_input_mode_pairs": 138,
+    "json_observation_controls": 552,
+    "fixed_zig_program_modes": 15,
+    "compiler_rt_bypass_ratchet": 130
+  },
+  "diagnostic": {
+    "scope": "Complete selection of unchanged compiler and runtime inputs; no complete object or execution credit",
+    "compiler": {
+      "status": "blocked",
+      "failure_stage": "selection",
+      "source_and_backend_verified": true,
+      "backend": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/address-intrinsic-wide-abi-20261108/compiler-fast-accepted/bin/z_llvm",
+        "bytes": 39869224,
+        "sha256": "6434ad3311767eb8f09c97ae2ec0911440b77975049dae712b8b45cdd7639bd1"
+      },
+      "input": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/address-intrinsic-wide-abi-20261108/compiler-replay-accepted/backend/input.ll",
+        "bytes": 443624107,
+        "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e"
+      },
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 6752,
+        "failed": 2176
+      },
+      "dependency_coverage": "conservative",
+      "process_completed": true,
+      "returncode": 1,
+      "object_complete": false,
+      "time_record": "Command exited with non-zero status 1\nwall_seconds=913.26\nmax_rss_kb=6520732\nexit_status=1\n",
+      "events": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/address-intrinsic-wide-abi-20261108/compiler-replay-accepted/backend/profile.events.jsonl",
+        "bytes": 1042587932,
+        "sha256": "d41627bc6bad1d6e0ee424256cbcad8154318b584d9fbf4863af6c54c9475516"
+      },
+      "event_audit": {
+        "sequence": 3508029,
+        "elapsed_ns": 912996788136,
+        "begins": 8928,
+        "ends": 8928,
+        "selected": 6752,
+        "failed": 2176,
+        "active": null,
+        "pending_legalizer": null,
+        "activity": null,
+        "retry": false,
+        "complete": true,
+        "succeeded": false,
+        "counters": {
+          "selected_functions": 6752,
+          "failed_functions": 2176,
+          "normalization_runs": 66215,
+          "legalizer_attempts": 1206659,
+          "legalizer_rewrites": 63119,
+          "original_form_retries": 32882,
+          "original_form_selected": 5646,
+          "selection_iterations": 66215,
+          "max_selection_iterations": 26,
+          "emitted_instructions": 6302419,
+          "emitted_spill_instructions": 1415804
+        },
+        "unique_functions": 8928
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": 2411,
+      "classifier_selected_identities_match": true,
+      "classifier_failure_tuples_match": true,
+      "profile": {
+        "total_ns": 912965151030,
+        "phases": [
+          {
+            "phase": "other",
+            "exclusive_ns": 777455234
+          },
+          {
+            "phase": "input",
+            "exclusive_ns": 173779723
+          },
+          {
+            "phase": "parse",
+            "exclusive_ns": 5319147315
+          },
+          {
+            "phase": "air_lowering",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "verify",
+            "exclusive_ns": 16591391455
+          },
+          {
+            "phase": "optimize",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "reachability",
+            "exclusive_ns": 222425175758
+          },
+          {
+            "phase": "normalize",
+            "exclusive_ns": 19113806590
+          },
+          {
+            "phase": "legalize",
+            "exclusive_ns": 340435009819
+          },
+          {
+            "phase": "select",
+            "exclusive_ns": 308129385136
+          },
+          {
+            "phase": "object_write",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "ownership_write",
+            "exclusive_ns": 0
+          }
+        ],
+        "counters": {
+          "selected_functions": 6752,
+          "failed_functions": 2176,
+          "normalization_runs": 66215,
+          "legalizer_attempts": 1206659,
+          "legalizer_rewrites": 63119,
+          "original_form_retries": 32882,
+          "original_form_selected": 5646,
+          "selection_iterations": 66215,
+          "max_selection_iterations": 26,
+          "emitted_instructions": 6302419,
+          "emitted_spill_instructions": 1415804
+        },
+        "legalizer_allocations": {
+          "alloc_calls": 153898580,
+          "requested_bytes": 50158126419,
+          "allocated_bytes": 50158126419,
+          "failed_allocations": 0,
+          "resize_calls": 0,
+          "remap_calls": 25893502,
+          "grown_bytes": 43092757031,
+          "free_calls": 135730959
+        },
+        "slowest_functions": [
+          {
+            "name": "codegen.aarch64.Select.body",
+            "input_blocks": 9643,
+            "input_instructions": 51773,
+            "total_ns": 81543677235,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 31672
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 3496224510
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 67079536280
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 10967884773
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 20,
+              "legalizer_attempts": 271,
+              "legalizer_rewrites": 19,
+              "original_form_retries": 8,
+              "original_form_selected": 0,
+              "selection_iterations": 20,
+              "max_selection_iterations": 20,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 2068632,
+              "requested_bytes": 1039745495,
+              "allocated_bytes": 1039745495,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 612082,
+              "grown_bytes": 1120813501,
+              "free_calls": 1631395
+            },
+            "original_form_ns": 8022094644,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "Sema.analyzeBodyInner",
+            "input_blocks": 6558,
+            "input_instructions": 51889,
+            "total_ns": 36165363182,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9207
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 2697587097
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 33327515378
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 140251500
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 15,
+              "legalizer_attempts": 183,
+              "legalizer_rewrites": 15,
+              "original_form_retries": 5,
+              "original_form_selected": 0,
+              "selection_iterations": 15,
+              "max_selection_iterations": 15,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 3024436,
+              "requested_bytes": 812389661,
+              "allocated_bytes": 812389661,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 199119,
+              "grown_bytes": 357989102,
+              "free_calls": 2847523
+            },
+            "original_form_ns": 48349748,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "zig.llvm.Builder.toBitcode",
+            "input_blocks": 7823,
+            "input_instructions": 47274,
+            "total_ns": 31094466361,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 11281
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 1918101534
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 29033867206
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 142486340
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 13,
+              "legalizer_attempts": 166,
+              "legalizer_rewrites": 13,
+              "original_form_retries": 5,
+              "original_form_selected": 0,
+              "selection_iterations": 13,
+              "max_selection_iterations": 13,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 21423980,
+              "requested_bytes": 3755152486,
+              "allocated_bytes": 3755152486,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 370562,
+              "grown_bytes": 671212106,
+              "free_calls": 21197089
+            },
+            "original_form_ns": 20475202,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.loongarch.Assemble.parseInstruction",
+            "input_blocks": 20976,
+            "input_instructions": 133719,
+            "total_ns": 21122487759,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 13197
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 427677510
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2271435362
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 18423361690
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 6,
+              "legalizer_attempts": 124,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 3,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 904114,
+              "requested_bytes": 540265790,
+              "allocated_bytes": 540265790,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 872961,
+              "grown_bytes": 1621109255,
+              "free_calls": 557158
+            },
+            "original_form_ns": 11718991057,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.x86_64.CodeGen.genBody",
+            "input_blocks": 4120,
+            "input_instructions": 27078,
+            "total_ns": 17592323947,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9759
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 1046282572
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 16470281730
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 75749886
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 14,
+              "legalizer_attempts": 171,
+              "legalizer_rewrites": 14,
+              "original_form_retries": 6,
+              "original_form_selected": 0,
+              "selection_iterations": 14,
+              "max_selection_iterations": 14,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1462400,
+              "requested_bytes": 471958582,
+              "allocated_bytes": 471958582,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 200339,
+              "grown_bytes": 352800599,
+              "free_calls": 1316712
+            },
+            "original_form_ns": 11685929,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "link.Wasm.Flush.finish",
+            "input_blocks": 4126,
+            "input_instructions": 27671,
+            "total_ns": 15565215558,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9178
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 461825461
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 15042465752
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 60915167
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 26,
+              "legalizer_attempts": 356,
+              "legalizer_rewrites": 25,
+              "original_form_retries": 9,
+              "original_form_selected": 0,
+              "selection_iterations": 26,
+              "max_selection_iterations": 26,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 17917049,
+              "requested_bytes": 3108415302,
+              "allocated_bytes": 3108415302,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 197533,
+              "grown_bytes": 355660643,
+              "free_calls": 17765854
+            },
+            "original_form_ns": 7165855,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "link.MachO.flush",
+            "input_blocks": 4250,
+            "input_instructions": 28054,
+            "total_ns": 13325238121,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9408
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 667285519
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 12588196820
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 69746374
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 19,
+              "legalizer_attempts": 262,
+              "legalizer_rewrites": 18,
+              "original_form_retries": 9,
+              "original_form_selected": 0,
+              "selection_iterations": 19,
+              "max_selection_iterations": 19,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 5304045,
+              "requested_bytes": 1112188918,
+              "allocated_bytes": 1112188918,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 195017,
+              "grown_bytes": 325673850,
+              "free_calls": 5147887
+            },
+            "original_form_ns": 8692407,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "\"zig.llvm.bitcode_writer.BitcodeWriter(&.{ zig.llvm.Builder.Type, zig.llvm.Builder.FunctionAttributes }[0..2]).BlockWriter(zig.llvm.ir.ModuleBlock.ConstantsBlock).init__func_17755\"",
+            "input_blocks": 931,
+            "input_instructions": 6754,
+            "total_ns": 11120944439,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 21993
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 5723173
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 70258983
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 11044940290
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 6,
+              "legalizer_attempts": 107,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 3,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 40351,
+              "emitted_spill_instructions": 10090
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 23800,
+              "requested_bytes": 29340836,
+              "allocated_bytes": 29340836,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 35987,
+              "grown_bytes": 61081430,
+              "free_calls": 7170
+            },
+            "original_form_ns": 392473835,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "link.Elf.flushInner",
+            "input_blocks": 3413,
+            "input_instructions": 22848,
+            "total_ns": 9677439885,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9909
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 398703044
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 7301395469
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 1977331463
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 20,
+              "legalizer_attempts": 276,
+              "legalizer_rewrites": 19,
+              "original_form_retries": 9,
+              "original_form_selected": 0,
+              "selection_iterations": 20,
+              "max_selection_iterations": 20,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 5619168,
+              "requested_bytes": 1062974110,
+              "allocated_bytes": 1062974110,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 130444,
+              "grown_bytes": 225423730,
+              "free_calls": 5517978
+            },
+            "original_form_ns": 1522246345,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.llvm.FuncGen.genBody",
+            "input_blocks": 4102,
+            "input_instructions": 28886,
+            "total_ns": 9300466731,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 10271
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 517513082
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 8729672445
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 53270933
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 14,
+              "legalizer_attempts": 180,
+              "legalizer_rewrites": 14,
+              "original_form_retries": 5,
+              "original_form_selected": 0,
+              "selection_iterations": 14,
+              "max_selection_iterations": 14,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 6900259,
+              "requested_bytes": 1302016534,
+              "allocated_bytes": 1302016534,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 145451,
+              "grown_bytes": 248076523,
+              "free_calls": 6781105
+            },
+            "original_form_ns": 10298827,
+            "discarded_candidate_bytes": 0
+          }
+        ],
+        "slowest_legalizers": [
+          {
+            "stage": "integer_forms.zig.legalize",
+            "attempts": 60961,
+            "rewrites": 4471,
+            "errors": 0,
+            "elapsed_ns": 218669523543,
+            "rewritten_ns": 17303490099,
+            "unchanged_ns": 201366033444,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 586162,
+              "requested_bytes": 1162883547,
+              "allocated_bytes": 1162883547,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 676109,
+              "grown_bytes": 820724886,
+              "free_calls": 78622
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 10,
+            "discarded_candidate_bytes": 1470378
+          },
+          {
+            "stage": "padded_frame.zig.legalizeStorage",
+            "attempts": 34516,
+            "rewrites": 7151,
+            "errors": 0,
+            "elapsed_ns": 32146765990,
+            "rewritten_ns": 24462439762,
+            "unchanged_ns": 7684326228,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2406380,
+              "requested_bytes": 2588661314,
+              "allocated_bytes": 2588661314,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2209790,
+              "grown_bytes": 1486901747,
+              "free_calls": 318101
+            },
+            "unchanged_allocation_bytes": 439175996,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "integer_vectors.zig.legalize",
+            "attempts": 66201,
+            "rewrites": 822,
+            "errors": 0,
+            "elapsed_ns": 15188209395,
+            "rewritten_ns": 398019546,
+            "unchanged_ns": 14790189849,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 6279593,
+              "requested_bytes": 8646273833,
+              "allocated_bytes": 8646273833,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 9464980,
+              "grown_bytes": 18165565596,
+              "free_calls": 424193
+            },
+            "unchanged_allocation_bytes": 26100089660,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "word_pair_values.zig.legalize",
+            "attempts": 39963,
+            "rewrites": 1810,
+            "errors": 0,
+            "elapsed_ns": 12824192426,
+            "rewritten_ns": 11492823179,
+            "unchanged_ns": 1331369247,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 88752747,
+              "requested_bytes": 14624385042,
+              "allocated_bytes": 14624385042,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 488896,
+              "grown_bytes": 910943424,
+              "free_calls": 88420705
+            },
+            "unchanged_allocation_bytes": 1036240,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "word_pair_memory.zig.legalize",
+            "attempts": 38153,
+            "rewrites": 196,
+            "errors": 0,
+            "elapsed_ns": 11987347463,
+            "rewritten_ns": 1228286249,
+            "unchanged_ns": 10759061214,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 8344196,
+              "requested_bytes": 1459967538,
+              "allocated_bytes": 1459967538,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 133832,
+              "grown_bytes": 288015744,
+              "free_calls": 8255512
+            },
+            "unchanged_allocation_bytes": 1303623232,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "padded_frame.zig.legalize",
+            "attempts": 37957,
+            "rewrites": 3441,
+            "errors": 0,
+            "elapsed_ns": 8286253362,
+            "rewritten_ns": 2745272337,
+            "unchanged_ns": 5540981025,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 658796,
+              "requested_bytes": 772400609,
+              "allocated_bytes": 772400609,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 667015,
+              "grown_bytes": 693753919,
+              "free_calls": 77178
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "address_forms.zig.legalize",
+            "attempts": 27365,
+            "rewrites": 6804,
+            "errors": 0,
+            "elapsed_ns": 5524852148,
+            "rewritten_ns": 1709407591,
+            "unchanged_ns": 3815444557,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2725374,
+              "requested_bytes": 3938460936,
+              "allocated_bytes": 3938460936,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 4033108,
+              "grown_bytes": 7736819172,
+              "free_calls": 287565
+            },
+            "unchanged_allocation_bytes": 8492214336,
+            "discarded_candidates": 237,
+            "discarded_candidate_bytes": 26228748
+          },
+          {
+            "stage": "pointer_values.zig.legalize",
+            "attempts": 17882,
+            "rewrites": 6706,
+            "errors": 0,
+            "elapsed_ns": 4803702767,
+            "rewritten_ns": 2471614642,
+            "unchanged_ns": 2332088125,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 1865338,
+              "requested_bytes": 2387238013,
+              "allocated_bytes": 2387238013,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2852614,
+              "grown_bytes": 4815253817,
+              "free_calls": 185047
+            },
+            "unchanged_allocation_bytes": 4404429888,
+            "discarded_candidates": 158,
+            "discarded_candidate_bytes": 10866144
+          },
+          {
+            "stage": "overflow_values.zig.legalize",
+            "attempts": 65221,
+            "rewrites": 1861,
+            "errors": 0,
+            "elapsed_ns": 4237206315,
+            "rewritten_ns": 3758385833,
+            "unchanged_ns": 478820482,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 35067014,
+              "requested_bytes": 6110515247,
+              "allocated_bytes": 6110515247,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 585165,
+              "grown_bytes": 1096524255,
+              "free_calls": 34684467
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "narrow_abi.zig.legalize",
+            "attempts": 47641,
+            "rewrites": 7678,
+            "errors": 0,
+            "elapsed_ns": 3489901925,
+            "rewritten_ns": 2235622349,
+            "unchanged_ns": 1254279576,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 861234,
+              "requested_bytes": 1121138368,
+              "allocated_bytes": 1121138368,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1062975,
+              "grown_bytes": 1550618038,
+              "free_calls": 101226
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          }
+        ]
+      }
+    },
+    "runtime": {
+      "status": "blocked",
+      "failure_stage": "selection",
+      "source_and_backend_verified": true,
+      "backend": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/address-intrinsic-wide-abi-20261108/compiler-fast-accepted/bin/z_llvm",
+        "bytes": 39869224,
+        "sha256": "6434ad3311767eb8f09c97ae2ec0911440b77975049dae712b8b45cdd7639bd1"
+      },
+      "input": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/address-intrinsic-wide-abi-20261108/runtime-replay-final/backend/input.ll",
+        "bytes": 1856543,
+        "sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af"
+      },
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 274,
+        "failed": 181
+      },
+      "dependency_coverage": "conservative",
+      "process_completed": true,
+      "returncode": 1,
+      "object_complete": false,
+      "time_record": "Command exited with non-zero status 1\nwall_seconds=1.08\nmax_rss_kb=54184\nexit_status=1\n",
+      "events": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/address-intrinsic-wide-abi-20261108/runtime-replay-final/backend/profile.events.jsonl",
+        "bytes": 20150918,
+        "sha256": "f769a35b8317da9f44da2398e1dee2567c6216071d8700bea0a2c8b3fed7d4a9"
+      },
+      "event_audit": {
+        "sequence": 70370,
+        "elapsed_ns": 1084299117,
+        "begins": 455,
+        "ends": 455,
+        "selected": 274,
+        "failed": 181,
+        "active": null,
+        "pending_legalizer": null,
+        "activity": null,
+        "retry": false,
+        "complete": true,
+        "succeeded": false,
+        "counters": {
+          "selected_functions": 274,
+          "failed_functions": 181,
+          "normalization_runs": 1352,
+          "legalizer_attempts": 23374,
+          "legalizer_rewrites": 1051,
+          "original_form_retries": 756,
+          "original_form_selected": 154,
+          "selection_iterations": 1352,
+          "max_selection_iterations": 12,
+          "emitted_instructions": 44135,
+          "emitted_spill_instructions": 8229
+        },
+        "unique_functions": 455
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": 0,
+      "classifier_selected_identities_match": true,
+      "classifier_failure_tuples_match": true,
+      "profile": {
+        "total_ns": 1082736562,
+        "phases": [
+          {
+            "phase": "other",
+            "exclusive_ns": 8072058
+          },
+          {
+            "phase": "input",
+            "exclusive_ns": 705819
+          },
+          {
+            "phase": "parse",
+            "exclusive_ns": 20547238
+          },
+          {
+            "phase": "air_lowering",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "verify",
+            "exclusive_ns": 8426603
+          },
+          {
+            "phase": "optimize",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "reachability",
+            "exclusive_ns": 5932788
+          },
+          {
+            "phase": "normalize",
+            "exclusive_ns": 34793732
+          },
+          {
+            "phase": "legalize",
+            "exclusive_ns": 273406067
+          },
+          {
+            "phase": "select",
+            "exclusive_ns": 730852257
+          },
+          {
+            "phase": "object_write",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "ownership_write",
+            "exclusive_ns": 0
+          }
+        ],
+        "counters": {
+          "selected_functions": 274,
+          "failed_functions": 181,
+          "normalization_runs": 1352,
+          "legalizer_attempts": 23374,
+          "legalizer_rewrites": 1051,
+          "original_form_retries": 756,
+          "original_form_selected": 154,
+          "selection_iterations": 1352,
+          "max_selection_iterations": 12,
+          "emitted_instructions": 44135,
+          "emitted_spill_instructions": 8229
+        },
+        "legalizer_allocations": {
+          "alloc_calls": 126440,
+          "requested_bytes": 125758464,
+          "allocated_bytes": 125758464,
+          "failed_allocations": 0,
+          "resize_calls": 0,
+          "remap_calls": 120253,
+          "grown_bytes": 190481213,
+          "free_calls": 56951
+        },
+        "slowest_functions": [
+          {
+            "name": "compiler_rt.memmove.memmoveFast",
+            "input_blocks": 24,
+            "input_instructions": 176,
+            "total_ns": 54042398,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 5531
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 89597
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2400823
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 51546447
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 4,
+              "legalizer_attempts": 51,
+              "legalizer_rewrites": 4,
+              "original_form_retries": 2,
+              "original_form_selected": 1,
+              "selection_iterations": 4,
+              "max_selection_iterations": 4,
+              "emitted_instructions": 2459,
+              "emitted_spill_instructions": 546
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1159,
+              "requested_bytes": 1940188,
+              "allocated_bytes": 1940188,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1439,
+              "grown_bytes": 2306270,
+              "free_calls": 113
+            },
+            "original_form_ns": 51120437,
+            "discarded_candidate_bytes": 717678
+          },
+          {
+            "name": "compiler_rt.ssp.__memcpy_chk",
+            "input_blocks": 17,
+            "input_instructions": 111,
+            "total_ns": 42862172,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 5501
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 63173
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 1378254
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 41415244
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 2,
+              "legalizer_attempts": 8,
+              "legalizer_rewrites": 2,
+              "original_form_retries": 1,
+              "original_form_selected": 1,
+              "selection_iterations": 2,
+              "max_selection_iterations": 2,
+              "emitted_instructions": 2193,
+              "emitted_spill_instructions": 462
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 948,
+              "requested_bytes": 1267766,
+              "allocated_bytes": 1267766,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1173,
+              "grown_bytes": 876597,
+              "free_calls": 58
+            },
+            "original_form_ns": 41080278,
+            "discarded_candidate_bytes": 461013
+          },
+          {
+            "name": "compiler_rt.memcpy.memcpyFast",
+            "input_blocks": 15,
+            "input_instructions": 107,
+            "total_ns": 40115302,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 8177
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 43174
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 916803
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 39147148
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 2,
+              "legalizer_attempts": 8,
+              "legalizer_rewrites": 2,
+              "original_form_retries": 1,
+              "original_form_selected": 1,
+              "selection_iterations": 2,
+              "max_selection_iterations": 2,
+              "emitted_instructions": 2182,
+              "emitted_spill_instructions": 461
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 942,
+              "requested_bytes": 1253558,
+              "allocated_bytes": 1253558,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1171,
+              "grown_bytes": 877365,
+              "free_calls": 58
+            },
+            "original_form_ns": 38793518,
+            "discarded_candidate_bytes": 449493
+          },
+          {
+            "name": "compiler_rt.rem_pio2.rem_pio2",
+            "input_blocks": 60,
+            "input_instructions": 348,
+            "total_ns": 36542127,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 4700
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 164289
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2126177
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 34246961
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 6,
+              "legalizer_attempts": 101,
+              "legalizer_rewrites": 6,
+              "original_form_retries": 4,
+              "original_form_selected": 1,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 1423,
+              "emitted_spill_instructions": 284
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1236,
+              "requested_bytes": 1296810,
+              "allocated_bytes": 1296810,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1449,
+              "grown_bytes": 1949927,
+              "free_calls": 330
+            },
+            "original_form_ns": 33813874,
+            "discarded_candidate_bytes": 45044
+          },
+          {
+            "name": "compiler_rt.rem_pio2_large.rem_pio2_large",
+            "input_blocks": 137,
+            "input_instructions": 917,
+            "total_ns": 20501528,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 11211
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 967222
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 15327025
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 4196070
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 12,
+              "legalizer_attempts": 187,
+              "legalizer_rewrites": 11,
+              "original_form_retries": 7,
+              "original_form_selected": 0,
+              "selection_iterations": 12,
+              "max_selection_iterations": 12,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 5991,
+              "requested_bytes": 7609300,
+              "allocated_bytes": 7609300,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 6265,
+              "grown_bytes": 11946282,
+              "free_calls": 2064
+            },
+            "original_form_ns": 64847,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.mulf3.__muldf3",
+            "input_blocks": 31,
+            "input_instructions": 131,
+            "total_ns": 15598765,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 5251
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 94665
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 814282
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 14684567
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 4,
+              "legalizer_attempts": 66,
+              "legalizer_rewrites": 3,
+              "original_form_retries": 3,
+              "original_form_selected": 0,
+              "selection_iterations": 4,
+              "max_selection_iterations": 4,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 570,
+              "requested_bytes": 543978,
+              "allocated_bytes": 543978,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 321,
+              "grown_bytes": 466398,
+              "free_calls": 254
+            },
+            "original_form_ns": 11383143,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.int.__udivmoddi4",
+            "input_blocks": 50,
+            "input_instructions": 242,
+            "total_ns": 15067796,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 29798
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 128090
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2091530
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 12818378
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 6,
+              "legalizer_attempts": 95,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 4,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 1216,
+              "emitted_spill_instructions": 298
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1975,
+              "requested_bytes": 1432400,
+              "allocated_bytes": 1432400,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1070,
+              "grown_bytes": 1324242,
+              "free_calls": 1157
+            },
+            "original_form_ns": 8506,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.sqrt.sqrt",
+            "input_blocks": 8,
+            "input_instructions": 84,
+            "total_ns": 14899787,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 4739
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 97911
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 743714
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 14053423
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 5,
+              "legalizer_attempts": 59,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 4,
+              "original_form_selected": 1,
+              "selection_iterations": 5,
+              "max_selection_iterations": 5,
+              "emitted_instructions": 583,
+              "emitted_spill_instructions": 121
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 225,
+              "requested_bytes": 497052,
+              "allocated_bytes": 497052,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 291,
+              "grown_bytes": 305610,
+              "free_calls": 44
+            },
+            "original_form_ns": 13805819,
+            "discarded_candidate_bytes": 85071
+          },
+          {
+            "name": "compiler_rt.count0bits.__clzti2",
+            "input_blocks": 1,
+            "input_instructions": 38,
+            "total_ns": 14021761,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 7474
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 68884
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 544975
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 13400428
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 3,
+              "legalizer_attempts": 25,
+              "legalizer_rewrites": 3,
+              "original_form_retries": 3,
+              "original_form_selected": 1,
+              "selection_iterations": 3,
+              "max_selection_iterations": 3,
+              "emitted_instructions": 1154,
+              "emitted_spill_instructions": 279
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 257,
+              "requested_bytes": 674680,
+              "allocated_bytes": 674680,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 466,
+              "grown_bytes": 319824,
+              "free_calls": 29
+            },
+            "original_form_ns": 13162183,
+            "discarded_candidate_bytes": 124416
+          },
+          {
+            "name": "compiler_rt.divtf3.__divtf3",
+            "input_blocks": 33,
+            "input_instructions": 413,
+            "total_ns": 13147412,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 4850
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 531328
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 11565229
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 1046005
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 6,
+              "legalizer_attempts": 91,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 4,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 2641,
+              "requested_bytes": 5534738,
+              "allocated_bytes": 5534738,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 4858,
+              "grown_bytes": 9119304,
+              "free_calls": 405
+            },
+            "original_form_ns": 27213,
+            "discarded_candidate_bytes": 0
+          }
+        ],
+        "slowest_legalizers": [
+          {
+            "stage": "integer_vectors.zig.legalize",
+            "attempts": 1352,
+            "rewrites": 3,
+            "errors": 0,
+            "elapsed_ns": 52159890,
+            "rewritten_ns": 1644855,
+            "unchanged_ns": 50515035,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 24931,
+              "requested_bytes": 30797040,
+              "allocated_bytes": 30797040,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 35743,
+              "grown_bytes": 78972096,
+              "free_calls": 3879
+            },
+            "unchanged_allocation_bytes": 106005120,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "integer_forms.zig.legalize",
+            "attempts": 1131,
+            "rewrites": 117,
+            "errors": 0,
+            "elapsed_ns": 27888399,
+            "rewritten_ns": 6947595,
+            "unchanged_ns": 20940804,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 3311,
+              "requested_bytes": 7134765,
+              "allocated_bytes": 7134765,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 3543,
+              "grown_bytes": 2952954,
+              "free_calls": 763
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 11,
+            "discarded_candidate_bytes": 394287
+          },
+          {
+            "stage": "address_forms.zig.legalize",
+            "attempts": 654,
+            "rewrites": 66,
+            "errors": 0,
+            "elapsed_ns": 26606034,
+            "rewritten_ns": 6448637,
+            "unchanged_ns": 20157397,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 13797,
+              "requested_bytes": 18558414,
+              "allocated_bytes": 18558414,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 19627,
+              "grown_bytes": 43443129,
+              "free_calls": 2547
+            },
+            "unchanged_allocation_bytes": 49487040,
+            "discarded_candidates": 10,
+            "discarded_candidate_bytes": 993660
+          },
+          {
+            "stage": "pointer_values.zig.legalize",
+            "attempts": 548,
+            "rewrites": 60,
+            "errors": 0,
+            "elapsed_ns": 19947161,
+            "rewritten_ns": 3279070,
+            "unchanged_ns": 16668091,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 9104,
+              "requested_bytes": 10083508,
+              "allocated_bytes": 10083508,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 13871,
+              "grown_bytes": 33872188,
+              "free_calls": 1560
+            },
+            "unchanged_allocation_bytes": 37896804,
+            "discarded_candidates": 6,
+            "discarded_candidate_bytes": 201804
+          },
+          {
+            "stage": "pair_arithmetic.zig.legalize",
+            "attempts": 1014,
+            "rewrites": 100,
+            "errors": 0,
+            "elapsed_ns": 14447618,
+            "rewritten_ns": 11896116,
+            "unchanged_ns": 2551502,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 16051,
+              "requested_bytes": 22308379,
+              "allocated_bytes": 22308379,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 28177,
+              "grown_bytes": 3224385,
+              "free_calls": 2010
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 1,
+            "discarded_candidate_bytes": 91008
+          },
+          {
+            "stage": "comparison_forms.zig.legalize",
+            "attempts": 1299,
+            "rewrites": 152,
+            "errors": 0,
+            "elapsed_ns": 7203252,
+            "rewritten_ns": 5269676,
+            "unchanged_ns": 1933576,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 3811,
+              "requested_bytes": 8185587,
+              "allocated_bytes": 8185587,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2891,
+              "grown_bytes": 3700662,
+              "free_calls": 889
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 59,
+            "discarded_candidate_bytes": 3250452
+          },
+          {
+            "stage": "boolean_values.zig.legalize",
+            "attempts": 843,
+            "rewrites": 91,
+            "errors": 0,
+            "elapsed_ns": 6681562,
+            "rewritten_ns": 5607563,
+            "unchanged_ns": 1073999,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2457,
+              "requested_bytes": 6960276,
+              "allocated_bytes": 6960276,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 3109,
+              "grown_bytes": 5408655,
+              "free_calls": 750
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "pair_memory.zig.legalize",
+            "attempts": 1349,
+            "rewrites": 33,
+            "errors": 0,
+            "elapsed_ns": 5313225,
+            "rewritten_ns": 1418437,
+            "unchanged_ns": 3894788,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2530,
+              "requested_bytes": 2844020,
+              "allocated_bytes": 2844020,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1424,
+              "grown_bytes": 580767,
+              "free_calls": 1592
+            },
+            "unchanged_allocation_bytes": 265200,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "integer_intrinsics.zig.legalize",
+            "attempts": 914,
+            "rewrites": 29,
+            "errors": 0,
+            "elapsed_ns": 5108422,
+            "rewritten_ns": 2962290,
+            "unchanged_ns": 2146132,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 1543,
+              "requested_bytes": 2096466,
+              "allocated_bytes": 2096466,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2282,
+              "grown_bytes": 4057176,
+              "free_calls": 307
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "stack_addresses.zig.legalize",
+            "attempts": 588,
+            "rewrites": 40,
+            "errors": 0,
+            "elapsed_ns": 4259353,
+            "rewritten_ns": 3064733,
+            "unchanged_ns": 1194620,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2087,
+              "requested_bytes": 1947907,
+              "allocated_bytes": 1947907,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2471,
+              "grown_bytes": 4226353,
+              "free_calls": 552
+            },
+            "unchanged_allocation_bytes": 28672,
+            "discarded_candidates": 4,
+            "discarded_candidate_bytes": 120884
+          }
+        ]
+      }
+    },
+    "failure_comparison_normalization": "Only absent CLI selector tag/detail markers '-' are mapped to JSON null",
+    "compiler_failure_groups": [
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-global-properties"
+        },
+        "functions": 372
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-llvm-intrinsic"
+        },
+        "functions": 217
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "stage2-register-pressure"
+        },
+        "functions": 184
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-icmp-rhs"
+        },
+        "functions": 160
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "alloca"
+        },
+        "functions": 123
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-unsupported-value"
+        },
+        "functions": 119
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-readonly-table-global"
+        },
+        "functions": 103
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "icmp"
+        },
+        "functions": 102
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-arg"
+        },
+        "functions": 92
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCallAttributeAbi",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 89
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-freeze-width"
+        },
+        "functions": 80
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "load"
+        },
+        "functions": 71
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 47
+      },
+      {
+        "failure": {
+          "diagnostic": "ValueUseSetccEaxCompareImmediateOutOfRange",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 47
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-smulo-i64-rhs"
+        },
+        "functions": 46
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "stage2-indirect-phi"
+        },
+        "functions": 44
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-icmp-form"
+        },
+        "functions": 41
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-load-width"
+        },
+        "functions": 26
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "inline-asm-call"
+        },
+        "functions": 18
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "insertelement"
+        },
+        "functions": 15
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-cast-value"
+        },
+        "functions": 14
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "phi"
+        },
+        "functions": 13
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-param-type"
+        },
+        "functions": 12
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-select-false-value"
+        },
+        "functions": 10
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "llvm.ctpop"
+        },
+        "functions": 10
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-ctpop-range"
+        },
+        "functions": 8
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-select-true-value"
+        },
+        "functions": 8
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "stage2-block-count"
+        },
+        "functions": 8
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "call-ret"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-freeze-type"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-param-width"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-store-width"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-width"
+        },
+        "functions": 6
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-binary-imm-lhs"
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "alloca"
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-global-properties"
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-dst"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "store"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-ptr-arg"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "ValueUseIdentityTooLong",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "ValueUseUnsupportedSource",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-form"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-param-reg"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-unknown-lhs"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "fcmp"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-return-type"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-ptr-arg"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "inline-asm-call"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "call-arg"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "cast"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-ptr-arg"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-inline-asm-result"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-memcpy-dst"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-memcpy-src"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-memset-attrs"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-pair-binary-op"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "fptoui"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "freeze"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "insertvalue"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "sdiv"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-global-properties"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-llvm-intrinsic"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "insertelement"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "stage2-register-pressure"
+        },
+        "functions": 1
+      }
+    ],
+    "transitions_file": "local-state/validations/address-intrinsic-wide-abi-20261108/wide-compiler-comparison.json",
+    "classification_before_file": "local-state/validations/census-integer-abi-20261107/classification-after.json",
+    "classification_after_file": "local-state/validations/address-intrinsic-wide-abi-20261108/classification-after.json",
+    "staged_replays": [
+      {
+        "checkpoint": "constant_addresses",
+        "revision": "8f803cc5",
+        "compiler": {
+          "examined": 8928,
+          "selected": 6147,
+          "failed": 2781,
+          "new_successes": 1806,
+          "lost_successes": 0
+        },
+        "runtime": {
+          "examined": 455,
+          "selected": 274,
+          "failed": 181,
+          "new_successes": 0,
+          "lost_successes": 0
+        }
+      },
+      {
+        "checkpoint": "intrinsic_facts",
+        "revision": "421be498",
+        "compiler": {
+          "examined": 8928,
+          "selected": 6734,
+          "failed": 2194,
+          "new_successes": 587,
+          "lost_successes": 0
+        },
+        "runtime": {
+          "examined": 455,
+          "selected": 274,
+          "failed": 181,
+          "new_successes": 0,
+          "lost_successes": 0
+        }
+      },
+      {
+        "checkpoint": "wide_abi_carriers",
+        "revision": "761ea199",
+        "compiler": {
+          "examined": 8928,
+          "selected": 6752,
+          "failed": 2176,
+          "new_successes": 18,
+          "lost_successes": 0
+        },
+        "runtime": {
+          "examined": 455,
+          "selected": 274,
+          "failed": 181,
+          "new_successes": 0,
+          "lost_successes": 0
+        }
+      }
+    ],
+    "classification_limit": "Final call or parameter observations after private legalization; call argument lists do not identify an individual failing argument; other rejection kinds are unattributed",
+    "complete_object_credit": false,
+    "whole_compiler_execution_credit": false
+  },
+  "new_native_audit": {
+    "status": "passed",
+    "compiler_builds": 2,
+    "populations": 3,
+    "functions": 19,
+    "local_observations_per_compiler_build": 19008,
+    "reference_observations_per_compiler_build": 9504,
+    "rows": [
+      {
+        "population": "constant_pointer_memory",
+        "compiler_sha256": "f99e553ba1bbe460ee9db420d07eba8cb7a90146669e4b806165e82b7784682b",
+        "fixture_ir_sha256": "fa9474ce1e04950b1f1a5a9de511d6dac2b380cb0a0454b8f4f38922334c688d",
+        "driver_sha256": "ca5e57144a6354173c4eebc645e2ce661b75a8c78bd31c7316e1a157eca3b782",
+        "local_observations": 576,
+        "reference_observations": 288
+      },
+      {
+        "population": "intrinsic_facts",
+        "compiler_sha256": "f99e553ba1bbe460ee9db420d07eba8cb7a90146669e4b806165e82b7784682b",
+        "fixture_ir_sha256": "0a621b399ef1219cee0676a31f991f931b60438567684424fce882875b48937c",
+        "driver_sha256": "e836ac6c5113f82068f35ed8c5c48baad798b5bd51af9dbeda0f80ff89c5bba2",
+        "local_observations": 9216,
+        "reference_observations": 4608
+      },
+      {
+        "population": "wide_abi_carriers",
+        "compiler_sha256": "f99e553ba1bbe460ee9db420d07eba8cb7a90146669e4b806165e82b7784682b",
+        "fixture_ir_sha256": "0a5eadd49a6b0b430afda7243ef3d94d1fd7c4191f04e7d2540249a50938f53c",
+        "driver_sha256": "fa0ec58028d47a475784795f87a18770375ba80d636b533a080afbe7beac3234",
+        "local_observations": 9216,
+        "reference_observations": 4608
+      },
+      {
+        "population": "constant_pointer_memory",
+        "compiler_sha256": "6434ad3311767eb8f09c97ae2ec0911440b77975049dae712b8b45cdd7639bd1",
+        "fixture_ir_sha256": "fa9474ce1e04950b1f1a5a9de511d6dac2b380cb0a0454b8f4f38922334c688d",
+        "driver_sha256": "ca5e57144a6354173c4eebc645e2ce661b75a8c78bd31c7316e1a157eca3b782",
+        "local_observations": 576,
+        "reference_observations": 288
+      },
+      {
+        "population": "intrinsic_facts",
+        "compiler_sha256": "6434ad3311767eb8f09c97ae2ec0911440b77975049dae712b8b45cdd7639bd1",
+        "fixture_ir_sha256": "0a621b399ef1219cee0676a31f991f931b60438567684424fce882875b48937c",
+        "driver_sha256": "e836ac6c5113f82068f35ed8c5c48baad798b5bd51af9dbeda0f80ff89c5bba2",
+        "local_observations": 9216,
+        "reference_observations": 4608
+      },
+      {
+        "population": "wide_abi_carriers",
+        "compiler_sha256": "6434ad3311767eb8f09c97ae2ec0911440b77975049dae712b8b45cdd7639bd1",
+        "fixture_ir_sha256": "0a5eadd49a6b0b430afda7243ef3d94d1fd7c4191f04e7d2540249a50938f53c",
+        "driver_sha256": "fa0ec58028d47a475784795f87a18770375ba80d636b533a080afbe7beac3234",
+        "local_observations": 9216,
+        "reference_observations": 4608
+      }
+    ]
+  },
+  "controls": {
+    "schema": "execution-breadth-controls-v2",
+    "rows": [
+      {
+        "mode": "ReleaseFast",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      }
+    ],
+    "negative_controls": 54,
+    "function_modes": 21,
+    "observations": 22788,
+    "status": "passed"
+  },
+  "fixed_programs": {
+    "status": "passed",
+    "programs": 5,
+    "program_modes": 15,
+    "prior_source_manifest_emitter_identities_preserved": true,
+    "rows": [
+      {
+        "program": "recursive_fibonacci",
+        "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+        "manifest_sha256": "21bd150575f432aa005026f2db2ce765587f2eb9246cdc2457fec77a7d01a6ad",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "optionals",
+        "source_sha256": "8e47ea56fd5690e7b0220917f8a16eca60aa59537e2b9207ae2bf7ea485c8035",
+        "manifest_sha256": "65c424b0dc648041ec5781552aea18341353931dac668e37bd7f1356c41aed24",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "taking_pointer_of_global_tagged_union",
+        "source_sha256": "d88d9cde2f25cb0134aac0e1d894dcf1448a21e780c8ded5a91130fe7b07d7dc",
+        "manifest_sha256": "07d564db0173432a1f00b774fac6df169f36e80c56ae7853c959b6f70b20ab76",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "array_in_anon_struct",
+        "source_sha256": "9ea4e3efed991237fe3dcca39de9a8826efeb0d8de7df30c385870dc81471dce",
+        "manifest_sha256": "a1c70dc1e3162a0f7a435c7ea3faa60e0a258e5972a70800f7a19c564661764c",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "while_loops",
+        "source_sha256": "4775009971f7b7ba11a1881f55ae5ee97c69519e6ff04bc83f6d740369e41c53",
+        "manifest_sha256": "ed79b9a73c75410c2d2939d6a87519961267e466cc330fe713ecb949fb103327",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      }
+    ]
+  },
+  "prior_population_comparison": {
+    "prior_native_populations": 50,
+    "current_native_populations": 53,
+    "prior_populations_preserved": true,
+    "population_differences": [],
+    "new_populations": [
+      {
+        "population": "standalone-wide-abi-carriers",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9216",
+        "reference_observations": "4608",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      {
+        "population": "standalone-intrinsic-facts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "9216",
+        "reference_observations": "4608",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      {
+        "population": "standalone-constant-pointer-memory",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "576",
+        "reference_observations": "288",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    ],
+    "core": {
+      "records": 36,
+      "all_selected_object_and_observation_fields_match": true,
+      "strict_records_equal": false,
+      "excluded_fields": [
+        "reference_bytes",
+        "reference_sha256",
+        "linked_sha256"
+      ],
+      "scope": "Executable metadata is compared separately; selected-object bytes and all observation fields must match",
+      "executable_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153648",
+          "reference_bytes_after": "4153680",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153648",
+          "reference_bytes_after": "4153680",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151432",
+          "reference_bytes_after": "4151464",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154200",
+          "reference_bytes_after": "4154232",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148264",
+          "reference_bytes_after": "4148296",
+          "linked_bytes_before": "6283657",
+          "linked_bytes_after": "6283657",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153800",
+          "reference_bytes_after": "4153832",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152288",
+          "reference_bytes_after": "4152320",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147696",
+          "reference_bytes_after": "4147728",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148120",
+          "reference_bytes_after": "4148152",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148208",
+          "reference_bytes_after": "4148240",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148176",
+          "reference_bytes_after": "4148208",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148472",
+          "reference_bytes_after": "4148504",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039496",
+          "reference_bytes_after": "4039528",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039504",
+          "reference_bytes_after": "4039536",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035576",
+          "reference_bytes_after": "4035608",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040216",
+          "reference_bytes_after": "4040248",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034072",
+          "reference_bytes_after": "4034104",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039688",
+          "reference_bytes_after": "4039720",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038392",
+          "reference_bytes_after": "4038424",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034344",
+          "reference_bytes_after": "4034376",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034208",
+          "reference_bytes_after": "4034240",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034256",
+          "reference_bytes_after": "4034288",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034232",
+          "reference_bytes_after": "4034264",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034312",
+          "reference_bytes_after": "4034344",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        }
+      ]
+    }
+  },
+  "zig_corpus": {
+    "status": "passed",
+    "inputs": 29,
+    "input_mode_pairs": 87,
+    "actual_executions": 174,
+    "observation_controls": 603,
+    "independent_oracle": true,
+    "prior_observations_equal": true,
+    "prior_selection_counters_equal": true,
+    "selection_comparison_scope": "Recorded separately; a capability repair may change selection while preserving all oracle observations",
+    "prior_source_manifest_emitter_identities_preserved": true
+  },
+  "c_corpus": {
+    "status": "passed",
+    "inputs": 46,
+    "matched_inputs": 138,
+    "negative_controls": 552,
+    "source_files_equal": true,
+    "manifest_equal": true,
+    "observations_equal": true
+  },
+  "compiler_builds": {
+    "Debug": "f99e553ba1bbe460ee9db420d07eba8cb7a90146669e4b806165e82b7784682b",
+    "ReleaseFast": "6434ad3311767eb8f09c97ae2ec0911440b77975049dae712b8b45cdd7639bd1",
+    "scope": "Same frozen sources; ReleaseFast supplies integrated hooks and broader input corpora; runner defaults use verified final Debug"
+  },
+  "native_fixture_preservation": {
+    "all_previous_fixture_sources_unchanged": true,
+    "prior_registry_entries_unchanged": true,
+    "scope": "Only constant_pointer_memory, intrinsic_facts and wide_abi_carriers fixture/driver pairs and their registry entries are added to test/real_programs"
+  },
+  "retention": {
+    "original_scratch_files": 13,
+    "unchanged": true,
+    "archives_created": false,
+    "final_available_bytes": 28489060352,
+    "additional_disk_samples": [
+      {
+        "observed_utc": "2026-11-08T07:47:51Z",
+        "available_bytes": 33391398912
+      },
+      {
+        "observed_utc": "2026-11-08T07:48:22Z",
+        "available_bytes": 33381752832
+      },
+      {
+        "observed_utc": "2026-11-08T07:48:52Z",
+        "available_bytes": 33372225536
+      },
+      {
+        "observed_utc": "2026-11-08T07:49:22Z",
+        "available_bytes": 33359003648
+      },
+      {
+        "observed_utc": "2026-11-08T07:49:52Z",
+        "available_bytes": 33350152192
+      },
+      {
+        "observed_utc": "2026-11-08T07:50:22Z",
+        "available_bytes": 33337417728
+      },
+      {
+        "observed_utc": "2026-11-08T07:50:52Z",
+        "available_bytes": 33327869952
+      },
+      {
+        "observed_utc": "2026-11-08T07:51:22Z",
+        "available_bytes": 32612642816
+      },
+      {
+        "observed_utc": "2026-11-08T07:51:52Z",
+        "available_bytes": 32600240128
+      },
+      {
+        "observed_utc": "2026-11-08T07:52:22Z",
+        "available_bytes": 32591654912
+      },
+      {
+        "observed_utc": "2026-11-08T07:52:52Z",
+        "available_bytes": 32582598656
+      },
+      {
+        "observed_utc": "2026-11-08T07:53:22Z",
+        "available_bytes": 32573939712
+      },
+      {
+        "observed_utc": "2026-11-08T07:53:52Z",
+        "available_bytes": 32562524160
+      },
+      {
+        "observed_utc": "2026-11-08T07:54:22Z",
+        "available_bytes": 32549961728
+      },
+      {
+        "observed_utc": "2026-11-08T07:54:52Z",
+        "available_bytes": 32675291136
+      },
+      {
+        "observed_utc": "2026-11-08T07:55:22Z",
+        "available_bytes": 32666701824
+      },
+      {
+        "observed_utc": "2026-11-08T07:55:52Z",
+        "available_bytes": 32657752064
+      },
+      {
+        "observed_utc": "2026-11-08T07:56:22Z",
+        "available_bytes": 32010788864
+      },
+      {
+        "observed_utc": "2026-11-08T07:56:52Z",
+        "available_bytes": 32029769728
+      },
+      {
+        "observed_utc": "2026-11-08T07:57:22Z",
+        "available_bytes": 32021241856
+      },
+      {
+        "observed_utc": "2026-11-08T07:57:52Z",
+        "available_bytes": 32012394496
+      },
+      {
+        "observed_utc": "2026-11-08T07:58:22Z",
+        "available_bytes": 32003940352
+      },
+      {
+        "observed_utc": "2026-11-08T07:58:52Z",
+        "available_bytes": 31995170816
+      },
+      {
+        "observed_utc": "2026-11-08T07:59:22Z",
+        "available_bytes": 32020443136
+      },
+      {
+        "observed_utc": "2026-11-08T07:59:53Z",
+        "available_bytes": 31686406144
+      },
+      {
+        "observed_utc": "2026-11-08T08:00:23Z",
+        "available_bytes": 31477305344
+      },
+      {
+        "observed_utc": "2026-11-08T08:00:53Z",
+        "available_bytes": 31464751104
+      },
+      {
+        "observed_utc": "2026-11-08T08:01:24Z",
+        "available_bytes": 31356526592
+      },
+      {
+        "observed_utc": "2026-11-08T08:01:54Z",
+        "available_bytes": 31341985792
+      },
+      {
+        "observed_utc": "2026-11-08T08:02:24Z",
+        "available_bytes": 31334760448
+      },
+      {
+        "observed_utc": "2026-11-08T08:02:55Z",
+        "available_bytes": 31214321664
+      },
+      {
+        "observed_utc": "2026-11-08T08:03:26Z",
+        "available_bytes": 31205871616
+      },
+      {
+        "observed_utc": "2026-11-08T08:03:57Z",
+        "available_bytes": 31192924160
+      },
+      {
+        "observed_utc": "2026-11-08T08:04:27Z",
+        "available_bytes": 31179669504
+      },
+      {
+        "observed_utc": "2026-11-08T08:04:58Z",
+        "available_bytes": 31170945024
+      },
+      {
+        "observed_utc": "2026-11-08T08:05:29Z",
+        "available_bytes": 31155679232
+      },
+      {
+        "observed_utc": "2026-11-08T08:05:59Z",
+        "available_bytes": 31148945408
+      },
+      {
+        "observed_utc": "2026-11-08T08:06:30Z",
+        "available_bytes": 31136055296
+      },
+      {
+        "observed_utc": "2026-11-08T08:07:01Z",
+        "available_bytes": 31127420928
+      },
+      {
+        "observed_utc": "2026-11-08T08:07:31Z",
+        "available_bytes": 31114428416
+      },
+      {
+        "observed_utc": "2026-11-08T08:08:02Z",
+        "available_bytes": 31106191360
+      },
+      {
+        "observed_utc": "2026-11-08T08:08:32Z",
+        "available_bytes": 31093460992
+      },
+      {
+        "observed_utc": "2026-11-08T08:09:03Z",
+        "available_bytes": 31076937728
+      },
+      {
+        "observed_utc": "2026-11-08T08:09:33Z",
+        "available_bytes": 30838530048
+      },
+      {
+        "observed_utc": "2026-11-08T08:10:03Z",
+        "available_bytes": 30831169536
+      },
+      {
+        "observed_utc": "2026-11-08T08:10:34Z",
+        "available_bytes": 30818390016
+      },
+      {
+        "observed_utc": "2026-11-08T08:11:05Z",
+        "available_bytes": 30807576576
+      },
+      {
+        "observed_utc": "2026-11-08T08:11:36Z",
+        "available_bytes": 30795157504
+      },
+      {
+        "observed_utc": "2026-11-08T08:12:07Z",
+        "available_bytes": 30782668800
+      },
+      {
+        "observed_utc": "2026-11-08T08:12:37Z",
+        "available_bytes": 30774054912
+      },
+      {
+        "observed_utc": "2026-11-08T08:13:07Z",
+        "available_bytes": 30760611840
+      },
+      {
+        "observed_utc": "2026-11-08T08:13:38Z",
+        "available_bytes": 30751981568
+      },
+      {
+        "observed_utc": "2026-11-08T08:14:08Z",
+        "available_bytes": 30741282816
+      },
+      {
+        "observed_utc": "2026-11-08T08:14:39Z",
+        "available_bytes": 30738268160
+      },
+      {
+        "observed_utc": "2026-11-08T08:15:09Z",
+        "available_bytes": 30184333312
+      },
+      {
+        "observed_utc": "2026-11-08T08:15:39Z",
+        "available_bytes": 30184042496
+      },
+      {
+        "observed_utc": "2026-11-08T08:16:09Z",
+        "available_bytes": 30183845888
+      },
+      {
+        "observed_utc": "2026-11-08T08:16:40Z",
+        "available_bytes": 30061252608
+      },
+      {
+        "observed_utc": "2026-11-08T08:17:11Z",
+        "available_bytes": 29949112320
+      },
+      {
+        "observed_utc": "2026-11-08T08:17:41Z",
+        "available_bytes": 29860102144
+      },
+      {
+        "observed_utc": "2026-11-08T08:18:11Z",
+        "available_bytes": 29283803136
+      },
+      {
+        "observed_utc": "2026-11-08T08:18:41Z",
+        "available_bytes": 29214191616
+      },
+      {
+        "observed_utc": "2026-11-08T08:19:11Z",
+        "available_bytes": 28954263552
+      },
+      {
+        "observed_utc": "2026-11-08T08:19:41Z",
+        "available_bytes": 28884684800
+      },
+      {
+        "observed_utc": "2026-11-08T08:20:12Z",
+        "available_bytes": 28702195712
+      },
+      {
+        "observed_utc": "2026-11-08T08:20:42Z",
+        "available_bytes": 28531310592
+      },
+      {
+        "observed_utc": "2026-11-08T08:21:13Z",
+        "available_bytes": 28548317184
+      },
+      {
+        "observed_utc": "2026-11-08T08:21:43Z",
+        "available_bytes": 28471701504
+      },
+      {
+        "observed_utc": "2026-11-08T08:22:13Z",
+        "available_bytes": 28449067008
+      },
+      {
+        "observed_utc": "2026-11-08T08:22:43Z",
+        "available_bytes": 28414271488
+      },
+      {
+        "observed_utc": "2026-11-08T08:23:14Z",
+        "available_bytes": 28411092992
+      },
+      {
+        "observed_utc": "2026-11-08T08:23:44Z",
+        "available_bytes": 28366610432
+      },
+      {
+        "observed_utc": "2026-11-08T08:24:14Z",
+        "available_bytes": 28409475072
+      },
+      {
+        "observed_utc": "2026-11-08T08:24:44Z",
+        "available_bytes": 28407099392
+      },
+      {
+        "observed_utc": "2026-11-08T08:25:14Z",
+        "available_bytes": 28400586752
+      },
+      {
+        "observed_utc": "2026-11-08T08:25:45Z",
+        "available_bytes": 28396785664
+      },
+      {
+        "observed_utc": "2026-11-08T08:26:15Z",
+        "available_bytes": 28396711936
+      },
+      {
+        "observed_utc": "2026-11-08T08:26:45Z",
+        "available_bytes": 28396326912
+      },
+      {
+        "observed_utc": "2026-11-08T08:27:15Z",
+        "available_bytes": 28394786816
+      },
+      {
+        "observed_utc": "2026-11-08T08:27:45Z",
+        "available_bytes": 28388679680
+      },
+      {
+        "observed_utc": "2026-11-08T08:28:16Z",
+        "available_bytes": 28387856384
+      },
+      {
+        "observed_utc": "2026-11-08T08:28:47Z",
+        "available_bytes": 28387688448
+      },
+      {
+        "observed_utc": "2026-11-08T08:29:17Z",
+        "available_bytes": 28386152448
+      },
+      {
+        "observed_utc": "2026-11-08T08:29:47Z",
+        "available_bytes": 28384538624
+      },
+      {
+        "observed_utc": "2026-11-08T08:30:18Z",
+        "available_bytes": 29925707776
+      }
+    ],
+    "minimum_additional_sampled_available_bytes": 28366610432,
+    "prior_accepted_artifact_manifest_verified": true,
+    "cleanup": {
+      "roots": 19,
+      "removed_allocated_bytes": 2366296064,
+      "free_before": 31921242112,
+      "free_after": 34287906816,
+      "scope": "Obsolete project object-cache entries; current unit/structural/profile caches and final compiler hashes excluded; no open project-cache files observed",
+      "archives_created": false
+    },
+    "subsequent_cleanup": {
+      "schema": "completed-cache-and-replay-deduplication-v1",
+      "project_object_cache_roots_removed": 263,
+      "project_object_cache_allocated_bytes_removed": 1034977280,
+      "old_temporary_global_cache_roots_removed": 2,
+      "old_temporary_global_cache_allocated_bytes_removed": 84135936,
+      "cache_allocated_bytes_removed": 1119113216,
+      "input_deduplication": {
+        "paths_preserved": 12,
+        "original_inode_preserved": 56657485,
+        "unique_inodes_before": 4,
+        "unique_inodes_after": 1,
+        "duplicate_payload_bytes_removed": 1330872321,
+        "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+        "method": "Byte-compare each completed replay input with the original capture; atomically replace the duplicate path with a hard link; preserve original capture inode and every content hash"
+      },
+      "free_before": 30612123648,
+      "free_after": 33059487744,
+      "observed_free_delta": 2447364096,
+      "delta_scope": "Concurrent validation can allocate or release data; observed free delta is not an exact attributed reclamation total",
+      "input_source_compiler_default_compiler_and_scratch_hashes_verified": true,
+      "archives_created": false,
+      "interruption": {
+        "log": "local-state/validations/address-intrinsic-wide-abi-20261108/interrupted-acceptance.stderr",
+        "stage": "integrated executable behavioral checks",
+        "cause": "Cleanup removed a cached compiler that a subsequent behavioral zig build run expected, despite no open cache files at the audit instant",
+        "recovery": "Retain the interrupted run and reset stale project cache manifests. A rebuild generated a different binary identity, retained in cache-rebuild-binary.sha256; restore the previously validated compiler to the identical build-cache key and reinstall it. Verify the original accepted/default compiler hashes, then rerun the complete cumulative gate without further cache cleanup"
+      },
+      "runtime_setup_interruption": {
+        "report": "local-state/validations/address-intrinsic-wide-abi-20261108/runtime-replay-accepted/report.json",
+        "cause": "Admission space below unchanged 32949672960-byte threshold",
+        "recovery": "Final runtime-replay-final run admitted after cleanup; all 455 definitions completed and event stream audited"
+      }
+    },
+    "excluded_attempts": [
+      "interrupted-acceptance stopped during behavioral checks after cache removal; full gate rerun after cache recovery",
+      "rerun-setup refused the retained prior scratch directory before any gate; final run uses a fresh serial scratch root",
+      "runtime-replay-accepted stopped at admission; runtime-replay-final supplies the accepted complete replay"
+    ]
+  },
+  "limitations": [
+    "Selection counts are not complete object, whole-compiler execution or self-rebuild evidence",
+    "Every original definition is attempted; dependency coverage remains conservative",
+    "First rejections are not estimates of how many functions a repair will complete",
+    "Observer context identifies a final call or parameter, not an individual failing call argument; unobserved rejection kinds are null",
+    "One dynamic stack-source memcpy remains rejected; the largest compiler group is 372 global-address property rejections",
+    "The main intrinsic group retains 217 first rejections; none are uadd.sat",
+    "Executable metadata is compared separately; selected object bytes and execution observations must match",
+    "Recorded diagnostic timings include profiling and concurrent validation, not a compiler-throughput comparison"
+  ],
+  "artifact_manifest": {
+    "path": "local-state/validations/address-intrinsic-wide-abi-20261108/acceptance-artifacts.sha256",
+    "sha256": "53c4b7b895f97a1b83aea7784b603fb33d41fecf55c5df40b83ddfc161f97140"
+  }
+}

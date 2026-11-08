@@ -1,6 +1,12 @@
 # Constant addresses, intrinsic facts and wide integer ABI carriers
 
-Status: in progress. Baseline implementation `baf7a767` and documentation
+Status: complete at `761ea199`. All 17 cumulative gates and 53 native
+populations pass. Complete replay selects 6,752 of 8,928 compiler definitions,
+adding 2,411 while preserving all prior successes. Runtime remains 274 of 455.
+See the [implementation evidence](../evidence/address_intrinsic_wide_abi.md) and
+[acceptance record](../evidence/address_intrinsic_wide_abi_acceptance_20261108.json).
+
+Baseline implementation `baf7a767` and documentation
 `c471c743` accept 4,341 of 8,928 compiler definitions and 274 of 455 runtime
 definitions, with all 17 integration gates and 50 native populations passing.
 These are selection counts; complete compiler emission and self-hosting remain

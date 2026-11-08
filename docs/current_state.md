@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `baf7a767e45c52f21eeafcb67cd01b4cb155a4c4`; tree: `271f84e7a31ec2c27aedd6e6d9fdf90f2de84783`.
+Accepted revision: `761ea1991a3d8f65d2031302fc868afb3cd7fc7e`; tree: `a3e4eb84c3696f3c72d2716d71b7cb9dd75fdff3`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,32 +25,40 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [census classification and integer ABI checkpoint](evidence/census_integer_abi.md)
-is accepted at `baf7a767`: all 17 integration gates and 50 native populations pass.
-Debug and ReleaseSafe each pass 1,949 units and 21 structural checks; profiling
+The [constant-address, intrinsic-fact and wide ABI checkpoint](evidence/address_intrinsic_wide_abi.md)
+is accepted at `761ea199`: all 17 integration gates and 53 native populations pass.
+Debug and ReleaseSafe each pass 1,955 units and 21 structural checks; profiling
 process tests, readiness, both input corpora and fixed programs pass. Native
-coverage totals 1,810,884 local observations against 905,442 LLVM references.
+coverage totals 1,829,892 local observations against 914,946 LLVM references.
 
-The unchanged compiler replay attempts all 8,928 definitions, selecting 4,341
-and rejecting 4,587. All 3,524 previous successes remain, with 817 additions.
+The unchanged compiler replay attempts all 8,928 definitions, selecting 6,752
+and rejecting 2,176. All 4,341 previous successes remain, with 2,411 additions.
 The runtime preserves all 274 previous selections among 455 definitions. Both
 complete event streams are audited. Dependency coverage remains conservative;
 no complete compiler/runtime object, startup or self-rebuild is claimed.
 
-The Zig census tool observes final calls and parameters after private
-legalization. It reproduces baseline identities before attributing rejection
-forms. Shared narrow ABI handling now accepts validated advisory facts while
-masking logical payloads and preserving original IR attributes. Unsupported ABI
-forms remain explicit boundaries. The next repair targets constant-pointer
-sources through shared address/dependency contracts: 1,771 of 1,772 first memcpy
-source failures are constant GEP expressions. Intrinsic handling accounts for
-976 first failures, including 757 saturating-add calls carrying advisory facts.
+Shared address handling accepts known constant GEP flags and resolved data
+aliases while preserving relocation identity and dependency checks. Scalar
+integer intrinsic expansion accepts validated advisory facts and omits them
+from private overflow aggregates or widened results. The existing ABI carrier
+contract now covers every non-native integer width from 1 through 63, with
+receive masks before publication and unsupported ABI promises still rejected.
+Original IR types and attributes remain unchanged.
 
-The preceding [complete census](evidence/selection_census_completion.md)
-established flushed progress events, shared temporary/allocation indexes and
-validated call/memory facts. Core counts stay at 100 lowered/emitted/linked and
-12 executed functions per mode; bypass ratchet 130 is unchanged. All 36 core
-records preserve selected objects, observations and linked sizes. Reference-wrapper
+The next slice should classify the concrete globals and properties behind 372
+`composed-block-gep-global-properties` first rejections before extending the
+shared address contract. The main intrinsic group retains 217 first failures,
+led by `ctpop.i32`, `fshl.i64` and `fshl.i16`; register pressure accounts for 184.
+No call argument/return width or `uadd.sat` first failures remain. One dynamic
+stack-source memcpy remains outside the completed constant-address contract.
+
+The preceding [census classification and integer ABI checkpoint](evidence/census_integer_abi.md)
+established final private-call/parameter observations and validated narrow ABI
+facts. The [complete census](evidence/selection_census_completion.md) established
+flushed progress events, shared temporary/allocation indexes and validated
+call/memory facts. Core counts stay at 100 lowered/emitted/linked and twelve
+executed functions per mode; bypass ratchet 130 is unchanged. All 36 core records
+preserve selected objects, observations and linked sizes. Reference-wrapper
 size/hash differences are recorded separately, without a blanket executable
 byte-identity claim. The preceding
 [allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
