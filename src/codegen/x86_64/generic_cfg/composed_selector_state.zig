@@ -118,6 +118,30 @@ pub fn observeRejectedIcmp(selector: *const ComposedBlockSelector, result: ?[]co
     });
 }
 
+pub fn observeRejectedTableGep(selector: *const ComposedBlockSelector, result: []const u8, gep: ir.GepInst, failure: Diagnostic, decode_error: ?[]const u8) !void {
+    const observer = selector.rejection_observer orelse return;
+    const Operand = @import("rejection_observer.zig").Operand;
+    const operands = try selector.allocator.alloc(Operand, gep.indices.items.len);
+    defer selector.allocator.free(operands);
+    for (gep.indices.items, operands) |index, *operand| operand.* = .{
+        .argument = .{ .ty = index.ty, .value = index.value },
+        .location = if (resolveValue(selector, index.value)) |loc| @tagName(loc) else null,
+    };
+    try observer.reject(.{
+        .function = selector.function.?.*,
+        .position = selector.current_position,
+        .tag = failure.tagName(),
+        .detail = failure.detail(),
+        .readonly_table = .{
+            .gep = gep,
+            .global = selector.module_context.?.findGlobal(gep.ptr.named),
+            .decode_error = decode_error,
+        },
+        .result = result,
+        .operands = operands,
+    });
+}
+
 pub const EflagsEffect = eflags.Effect;
 pub const EflagsLiveness = eflags.Liveness;
 pub const EflagsDefinitionPurpose = eflags.DefinitionPurpose;

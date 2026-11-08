@@ -1350,8 +1350,14 @@ fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const 
     const index = gep.indices.items[0];
     if (!index.ty.eql(.{ .int = 64 }) or index.value != .named) return .{ .no_emitter = "composed-block-gep-readonly-table-index" };
     const context = selector.module_context orelse return .{ .no_emitter = "composed-block-gep-readonly-table-context" };
-    var decoded = (constant_table.decodeSymbol(selector.allocator, context.*, gep.ptr.named) catch return .{ .no_emitter = "composed-block-gep-readonly-table-global" }) orelse
-        return .{ .no_emitter = "composed-block-gep-readonly-table-global" };
+    const global_failure: Diagnostic = .{ .no_emitter = "composed-block-gep-readonly-table-global" };
+    var decoded = (constant_table.decodeSymbol(selector.allocator, context.*, gep.ptr.named) catch |err| {
+        try selector_state.observeRejectedTableGep(selector, result_name, gep, global_failure, @errorName(err));
+        return global_failure;
+    }) orelse {
+        try selector_state.observeRejectedTableGep(selector, result_name, gep, global_failure, null);
+        return global_failure;
+    };
     defer decoded.deinit(selector.allocator);
     if (!sourceStrideMatchesShape(gep.source_ty, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-source" };
     if (!hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-range" };

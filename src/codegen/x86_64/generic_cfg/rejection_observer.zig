@@ -14,6 +14,12 @@ pub const GlobalAddress = struct {
     property_failure: ?[]const u8,
 };
 
+pub const ReadOnlyTable = struct {
+    gep: ir.GepInst,
+    global: ?ir.Global,
+    decode_error: ?[]const u8,
+};
+
 pub const Rejection = struct {
     function: ir.Function,
     position: usize,
@@ -25,6 +31,7 @@ pub const Rejection = struct {
     result: ?[]const u8 = null,
     parameter: ?ir.Param = null,
     global_address: ?GlobalAddress = null,
+    readonly_table: ?ReadOnlyTable = null,
     pressure: ?@import("stage2_planning.zig").StageTwoSummary = null,
     operands: []const Operand = &.{},
 };

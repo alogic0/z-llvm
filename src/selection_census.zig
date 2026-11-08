@@ -78,6 +78,23 @@ const Capture = struct {
                 .attrs = address.global.attrs,
                 .property_failure = address.property_failure,
             } else null,
+            .readonly_table = if (rejection.readonly_table) |table| .{
+                .result = rejection.result,
+                .source_type = try std.fmt.allocPrint(a, "{f}", .{table.gep.source_ty}),
+                .pointer = try std.fmt.allocPrint(a, "{f}", .{table.gep.ptr}),
+                .pointer_addrspace = table.gep.ptr_addrspace,
+                .indices = operands,
+                .decode_error = table.decode_error,
+                .global = if (table.global) |global| .{
+                    .name = global.name,
+                    .type = try std.fmt.allocPrint(a, "{f}", .{global.ty}),
+                    .kind = @tagName(global.kind),
+                    .linkage = @tagName(global.linkage),
+                    .address_attrs = global.address_attrs,
+                    .attrs = global.attrs,
+                    .initializer = @tagName(global.initializer),
+                } else null,
+            } else null,
             .call = if (rejection.call) |call| .{
                 .callee = call.callee,
                 .indirect = call.callee_value != null,
@@ -383,6 +400,49 @@ test "selection census copies resolved global properties and original alias iden
     try std.testing.expectEqualStrings("UnsupportedGlobalAddressAttribute", address.get("property_failure").?.string);
     try std.testing.expectEqual(@as(i64, 3), address.get("addend").?.integer);
     try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    observations.Observer.reset(&observer);
+    try std.testing.expect(capture.payload == null);
+}
+
+test "selection census retains rejected table representation without changing selection" {
+    const text =
+        \\target datalayout = "e-p:64:64-i64:64"
+        \\@"table bytes" = internal constant [8 x i8] zeroinitializer, align 8
+        \\declare void @witness(ptr)
+        \\define ptr @table(i64 %index) {
+        \\entry:
+        \\ %result = getelementptr i8, ptr @"table bytes", i64 %index
+        \\ call void @witness(ptr %result)
+        \\ ret ptr %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const context: x86.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    var machine = x86.MachineFunction.init("table", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    const selector = @import("codegen/x86_64/generic_cfg_selector.zig");
+    const observed = try selector.tryLowerObserved(std.testing.allocator, &machine, module.functions.items[0], &context, null, &observer);
+    try std.testing.expect(observed == .unsupported);
+    try std.testing.expect(capture.matches(observed.unsupported.tagName(), observed.unsupported.detail()));
+    try std.testing.expectEqualStrings("composed-block-gep-readonly-table-global", observed.unsupported.detail());
+    const plain = try selector.tryLowerWithContext(std.testing.allocator, &machine, module.functions.items[0], &context);
+    try std.testing.expect(plain == .unsupported);
+    try std.testing.expectEqualStrings(observed.unsupported.detail(), plain.unsupported.detail());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const table = payload.value.object.get("readonly_table").?.object;
+    try std.testing.expectEqualStrings("i8", table.get("source_type").?.string);
+    try std.testing.expectEqualStrings("@\"table bytes\"", table.get("pointer").?.string);
+    try std.testing.expectEqualStrings("[8 x i8]", table.get("global").?.object.get("type").?.string);
+    try std.testing.expectEqualStrings("scalar", table.get("global").?.object.get("initializer").?.string);
+    try std.testing.expectEqualStrings("i64", table.get("indices").?.array.items[0].object.get("type").?.string);
+    try std.testing.expectEqualStrings("parameter", table.get("indices").?.array.items[0].object.get("origin").?.string);
     observations.Observer.reset(&observer);
     try std.testing.expect(capture.payload == null);
 }
