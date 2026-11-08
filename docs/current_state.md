@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `5ad6c51c8a9c50e23fa0aa1a208174f66472a5e9`; tree: `53462efaedeb06be3e2a3ad9d144911d93d0ec9c`.
+Accepted revision: `baf7a767e45c52f21eeafcb67cd01b4cb155a4c4`; tree: `271f84e7a31ec2c27aedd6e6d9fdf90f2de84783`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,31 +25,34 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [complete selection-census checkpoint](evidence/selection_census_completion.md)
-is accepted at `5ad6c51c`: all 17 integration gates and 49 native populations pass.
-Debug and ReleaseSafe each pass 1,944 units and 21 structural checks; profiling
+The [census classification and integer ABI checkpoint](evidence/census_integer_abi.md)
+is accepted at `baf7a767`: all 17 integration gates and 50 native populations pass.
+Debug and ReleaseSafe each pass 1,949 units and 21 structural checks; profiling
 process tests, readiness, both input corpora and fixed programs pass. Native
-coverage totals 1,803,204 local observations against 901,602 LLVM references.
+coverage totals 1,810,884 local observations against 905,442 LLVM references.
 
-The unchanged compiler replay now attempts all 8,928 definitions, selecting
-3,524 and rejecting 5,404 in 759.67 seconds. The runtime selects 274 of 455,
-preserving all previous 272 successes. Both complete event streams are audited.
-Dependency coverage remains conservative; these are selection results, with no
-complete compiler/runtime object, startup or self-rebuild success claimed.
+The unchanged compiler replay attempts all 8,928 definitions, selecting 4,341
+and rejecting 4,587. All 3,524 previous successes remain, with 817 additions.
+The runtime preserves all 274 previous selections among 455 definitions. Both
+complete event streams are audited. Dependency coverage remains conservative;
+no complete compiler/runtime object, startup or self-rebuild is claimed.
 
-Opt-in flushed progress events expose active functions, normalization, legalizers
-and retries after interruption. Shared indexes remove repeated temporary-name
-and per-allocation use scans. The previously blocking large-function diagnostic
-now finishes in 33.87 seconds with an explicit block-count rejection.
-Validated call facts are shared with nonvolatile memcpy/memmove, including
-integer length ranges. The full census's largest remaining first-failure groups
-are call argument/return widths, intrinsics and memcpy source ownership/forms;
-the retained profile also identifies remaining reachability and legalization costs.
+The Zig census tool observes final calls and parameters after private
+legalization. It reproduces baseline identities before attributing rejection
+forms. Shared narrow ABI handling now accepts validated advisory facts while
+masking logical payloads and preserving original IR attributes. Unsupported ABI
+forms remain explicit boundaries. The next repair targets constant-pointer
+sources through shared address/dependency contracts: 1,771 of 1,772 first memcpy
+source failures are constant GEP expressions. Intrinsic handling accounts for
+976 first failures, including 757 saturating-add calls carrying advisory facts.
 
-Core counts stay at 100 lowered/emitted/linked and 12 executed functions per mode;
-bypass ratchet 130 is unchanged. All 36 core records preserve selected objects
-and observations. Reference-wrapper size/hash differences are recorded separately,
-without a blanket executable byte-identity claim. The preceding
+The preceding [complete census](evidence/selection_census_completion.md)
+established flushed progress events, shared temporary/allocation indexes and
+validated call/memory facts. Core counts stay at 100 lowered/emitted/linked and
+12 executed functions per mode; bypass ratchet 130 is unchanged. All 36 core
+records preserve selected objects, observations and linked sizes. Reference-wrapper
+size/hash differences are recorded separately, without a blanket executable
+byte-identity claim. The preceding
 [allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
 established complete module verification, scalar FP memory rewriting and the
 allocation-attribute contract. The [parser and runtime-cast checkpoint](evidence/compiler_parser_vector_casts.md)

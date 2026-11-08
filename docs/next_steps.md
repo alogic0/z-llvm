@@ -1,24 +1,32 @@
 # Active direction
 
-The [complete selection census](evidence/selection_census_completion.md) is
-accepted at `5ad6c51c`. It attempts all 8,928 compiler definitions: 3,524 select
-and 5,404 reject. Runtime selection succeeds for 274 of 455 definitions and
-rejects 181. All 17 integration gates and 49 native populations pass. See the
-[acceptance record](evidence/selection_census_completion_acceptance_20261107.json).
+The [census classification and integer ABI plan](plans/2026-11-07-census-integer-abi.md)
+is complete at `baf7a767`. The unchanged compiler selects 4,341 of 8,928
+definitions and rejects 4,587: 817 new successes, with all 3,524 prior successes
+preserved. Runtime selection remains 274 of 455, with no lost successes. All 17
+integration gates and 50 native populations pass. See the
+[evidence](evidence/census_integer_abi.md) and
+[acceptance record](evidence/census_integer_abi_acceptance_20261107.json).
 
-The active [census classification and integer ABI plan](plans/2026-11-07-census-integer-abi.md)
-first classifies final rejection points after legalization: call argument widths
-(1,086 functions), intrinsics (785), call return widths (771), and memcpy source
-representations (751). Shared integer ABI handling, including 314 parameter
-extension failures, is the initial repair candidate; classification determines
-its exact scope. Replay both complete inputs after the shared repair, preserving
-every previously selected function and reporting newly exposed boundaries.
+The next slice is constant-pointer source handling through the shared address
+and dependency contracts. Of 1,772 first memcpy-source rejections, 1,771 are
+constant `getelementptr` expressions without a resolved location; one is a stack
+allocation. Preserve global properties, aliases, exact copy widths and rollback.
+Add native differential cases and replay both complete original inputs, retaining
+every current success. Removing this rejection can expose another boundary.
 
-Allocation attributes, runtime memory and parser/vector-cast repairs are already
-accepted. They are historical work, not the next implementation slice. Current
-raw census evidence is under `local-state/validations/selection-census-20261107/`.
-No complete compiler/runtime object, compiler startup or self-rebuild is claimed.
-Preserve the 12-function core cohort, ratchet 130 and all existing populations.
+The next intrinsic lead is also concrete: 757 `llvm.uadd.sat.i64` calls carry
+advisory facts rejected by the existing matcher. Validate these facts through a
+shared intrinsic contract; do not transfer scalar range facts onto the generated
+overflow aggregate. The entire intrinsic first-failure group is 976 functions.
+The 22 remaining call-argument-width failures involve i33/i37/i49/i63 carriers,
+outside the completed 1–31-bit ABI slice. Retained observations describe the
+final private call or parameter; unrelated rejection kinds remain unattributed.
+
+Allocation attributes, parser/vector casts and narrow ABI facts are accepted.
+Current raw evidence is under `local-state/validations/census-integer-abi-20261107/`.
+No complete compiler/runtime object, startup or self-rebuild is claimed. Preserve
+the 12-function core cohort, ratchet 130 and every existing execution population.
 Admission and runtime reserve remain 32.95 GB and 24.36 GB. Create no archives.
 
 ## Preceding checkpoints
@@ -38,9 +46,9 @@ Vector GEP result semantics were a separate gap after their syntax repair.
 
 That earlier runtime census examined all 455 definitions: 265 succeeded and 190 rejected,
 with complete diagnostics and capability grouping retained under
-`local-state/validations/parser-vector-20261107/`. The first failure is memset
-attributes; `sincos_f32` next rejects ordinary scalar FP pointer loads. Continue
-through shared memory/register contracts when extending that runtime family.
+`local-state/validations/parser-vector-20261107/`. Its first failure was memset
+attributes; `sincos_f32` then rejected ordinary scalar FP pointer loads. Those
+repairs were subsequently accepted through shared memory/register contracts.
 No complete compiler or runtime object, compiler startup or self-rebuild is
 claimed. Preserve the 12-function core cohort, ratchet 130 and all existing
 populations. Admission and runtime reserve remain 32.95 GB and 24.36 GB.

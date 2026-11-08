@@ -1,9 +1,13 @@
 # Census classification and shared integer ABI repair
 
-Status: in progress. Baseline implementation `5ad6c51c`, documented by the
+Status: complete, accepted at `baf7a767`. The [evidence](../evidence/census_integer_abi.md)
+records 4,341 compiler selections, including 817 additions with no lost successes,
+unchanged runtime selection and all 17 cumulative gates passing.
+
+Baseline implementation `5ad6c51c` is documented by the
 [complete selection census](../evidence/selection_census_completion.md).
-The unchanged compiler selects 3,524 of 8,928 definitions; the runtime selects
-274 of 455. These counts describe selection, not complete objects or execution.
+That baseline selected 3,524 of 8,928 compiler definitions and 274 of 455 runtime
+definitions. These counts describe selection, not complete objects or execution.
 
 1. Correct the active handoff in `docs/next_steps.md`. Keep one current baseline
    and next action; identify preceding allocation/parser work as historical.

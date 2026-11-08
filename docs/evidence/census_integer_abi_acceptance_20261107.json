@@ -1,0 +1,5445 @@
+{
+  "gates": [
+    {
+      "id": "selected-object-suite",
+      "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+      "exit_status": "0",
+      "duration_ms": "62763",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "2117",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "3773",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "3750",
+      "cache_status": "none"
+    },
+    {
+      "id": "zig-source-native-link",
+      "tool": "tools/run_distribution_zig_source_native_link.zig",
+      "exit_status": "0",
+      "duration_ms": "22872",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-postopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "91103",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-preopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "--pipeline": "preopt",
+      "exit_status": "0",
+      "duration_ms": "43001",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-ir-writer",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "17627",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-release",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "12172",
+      "cache_status": "none"
+    },
+    {
+      "id": "real-rows-release-fast",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseFast",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "736272",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-safe",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSafe",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "764335",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-small",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSmall",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "425162",
+      "cache_status": "hit"
+    },
+    {
+      "id": "integrated-executable",
+      "tool": "tools/run_distribution_zig_integrated_exe.zig",
+      "exit_status": "0",
+      "duration_ms": "2397503",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "494",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "1126",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "1021",
+      "cache_status": "none"
+    },
+    {
+      "id": "boundary-gates",
+      "tool": "tools/run_distribution_boundary_gates.zig",
+      "exit_status": "0",
+      "duration_ms": "8104",
+      "cache_status": "none"
+    }
+  ],
+  "compiler_core": [
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseFast",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSafe",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSmall",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    }
+  ],
+  "execution_cohort": [
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "771c812fe0df706e15fecc90163c3918a16f4b8b1bf3efcc001f3dfdda9e63cb",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4148120",
+      "reference_sha256": "91ed02cc0596228dcd6f43804474148237244e76d6a4bcbabcf4eca2437d91d6",
+      "linked_bytes": "6291806",
+      "linked_sha256": "5e7562c20251ef7d841f84f4e172d29dbafce63837a3fe2e1383683e267314a8",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "b438f39a0529f7137c83a4282b7cb8f1d830a73fff9ac11233852dfc98b9a890",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4148208",
+      "reference_sha256": "f70b1afe2b9f62ddec01564b1ec23d6e36cb16bdc49922bbdee316378a93eea0",
+      "linked_bytes": "6291806",
+      "linked_sha256": "139b39a9d041ec7fe7a4e599bc135f08ebc2fbbd6997c3170a7ed7828bd4a232",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "e7226becbcf2d8c362726684777a76e4cef8e09ef39b8e19044097f7dc60433d",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4148176",
+      "reference_sha256": "0c2d8b3b8aa3cfff506eb8205e4e5f6e94804479c6ede863c5e9326e536ade83",
+      "linked_bytes": "6291806",
+      "linked_sha256": "8a0a5c90c9da144eb7505cbb51943a02344aced1554f1ad594a15dda9d3e669f",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0757ed24dd920f69a1dd0f4a4f8bf8b40f97ef21f9dd52b4dbe6d46b7c71cbe0",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4148472",
+      "reference_sha256": "b8e5b7c86030ea81c59c6f5c71842df2fa063916e258ccfcdba85489ab0f1479",
+      "linked_bytes": "6291806",
+      "linked_sha256": "1430aaaf5a01a91c0a722a132885f475b00a0431410becce73aab36024906b71",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "096d9472ae183cfa3719c65a5594248c8d527463f93342de612faf74b3eb8de7",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4151432",
+      "reference_sha256": "b9303a7ec8c1b388ba80fd7d3da4f9bff937dcc851e177fd93dc4fae8cadeeca",
+      "linked_bytes": "6288265",
+      "linked_sha256": "033ddb691750617d9475b4c6c8f3de1dbea375ee783aee27ee0adc0e4e0d7495",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "d37472effb4bd393891542a999edbe11f89eea30771f288c51a3091d50585e09",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4153648",
+      "reference_sha256": "7456cdfe995ff32fd5853edfa2b1fbdb6c55bb840af611042363e83191ea4c61",
+      "linked_bytes": "6287668",
+      "linked_sha256": "5dfa4ea43c4b083bb2091bade6ddf249ebcb8e78ee3aeafd01fa58400266cbc1",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "61a61fe05c25f9f28cd23c0826ad17410738360b00a6686c55e36b5ef112eb10",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4153648",
+      "reference_sha256": "fa0c6a4a40948c3355beb17ff7c3b3901c8beb2652d3ec76b81ca1a7f5cf4b2f",
+      "linked_bytes": "6287668",
+      "linked_sha256": "95244d8ed0765bf26590ae9ac3385fbb267d405e3c0f6b3f72e50035fc2cddff",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4154200",
+      "reference_sha256": "2f96a9a742e11441be5a987223a9564fcb9d3cff7aafaad9ff4c3032233438eb",
+      "linked_bytes": "6292446",
+      "linked_sha256": "ae8b05cc59be2dac5025f94487f2d27ea29bd065ab939dca9e7a60c109257855",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "67dfabcf131de792bd4b8c9c8b4276e8c16bbe5a23cb534fdda95782e84527d0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4153800",
+      "reference_sha256": "b35dcc72e554acde67ec80fe92370bfbe9c233133efe3aedf1c7f3d9e01e87b5",
+      "linked_bytes": "6287625",
+      "linked_sha256": "ff971ae8764846e7f687ba03fcbf82edd25bb13dbc2c28e8b84e481bac1060ea",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "4dbb2cb74487df4ec7164dd64a99cef5e4cdb798149003035e81f4c23446970f",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4148264",
+      "reference_sha256": "323bd96b0296a815075f861c55683807a11fee8a3286f24577263521350530e5",
+      "linked_bytes": "6283657",
+      "linked_sha256": "2657004a38857cfeac780e170fccf4df9ad549a083fb5e78f2622a0e6baf8903",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "cec703a7cc929cf1399c85bb23682a3932ff2937c4aa17f4575f1e6a127da857",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4152288",
+      "reference_sha256": "cea1e3da506ec2279b6c1c20f09ef45c0702609732b3c4126f269a559d82af9b",
+      "linked_bytes": "6291977",
+      "linked_sha256": "50110c92089255d2d584a4d69fd42689382a869d02de1708dac6253c0c93c3d2",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "05b7decf31bfa3f305b59b80c43f6f1203a14bcdba17aa78b789363ca6f4b334",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4147696",
+      "reference_sha256": "e06cde0d3d3e5f8bed9b1ad8e887c3523f54a9459a6f6a227658a30763e71198",
+      "linked_bytes": "6291977",
+      "linked_sha256": "2daf00df8829d75c7083e2100b2c09daa61e777dee30a425bc1db9a1b22c914c",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "ec4c7a087cc6fb0bfc4302bbeb9e2f729322ff2152f4f1b2a4f8eb266303a24d",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4034208",
+      "reference_sha256": "9e42fe8a871c55e7207a91acd3da3e83618fd1c03d566447957a22ada0b01300",
+      "linked_bytes": "6147062",
+      "linked_sha256": "b83d74a9ad6dce890d7759374cf39a16659d23cfeca7905fb6eb233e9469a849",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "673975f12bc2f12983539c9fceb7987e957a9af1b480e35c2af400d2070a5109",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4034256",
+      "reference_sha256": "19f908a286faa7fa48270d6ddd7f3499430c58904628e54900031ef1452940cd",
+      "linked_bytes": "6147062",
+      "linked_sha256": "6492a25164720df46d8cd7d01d5796b7153b380c962ddc56658bda570b547b42",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "f4d9f0cce93a6a792ec4a31124708e49b79e3c72bdda6bc6eba7df4336819ab2",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4034232",
+      "reference_sha256": "e0351059b771c8bd0be2ea43f20dbd484866e111e9a1b96104752f07dfc30b81",
+      "linked_bytes": "6147062",
+      "linked_sha256": "d67258b6f987f241923e45319c421c6788cb2f7a70756e6f4d41c48e81fae833",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0f0e86316bfb932fd92a27b50d213d251439538c0700ac70e5eda5654dee373f",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4034312",
+      "reference_sha256": "e5e3616d39da4523beed5874c369b12b65a8d56eb7364a26ece99af9dae6369c",
+      "linked_bytes": "6147062",
+      "linked_sha256": "8edab7402b86467463688f8a97c9dc05b7a84d083e944ea941aa46ec8e934626",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "f6d0b8ccfd56bf25d342984dd53c64dfa3ed7e733c79c8382ea8106d859139d4",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4035576",
+      "reference_sha256": "7bdb8ea77a0e8c7e85c04904c33367317a31e8d2a5ff5e06caec017359ef0d06",
+      "linked_bytes": "6142732",
+      "linked_sha256": "392c670b68749288e954110b0d8fa1ba987f75a5f7931a9f9530df35f253896e",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "4d1fe939c4cf95156e3f1b8b53e0c2a224a2221a1ddc3cf09acab00785b7deb0",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4039496",
+      "reference_sha256": "be06162d1facaf08e4203e966e7c74b820391d3a9d89a786594edd6c5645691b",
+      "linked_bytes": "6142796",
+      "linked_sha256": "53160dc585d0de4e136c849d04541db52b72d12279ccabf457953ef581e3dede",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "0c4f15638e021ab253fb2fe0fd0c343a09ff9e06890910b76d2f4c085edd5743",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4039504",
+      "reference_sha256": "e1205d099fc3ebd070e1e904cac29a331d82d113051b355983c3c919c80572cc",
+      "linked_bytes": "6142796",
+      "linked_sha256": "d3a2399769eda31b767544de60ece819a7ef76547bd178f08d6b82cd2b114b5e",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4040216",
+      "reference_sha256": "519d004001f434dad368feb9baca9b54cc9515e2097ac2997b33973ab1c46b08",
+      "linked_bytes": "6147638",
+      "linked_sha256": "0f8e674c4611deec27b2b73834b32a802de60696a06b94c4941e2315df27a74e",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "779b502b10695d9d1e81bf7122b0d50882ab5e6c75e8fa011fd87e7167b64ec6",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4039688",
+      "reference_sha256": "0c5fbbd6e7968ef7b2905e6d7cc0a93f7da87662e4328c50751707967db1e491",
+      "linked_bytes": "6142732",
+      "linked_sha256": "2d0abb4ecc26eb1ab9e3c542d994e70e4e96abf836d4e09f2313950788ecae30",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "81641a4e0b55b09f7e522a15636d7cfe97c5e046222b430c1e49402929d00c52",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4034072",
+      "reference_sha256": "4de08129bdca9c8014306afdd69b048b9ed52866e113c94ab44097ca1298d8d7",
+      "linked_bytes": "6142646",
+      "linked_sha256": "332afb79607ac1e9370c7cb6ee119d99d1128e1f17be8310110629b212e8cb10",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "58b67ba6931f90a1854142a7989f32094edeff8fa416a841ffac653b7c3cd233",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4038392",
+      "reference_sha256": "7661dd3f74a9952bfa43c40d5f15ef2ea5e7a6f44d2c30e89089d826c3cff5ba",
+      "linked_bytes": "6147318",
+      "linked_sha256": "3f2c47af504875c690985d66104eadac52b336a3ca995299140694f422e535a9",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "f3ed1a8136b5d2fc6ff566354d364e99078dac14fc918df8dc8d39d0ec04e57e",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4034344",
+      "reference_sha256": "7273e2382deb7aa91a30659eeee28fab0ed3c732bd7c090cf9d591db31beb513",
+      "linked_bytes": "6147318",
+      "linked_sha256": "c936acaa0b9b49a6fd53f27a9b4b5db164c5c3b222a3b3b984f1395ad06a6750",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "a2a97ff3e5bd48a80f721303693b269112227fd7ef5fc96a4526d72f06c9343e",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "149664",
+      "reference_sha256": "517296ad1fd60856ab22e843f46132e985d92247d21b2c6e23e2eb55c6fa5625",
+      "linked_bytes": "355886",
+      "linked_sha256": "27b3ece3f14bc7da0eb06d6f73a689c9f43e0e614f12abd9b891d427bd4ac846",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "5969dece1d04131c7fc77db02d5b7ba7e35d53c72cb73053f3218a403a53638e",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "149664",
+      "reference_sha256": "e50a6c386ae71b6da538d1cd15a27be2f4d70dbbd450bade592d09a1b978c774",
+      "linked_bytes": "355886",
+      "linked_sha256": "b4cad99337cf89833d4b351b0442e70b606267a30507d72b6f0e796793b11916",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "afc10d2b53f59145c9585fa576994f831169b48344efc8b71b50c449388eb439",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "149664",
+      "reference_sha256": "981c89cda9bb178597bf907fdc9ca4a4d96225b0b8ded4bcbf9564e626526a8a",
+      "linked_bytes": "355886",
+      "linked_sha256": "6e0ca4eaef2cd970ced3628a9e93faa20d130827f596821871e41810e05b539e",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "429bfd019f347369b5fa197515435b0ddde1d3304a342b7131ed32e1175a11ff",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "149696",
+      "reference_sha256": "b8e2be571cafd55f9d19259e137c27866fee71be1d45040d038ac8abe9b78402",
+      "linked_bytes": "355886",
+      "linked_sha256": "b83965a3a36dfe5abea79336f9c9c73b85d06d2eec9eb22d1657b435337d4f83",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "9bde311d7a2276fd1d855635eb3f9a3aecd44609a1199362e45e405154d413b2",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "149992",
+      "reference_sha256": "e4ca544afaf896553f640ae6d9c8ba888c723ed004a600696e3cd0cb90537666",
+      "linked_bytes": "356217",
+      "linked_sha256": "35e2d7ab6639afeee93212e2020f42f882d0cc1122f569698db67d1d0e67554d",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "b90f3029c1a86c3e284c3f6b64e2f95191644d7c832395f9eed036bddb542e70",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "82e7fee902b89f4759d163f29a7f9d26862ced09cc2b8cad32c4675411cfa0ff",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "d612a4a4d3090ef336ed6df433b50de3dd5c1a51cb0d677dcbff307a972faa3f",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "0909e6eb1647bcc72fcd6bd3f8e1f9affa1abc5bc48abf1fe6b7a4cb9a3aeb59",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "149824",
+      "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+      "linked_bytes": "356198",
+      "linked_sha256": "14ab19f82c68b1c12e58cba1892f3e4a26b4b61ce501d85b9a67f58c80fd025f",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "7e7f85ea61fd2f396425cee8a64b7f32fe4e0bf193dffc27c9e8697e10f530e0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "149872",
+      "reference_sha256": "2fd34967a38babe25d3ab728000c7f7a44b7b38b32caa9670d684f4fa63bc609",
+      "linked_bytes": "356005",
+      "linked_sha256": "6e32ff9bb55cff18b9845102194a369257a486ad01ba0622d3a4a514edf6da79",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "28a053d41f368edda8b4a4385fb48b10e3f2152bbb7851060dff9529d58a0093",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "149712",
+      "reference_sha256": "83240aba201a066d7992f6a2e17a80c1317747c5e608d9793c01093ca08172d8",
+      "linked_bytes": "356205",
+      "linked_sha256": "b1aa8842e63a1b04c815bdcf344be5372bd6fa8b2e64bf56029ac34852bff4eb",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "985f961062e1be2560deabefbca27b243be360298f89db15da08eeec80648843",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "149768",
+      "reference_sha256": "ac759d10d2000fdc39a6ed57414035e275261adbaef8cdb366c30e54dd87baa1",
+      "linked_bytes": "356041",
+      "linked_sha256": "80065fb40d08d8aec2b724580438cd8431bb71b18173d98ac2eeeb76290f2512",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "9fd2c46b5b3bb636bf1a0ca90695e93d075ad39332c90f96ba4ce2ee40abe025",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "149768",
+      "reference_sha256": "71de76cacc973a3644ee5257ed0d184bb036d0e2c3df77826a8b534fec5f0b46",
+      "linked_bytes": "356042",
+      "linked_sha256": "4e22cdf41f556d547542dbe667974016c8bb261cb83522c609da60c4894cd746",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    }
+  ],
+  "native_populations": [
+    {
+      "population": "standalone-two-word-stack-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "384",
+      "reference_observations": "192",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-pointer-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "486",
+      "reference_observations": "243",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-pointer-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-signed-nonnegative",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-type-allocation-padding",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-attributes",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14790",
+      "reference_observations": "7395",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "8466",
+      "reference_observations": "4233",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-fp-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-packed-globals",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-parallel-transfer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-scalar",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "110592",
+      "reference_observations": "55296",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-branches",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "18432",
+      "reference_observations": "9216",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aligned-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "36864",
+      "reference_observations": "18432",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-vectors",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "795648",
+      "reference_observations": "397824",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "32256",
+      "reference_observations": "16128",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-integer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "73728",
+      "reference_observations": "36864",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-system-assembly",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "70656",
+      "reference_observations": "35328",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "78336",
+      "reference_observations": "39168",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-accumulator-store",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-contracts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-address-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14208",
+      "reference_observations": "7104",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-atomics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "112908",
+      "reference_observations": "56454",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "87552",
+      "reference_observations": "43776",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-switch-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "26112",
+      "reference_observations": "13056",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-word-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "29568",
+      "reference_observations": "14784",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-integers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46464",
+      "reference_observations": "23232",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-stack-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3456",
+      "reference_observations": "1728",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "5760",
+      "reference_observations": "2880",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "guard_checks": "18"
+    },
+    {
+      "population": "standalone-safe-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-safe-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-stack-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9984",
+      "reference_observations": "4992",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3840",
+      "reference_observations": "1920",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aggregate-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-remainder",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-rax-pointer-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "2688",
+      "reference_observations": "1344",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-general-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1920",
+      "reference_observations": "960",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-frame",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-module-dependencies",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "330",
+      "reference_observations": "165",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "negative_controls": "30",
+      "environment_checks": "3"
+    },
+    {
+      "population": "standalone-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-boolean-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "192",
+      "reference_observations": "96",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "240",
+      "reference_observations": "120",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    }
+  ],
+  "disk": {
+    "schema_version": "1",
+    "run_id": "3906b05bb6c90e998a6dd9797ad729fc",
+    "scratch_path": "tmp/census-integer-abi-20261107-final",
+    "bundle_path": "tmp/census-integer-abi-20261107-final/release_source_object_bundle",
+    "target": "x86_64-unknown-linux-gnu",
+    "mode": "serial",
+    "real_rows_concurrency": "3",
+    "subgates": "17",
+    "wall_ms": "3566687",
+    "starting_free_bytes": "42943426560",
+    "minimum_observed_free_bytes": "38694051840",
+    "final_free_bytes": "41339289600",
+    "observed_peak_bytes": "4249374720",
+    "reserve_bytes": "24359738368",
+    "required_start_bytes": "32949672960",
+    "local_fail": "0"
+  },
+  "cache": [
+    {
+      "mode": "ReleaseFast",
+      "status": "hit",
+      "duration_ms": "15490",
+      "cache_key": "71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6",
+      "descriptor_bytes": "1343891552"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "status": "hit",
+      "duration_ms": "16930",
+      "cache_key": "c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de",
+      "descriptor_bytes": "1473501276"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "status": "hit",
+      "duration_ms": "12781",
+      "cache_key": "db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7",
+      "descriptor_bytes": "1106433056"
+    }
+  ],
+  "native_population_count": 50,
+  "native_local_observations": 1810884,
+  "native_reference_observations": 905442,
+  "schema": "census-integer-abi-acceptance-v1",
+  "status": "passed",
+  "returncode": 0,
+  "recorded_utc": "2026-11-08T05:28:57Z",
+  "accepted_revision": "baf7a767e45c52f21eeafcb67cd01b4cb155a4c4",
+  "accepted_tree": "271f84e7a31ec2c27aedd6e6d9fdf90f2de84783",
+  "source_binding": {
+    "accepted_revision": "baf7a767e45c52f21eeafcb67cd01b4cb155a4c4",
+    "accepted_tree": "271f84e7a31ec2c27aedd6e6d9fdf90f2de84783",
+    "working_base": "22fc1347",
+    "baseline_accepted_revision": "5ad6c51c8a9c50e23fa0aa1a208174f66472a5e9",
+    "source_files": 1741,
+    "source_hash_manifest": "local-state/validations/census-integer-abi-20261107/final-sources.sha256",
+    "compiler_hash_manifest": "local-state/validations/census-integer-abi-20261107/compilers.sha256",
+    "scope": "Compiler, tools, tests and build inputs frozen before final builds and validation; documentation is finalized afterward",
+    "hashes_verified": true,
+    "membership_verified": true
+  },
+  "source_snapshot_verified": true,
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "implementation": {
+    "final_private_rejection_observations": true,
+    "baseline_identities_reproduced": true,
+    "state_authority_for_diagnostic_location_tags": true,
+    "bypass_allowances_unchanged": true,
+    "validated_narrow_integer_advisory_facts": true,
+    "logical_payload_masks_before_publication": true,
+    "original_ir_types_and_attributes_preserved": true,
+    "wide_carriers_omit_narrow_payload_facts": true,
+    "shared_temporary_collision_index": true,
+    "unsupported_abi_boundaries_preserved": true,
+    "frontend_unchanged": true,
+    "execution_cohort_unchanged": true,
+    "candidate_prefix_unchanged": true
+  },
+  "validation": {
+    "unit_tests_per_build_mode": 1949,
+    "unit_build_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "structural_checks_per_mode": 21,
+    "profile_process_tests": 2,
+    "whole_compiler_report_tests": 5,
+    "readiness_passed": true,
+    "full_gates": 17,
+    "new_native_functions": 5,
+    "new_native_local_observations_per_compiler_build": 7680,
+    "new_native_reference_observations_per_compiler_build": 3840,
+    "new_native_compiler_builds": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "cohort_observations_per_route": 23568,
+    "behavioral_observations": 6528,
+    "zig_input_mode_pairs": 87,
+    "zig_observation_controls": 603,
+    "json_input_mode_pairs": 138,
+    "json_observation_controls": 552,
+    "fixed_zig_program_modes": 15,
+    "compiler_rt_bypass_ratchet": 130
+  },
+  "diagnostic": {
+    "scope": "Complete selection of unchanged compiler and runtime inputs; no complete object or execution credit",
+    "compiler": {
+      "status": "blocked",
+      "failure_stage": "selection",
+      "source_and_backend_verified": true,
+      "backend": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/census-integer-abi-20261107/compiler-fast-accepted/bin/z_llvm",
+        "bytes": 39866256,
+        "sha256": "123c31b85f8630fb163289194fbde4a588c8f68212d076e901db3f1bbebc9659"
+      },
+      "input": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/census-integer-abi-20261107/compiler-replay-accepted/backend/input.ll",
+        "bytes": 443624107,
+        "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e"
+      },
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 4341,
+        "failed": 4587
+      },
+      "dependency_coverage": "conservative",
+      "process_completed": true,
+      "returncode": 1,
+      "object_complete": false,
+      "time_record": "Command exited with non-zero status 1\nwall_seconds=791.94\nmax_rss_kb=6365528\nexit_status=1\n",
+      "events": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/census-integer-abi-20261107/compiler-replay-accepted/backend/profile.events.jsonl",
+        "bytes": 1061981489,
+        "sha256": "1226a3c47b9019cfb48600f30ba0e063ce626bb9db2f3f526f53e845db989330"
+      },
+      "event_audit": {
+        "sequence": 3568532,
+        "elapsed_ns": 791661986317,
+        "begins": 8928,
+        "ends": 8928,
+        "selected": 4341,
+        "failed": 4587,
+        "active": null,
+        "pending_legalizer": null,
+        "activity": null,
+        "retry": false,
+        "complete": true,
+        "succeeded": false,
+        "counters": {
+          "selected_functions": 4341,
+          "failed_functions": 4587,
+          "normalization_runs": 66048,
+          "legalizer_attempts": 1238217,
+          "legalizer_rewrites": 60828,
+          "original_form_retries": 32828,
+          "original_form_selected": 3524,
+          "selection_iterations": 66048,
+          "max_selection_iterations": 26,
+          "emitted_instructions": 3444138,
+          "emitted_spill_instructions": 765777
+        },
+        "unique_functions": 8928
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": 817,
+      "classifier_selected_identities_match": true,
+      "classifier_failure_tuples_match": true,
+      "profile": {
+        "total_ns": 791615997991,
+        "phases": [
+          {
+            "phase": "other",
+            "exclusive_ns": 15128413380
+          },
+          {
+            "phase": "input",
+            "exclusive_ns": 183993527
+          },
+          {
+            "phase": "parse",
+            "exclusive_ns": 4402384158
+          },
+          {
+            "phase": "air_lowering",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "verify",
+            "exclusive_ns": 13637513385
+          },
+          {
+            "phase": "optimize",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "reachability",
+            "exclusive_ns": 187150043621
+          },
+          {
+            "phase": "normalize",
+            "exclusive_ns": 18717864321
+          },
+          {
+            "phase": "legalize",
+            "exclusive_ns": 313836542050
+          },
+          {
+            "phase": "select",
+            "exclusive_ns": 238559243549
+          },
+          {
+            "phase": "object_write",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "ownership_write",
+            "exclusive_ns": 0
+          }
+        ],
+        "counters": {
+          "selected_functions": 4341,
+          "failed_functions": 4587,
+          "normalization_runs": 66048,
+          "legalizer_attempts": 1238217,
+          "legalizer_rewrites": 60828,
+          "original_form_retries": 32828,
+          "original_form_selected": 3524,
+          "selection_iterations": 66048,
+          "max_selection_iterations": 26,
+          "emitted_instructions": 3444138,
+          "emitted_spill_instructions": 765777
+        },
+        "legalizer_allocations": {
+          "alloc_calls": 129328772,
+          "requested_bytes": 45488244325,
+          "allocated_bytes": 45488244325,
+          "failed_allocations": 0,
+          "resize_calls": 0,
+          "remap_calls": 25141208,
+          "grown_bytes": 41727001134,
+          "free_calls": 111673519
+        },
+        "slowest_functions": [
+          {
+            "name": "codegen.aarch64.Select.body",
+            "input_blocks": 9643,
+            "input_instructions": 51773,
+            "total_ns": 82212570515,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 12095
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 4116282842
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 66842719534
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 11253556044
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 19,
+              "legalizer_attempts": 266,
+              "legalizer_rewrites": 18,
+              "original_form_retries": 8,
+              "original_form_selected": 0,
+              "selection_iterations": 19,
+              "max_selection_iterations": 19,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1926751,
+              "requested_bytes": 999847277,
+              "allocated_bytes": 999847277,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 581658,
+              "grown_bytes": 1056938369,
+              "free_calls": 1506886
+            },
+            "original_form_ns": 8446080514,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "Sema.analyzeBodyInner",
+            "input_blocks": 6558,
+            "input_instructions": 51889,
+            "total_ns": 37642610434,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 10471
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 2639407921
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 34856746756
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 146445286
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 15,
+              "legalizer_attempts": 183,
+              "legalizer_rewrites": 15,
+              "original_form_retries": 5,
+              "original_form_selected": 0,
+              "selection_iterations": 15,
+              "max_selection_iterations": 15,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 2595075,
+              "requested_bytes": 762303277,
+              "allocated_bytes": 762303277,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 189926,
+              "grown_bytes": 339061310,
+              "free_calls": 2418227
+            },
+            "original_form_ns": 51964246,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "zig.llvm.Builder.toBitcode",
+            "input_blocks": 7823,
+            "input_instructions": 47274,
+            "total_ns": 28866968315,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 10871
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 1681827996
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 27068937620
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 116191828
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 12,
+              "legalizer_attempts": 161,
+              "legalizer_rewrites": 12,
+              "original_form_retries": 5,
+              "original_form_selected": 0,
+              "selection_iterations": 12,
+              "max_selection_iterations": 12,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 17541011,
+              "requested_bytes": 3113186480,
+              "allocated_bytes": 3113186480,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 342228,
+              "grown_bytes": 616463990,
+              "free_calls": 17330053
+            },
+            "original_form_ns": 18533891,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.loongarch.Assemble.parseInstruction",
+            "input_blocks": 20976,
+            "input_instructions": 133719,
+            "total_ns": 16459075348,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 11854
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 409054731
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2136158952
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 13913849811
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 6,
+              "legalizer_attempts": 124,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 3,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 904114,
+              "requested_bytes": 540265790,
+              "allocated_bytes": 540265790,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 872961,
+              "grown_bytes": 1621109255,
+              "free_calls": 557158
+            },
+            "original_form_ns": 9220368389,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.x86_64.CodeGen.genBody",
+            "input_blocks": 4120,
+            "input_instructions": 27078,
+            "total_ns": 15258166683,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9829
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 1013047122
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 14177446497
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 67663235
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 14,
+              "legalizer_attempts": 171,
+              "legalizer_rewrites": 14,
+              "original_form_retries": 6,
+              "original_form_selected": 0,
+              "selection_iterations": 14,
+              "max_selection_iterations": 14,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1462034,
+              "requested_bytes": 472428944,
+              "allocated_bytes": 472428944,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 200008,
+              "grown_bytes": 352217469,
+              "free_calls": 1316360
+            },
+            "original_form_ns": 10593370,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "link.Wasm.Flush.finish",
+            "input_blocks": 4126,
+            "input_instructions": 27671,
+            "total_ns": 14203561837,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 10640
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 521606069
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 13617085885
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 64859243
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 26,
+              "legalizer_attempts": 356,
+              "legalizer_rewrites": 25,
+              "original_form_retries": 9,
+              "original_form_selected": 0,
+              "selection_iterations": 26,
+              "max_selection_iterations": 26,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 14165947,
+              "requested_bytes": 2507609924,
+              "allocated_bytes": 2507609924,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 193148,
+              "grown_bytes": 348758151,
+              "free_calls": 14015708
+            },
+            "original_form_ns": 6730471,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "\"zig.llvm.bitcode_writer.BitcodeWriter(&.{ zig.llvm.Builder.Type, zig.llvm.Builder.FunctionAttributes }[0..2]).BlockWriter(zig.llvm.ir.ModuleBlock.ConstantsBlock).init__func_17755\"",
+            "input_blocks": 931,
+            "input_instructions": 6754,
+            "total_ns": 11759221430,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 29508
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 5276916
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 66262995
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 11687652011
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 6,
+              "legalizer_attempts": 107,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 3,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 40351,
+              "emitted_spill_instructions": 10090
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 23800,
+              "requested_bytes": 29340836,
+              "allocated_bytes": 29340836,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 35987,
+              "grown_bytes": 61081430,
+              "free_calls": 7170
+            },
+            "original_form_ns": 352269176,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "link.MachO.flush",
+            "input_blocks": 4250,
+            "input_instructions": 28054,
+            "total_ns": 8805604799,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 11562
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 491448003
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 8260612552
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 53532682
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 18,
+              "legalizer_attempts": 237,
+              "legalizer_rewrites": 17,
+              "original_form_retries": 9,
+              "original_form_selected": 0,
+              "selection_iterations": 18,
+              "max_selection_iterations": 18,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 3859874,
+              "requested_bytes": 855123927,
+              "allocated_bytes": 855123927,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 168225,
+              "grown_bytes": 277906418,
+              "free_calls": 3721594
+            },
+            "original_form_ns": 6382874,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.llvm.FuncGen.genBody",
+            "input_blocks": 4102,
+            "input_instructions": 28886,
+            "total_ns": 8019604020,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 9739
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 524745219
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 7440314485
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 54534577
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 13,
+              "legalizer_attempts": 175,
+              "legalizer_rewrites": 13,
+              "original_form_retries": 5,
+              "original_form_selected": 0,
+              "selection_iterations": 13,
+              "max_selection_iterations": 13,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 5770853,
+              "requested_bytes": 1114276960,
+              "allocated_bytes": 1114276960,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 135612,
+              "grown_bytes": 226732896,
+              "free_calls": 5657338
+            },
+            "original_form_ns": 9405741,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "codegen.x86_64.CodeGen.genCall",
+            "input_blocks": 3424,
+            "input_instructions": 15315,
+            "total_ns": 7044850177,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 10420
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 238178781
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 3050199079
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 3756461897
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 18,
+              "legalizer_attempts": 236,
+              "legalizer_rewrites": 17,
+              "original_form_retries": 8,
+              "original_form_selected": 0,
+              "selection_iterations": 18,
+              "max_selection_iterations": 18,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1217680,
+              "requested_bytes": 397843474,
+              "allocated_bytes": 397843474,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 177431,
+              "grown_bytes": 299933054,
+              "free_calls": 1087945
+            },
+            "original_form_ns": 2946937657,
+            "discarded_candidate_bytes": 0
+          }
+        ],
+        "slowest_legalizers": [
+          {
+            "stage": "integer_forms.zig.legalize",
+            "attempts": 61806,
+            "rewrites": 4445,
+            "errors": 0,
+            "elapsed_ns": 201345860840,
+            "rewritten_ns": 15813256985,
+            "unchanged_ns": 185532603855,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 581617,
+              "requested_bytes": 1149561435,
+              "allocated_bytes": 1149561435,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 673266,
+              "grown_bytes": 815671062,
+              "free_calls": 78450
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 10,
+            "discarded_candidate_bytes": 1470378
+          },
+          {
+            "stage": "padded_frame.zig.legalizeStorage",
+            "attempts": 36247,
+            "rewrites": 7151,
+            "errors": 0,
+            "elapsed_ns": 30639001621,
+            "rewritten_ns": 23785363093,
+            "unchanged_ns": 6853638528,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2389668,
+              "requested_bytes": 2568391503,
+              "allocated_bytes": 2568391503,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2192383,
+              "grown_bytes": 1472606734,
+              "free_calls": 316605
+            },
+            "unchanged_allocation_bytes": 410591180,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "integer_vectors.zig.legalize",
+            "attempts": 66034,
+            "rewrites": 822,
+            "errors": 0,
+            "elapsed_ns": 14593107122,
+            "rewritten_ns": 793718235,
+            "unchanged_ns": 13799388887,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 6100772,
+              "requested_bytes": 8381071447,
+              "allocated_bytes": 8381071447,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 9193599,
+              "grown_bytes": 17616322365,
+              "free_calls": 418555
+            },
+            "unchanged_allocation_bytes": 25285644043,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "word_pair_values.zig.legalize",
+            "attempts": 41694,
+            "rewrites": 1810,
+            "errors": 0,
+            "elapsed_ns": 11690267415,
+            "rewritten_ns": 10537027665,
+            "unchanged_ns": 1153239750,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 87478998,
+              "requested_bytes": 14420847986,
+              "allocated_bytes": 14420847986,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 486847,
+              "grown_bytes": 906254016,
+              "free_calls": 87147472
+            },
+            "unchanged_allocation_bytes": 887600,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "word_pair_memory.zig.legalize",
+            "attempts": 39884,
+            "rewrites": 196,
+            "errors": 0,
+            "elapsed_ns": 11432780163,
+            "rewritten_ns": 1200613006,
+            "unchanged_ns": 10232167157,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 7056817,
+              "requested_bytes": 1253701122,
+              "allocated_bytes": 1253701122,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 133480,
+              "grown_bytes": 287128320,
+              "free_calls": 6968137
+            },
+            "unchanged_allocation_bytes": 1097611600,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "padded_frame.zig.legalize",
+            "attempts": 39688,
+            "rewrites": 3441,
+            "errors": 0,
+            "elapsed_ns": 7927074075,
+            "rewritten_ns": 2649810329,
+            "unchanged_ns": 5277263746,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 658817,
+              "requested_bytes": 773119868,
+              "allocated_bytes": 773119868,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 666053,
+              "grown_bytes": 690863878,
+              "free_calls": 77199
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "address_forms.zig.legalize",
+            "attempts": 29096,
+            "rewrites": 6804,
+            "errors": 0,
+            "elapsed_ns": 5264579598,
+            "rewritten_ns": 1594065369,
+            "unchanged_ns": 3670514229,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2767685,
+              "requested_bytes": 3981268653,
+              "allocated_bytes": 3981268653,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 4088701,
+              "grown_bytes": 7817567385,
+              "free_calls": 295207
+            },
+            "unchanged_allocation_bytes": 8621826624,
+            "discarded_candidates": 237,
+            "discarded_candidate_bytes": 26229522
+          },
+          {
+            "stage": "pointer_values.zig.legalize",
+            "attempts": 19613,
+            "rewrites": 6676,
+            "errors": 0,
+            "elapsed_ns": 4606850037,
+            "rewritten_ns": 2327935466,
+            "unchanged_ns": 2278914571,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 1871190,
+              "requested_bytes": 2380313836,
+              "allocated_bytes": 2380313836,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2873462,
+              "grown_bytes": 4914000215,
+              "free_calls": 187351
+            },
+            "unchanged_allocation_bytes": 4544970624,
+            "discarded_candidates": 157,
+            "discarded_candidate_bytes": 10784040
+          },
+          {
+            "stage": "narrow_abi.zig.legalize",
+            "attempts": 49371,
+            "rewrites": 7677,
+            "errors": 0,
+            "elapsed_ns": 3249342899,
+            "rewritten_ns": 2079644634,
+            "unchanged_ns": 1169698265,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 861165,
+              "requested_bytes": 1122104508,
+              "allocated_bytes": 1122104508,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1060771,
+              "grown_bytes": 1544114124,
+              "free_calls": 101341
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "stack_addresses.zig.legalize",
+            "attempts": 22292,
+            "rewrites": 2679,
+            "errors": 0,
+            "elapsed_ns": 2331898342,
+            "rewritten_ns": 1148869164,
+            "unchanged_ns": 1183029178,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 480727,
+              "requested_bytes": 651182877,
+              "allocated_bytes": 651182877,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 646246,
+              "grown_bytes": 1160318576,
+              "free_calls": 78531
+            },
+            "unchanged_allocation_bytes": 25491582,
+            "discarded_candidates": 3,
+            "discarded_candidate_bytes": 123705
+          }
+        ]
+      }
+    },
+    "runtime": {
+      "status": "blocked",
+      "failure_stage": "selection",
+      "source_and_backend_verified": true,
+      "backend": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/census-integer-abi-20261107/compiler-fast-accepted/bin/z_llvm",
+        "bytes": 39866256,
+        "sha256": "123c31b85f8630fb163289194fbde4a588c8f68212d076e901db3f1bbebc9659"
+      },
+      "input": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/census-integer-abi-20261107/runtime-replay-accepted/backend/input.ll",
+        "bytes": 1856543,
+        "sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af"
+      },
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 274,
+        "failed": 181
+      },
+      "dependency_coverage": "conservative",
+      "process_completed": true,
+      "returncode": 1,
+      "object_complete": false,
+      "time_record": "Command exited with non-zero status 1\nwall_seconds=1.13\nmax_rss_kb=54596\nexit_status=1\n",
+      "events": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/census-integer-abi-20261107/runtime-replay-accepted/backend/profile.events.jsonl",
+        "bytes": 20155472,
+        "sha256": "6ab0f9a3862ce653f57803342b647ad9c08430a8589971f1424f6b0d7733f749"
+      },
+      "event_audit": {
+        "sequence": 70370,
+        "elapsed_ns": 1130115290,
+        "begins": 455,
+        "ends": 455,
+        "selected": 274,
+        "failed": 181,
+        "active": null,
+        "pending_legalizer": null,
+        "activity": null,
+        "retry": false,
+        "complete": true,
+        "succeeded": false,
+        "counters": {
+          "selected_functions": 274,
+          "failed_functions": 181,
+          "normalization_runs": 1352,
+          "legalizer_attempts": 23374,
+          "legalizer_rewrites": 1051,
+          "original_form_retries": 756,
+          "original_form_selected": 154,
+          "selection_iterations": 1352,
+          "max_selection_iterations": 12,
+          "emitted_instructions": 44135,
+          "emitted_spill_instructions": 8229
+        },
+        "unique_functions": 455
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": 0,
+      "classifier_selected_identities_match": true,
+      "classifier_failure_tuples_match": true,
+      "profile": {
+        "total_ns": 1128600983,
+        "phases": [
+          {
+            "phase": "other",
+            "exclusive_ns": 8003057
+          },
+          {
+            "phase": "input",
+            "exclusive_ns": 740496
+          },
+          {
+            "phase": "parse",
+            "exclusive_ns": 23033584
+          },
+          {
+            "phase": "air_lowering",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "verify",
+            "exclusive_ns": 9039640
+          },
+          {
+            "phase": "optimize",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "reachability",
+            "exclusive_ns": 6051035
+          },
+          {
+            "phase": "normalize",
+            "exclusive_ns": 37129922
+          },
+          {
+            "phase": "legalize",
+            "exclusive_ns": 287972184
+          },
+          {
+            "phase": "select",
+            "exclusive_ns": 756631065
+          },
+          {
+            "phase": "object_write",
+            "exclusive_ns": 0
+          },
+          {
+            "phase": "ownership_write",
+            "exclusive_ns": 0
+          }
+        ],
+        "counters": {
+          "selected_functions": 274,
+          "failed_functions": 181,
+          "normalization_runs": 1352,
+          "legalizer_attempts": 23374,
+          "legalizer_rewrites": 1051,
+          "original_form_retries": 756,
+          "original_form_selected": 154,
+          "selection_iterations": 1352,
+          "max_selection_iterations": 12,
+          "emitted_instructions": 44135,
+          "emitted_spill_instructions": 8229
+        },
+        "legalizer_allocations": {
+          "alloc_calls": 126430,
+          "requested_bytes": 125753024,
+          "allocated_bytes": 125753024,
+          "failed_allocations": 0,
+          "resize_calls": 0,
+          "remap_calls": 120253,
+          "grown_bytes": 190482365,
+          "free_calls": 56951
+        },
+        "slowest_functions": [
+          {
+            "name": "compiler_rt.memmove.memmoveFast",
+            "input_blocks": 24,
+            "input_instructions": 176,
+            "total_ns": 52600864,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 6502
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 96497
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2207389
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 50290476
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 4,
+              "legalizer_attempts": 51,
+              "legalizer_rewrites": 4,
+              "original_form_retries": 2,
+              "original_form_selected": 1,
+              "selection_iterations": 4,
+              "max_selection_iterations": 4,
+              "emitted_instructions": 2459,
+              "emitted_spill_instructions": 546
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1159,
+              "requested_bytes": 1940188,
+              "allocated_bytes": 1940188,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1439,
+              "grown_bytes": 2306270,
+              "free_calls": 113
+            },
+            "original_form_ns": 49891946,
+            "discarded_candidate_bytes": 717678
+          },
+          {
+            "name": "compiler_rt.ssp.__memcpy_chk",
+            "input_blocks": 17,
+            "input_instructions": 111,
+            "total_ns": 44066682,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 4269
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 45679
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 931399
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 43085335
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 2,
+              "legalizer_attempts": 8,
+              "legalizer_rewrites": 2,
+              "original_form_retries": 1,
+              "original_form_selected": 1,
+              "selection_iterations": 2,
+              "max_selection_iterations": 2,
+              "emitted_instructions": 2193,
+              "emitted_spill_instructions": 462
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 948,
+              "requested_bytes": 1267766,
+              "allocated_bytes": 1267766,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1173,
+              "grown_bytes": 876597,
+              "free_calls": 58
+            },
+            "original_form_ns": 42837852,
+            "discarded_candidate_bytes": 461013
+          },
+          {
+            "name": "compiler_rt.memcpy.memcpyFast",
+            "input_blocks": 15,
+            "input_instructions": 107,
+            "total_ns": 40810895,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 6593
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 40500
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 906781
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 39857021
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 2,
+              "legalizer_attempts": 8,
+              "legalizer_rewrites": 2,
+              "original_form_retries": 1,
+              "original_form_selected": 1,
+              "selection_iterations": 2,
+              "max_selection_iterations": 2,
+              "emitted_instructions": 2182,
+              "emitted_spill_instructions": 461
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 942,
+              "requested_bytes": 1253558,
+              "allocated_bytes": 1253558,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1171,
+              "grown_bytes": 877365,
+              "free_calls": 58
+            },
+            "original_form_ns": 39602696,
+            "discarded_candidate_bytes": 449493
+          },
+          {
+            "name": "compiler_rt.rem_pio2.rem_pio2",
+            "input_blocks": 60,
+            "input_instructions": 348,
+            "total_ns": 39226642,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 7144
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 158379
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 2087236
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 36973883
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 6,
+              "legalizer_attempts": 101,
+              "legalizer_rewrites": 6,
+              "original_form_retries": 4,
+              "original_form_selected": 1,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 1423,
+              "emitted_spill_instructions": 284
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1236,
+              "requested_bytes": 1296810,
+              "allocated_bytes": 1296810,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1449,
+              "grown_bytes": 1949927,
+              "free_calls": 330
+            },
+            "original_form_ns": 36489427,
+            "discarded_candidate_bytes": 45044
+          },
+          {
+            "name": "compiler_rt.rem_pio2_large.rem_pio2_large",
+            "input_blocks": 137,
+            "input_instructions": 917,
+            "total_ns": 17958044,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 6894
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 1030154
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 13758042
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 3162954
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 12,
+              "legalizer_attempts": 187,
+              "legalizer_rewrites": 11,
+              "original_form_retries": 7,
+              "original_form_selected": 0,
+              "selection_iterations": 12,
+              "max_selection_iterations": 12,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 5991,
+              "requested_bytes": 7609300,
+              "allocated_bytes": 7609300,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 6265,
+              "grown_bytes": 11946282,
+              "free_calls": 2064
+            },
+            "original_form_ns": 68414,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.mulf3.__muldf3",
+            "input_blocks": 31,
+            "input_instructions": 131,
+            "total_ns": 16997909,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 6673
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 110885
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 910158
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 15970193
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 4,
+              "legalizer_attempts": 66,
+              "legalizer_rewrites": 3,
+              "original_form_retries": 3,
+              "original_form_selected": 0,
+              "selection_iterations": 4,
+              "max_selection_iterations": 4,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 570,
+              "requested_bytes": 543978,
+              "allocated_bytes": 543978,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 321,
+              "grown_bytes": 466398,
+              "free_calls": 254
+            },
+            "original_form_ns": 12339683,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.count0bits.__clzti2",
+            "input_blocks": 1,
+            "input_instructions": 38,
+            "total_ns": 14496715,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 5580
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 73764
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 570604
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 13846767
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 3,
+              "legalizer_attempts": 25,
+              "legalizer_rewrites": 3,
+              "original_form_retries": 3,
+              "original_form_selected": 1,
+              "selection_iterations": 3,
+              "max_selection_iterations": 3,
+              "emitted_instructions": 1154,
+              "emitted_spill_instructions": 279
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 257,
+              "requested_bytes": 674680,
+              "allocated_bytes": 674680,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 466,
+              "grown_bytes": 319824,
+              "free_calls": 29
+            },
+            "original_form_ns": 13675653,
+            "discarded_candidate_bytes": 124416
+          },
+          {
+            "name": "compiler_rt.int.__udivmoddi4",
+            "input_blocks": 50,
+            "input_instructions": 242,
+            "total_ns": 14459272,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 17795
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 119394
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 1912515
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 12409568
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 6,
+              "legalizer_attempts": 95,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 4,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 1216,
+              "emitted_spill_instructions": 298
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 1975,
+              "requested_bytes": 1432400,
+              "allocated_bytes": 1432400,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1070,
+              "grown_bytes": 1324242,
+              "free_calls": 1157
+            },
+            "original_form_ns": 5359,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.mulf3.__mulhf3",
+            "input_blocks": 31,
+            "input_instructions": 120,
+            "total_ns": 13471013,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 8236
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 259466
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 1140978
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 12062333
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 3,
+              "legalizer_attempts": 69,
+              "legalizer_rewrites": 2,
+              "original_form_retries": 1,
+              "original_form_selected": 0,
+              "selection_iterations": 3,
+              "max_selection_iterations": 3,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 716,
+              "requested_bytes": 448355,
+              "allocated_bytes": 448355,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 424,
+              "grown_bytes": 853632,
+              "free_calls": 470
+            },
+            "original_form_ns": 6145971,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "name": "compiler_rt.divtf3.__divtf3",
+            "input_blocks": 33,
+            "input_instructions": 413,
+            "total_ns": 13203851,
+            "phases": [
+              {
+                "phase": "other",
+                "exclusive_ns": 5020
+              },
+              {
+                "phase": "input",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "parse",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "air_lowering",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "verify",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "optimize",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "reachability",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "normalize",
+                "exclusive_ns": 403137
+              },
+              {
+                "phase": "legalize",
+                "exclusive_ns": 11737008
+              },
+              {
+                "phase": "select",
+                "exclusive_ns": 1058686
+              },
+              {
+                "phase": "object_write",
+                "exclusive_ns": 0
+              },
+              {
+                "phase": "ownership_write",
+                "exclusive_ns": 0
+              }
+            ],
+            "counters": {
+              "selected_functions": 0,
+              "failed_functions": 1,
+              "normalization_runs": 6,
+              "legalizer_attempts": 91,
+              "legalizer_rewrites": 5,
+              "original_form_retries": 4,
+              "original_form_selected": 0,
+              "selection_iterations": 6,
+              "max_selection_iterations": 6,
+              "emitted_instructions": 0,
+              "emitted_spill_instructions": 0
+            },
+            "legalizer_allocations": {
+              "alloc_calls": 2641,
+              "requested_bytes": 5534738,
+              "allocated_bytes": 5534738,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 4858,
+              "grown_bytes": 9119304,
+              "free_calls": 405
+            },
+            "original_form_ns": 30870,
+            "discarded_candidate_bytes": 0
+          }
+        ],
+        "slowest_legalizers": [
+          {
+            "stage": "integer_vectors.zig.legalize",
+            "attempts": 1352,
+            "rewrites": 3,
+            "errors": 0,
+            "elapsed_ns": 55032705,
+            "rewritten_ns": 1470822,
+            "unchanged_ns": 53561883,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 24931,
+              "requested_bytes": 30788976,
+              "allocated_bytes": 30788976,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 35743,
+              "grown_bytes": 78974784,
+              "free_calls": 3879
+            },
+            "unchanged_allocation_bytes": 105999744,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "integer_forms.zig.legalize",
+            "attempts": 1131,
+            "rewrites": 117,
+            "errors": 0,
+            "elapsed_ns": 29852581,
+            "rewritten_ns": 7313125,
+            "unchanged_ns": 22539456,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 3311,
+              "requested_bytes": 7134765,
+              "allocated_bytes": 7134765,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 3543,
+              "grown_bytes": 2952954,
+              "free_calls": 763
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 11,
+            "discarded_candidate_bytes": 394287
+          },
+          {
+            "stage": "address_forms.zig.legalize",
+            "attempts": 654,
+            "rewrites": 66,
+            "errors": 0,
+            "elapsed_ns": 27205512,
+            "rewritten_ns": 6405927,
+            "unchanged_ns": 20799585,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 13797,
+              "requested_bytes": 18558414,
+              "allocated_bytes": 18558414,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 19627,
+              "grown_bytes": 43443129,
+              "free_calls": 2547
+            },
+            "unchanged_allocation_bytes": 49487040,
+            "discarded_candidates": 10,
+            "discarded_candidate_bytes": 993660
+          },
+          {
+            "stage": "pointer_values.zig.legalize",
+            "attempts": 548,
+            "rewrites": 60,
+            "errors": 0,
+            "elapsed_ns": 20962127,
+            "rewritten_ns": 3476815,
+            "unchanged_ns": 17485312,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 9104,
+              "requested_bytes": 10083508,
+              "allocated_bytes": 10083508,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 13871,
+              "grown_bytes": 33872188,
+              "free_calls": 1560
+            },
+            "unchanged_allocation_bytes": 37896804,
+            "discarded_candidates": 6,
+            "discarded_candidate_bytes": 201804
+          },
+          {
+            "stage": "pair_arithmetic.zig.legalize",
+            "attempts": 1014,
+            "rewrites": 100,
+            "errors": 0,
+            "elapsed_ns": 15715618,
+            "rewritten_ns": 12920479,
+            "unchanged_ns": 2795139,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 16051,
+              "requested_bytes": 22308379,
+              "allocated_bytes": 22308379,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 28177,
+              "grown_bytes": 3224385,
+              "free_calls": 2010
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 1,
+            "discarded_candidate_bytes": 91008
+          },
+          {
+            "stage": "comparison_forms.zig.legalize",
+            "attempts": 1299,
+            "rewrites": 152,
+            "errors": 0,
+            "elapsed_ns": 7805112,
+            "rewritten_ns": 5506711,
+            "unchanged_ns": 2298401,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 3811,
+              "requested_bytes": 8185587,
+              "allocated_bytes": 8185587,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2891,
+              "grown_bytes": 3700662,
+              "free_calls": 889
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 59,
+            "discarded_candidate_bytes": 3250452
+          },
+          {
+            "stage": "boolean_values.zig.legalize",
+            "attempts": 843,
+            "rewrites": 91,
+            "errors": 0,
+            "elapsed_ns": 6919676,
+            "rewritten_ns": 5759515,
+            "unchanged_ns": 1160161,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2457,
+              "requested_bytes": 6960276,
+              "allocated_bytes": 6960276,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 3109,
+              "grown_bytes": 5408655,
+              "free_calls": 750
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "pair_memory.zig.legalize",
+            "attempts": 1349,
+            "rewrites": 33,
+            "errors": 0,
+            "elapsed_ns": 5715329,
+            "rewritten_ns": 1508710,
+            "unchanged_ns": 4206619,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2530,
+              "requested_bytes": 2844020,
+              "allocated_bytes": 2844020,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 1424,
+              "grown_bytes": 580767,
+              "free_calls": 1592
+            },
+            "unchanged_allocation_bytes": 265200,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "integer_intrinsics.zig.legalize",
+            "attempts": 914,
+            "rewrites": 29,
+            "errors": 0,
+            "elapsed_ns": 4813098,
+            "rewritten_ns": 3125963,
+            "unchanged_ns": 1687135,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 1533,
+              "requested_bytes": 2094866,
+              "allocated_bytes": 2094866,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2282,
+              "grown_bytes": 4057176,
+              "free_calls": 307
+            },
+            "unchanged_allocation_bytes": 0,
+            "discarded_candidates": 0,
+            "discarded_candidate_bytes": 0
+          },
+          {
+            "stage": "stack_addresses.zig.legalize",
+            "attempts": 588,
+            "rewrites": 40,
+            "errors": 0,
+            "elapsed_ns": 4370879,
+            "rewritten_ns": 3169580,
+            "unchanged_ns": 1201299,
+            "error_ns": 0,
+            "allocations": {
+              "alloc_calls": 2087,
+              "requested_bytes": 1947907,
+              "allocated_bytes": 1947907,
+              "failed_allocations": 0,
+              "resize_calls": 0,
+              "remap_calls": 2471,
+              "grown_bytes": 4226353,
+              "free_calls": 552
+            },
+            "unchanged_allocation_bytes": 28672,
+            "discarded_candidates": 4,
+            "discarded_candidate_bytes": 120884
+          }
+        ]
+      }
+    },
+    "failure_comparison_normalization": "Only absent CLI selector tag/detail markers '-' are mapped to JSON null",
+    "compiler_failure_groups": [
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-memcpy-src"
+        },
+        "functions": 1772
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-llvm-intrinsic"
+        },
+        "functions": 976
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-global-properties"
+        },
+        "functions": 368
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "stage2-register-pressure"
+        },
+        "functions": 184
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "alloca"
+        },
+        "functions": 123
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-unsupported-value"
+        },
+        "functions": 119
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "icmp"
+        },
+        "functions": 102
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCallAttributeAbi",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 89
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-arg"
+        },
+        "functions": 87
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-freeze-width"
+        },
+        "functions": 77
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-readonly-table-global"
+        },
+        "functions": 71
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "load"
+        },
+        "functions": 71
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-src"
+        },
+        "functions": 58
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 47
+      },
+      {
+        "failure": {
+          "diagnostic": "ValueUseSetccEaxCompareImmediateOutOfRange",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 44
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-icmp-rhs"
+        },
+        "functions": 43
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "stage2-indirect-phi"
+        },
+        "functions": 39
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-icmp-form"
+        },
+        "functions": 38
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-load-width"
+        },
+        "functions": 25
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-arg-width"
+        },
+        "functions": 22
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "inline-asm-call"
+        },
+        "functions": 18
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "insertelement"
+        },
+        "functions": 15
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-cast-value"
+        },
+        "functions": 14
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-param-width"
+        },
+        "functions": 13
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "phi"
+        },
+        "functions": 13
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-param-type"
+        },
+        "functions": 12
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "llvm.ctpop"
+        },
+        "functions": 10
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-unknown-byte-gep-ptr"
+        },
+        "functions": 9
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-select-true-value"
+        },
+        "functions": 8
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "stage2-block-count"
+        },
+        "functions": 8
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "call-ret"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-ctpop-range"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-select-false-value"
+        },
+        "functions": 7
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-width"
+        },
+        "functions": 6
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-freeze-type"
+        },
+        "functions": 6
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-binary-imm-lhs"
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "alloca"
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-global-properties"
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "ValueUseUnsupportedSource",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 5
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-store-value-other"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-store-width"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-dst"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "store"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-memcpy-src"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-ptr-arg"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "ValueUseIdentityTooLong",
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-form"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-param-reg"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-unknown-lhs"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-unknown-store-ptr"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "fcmp"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-return-type"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-ptr-arg"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "inline-asm-call"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "call-arg"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "cast"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-ptr-arg"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-inline-asm-result"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-memcpy-dst"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-memset-attrs"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-memset-value"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-pair-binary-op"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "fptoui"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "freeze"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "insertvalue"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "sdiv"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-global-properties"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-llvm-intrinsic"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "insertelement"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "stage2-register-pressure"
+        },
+        "functions": 1
+      }
+    ],
+    "transitions_file": "local-state/validations/census-integer-abi-20261107/compiler-probe-comparison.json",
+    "classification_before_file": "local-state/validations/census-integer-abi-20261107/classification.json",
+    "classification_after_file": "local-state/validations/census-integer-abi-20261107/classification-after.json",
+    "classification_limit": "Final call or parameter observations after private legalization; call argument lists do not identify an individual failing argument; other rejection kinds are unattributed",
+    "complete_object_credit": false,
+    "whole_compiler_execution_credit": false
+  },
+  "classification_baseline_equivalence": {
+    "compiler": {
+      "complete": true,
+      "examined": 8928,
+      "selected": 3524,
+      "selection_identities_match": true,
+      "all_failure_records_match": true,
+      "new_failures": [],
+      "new_successes": []
+    },
+    "runtime": {
+      "complete": true,
+      "examined": 455,
+      "selected": 274,
+      "selection_identities_match": true,
+      "all_failure_records_match": true,
+      "new_failures": [],
+      "new_successes": []
+    }
+  },
+  "controls": {
+    "schema": "execution-breadth-controls-v2",
+    "rows": [
+      {
+        "mode": "ReleaseFast",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      }
+    ],
+    "negative_controls": 54,
+    "function_modes": 21,
+    "observations": 22788,
+    "status": "passed"
+  },
+  "fixed_programs": {
+    "status": "passed",
+    "programs": 5,
+    "program_modes": 15,
+    "prior_source_manifest_emitter_identities_preserved": true,
+    "rows": [
+      {
+        "program": "recursive_fibonacci",
+        "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+        "manifest_sha256": "21bd150575f432aa005026f2db2ce765587f2eb9246cdc2457fec77a7d01a6ad",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "optionals",
+        "source_sha256": "8e47ea56fd5690e7b0220917f8a16eca60aa59537e2b9207ae2bf7ea485c8035",
+        "manifest_sha256": "65c424b0dc648041ec5781552aea18341353931dac668e37bd7f1356c41aed24",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "taking_pointer_of_global_tagged_union",
+        "source_sha256": "d88d9cde2f25cb0134aac0e1d894dcf1448a21e780c8ded5a91130fe7b07d7dc",
+        "manifest_sha256": "07d564db0173432a1f00b774fac6df169f36e80c56ae7853c959b6f70b20ab76",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "array_in_anon_struct",
+        "source_sha256": "9ea4e3efed991237fe3dcca39de9a8826efeb0d8de7df30c385870dc81471dce",
+        "manifest_sha256": "a1c70dc1e3162a0f7a435c7ea3faa60e0a258e5972a70800f7a19c564661764c",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "while_loops",
+        "source_sha256": "4775009971f7b7ba11a1881f55ae5ee97c69519e6ff04bc83f6d740369e41c53",
+        "manifest_sha256": "ed79b9a73c75410c2d2939d6a87519961267e466cc330fe713ecb949fb103327",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      }
+    ]
+  },
+  "prior_population_comparison": {
+    "prior_native_populations": 49,
+    "current_native_populations": 50,
+    "prior_populations_preserved": true,
+    "population_differences": [],
+    "new_populations": [
+      {
+        "population": "standalone-narrow-abi-facts",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "7680",
+        "reference_observations": "3840",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    ],
+    "core": {
+      "records": 36,
+      "all_selected_object_and_observation_fields_match": true,
+      "strict_records_equal": false,
+      "excluded_fields": [
+        "reference_bytes",
+        "reference_sha256",
+        "linked_sha256"
+      ],
+      "scope": "Executable metadata is compared separately; selected-object bytes and all observation fields must match",
+      "executable_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153640",
+          "reference_bytes_after": "4153648",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153640",
+          "reference_bytes_after": "4153648",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151424",
+          "reference_bytes_after": "4151432",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154192",
+          "reference_bytes_after": "4154200",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148256",
+          "reference_bytes_after": "4148264",
+          "linked_bytes_before": "6283657",
+          "linked_bytes_after": "6283657",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153792",
+          "reference_bytes_after": "4153800",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152280",
+          "reference_bytes_after": "4152288",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147688",
+          "reference_bytes_after": "4147696",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148112",
+          "reference_bytes_after": "4148120",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148200",
+          "reference_bytes_after": "4148208",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148168",
+          "reference_bytes_after": "4148176",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148464",
+          "reference_bytes_after": "4148472",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039488",
+          "reference_bytes_after": "4039496",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039496",
+          "reference_bytes_after": "4039504",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035568",
+          "reference_bytes_after": "4035576",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040208",
+          "reference_bytes_after": "4040216",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034064",
+          "reference_bytes_after": "4034072",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039680",
+          "reference_bytes_after": "4039688",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038384",
+          "reference_bytes_after": "4038392",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034336",
+          "reference_bytes_after": "4034344",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034200",
+          "reference_bytes_after": "4034208",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034248",
+          "reference_bytes_after": "4034256",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034224",
+          "reference_bytes_after": "4034232",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034304",
+          "reference_bytes_after": "4034312",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        }
+      ]
+    }
+  },
+  "zig_corpus": {
+    "status": "passed",
+    "inputs": 29,
+    "input_mode_pairs": 87,
+    "actual_executions": 174,
+    "observation_controls": 603,
+    "independent_oracle": true,
+    "prior_observations_equal": true,
+    "prior_selection_counters_equal": true,
+    "selection_comparison_scope": "Recorded separately; a capability repair may change selection while preserving all oracle observations"
+  },
+  "c_corpus": {
+    "status": "passed",
+    "inputs": 46,
+    "matched_inputs": 138,
+    "negative_controls": 552,
+    "source_files_equal": true,
+    "manifest_equal": true,
+    "observations_equal": true
+  },
+  "compiler_builds": {
+    "Debug": "768034941143f9918e8a9278d4bad49ab032a0ed3807ca16987187a2c1a8cee3",
+    "ReleaseFast": "123c31b85f8630fb163289194fbde4a588c8f68212d076e901db3f1bbebc9659",
+    "scope": "Same frozen sources; ReleaseFast supplies integrated hooks and broader input corpora; runner defaults use verified final Debug"
+  },
+  "native_fixture_preservation": {
+    "all_previous_fixture_sources_unchanged": true,
+    "scope": "Only narrow_abi_facts.ll, its driver and the population registry differ in test/real_programs from the prior accepted source"
+  },
+  "retention": {
+    "original_scratch_files": 13,
+    "unchanged": true,
+    "archives_created": false,
+    "final_available_bytes": 41338687488,
+    "additional_disk_samples": [
+      {
+        "observed_utc": "2026-11-08T04:45:38Z",
+        "available_bytes": 41308151808
+      },
+      {
+        "observed_utc": "2026-11-08T04:46:08Z",
+        "available_bytes": 41221619712
+      },
+      {
+        "observed_utc": "2026-11-08T04:46:38Z",
+        "available_bytes": 41591263232
+      },
+      {
+        "observed_utc": "2026-11-08T04:47:08Z",
+        "available_bytes": 41578811392
+      },
+      {
+        "observed_utc": "2026-11-08T04:47:38Z",
+        "available_bytes": 41566056448
+      },
+      {
+        "observed_utc": "2026-11-08T04:48:08Z",
+        "available_bytes": 41556443136
+      },
+      {
+        "observed_utc": "2026-11-08T04:48:38Z",
+        "available_bytes": 41544011776
+      },
+      {
+        "observed_utc": "2026-11-08T04:49:08Z",
+        "available_bytes": 41535193088
+      },
+      {
+        "observed_utc": "2026-11-08T04:49:38Z",
+        "available_bytes": 41522249728
+      },
+      {
+        "observed_utc": "2026-11-08T04:50:08Z",
+        "available_bytes": 41509810176
+      },
+      {
+        "observed_utc": "2026-11-08T04:50:38Z",
+        "available_bytes": 41501077504
+      },
+      {
+        "observed_utc": "2026-11-08T04:51:08Z",
+        "available_bytes": 41489350656
+      },
+      {
+        "observed_utc": "2026-11-08T04:51:38Z",
+        "available_bytes": 41480761344
+      },
+      {
+        "observed_utc": "2026-11-08T04:52:08Z",
+        "available_bytes": 41601105920
+      },
+      {
+        "observed_utc": "2026-11-08T04:52:38Z",
+        "available_bytes": 41592434688
+      },
+      {
+        "observed_utc": "2026-11-08T04:53:08Z",
+        "available_bytes": 41587531776
+      },
+      {
+        "observed_utc": "2026-11-08T04:53:38Z",
+        "available_bytes": 41574694912
+      },
+      {
+        "observed_utc": "2026-11-08T04:54:09Z",
+        "available_bytes": 41603313664
+      },
+      {
+        "observed_utc": "2026-11-08T04:54:39Z",
+        "available_bytes": 41594392576
+      },
+      {
+        "observed_utc": "2026-11-08T04:55:09Z",
+        "available_bytes": 41582727168
+      },
+      {
+        "observed_utc": "2026-11-08T04:55:39Z",
+        "available_bytes": 41568411648
+      },
+      {
+        "observed_utc": "2026-11-08T04:56:09Z",
+        "available_bytes": 41591341056
+      },
+      {
+        "observed_utc": "2026-11-08T04:56:39Z",
+        "available_bytes": 41582157824
+      },
+      {
+        "observed_utc": "2026-11-08T04:57:09Z",
+        "available_bytes": 41572601856
+      },
+      {
+        "observed_utc": "2026-11-08T04:57:39Z",
+        "available_bytes": 41563095040
+      },
+      {
+        "observed_utc": "2026-11-08T04:58:09Z",
+        "available_bytes": 41554477056
+      },
+      {
+        "observed_utc": "2026-11-08T04:58:40Z",
+        "available_bytes": 41441583104
+      },
+      {
+        "observed_utc": "2026-11-08T04:59:11Z",
+        "available_bytes": 41426812928
+      },
+      {
+        "observed_utc": "2026-11-08T04:59:41Z",
+        "available_bytes": 41412136960
+      },
+      {
+        "observed_utc": "2026-11-08T05:00:12Z",
+        "available_bytes": 41403928576
+      },
+      {
+        "observed_utc": "2026-11-08T05:00:43Z",
+        "available_bytes": 41387184128
+      },
+      {
+        "observed_utc": "2026-11-08T05:01:14Z",
+        "available_bytes": 41369051136
+      },
+      {
+        "observed_utc": "2026-11-08T05:01:45Z",
+        "available_bytes": 41356103680
+      },
+      {
+        "observed_utc": "2026-11-08T05:02:15Z",
+        "available_bytes": 41347424256
+      },
+      {
+        "observed_utc": "2026-11-08T05:02:45Z",
+        "available_bytes": 41334661120
+      },
+      {
+        "observed_utc": "2026-11-08T05:03:15Z",
+        "available_bytes": 41321590784
+      },
+      {
+        "observed_utc": "2026-11-08T05:03:46Z",
+        "available_bytes": 41306820608
+      },
+      {
+        "observed_utc": "2026-11-08T05:04:17Z",
+        "available_bytes": 41290657792
+      },
+      {
+        "observed_utc": "2026-11-08T05:04:47Z",
+        "available_bytes": 41274499072
+      },
+      {
+        "observed_utc": "2026-11-08T05:05:17Z",
+        "available_bytes": 41267253248
+      },
+      {
+        "observed_utc": "2026-11-08T05:05:48Z",
+        "available_bytes": 41254653952
+      },
+      {
+        "observed_utc": "2026-11-08T05:06:19Z",
+        "available_bytes": 41235886080
+      },
+      {
+        "observed_utc": "2026-11-08T05:06:50Z",
+        "available_bytes": 41223434240
+      },
+      {
+        "observed_utc": "2026-11-08T05:07:21Z",
+        "available_bytes": 41209511936
+      },
+      {
+        "observed_utc": "2026-11-08T05:07:52Z",
+        "available_bytes": 41188462592
+      },
+      {
+        "observed_utc": "2026-11-08T05:08:23Z",
+        "available_bytes": 41169666048
+      },
+      {
+        "observed_utc": "2026-11-08T05:08:54Z",
+        "available_bytes": 41153552384
+      },
+      {
+        "observed_utc": "2026-11-08T05:09:25Z",
+        "available_bytes": 41138573312
+      },
+      {
+        "observed_utc": "2026-11-08T05:09:55Z",
+        "available_bytes": 41129992192
+      },
+      {
+        "observed_utc": "2026-11-08T05:10:25Z",
+        "available_bytes": 41122045952
+      },
+      {
+        "observed_utc": "2026-11-08T05:10:55Z",
+        "available_bytes": 41121210368
+      },
+      {
+        "observed_utc": "2026-11-08T05:11:25Z",
+        "available_bytes": 41017389056
+      },
+      {
+        "observed_utc": "2026-11-08T05:11:55Z",
+        "available_bytes": 41017348096
+      },
+      {
+        "observed_utc": "2026-11-08T05:12:26Z",
+        "available_bytes": 40940331008
+      },
+      {
+        "observed_utc": "2026-11-08T05:12:56Z",
+        "available_bytes": 40868810752
+      },
+      {
+        "observed_utc": "2026-11-08T05:13:26Z",
+        "available_bytes": 40707477504
+      },
+      {
+        "observed_utc": "2026-11-08T05:13:57Z",
+        "available_bytes": 40570126336
+      },
+      {
+        "observed_utc": "2026-11-08T05:14:27Z",
+        "available_bytes": 40499339264
+      },
+      {
+        "observed_utc": "2026-11-08T05:14:58Z",
+        "available_bytes": 40347496448
+      },
+      {
+        "observed_utc": "2026-11-08T05:15:28Z",
+        "available_bytes": 40286625792
+      },
+      {
+        "observed_utc": "2026-11-08T05:15:59Z",
+        "available_bytes": 40103587840
+      },
+      {
+        "observed_utc": "2026-11-08T05:16:30Z",
+        "available_bytes": 39958327296
+      },
+      {
+        "observed_utc": "2026-11-08T05:17:00Z",
+        "available_bytes": 39896043520
+      },
+      {
+        "observed_utc": "2026-11-08T05:17:30Z",
+        "available_bytes": 39856422912
+      },
+      {
+        "observed_utc": "2026-11-08T05:18:00Z",
+        "available_bytes": 39835709440
+      },
+      {
+        "observed_utc": "2026-11-08T05:18:30Z",
+        "available_bytes": 39828910080
+      },
+      {
+        "observed_utc": "2026-11-08T05:19:01Z",
+        "available_bytes": 39826022400
+      },
+      {
+        "observed_utc": "2026-11-08T05:19:31Z",
+        "available_bytes": 39825649664
+      },
+      {
+        "observed_utc": "2026-11-08T05:20:01Z",
+        "available_bytes": 39825416192
+      },
+      {
+        "observed_utc": "2026-11-08T05:20:31Z",
+        "available_bytes": 39820357632
+      },
+      {
+        "observed_utc": "2026-11-08T05:21:01Z",
+        "available_bytes": 39814103040
+      },
+      {
+        "observed_utc": "2026-11-08T05:21:32Z",
+        "available_bytes": 39813038080
+      },
+      {
+        "observed_utc": "2026-11-08T05:22:02Z",
+        "available_bytes": 39812939776
+      },
+      {
+        "observed_utc": "2026-11-08T05:22:32Z",
+        "available_bytes": 39812222976
+      },
+      {
+        "observed_utc": "2026-11-08T05:23:02Z",
+        "available_bytes": 39807021056
+      },
+      {
+        "observed_utc": "2026-11-08T05:23:32Z",
+        "available_bytes": 39800934400
+      },
+      {
+        "observed_utc": "2026-11-08T05:24:03Z",
+        "available_bytes": 39799603200
+      },
+      {
+        "observed_utc": "2026-11-08T05:24:33Z",
+        "available_bytes": 39799410688
+      },
+      {
+        "observed_utc": "2026-11-08T05:25:03Z",
+        "available_bytes": 39799336960
+      },
+      {
+        "observed_utc": "2026-11-08T05:25:33Z",
+        "available_bytes": 39795048448
+      }
+    ],
+    "minimum_additional_sampled_available_bytes": 39795048448,
+    "prior_accepted_artifact_manifest_verified": true,
+    "excluded_setup_attempt": "full-setup stopped before any gate because the new validation root did not exist; directory created, no source changes"
+  },
+  "limitations": [
+    "Selection counts are not complete object, whole-compiler execution or self-rebuild evidence",
+    "Every original definition is attempted; dependency coverage remains conservative",
+    "First rejections are not estimates of how many functions a repair will complete",
+    "Observer context identifies a final call or parameter, not an individual failing call argument; unobserved rejection kinds are null",
+    "The remaining memcpy group contains 1771 constant GEP sources and one stack source; intrinsic and wider ABI boundaries remain",
+    "Reference-wrapper sizes and executable hashes are compared separately; selected object bytes and execution observations must match",
+    "Recorded diagnostic timings include profiling and concurrent validation, not a compiler-throughput comparison"
+  ],
+  "artifact_manifest": {
+    "path": "local-state/validations/census-integer-abi-20261107/acceptance-artifacts.sha256",
+    "sha256": "4cc1e5ece5d81a6137e375c9eaddb7bdfc01b74f52836a640e239a27f3430a20"
+  }
+}

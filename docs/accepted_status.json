@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "5ad6c51c8a9c50e23fa0aa1a208174f66472a5e9",
-  "accepted_tree": "53462efaedeb06be3e2a3ad9d144911d93d0ec9c",
+  "accepted_revision": "baf7a767e45c52f21eeafcb67cd01b4cb155a4c4",
+  "accepted_tree": "271f84e7a31ec2c27aedd6e6d9fdf90f2de84783",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "5ad6c51c",
+  "declaration_revision": "baf7a767",
   "evidence": [
+    "docs/evidence/census_integer_abi_acceptance_20261107.json",
+    "docs/evidence/census_integer_abi.md",
     "docs/evidence/selection_census_completion_acceptance_20261107.json",
     "docs/evidence/selection_census_completion.md",
     "docs/evidence/allocation_runtime_memory_acceptance_20261107.json",
