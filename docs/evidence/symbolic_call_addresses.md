@@ -1,9 +1,11 @@
 # Symbolic integer call arguments and the readonly-table frontier
 
-Status: implementation and focused validation complete; cumulative acceptance
-is waiting for sufficient disk headroom. This is not an accepted checkpoint.
+Status: complete and accepted at `b43dd3dc`. Both complete production/event
+replays, all 17 integration gates and all 61 native populations pass.
 Plan: [symbolic call addresses](../plans/2026-11-08-symbolic-call-addresses.md).
-Record: [focused validation and pending acceptance](symbolic_call_addresses_focused_20261108.json).
+Record: [full acceptance](symbolic_call_addresses_acceptance_20261108.json).
+The [earlier focused receipt](symbolic_call_addresses_focused_20261108.json)
+remains historical and unchanged.
 Raw evidence: `local-state/validations/symbolic-call-20261108/`.
 
 Implementation is frozen at `b43dd3dc`, following `d2903a1c` for shared address
@@ -77,10 +79,42 @@ table-shape list is unnecessary for these ordinary integer arrays.
 Frozen Debug and ReleaseSafe each pass 1,970 unit tests and 22 structural checks.
 Both frozen Debug and ReleaseFast compilers pass the new native population in
 all three modes. The two profile tests, five whole-compiler report tests and
-readiness also pass. Source and scratch checks pass. Full acceptance and the
-runtime production replay stopped at admission; neither began compilation.
-Production replays, complete event audits and all 17 integration gates remain
-required before updating the accepted checkpoint.
+readiness also pass. Both complete production replays match diagnostic selected
+identities and failure tuples. Event audits account for all 8,928 compiler and
+455 runtime definitions, with no unfinished function or legalizer activity.
+
+All 17 cumulative gates and 61 native populations pass, totaling 1,949,700 local
+observations against 974,850 references. Every preceding native population is
+preserved. The twelve-function core cohort retains all 36 selected-object and
+execution-observation records. Local linked sizes match. Twenty-four Fast/Safe
+reference wrappers shrink by 16 bytes, consistent with the shorter validation
+path; that explanation is an inference. Their metadata is recorded separately,
+without claiming old/new ELF section identity. Ratchet 130 remains unchanged.
+
+All five fixed Zig programs pass in three modes. The larger unchanged Zig
+program passes 87 input/mode pairs and 603 observation controls; the C corpus
+passes 138 pairs and 552 observation controls. Core controls retain 21
+function/mode pairs, 22,788 observations and all 54 fault detections.
+
+## Compiler identity and retained evidence
+
+The suite's first object gate invokes `zig build run`, rebuilding default Debug
+after the earlier cache retirement. The final exact-binary check detected a
+different hash. Both binaries are retained: focused Debug starts `71b319f7`,
+and suite Debug starts `31b84769`. The upstream C/native report authenticates the
+suite binary; the full 1,763-file source manifest is unchanged. ReleaseFast
+remains `27719fda` and supplies the complete production replays and broader
+input-program hooks.
+
+An ELF comparison finds identical machine code, seven identical allocated
+sections, unchanged BSS/TLS-zero layouts and byte-identical contents of all
+22,132 declared readonly data objects (1,524,002 bytes). The 156,468 differing
+allocated bytes lie outside those object ranges in `.data.rel.ro`; debug and
+symbol metadata also differ. This establishes the stated section/object
+comparisons, not whole-file identity or behavior of arbitrary reads outside
+declared objects. The source audit and completed execution suite support
+acceptance of the separately identified rebuild. The initial failed comparison
+is retained; no compiler source or test expectation was changed to accept it.
 
 Original input IR, prior accepted artifacts, AIR caches and all thirteen scratch
 files are preserved. Inactive project caches were retired before builds and
@@ -92,14 +126,18 @@ and backend captures remain independent. No archives were created. The storage
 inventory and before/after checks are retained under the evidence root. Admission
 and execution reserve remain 32,949,672,960 and 24,359,738,368 bytes.
 
-After space is available, run
-`bash local-state/validations/symbolic-call-20261108/resume-validation.sh`.
-It checks frozen identities, runs both production replays/event audits, then the
-full suite and population comparisons. Inspect the actual core executable
-metadata before final postchecks and publication. The 271-file focused evidence
-manifest is already verified; pending scripts and future outputs are excluded
-from that immutable subset. Gross allocation accounted for across cache
-retirements, obsolete binaries and identical-file sharing is 4.35 GB; this is
-not the net free-space change on the concurrently used filesystem.
+The initial full-suite and runtime-production attempts stopped at admission
+before compilation. Resumed validation began with 44.65 GB free and performed
+no cleanup while running. Its lowest additional disk sample is 30.82 GB;
+final postcheck space is 31.92 GB. The suite took 62.4 minutes. Diagnostic
+timings include concurrent validation and profiling and are not throughput
+comparisons.
+
+Source, compiler, frontend, original input and scratch identities verify. The
+prior accepted artifact manifest and immutable 271-file focused manifest also
+verify. Full acceptance seals 831 retained files. Gross allocation accounted
+for by the earlier cache retirements, obsolete binaries and identical-file
+sharing is 4.35 GB; this differs from net free-space change on the concurrently
+used filesystem.
 
 No complete compiler/runtime object, compiler startup or self-rebuild is claimed.

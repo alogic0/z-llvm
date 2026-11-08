@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `111f2e0af7a345732b057ec5e2d7889caeb4638b`; tree: `f24780b4def2de371a9903ca754d5b8051528a97`.
+Accepted revision: `b43dd3dc7faf3ecd3f88e6ad25e7bc528f52a3dc`; tree: `971db4fa54baee19f3435d3126414c4b9764a80c`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -26,46 +26,51 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 <!-- accepted-status:end -->
 
 The [symbolic integer call-address slice](evidence/symbolic_call_addresses.md)
-at `b43dd3dc` has passed focused checks and complete censuses: 7,441 compiler and
-284 runtime selections, adding 325 with no losses. Production/event replays and
-all 17 cumulative gates remain blocked at disk admission, so the accepted block
-above is unchanged. All 225 readonly-table failures are classified as accesses
-to two quoted private integer-array globals; shared quoted-symbol handling is
-the next repair after this slice receives cumulative acceptance.
-
-The [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
-is accepted at `111f2e0a`: all 17 integration gates and 60 native populations pass.
-Debug and ReleaseSafe each pass 1,965 units and 21 structural checks. Readiness,
+is accepted at `b43dd3dc`: all 17 integration gates and 61 native populations pass.
+Debug and ReleaseSafe each pass 1,970 units and 22 structural checks. Readiness,
 profiling checks, both input corpora and fixed programs pass. Native coverage
-totals 1,942,788 local observations against 971,394 LLVM references; all 58 prior
+totals 1,949,700 local observations against 974,850 references; all 60 prior
 population records are preserved.
 
-The unchanged compiler replay attempts all 8,928 definitions, selecting 7,116
-and rejecting 1,812. All 7,040 previous successes remain, with 76 additions.
-Failures decrease by 4.03%. Runtime retains all 284 of 455 selections. Both
+The unchanged compiler replay attempts all 8,928 definitions, selecting 7,441
+and rejecting 1,487. All 7,116 previous successes remain, with 325 additions.
+Failures decrease by 17.94%. Runtime retains all 284 of 455 selections. Both
 production replays match diagnostic selected identities and failure tuples,
 with complete event audits. Dependency coverage remains conservative; no complete
 compiler/runtime object, startup or self-rebuild is claimed.
 
-The exact Linux x86-64 syscall contract now validates typed facts and optional
-tail hints through shared call machinery. Named `samesign ult i64` comparisons
-reuse the existing full-width transfer action. All 328 assembly first failures
-and 179 comparison-RHS first failures advance; many reach later boundaries.
-The two new native populations pass with both frozen Debug and ReleaseFast
-compilers, preserving original IR, register effects and rollback contracts.
+Symbolic i64 pointer constants now use shared address materialization and
+existing ordinary/indirect/stack/syscall argument transfers. All 326 targeted
+functions advance: 325 select and `main.lldMain` reaches a later poison argument.
+The new seven-function native population passes with frozen Debug and
+ReleaseFast, preserving original IR, register effects and rollback contracts.
 
 All 36 core records preserve selected objects and execution observations, and
-local linked sizes match. Twenty-four LLVM reference wrappers shrink by 32 or
-40 bytes; the exact metadata differences and their review are retained separately.
+local linked sizes match. Twenty-four reference wrappers shrink by 16 bytes;
+the exact metadata differences and their review are retained separately.
 No section-level executable identity is claimed. The 12-function core cohort,
 ratchet 130, all 603 Zig and 552 C observation controls, and 54 core fault
 detections remain intact.
 
-That checkpoint identified 326 symbolic integer call-argument cases and 225
-readonly-table global rejections. The focused slice above implements the address
-repair and classifies the tables; cumulative acceptance is still required.
-General-value and allocation failures retain concrete definitions/types. See
+The suite rebuilt default Debug after cache retirement. Both binary hashes are
+retained and authenticated. Its instructions, ordinary data and all 22,132
+declared readonly data objects match the focused binary; the bounded ELF review
+records differing bytes outside those object ranges and debug/symbol metadata.
+Source, input, frontend, scratch and prior evidence audits pass. Full acceptance
+seals 831 files; the lowest additional resumed disk sample is 30.82 GB and final
+postcheck free space is 31.92 GB. No cleanup occurred during resumed validation,
+and no archives were created.
+
+All 225 readonly-table failures refer to two resolved quoted private integer
+arrays. Shared canonical quoted-symbol handling is the next repair. Remaining
+general-value and allocation failures retain concrete definitions/types. See
 [the active handoff](next_steps.md) for the current order and remaining boundaries.
+
+The preceding [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
+at `111f2e0a` selected 7,116 compiler and 284 runtime definitions, with all 17
+gates and 60 native populations passing. It established typed syscall facts and
+optional tail hints, plus full-width transfers for named `samesign ult i64`
+comparisons. Its symbolic call-address recommendation is complete above.
 
 The preceding [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
 at `4b8eac2a` established shared general-dynamic TLS, scalar intrinsic widths and

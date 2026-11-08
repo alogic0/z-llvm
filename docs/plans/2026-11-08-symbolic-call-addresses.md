@@ -1,11 +1,14 @@
 # Symbolic integer call arguments and the next selection frontier
 
-Status: implementation and focused checks complete at `b43dd3dc`; production
-replays and cumulative acceptance are waiting for disk headroom. Complete
-censuses select 7,441 compiler and 284 runtime definitions, adding 325 with no
-losses. All 225 table failures are classified. Debug/ReleaseSafe units,
-structural checks, readiness and focused Debug/ReleaseFast native execution pass.
-See the [focused evidence](../evidence/symbolic_call_addresses.md).
+Status: complete and accepted at `b43dd3dc`. Complete production replays and
+event audits select 7,441 compiler and 284 runtime definitions, adding 325 with
+no losses. All 17 integration gates and 61 native populations pass, preserving
+the 60 prior populations and 36 core object/observation records. All 225 table
+failures are classified. Units, structural checks, readiness and focused native
+execution pass. The suite's Debug rebuild is retained and reviewed separately;
+source, input, scratch and artifact audits pass. See the
+[evidence](../evidence/symbolic_call_addresses.md) and
+[acceptance record](../evidence/symbolic_call_addresses_acceptance_20261108.json).
 
 Baseline implementation `111f2e0a`, documented at
 `088ae654`, selects 7,116 of 8,928 compiler definitions and 284 of 455 runtime

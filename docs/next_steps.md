@@ -1,58 +1,44 @@
 # Active direction
 
 The [symbolic integer call-address plan](plans/2026-11-08-symbolic-call-addresses.md)
-is implemented at `b43dd3dc`. Complete censuses select 7,441 compiler and 284
-runtime definitions, adding 325 without losses. Debug/ReleaseSafe units,
-structural checks, readiness and the new native population pass. Both production
-replays and all 17 cumulative gates still need admission headroom; the initial
-attempts stopped before compilation. See the [focused evidence](evidence/symbolic_call_addresses.md).
-Do not repeat this repair. First complete its production/event and cumulative
-acceptance checks under `local-state/validations/symbolic-call-20261108/`.
-The accepted checkpoint below remains authoritative until those checks pass.
+is complete and accepted at `b43dd3dc`. Both complete production replays and event
+audits pass: compiler selection is 7,441 of 8,928 and runtime selection is 284
+of 455. All 7,116 prior compiler successes remain, with 325 additions. Compiler
+failures fall from 1,812 to 1,487, a reduction of 17.94%. All 17 integration
+gates and 61 native populations pass; all 60 preceding native records and 36
+core object/observation records are preserved. Debug/ReleaseSafe each pass
+1,970 units and 22 structural checks. Readiness, both input corpora, fixed
+programs and fault controls pass. See the [evidence](evidence/symbolic_call_addresses.md)
+and [acceptance record](evidence/symbolic_call_addresses_acceptance_20261108.json).
 
 The next implementation slice should address canonical quoted symbol names:
 all 225 readonly-table failures refer to two resolved private integer arrays,
 `[4 x i64]` (213 functions) and `[8 x i64]` (twelve). Their actual private GEPs
-already use byte offsets. Preserve ordinary shared addressing, aliases and ELF
-symbol identity; test quoted/escaped names and replay every original definition.
+already use byte offsets. Extend canonical identifier handling through ordinary
+shared addressing, aliases and ELF symbol identity. Test quoted/escaped names,
+checked offsets and rollback, then replay every original definition. Preserve
+all 7,441 compiler and 284 runtime successes; later rejections may be exposed.
+These ordinary integer arrays do not require a specialized table-shape extension.
 
-The [syscall and measured selection-reduction plan](plans/2026-11-08-syscall-selection-reduction.md)
-is complete and accepted at `111f2e0a`. Both complete production replays and
-event audits pass: compiler selection is 7,116 of 8,928 and runtime selection
-284 of 455. All 7,040 compiler and 284 runtime baseline successes remain.
-Compiler failures fall from 1,888 to 1,812, a reduction of 76 (4.03%). Debug and
-ReleaseSafe each pass 1,965 units and 21 structural checks; both new native
-populations pass with Debug and ReleaseFast. All 17 integration gates and 60
-native populations pass; all 58 preceding native records and 36 core
-object/observation records are preserved. Source, input, scratch and prior
-artifact audits pass. Reference-wrapper metadata differences are recorded
-separately. See the [evidence](evidence/syscall_selection_reduction.md) and
-[acceptance record](evidence/syscall_selection_reduction_acceptance_20261108.json).
-
-The syscall contract now validates facts and optional tail hints through shared
-call machinery. Named `samesign ult i64` comparisons use the existing full-width
-transfer action. All 328 assembly first failures and 179 comparison-RHS first
-failures advance; many expose later boundaries. These repairs are implemented.
-
-That accepted checkpoint identified shared symbolic-address materialization for
-integer call arguments. Of 440 unknown-argument failures, 326 calls contained the same
-unresolved i64 `ptrtoint` of a constant GEP into
-`Io.Threaded.global_single_threaded_instance`. Preserve symbol/relocation identity,
-checked addends, aliases, simultaneous transfers and register effects. The other
-nonliteral candidates are i32 undef (86), i64 poison (22) and i64 undef (six);
-their semantics need an explicit separate decision. The focused implementation
-above resolves the symbolic-address candidates and awaits cumulative acceptance.
-
-The focused slice also classifies all 225 readonly-table global rejections,
-including 112 exposed by the comparison repair. All 133 general-value failures have concrete private
-definitions: the largest is 67 `<16 x i1>` comparison results, followed by thirteen
-`<2 x ptr>` loads. Allocation failures comprise 123 main and five varargs cases;
+The symbolic call repair advances all 326 targeted functions: 325 now select,
+and `main.lldMain` reaches a later i64 poison call argument. The remaining 115
+unknown-call candidates are i32 undef (86), i64 poison (23) and i64 undef (six).
+Their semantics require a separate decision. All 133 general-value failures
+have concrete private definitions: the largest is 67 `<16 x i1>` comparison
+results, followed by thirteen `<2 x ptr>` loads. Allocation failures comprise
+123 main and five varargs cases;
 all have observed types/attributes. Leading shapes are fp128 slots (30), arrays
 of two `%sort.block.Pull` values (20), 4,096-byte arrays (17), and one-element
 arrays of `{ ptr, i64 }` (10). Replay both complete inputs after each shared
 repair; group sizes do not predict completed functions.
 
-Raw evidence is under `local-state/validations/syscall-selection-20261108/`.
+Raw evidence is under `local-state/validations/symbolic-call-20261108/`.
+The suite rebuilt default Debug after cache retirement. Its separately retained
+binary has identical instructions and declared data objects; the initial exact
+hash mismatch and bounded ELF review are recorded. Keep focused and suite
+compiler identities distinct when extending this evidence. Source, input,
+scratch and prior artifact audits pass; reference-wrapper metadata is reviewed
+separately from selected objects and observations.
 No complete compiler/runtime object, startup or self-rebuild is claimed.
 Preserve the 12-function core cohort, ratchet 130 and every existing execution
 population. Admission and execution reserve remain 32.95 GB and 24.36 GB.
@@ -60,6 +46,12 @@ Finish cache cleanup before validation starts. Preserve original inputs,
 accepted evidence, AIR caches and user scratch files; create no archives.
 
 ## Preceding checkpoints
+
+The [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
+at `111f2e0a` selects 7,116 compiler and 284 runtime definitions, with all 17 gates
+and 60 native populations passing. It establishes typed syscall facts/tail hints
+and full-width transfers for named `samesign ult i64` comparisons. Its symbolic
+call-address recommendation is completed by the accepted checkpoint above.
 
 The [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
 at `4b8eac2a` selects 7,040 compiler and 284 runtime definitions, with all 17 gates
