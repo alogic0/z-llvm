@@ -66,8 +66,13 @@ pub const ReadOnlyModuleContext = struct {
 
     pub fn findGlobal(context: ReadOnlyModuleContext, symbol: []const u8) ?ir.Global {
         const name = if (std.mem.startsWith(u8, symbol, "@")) symbol[1..] else symbol;
+        // Most references retain their definition's spelling. Keep that lookup
+        // cheap before comparing alternate quoted/escaped spellings.
         for (context.globals) |global| {
-            if (std.mem.eql(u8, global.name, name)) return global;
+            if (std.mem.eql(u8, global.name, name)) return if (ir.identifiers.isValid(name)) global else null;
+        }
+        for (context.globals) |global| {
+            if (ir.identifiers.eql(global.name, name)) return global;
         }
         return null;
     }

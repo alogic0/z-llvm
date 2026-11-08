@@ -1,5 +1,34 @@
 const std = @import("std");
 const identifiers = @import("../ir/identifiers.zig");
+const ir = @import("../ir.zig");
+
+test "quoted symbol module verification shares canonical definition and call identity" {
+    for ([_][]const u8{
+        "@plain = global i64 1\n@\"pla\\69n\" = global i64 2\n",
+        "@plain = global i64 1\n@\"pla\\69n\" = alias i64, ptr @plain\n",
+        "declare i64 @plain()\ndeclare i64 @\"pla\\69n\"()\n",
+        "define i64 @plain() {\nentry:\n ret i64 1\n}\ndefine i64 @\"pla\\69n\"() {\nentry:\n ret i64 2\n}\n",
+    }) |source| {
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try std.testing.expectError(error.DuplicateDefinition, module.verify());
+    }
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\@"indirect,alias" = alias i64, ptr @"pla\69n"
+        \\@plain = global i64 1
+        \\@pointer = constant ptr @"indirect,ali\61s"
+        \\declare i64 @"consume"(i64)
+        \\define i64 @entry() {
+        \\entry:
+        \\ %r = call i64 @"cons\75me"(i64 3)
+        \\ ret i64 %r
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    module.functions.items[0].blocks.items[0].instructions.items[0].kind.call.args.items[0].ty = .{ .int = 32 };
+    try std.testing.expectError(error.CallSignatureMismatch, module.verify());
+}
 
 test "indexed identifier suffixes preserve canonical spelling and escaped identity" {
     for ([_][]const u8{ "tmp_12", "\"tmp_12\"", "\"\\74mp_\\31\\32\"" }) |name|

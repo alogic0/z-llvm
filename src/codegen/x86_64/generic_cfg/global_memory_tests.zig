@@ -8,6 +8,112 @@ const selector = @import("../generic_cfg_selector.zig");
 const global_memory = @import("global_memory.zig");
 const support = @import("value_use/test_support.zig");
 
+test "quoted symbol fixture selects dynamic tables and emits canonical alias relocation names once" {
+    const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/quoted_symbols.ll", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(source);
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .require_resolved_aliases = true };
+    try std.testing.expectEqualStrings("qs_data", context.findGlobal("@\"qs_d\\61ta\"").?.name);
+    const alias = context.dataAddress("@\"chain,fi\\72st\"").?;
+    try std.testing.expectEqualStrings("\"chain,first\"", alias.symbol);
+    try std.testing.expectEqualStrings("qs_data", alias.global.name);
+    var functions: std.ArrayList(machine.MachineFunction) = .empty;
+    defer {
+        for (functions.items) |*function| function.deinit(std.testing.allocator);
+        functions.deinit(std.testing.allocator);
+    }
+    for (module.functions.items) |function| {
+        var lowered = machine.MachineFunction.init(function.name, function.ret_ty);
+        errdefer lowered.deinit(std.testing.allocator);
+        const result = try selector.tryLowerWithContext(std.testing.allocator, &lowered, function, &context);
+        if (result == .unsupported) std.debug.print("quoted symbol {s}: {s}\n", .{ function.name, result.unsupported.detail() });
+        try std.testing.expect(result == .selected);
+        try verify.verifyFunction(lowered);
+        try functions.append(std.testing.allocator, lowered);
+    }
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, functions.items, module.aliases.items, context);
+    defer std.testing.allocator.free(object);
+    const shoff = std.mem.readInt(u64, object[40..48], .little);
+    const symtab = object[shoff + 5 * 64 ..][0..64];
+    const stroff = shoff + std.mem.readInt(u32, symtab[40..44], .little) * 64;
+    const strtab = object[stroff..][0..64];
+    const strings = object[std.mem.readInt(u64, strtab[24..32], .little)..][0..std.mem.readInt(u64, strtab[32..40], .little)];
+    const symbols = object[std.mem.readInt(u64, symtab[24..32], .little)..][0..std.mem.readInt(u64, symtab[32..40], .little)];
+    const expected = [_][]const u8{ "qs_data", "chain,first", "chain,second", "init,alias", "pointer,initializer", "quote\"-backslash\\31,()[]{}<>;" };
+    var counts: [expected.len]usize = @splat(0);
+    var data_value: ?u64 = null;
+    var alias_values: [3]?u64 = @splat(null);
+    var initializer_alias_index: ?usize = null;
+    var index: usize = 0;
+    while (index < symbols.len / 24) : (index += 1) {
+        const symbol = symbols[index * 24 ..][0..24];
+        const start = std.mem.readInt(u32, symbol[0..4], .little);
+        const name = std.mem.sliceTo(strings[start..], 0);
+        for (expected, 0..) |wanted, i| if (std.mem.eql(u8, wanted, name)) {
+            counts[i] += 1;
+            try std.testing.expect(std.mem.readInt(u16, symbol[6..8], .little) != 0);
+            const value = std.mem.readInt(u64, symbol[8..16], .little);
+            if (i == 0) data_value = value;
+            if (i >= 1 and i <= 3) alias_values[i - 1] = value;
+            if (i == 3) initializer_alias_index = index;
+        };
+    }
+    for (counts) |count| try std.testing.expectEqual(@as(usize, 1), count);
+    for (alias_values) |value| try std.testing.expectEqual(data_value.?, value.?);
+    const rela = object[shoff + 8 * 64 ..][0..64];
+    try std.testing.expectEqual(@as(u64, 24), std.mem.readInt(u64, rela[32..40], .little));
+    const relocation = object[std.mem.readInt(u64, rela[24..32], .little)..][0..24];
+    try std.testing.expectEqual(initializer_alias_index.?, std.mem.readInt(u64, relocation[8..16], .little) >> 32);
+    try std.testing.expectEqual(@as(i64, 8), std.mem.readInt(i64, relocation[16..24], .little));
+}
+
+test "quoted symbol normalization preserves original spellings and rollback boundaries" {
+    const source =
+        \\@"object,a" = internal global [32 x i8] zeroinitializer, align 8
+        \\declare i64 @consume(i64)
+        \\define i64 @address() {
+        \\entry:
+        \\ %result = call i64 @consume(i64 ptrtoint (ptr getelementptr (i8, ptr @"object,\61", i64 17) to i64))
+        \\ ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    const original = module.functions.items[0];
+    const expression = original.blocks.items[0].instructions.items[0].kind.call.args.items[0].value.constant_expr;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const normalized = (try global_memory.legalize(arena.allocator(), original, &context)).?;
+    try std.testing.expectEqualStrings("@\"object,\\61\"", normalized.blocks.items[0].instructions.items[0].kind.gep.ptr.named);
+    try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+    try std.testing.expectEqualStrings(expression, original.blocks.items[0].instructions.items[0].kind.call.args.items[0].value.constant_expr);
+    try std.testing.expect(try global_memory.legalize(arena.allocator(), normalized, &context) == null);
+    // A quoted reference does not widen linkage admission, even after private
+    // address rewriting. A rejected attempt must not publish machine output.
+    module.globals.items[0].linkage = .weak;
+    var lowered = machine.MachineFunction.init(original.name, original.ret_ty);
+    defer lowered.deinit(std.testing.allocator);
+    try std.testing.expect(try selector.tryLowerWithContext(std.testing.allocator, &lowered, original, &context) == .unsupported);
+    try std.testing.expectEqual(@as(usize, 0), lowered.instructions.items.len);
+    try std.testing.expectEqual(.unassigned, lowered.selection_owner);
+}
+
+test "quoted symbol global lookup preserves numbered identity and rejects malformed names" {
+    var module = try ir.Module.parse(std.testing.allocator, "@0 = internal global i64 11\n@\"0\" = internal global i64 29\n@\"plain\" = internal global i64 37\n");
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    try std.testing.expectEqualStrings("0", context.findGlobal("0").?.name);
+    try std.testing.expectEqualStrings("\"0\"", context.findGlobal("\"\\30\"").?.name);
+    try std.testing.expectEqualStrings("\"plain\"", context.findGlobal("plain").?.name);
+    for ([_][]const u8{ "\"plain", "\"pla\\00in\"", "\"pla\\GGin\"", "\"plain\"junk" }) |name|
+        try std.testing.expect(context.findGlobal(name) == null);
+}
+
 test "integer call address native fixture retains relocation identity and real GPR SSE spills" {
     const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/symbolic_call.ll", std.testing.allocator, .limited(1024 * 1024));
     defer std.testing.allocator.free(source);

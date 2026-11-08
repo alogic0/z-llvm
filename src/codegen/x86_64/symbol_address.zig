@@ -58,10 +58,9 @@ fn trim(text: []const u8) []const u8 {
 fn symbolName(value: []const u8) ?[]const u8 {
     const text = trim(value);
     if (text.len < 2 or text[0] != '@') return null;
-    for (text[1..]) |byte| switch (byte) {
-        'a'...'z', 'A'...'Z', '0'...'9', '.', '_', '-', '$' => {},
-        else => return null,
-    };
+    // Retain the complete LLVM spelling. Identity comparisons use the shared
+    // identifier contract; the MC boundary owns decoding to object-file bytes.
+    if (!ir.identifiers.isValid(text[1..])) return null;
     return text[1..];
 }
 
@@ -97,7 +96,7 @@ pub fn fromValue(value: ir.Value) ?Address {
         rest = trim(rest[end..]);
     }
     if (rest.len < 2 or rest[0] != '(' or rest[rest.len - 1] != ')') return null;
-    var fields = std.mem.splitScalar(u8, rest[1 .. rest.len - 1], ',');
+    var fields: @import("../../ir/structure.zig").Fields = .{ .rest = rest[1 .. rest.len - 1], .packed_type = false };
     if (!std.mem.eql(u8, trim(fields.next() orelse return null), "i8")) return null;
     const pointer = trim(fields.next() orelse return null);
     const index = trim(fields.next() orelse return null);
@@ -176,6 +175,35 @@ test "symbol byte addresses retain signed offsets and integer bit patterns" {
         try std.testing.expectEqual(case.offset, address.addend);
     }
     try std.testing.expectEqualStrings("named.object", fromValue(.{ .named = "@named.object" }).?.symbol);
+}
+
+test "quoted symbol addresses retain complete spelling through constant fields and integer casts" {
+    for ([_][]const u8{ "\"plain\"", "\"pla\\69n\"", "\"array(ptr,i64).table [0]\"", "\"punctuation ,(){}[]<>; to i64)\"", "\"quote\\22-backslash\\5C31\"", "\"name\\0Aline\"" }) |name| {
+        const reference = try std.fmt.allocPrint(std.testing.allocator, "@{s}", .{name});
+        defer std.testing.allocator.free(reference);
+        try std.testing.expectEqualStrings(name, fromValue(.{ .named = reference }).?.symbol);
+        for ([_]i32{ -8, 0, 17, std.math.minInt(i32), std.math.maxInt(i32) }) |offset| {
+            const expression = try std.fmt.allocPrint(std.testing.allocator, "getelementptr inbounds nuw (i8, ptr {s}, i64 {d})", .{ reference, offset });
+            defer std.testing.allocator.free(expression);
+            const address = fromValue(.{ .constant_expr = expression }).?;
+            try std.testing.expectEqualStrings(name, address.symbol);
+            try std.testing.expectEqual(offset, address.addend);
+            const integer = try std.fmt.allocPrint(std.testing.allocator, "ptrtoint (ptr {s} to i64)", .{expression});
+            defer std.testing.allocator.free(integer);
+            const cast = fromIntegerValue(.{ .int = 64 }, .{ .constant_expr = integer }).?;
+            try std.testing.expectEqualStrings(name, cast.symbol);
+            try std.testing.expectEqual(offset, cast.addend);
+        }
+    }
+    for ([_][]const u8{ "@\"\"", "@\"unfinished", "@\"bad\\00name\"", "@\"bad\\GG\"", "@\"bad\\1\"", "@\"bad\"tail", "@\"bad\"\"name\"", "@\"raw\nline\"", "@1suffix", "%\"local\"" }) |text|
+        try std.testing.expect(fromValue(.{ .named = text }) == null);
+    for ([_][]const u8{
+        "getelementptr (i8, ptr @\"a,b\", i64 0,)",
+        "getelementptr (i8, ptr @\"a,b\", i64 2147483648)",
+        "getelementptr (i8, ptr @\"a,b\", i32 0)",
+        "getelementptr (i8, ptr @\"a,b\", i64 0) trailing",
+        "getelementptr (i8, ptr @\"a,b, i64 0)",
+    }) |text| try std.testing.expect(fromValue(.{ .constant_expr = text }) == null);
 }
 
 test "integer symbolic addresses preserve pointer identity and reject other representations" {

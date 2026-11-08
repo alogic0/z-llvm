@@ -3,6 +3,34 @@ const ir = @import("../ir.zig");
 const compilation = @import("../compilation.zig");
 const artifact = @import("../compilation_artifact.zig");
 
+test "quoted symbol spellings agree between structured and textual construction" {
+    const builder = @import("../structured_ir_builder.zig");
+    var direct = try builder.DirectBuilder.init(std.testing.allocator, null, "x86_64-unknown-linux-gnu");
+    defer direct.deinit();
+    direct.activate();
+    defer direct.deactivate();
+    var text = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer text.deinit();
+    var output = builder.Module.init(&text.writer);
+    try output.global("\"object,a\"", "internal", .i64, "37", "8");
+    try output.alias("\"alias,a\"", .i64, "@\"object,\\61\"");
+    try output.declare(.i64, "\"helper,a\"", "i64");
+    var function = try output.function("", .i64, "\"entry,a\"", "i64 %x", "");
+    var block = try function.block("entry");
+    _ = try block.call("r", "", .i64, "@\"helper,\\61\"", "i64 %x");
+    try block.ret(builder.local(.i64, "%r"));
+    try function.end();
+    var parsed = try ir.Module.parse(std.testing.allocator, text.written());
+    defer parsed.deinit();
+    try parsed.verify();
+    try direct.module.verify();
+    try std.testing.expectEqualStrings(parsed.globals.items[0].name, direct.module.globals.items[0].name);
+    try std.testing.expectEqualStrings(parsed.aliases.items[0].target, direct.module.aliases.items[0].target);
+    try std.testing.expectEqualStrings(parsed.declarations.items[0].name, direct.module.declarations.items[0].name);
+    try std.testing.expectEqualStrings(parsed.functions.items[0].name, direct.module.functions.items[0].name);
+    try std.testing.expectEqualStrings(parsed.functions.items[0].blocks.items[0].instructions.items[0].kind.call.callee, direct.module.functions.items[0].blocks.items[0].instructions.items[0].kind.call.callee);
+}
+
 test "compilation preparation makes optimization explicit and honors pass limits" {
     const source =
         \\define i32 @answer() {

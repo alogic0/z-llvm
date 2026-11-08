@@ -405,8 +405,10 @@ test "selection census copies resolved global properties and original alias iden
 }
 
 test "selection census retains rejected table representation without changing selection" {
+    // Quoted globals now select with a 64-bit layout. Keep the observer's
+    // rejection proof on the unsupported 32-bit address-layout boundary.
     const text =
-        \\target datalayout = "e-p:64:64-i64:64"
+        \\target datalayout = "e-p:32:32-i64:64"
         \\@"table bytes" = internal constant [8 x i8] zeroinitializer, align 8
         \\declare void @witness(ptr)
         \\define ptr @table(i64 %index) {

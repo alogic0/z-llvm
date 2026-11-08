@@ -2,6 +2,15 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "quoted_symbols",
+      "codegen_args": ["--codegen-reachable"],
+      "prefix": "quoted-symbols",
+      "fixture": "quoted_symbols",
+      "functions": ["quoted_four", "quoted_eight", "quoted_initializer", "quoted_literal", "quoted_call", "quoted_mutate", "quoted_phi"],
+      "observations": 1024,
+      "stdout": "quoted-symbols observations=1024 tables=escapes=aliases=initializers=offsets=phis=guards=preserved\n"
+    },
+    {
       "population": "symbolic_call",
       "codegen_args": ["--codegen-reachable"],
       "prefix": "symbolic-call",

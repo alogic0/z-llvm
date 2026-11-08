@@ -1071,11 +1071,8 @@ fn stripValuePrefix(text: []const u8) []const u8 {
 
 fn stripGlobalPrefix(text: []const u8) []const u8 {
     const trimmed = std.mem.trim(u8, text, " \t");
-    const without_at = if (trimmed.len != 0 and trimmed[0] == '@') trimmed[1..] else trimmed;
-    if (without_at.len >= 2 and without_at[0] == '"' and without_at[without_at.len - 1] == '"') {
-        return without_at[1 .. without_at.len - 1];
-    }
-    return without_at;
+    // Match textual IR: keep quoting/escapes until the object-file boundary.
+    return if (trimmed.len != 0 and trimmed[0] == '@') trimmed[1..] else trimmed;
 }
 
 pub fn parseGlobalInitializer(ty: ir.Type, text: []const u8) ir.GlobalInitializer {

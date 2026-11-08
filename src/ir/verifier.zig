@@ -3,6 +3,11 @@ const core = @import("core.zig");
 const fp_semantics = @import("../analysis/fp_semantics.zig");
 const integer_semantics = @import("../analysis/integer_semantics.zig");
 const target = @import("../target.zig");
+const identifiers = @import("identifiers.zig");
+
+fn SymbolMap(comptime Value: type) type {
+    return std.HashMap([]const u8, Value, identifiers.Context, std.hash_map.default_max_load_percentage);
+}
 
 const InstructionLocation = struct {
     block_index: usize,
@@ -16,10 +21,10 @@ const Definition = struct {
 
 const ModuleLookup = struct {
     module: core.Module,
-    declarations: *const std.StringHashMap(usize),
-    functions: *const std.StringHashMap(usize),
-    global_defs: *const std.StringHashMap(void),
-    decl_defs: *const std.StringHashMap(void),
+    declarations: *const SymbolMap(usize),
+    functions: *const SymbolMap(usize),
+    global_defs: *const SymbolMap(void),
+    decl_defs: *const SymbolMap(void),
 
     fn findDeclaration(lookup: ModuleLookup, name: []const u8) ?core.FunctionDecl {
         const index = lookup.declarations.get(name) orelse return null;
@@ -391,13 +396,13 @@ pub fn verify(module: core.Module) !void {
     try verifyNamedTypes(module);
     try verifyMetadataGraph(module);
 
-    var global_defs = std.StringHashMap(void).init(module.allocator);
+    var global_defs = SymbolMap(void).init(module.allocator);
     defer global_defs.deinit();
-    var decl_defs = std.StringHashMap(void).init(module.allocator);
+    var decl_defs = SymbolMap(void).init(module.allocator);
     defer decl_defs.deinit();
-    var decl_indices = std.StringHashMap(usize).init(module.allocator);
+    var decl_indices = SymbolMap(usize).init(module.allocator);
     defer decl_indices.deinit();
-    var function_indices = std.StringHashMap(usize).init(module.allocator);
+    var function_indices = SymbolMap(usize).init(module.allocator);
     defer function_indices.deinit();
     var comdat_defs = std.StringHashMap(void).init(module.allocator);
     defer comdat_defs.deinit();
@@ -1491,24 +1496,24 @@ fn findConstantExprTopLevelComma(text: []const u8) ?usize {
 
 fn findDeclaration(module: core.Module, name: []const u8) ?core.FunctionDecl {
     for (module.declarations.items) |decl| {
-        if (std.mem.eql(u8, decl.name, name)) return decl;
+        if (identifiers.eql(decl.name, name)) return decl;
     }
     return null;
 }
 
 fn findFunction(module: core.Module, name: []const u8) ?core.Function {
     for (module.functions.items) |function| {
-        if (std.mem.eql(u8, function.name, name)) return function;
+        if (identifiers.eql(function.name, name)) return function;
     }
     return null;
 }
 
 fn hasGlobalValue(module: core.Module, name: []const u8) bool {
     for (module.globals.items) |global| {
-        if (std.mem.eql(u8, global.name, name)) return true;
+        if (identifiers.eql(global.name, name)) return true;
     }
     for (module.aliases.items) |alias| {
-        if (std.mem.eql(u8, alias.name, name)) return true;
+        if (identifiers.eql(alias.name, name)) return true;
     }
     if (findDeclaration(module, name) != null) return true;
     if (findFunction(module, name) != null) return true;

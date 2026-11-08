@@ -316,7 +316,7 @@ fn appendReachableGlobals(
     const context = module_context orelse return;
     var queue: std.ArrayList([]const u8) = .empty;
     defer queue.deinit(allocator);
-    var seen = std.StringHashMap(void).init(allocator);
+    var seen = std.HashMap([]const u8, void, symbol_names.Context, std.hash_map.default_max_load_percentage).init(allocator);
     defer seen.deinit();
     if (context.emit_all_globals) {
         for (context.globals) |global| try queue.append(allocator, global.name);
@@ -339,7 +339,7 @@ fn appendReachableGlobals(
         if (entry.found_existing) continue;
         if (seen.count() > 4096) return error.UnsupportedGlobalData;
         const global = context.findGlobal(name) orelse {
-            for (aliases) |alias| if (std.mem.eql(u8, alias.name, name)) {
+            for (aliases) |alias| if (ir.identifiers.eql(alias.name, name)) {
                 if (!context.require_resolved_aliases) return error.UnsupportedGlobalData;
                 try queue.append(allocator, alias.target);
                 break;
