@@ -1,0 +1,306 @@
+{
+  "schema": "symbolic-call-address-focused-v1",
+  "status": "focused_passed_acceptance_pending",
+  "recorded_utc": "2026-11-08T18:42:52Z",
+  "implementation_revision": "b43dd3dc7faf3ecd3f88e6ad25e7bc528f52a3dc",
+  "implementation_tree": "971db4fa54baee19f3435d3126414c4b9764a80c",
+  "implementation_commits": [
+    "d2903a1c",
+    "b43dd3dc"
+  ],
+  "accepted_checkpoint_unchanged": "111f2e0af7a345732b057ec5e2d7889caeb4638b",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "compiler": {
+    "examined": 8928,
+    "selected": 7441,
+    "failed": 1487,
+    "new_successes": 325,
+    "lost_successes": 0
+  },
+  "runtime": {
+    "examined": 455,
+    "selected": 284,
+    "failed": 171,
+    "new_successes": 0,
+    "lost_successes": 0
+  },
+  "measured_reduction": {
+    "examined": 8928,
+    "baseline_selected": 7116,
+    "selected": 7441,
+    "baseline_failed": 1812,
+    "failed": 1487,
+    "new_successes": 325,
+    "lost_successes": 0,
+    "failures_removed": 325,
+    "reduction_percent": 17.93598233995585
+  },
+  "targeted_symbolic_calls": {
+    "baseline_targets": 326,
+    "selected": 325,
+    "still_rejected": 1,
+    "remaining_symbolic_call_candidates": 0,
+    "after_groups": [
+      {
+        "outcome": {
+          "selected": true,
+          "selector_tag": null,
+          "selector_detail": null
+        },
+        "functions": 325
+      },
+      {
+        "outcome": {
+          "selected": false,
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-call-unknown-arg"
+        },
+        "functions": 1
+      }
+    ],
+    "limitation": "A candidate is an unresolved nonliteral argument in the actual rejected call; the observer does not identify one failing argument"
+  },
+  "remaining_target": {
+    "function": "main.lldMain",
+    "later_unresolved_nonliteral_argument": "i64 poison"
+  },
+  "readonly_tables": {
+    "baseline_failures": 225,
+    "current_failures": 225,
+    "observed": 225,
+    "baseline_transitions": [
+      {
+        "outcome": {
+          "selected": false,
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-gep-readonly-table-global"
+        },
+        "functions": 225
+      }
+    ],
+    "source_types": [
+      {
+        "type": "i8",
+        "functions": 225
+      }
+    ],
+    "global_shapes": [
+      {
+        "shape": {
+          "global": {
+            "type": "[4 x i64]",
+            "kind": "constant",
+            "linkage": "private",
+            "address_attrs": "unnamed_addr",
+            "attrs": "align 8",
+            "initializer": "array"
+          },
+          "decode_error": null
+        },
+        "functions": 213
+      },
+      {
+        "shape": {
+          "global": {
+            "type": "[8 x i64]",
+            "kind": "constant",
+            "linkage": "private",
+            "address_attrs": "unnamed_addr",
+            "attrs": "align 8",
+            "initializer": "array"
+          },
+          "decode_error": null
+        },
+        "functions": 12
+      }
+    ],
+    "symbols": [
+      {
+        "pointer": "@\"switch.table.array_hash_map.Custom([]const u8,main.CliModule,array_hash_map.StringContext,true).getOrPutContext.19906\"",
+        "functions": 213,
+        "representation": {
+          "result": "switch.gep",
+          "source_type": "i8",
+          "pointer": "@\"switch.table.array_hash_map.Custom([]const u8,main.CliModule,array_hash_map.StringContext,true).getOrPutContext.19906\"",
+          "pointer_addrspace": null,
+          "indices": [
+            {
+              "type": "i64",
+              "attrs": null,
+              "value": "%__zllvm_scalar_form_879",
+              "location": "spill64",
+              "origin": "binary"
+            }
+          ],
+          "decode_error": null,
+          "global": {
+            "name": "\"switch.table.array_hash_map.Custom([]const u8,main.CliModule,array_hash_map.StringContext,true).getOrPutContext.19906\"",
+            "type": "[4 x i64]",
+            "kind": "constant",
+            "linkage": "private",
+            "address_attrs": "unnamed_addr",
+            "attrs": "align 8",
+            "initializer": "array"
+          }
+        },
+        "examples": [
+          "Type.print",
+          "zig.AstGen.structDeclInner",
+          "zig.AstGen.containerDecl",
+          "\"array_hash_map.Custom(zig.Zir.Inst.Capture,zig.Zir.NullTerminatedString,array_hash_map.AutoContext(zig.Zir.Inst.Capture),true).getOrPut\""
+        ]
+      },
+      {
+        "pointer": "@\"switch.table.array_hash_map.Custom(void,void,array_hash_map.AutoContext(void),true).checkedHash__func_13412\"",
+        "functions": 12,
+        "representation": {
+          "result": "switch.gep",
+          "source_type": "i8",
+          "pointer": "@\"switch.table.array_hash_map.Custom(void,void,array_hash_map.AutoContext(void),true).checkedHash__func_13412\"",
+          "pointer_addrspace": null,
+          "indices": [
+            {
+              "type": "i64",
+              "attrs": null,
+              "value": "%__zllvm_scalar_form_63",
+              "location": "spill64",
+              "origin": "binary"
+            }
+          ],
+          "decode_error": null,
+          "global": {
+            "name": "\"switch.table.array_hash_map.Custom(void,void,array_hash_map.AutoContext(void),true).checkedHash__func_13412\"",
+            "type": "[8 x i64]",
+            "kind": "constant",
+            "linkage": "private",
+            "address_attrs": "unnamed_addr",
+            "attrs": "align 8",
+            "initializer": "array"
+          }
+        },
+        "examples": [
+          "link.MachO.ZigObject.resolveSymbols",
+          "link.MachO.InternalObject.resolveSymbols",
+          "link.MachO.file.File.resolveSymbols",
+          "link.MachO.dedupLiterals"
+        ]
+      }
+    ],
+    "quoted_pointers": 225,
+    "unresolved_globals": 0,
+    "scope": "Final private GEP, resolved global properties and initializer representation; decode errors retain their error names, a null error denotes a declined table shape or property"
+  },
+  "next_shared_repair": "Canonical quoted and escaped symbol names through ordinary symbolic addresses, aliases and ELF relocation identity",
+  "validation": {
+    "unit_build_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "unit_tests_per_mode": 1970,
+    "structural_checks_per_mode": 22,
+    "profile_process_tests": 2,
+    "whole_compiler_report_tests": 5,
+    "readiness_passed": true,
+    "native": {
+      "status": "passed",
+      "compiler_builds": 2,
+      "populations": 1,
+      "unique_functions": 7,
+      "local_observations_per_compiler_build": 6912,
+      "reference_observations_per_compiler_build": 3456,
+      "rows": [
+        {
+          "population": "symbolic_call",
+          "compiler_sha256": "71b319f7124c6af213d6c7851d94c3891705ff707eaa9ddd6b7f8f9e6b6989c7",
+          "fixture_ir_sha256": "3ae91b4ef8693f2a68ba6679f1ceba95fce985c861b8c4cf56e34dee46313ef2",
+          "driver_sha256": "6841ffe88b96312774eb75b6605b70df2ec09f8563153e268e24a7a7332c15e3",
+          "local_observations": 6912,
+          "reference_observations": 3456
+        },
+        {
+          "population": "symbolic_call",
+          "compiler_sha256": "27719fdaebb7378db5077e3dc96e69dafcb3181c6f099b75c9fcbdf7661cc07f",
+          "fixture_ir_sha256": "3ae91b4ef8693f2a68ba6679f1ceba95fce985c861b8c4cf56e34dee46313ef2",
+          "driver_sha256": "6841ffe88b96312774eb75b6605b70df2ec09f8563153e268e24a7a7332c15e3",
+          "local_observations": 6912,
+          "reference_observations": 3456
+        }
+      ]
+    },
+    "registry": {
+      "prior_populations": 60,
+      "current_populations": 61,
+      "prior_entries_preserved": true,
+      "new_entries": [
+        {
+          "population": "symbolic_call",
+          "codegen_args": [
+            "--codegen-reachable"
+          ],
+          "prefix": "symbolic-call",
+          "fixture": "symbolic_call",
+          "functions": [
+            "symbolic_direct",
+            "symbolic_indirect",
+            "symbolic_negative",
+            "symbolic_stack",
+            "symbolic_live",
+            "symbolic_write",
+            "symbolic_read"
+          ],
+          "observations": 1152,
+          "stdout": "symbolic-call observations=1152 addresses=aliases=stack=syscalls=live=phis=spills=preserved\n"
+        }
+      ]
+    },
+    "source_and_scratch_membership_and_content_verified": true,
+    "prior_artifact_manifest_verified": true,
+    "default_debug_binary_verified": true
+  },
+  "scope": "Every original compiler/runtime definition was selected independently; native execution validates the new seven-function population. Complete objects, whole-compiler execution and cumulative acceptance are not credited",
+  "acceptance_pending": {
+    "production_replays": [
+      "compiler",
+      "runtime"
+    ],
+    "production_event_audits": true,
+    "cumulative_integration_gates": 17,
+    "initial_full_attempt": "Stopped at admission before launching the full gate runner",
+    "initial_runtime_production_attempt": "Stopped at setup with InsufficientAdmissionSpace; no compilation",
+    "admission_available_bytes": 32822853632,
+    "required_start_bytes": 32949672960,
+    "reserve_bytes": 24359738368,
+    "latest_recorded_available_bytes": 32435949568,
+    "resume_script": "local-state/validations/symbolic-call-20261108/resume-validation.sh",
+    "after_gates": "Review actual core executable metadata; run source, input, scratch and prior-artifact postchecks; seal final artifacts and update accepted status only after acceptance"
+  },
+  "storage_reconciliation": {
+    "schema": "symbolic-call-storage-reconciliation-v1",
+    "initial_object_cache_allocated_bytes": 1273794560,
+    "subsequent_idle_project_caches_allocated_bytes": 1082134528,
+    "obsolete_temporary_binaries": 36,
+    "obsolete_temporary_binaries_allocated_bytes": 100261888,
+    "large_identical_files_shared": 4,
+    "large_duplicate_inode_allocation_retired_bytes": 1031499776,
+    "medium_identical_files_shared": 253,
+    "medium_duplicate_inode_allocation_retired_bytes": 867090432,
+    "total_accounted_allocation_bytes": 4354781184,
+    "all_retained_paths_and_hashes_preserved": true,
+    "original_frontend_backend_captures_independent": true,
+    "original_backend_inode_preserved": true,
+    "scratch_unchanged": true,
+    "accepted_manifest_hash_checks_passed": true,
+    "archives_created": false,
+    "scope": "Project-only cache retirement, obsolete temporary executables and hardlink sharing of completed immutable files; current binaries, original captures, AIR, scratch and all retained evidence content remain",
+    "accounting_limit": "Gross allocation associated with retired files/inodes across separate intervals; regenerated caches and concurrent filesystem changes make this different from net free-space gain. Initial stale cache metadata is excluded from byte totals.",
+    "initial_sharing_script": "Stopped at two already-shared legacy pairs after sharing two input copies; resume skipped those pairs and completed the remaining compiler snapshots; before and after inventories retained"
+  },
+  "archives_created": false,
+  "artifact_manifest": {
+    "path": "local-state/validations/symbolic-call-20261108/focused-artifacts.sha256",
+    "files": 271,
+    "sha256": "3befeb75143f561ec606b8a50a72bcdc1717f7887c3e12482bcfe0ac89947357",
+    "scope": "Immutable focused evidence subset; pending full-validation scripts and future outputs are excluded"
+  }
+}

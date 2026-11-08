@@ -25,6 +25,14 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The [symbolic integer call-address slice](evidence/symbolic_call_addresses.md)
+at `b43dd3dc` has passed focused checks and complete censuses: 7,441 compiler and
+284 runtime selections, adding 325 with no losses. Production/event replays and
+all 17 cumulative gates remain blocked at disk admission, so the accepted block
+above is unchanged. All 225 readonly-table failures are classified as accesses
+to two quoted private integer-array globals; shared quoted-symbol handling is
+the next repair after this slice receives cumulative acceptance.
+
 The [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
 is accepted at `111f2e0a`: all 17 integration gates and 60 native populations pass.
 Debug and ReleaseSafe each pass 1,965 units and 21 structural checks. Readiness,
@@ -53,11 +61,11 @@ No section-level executable identity is claimed. The 12-function core cohort,
 ratchet 130, all 603 Zig and 552 C observation controls, and 54 core fault
 detections remain intact.
 
-Next, prioritize symbolic-address materialization for integer call arguments:
-326 of 440 unknown-argument calls contain the same unresolved constant `ptrtoint`.
-Then classify 225 readonly-table global rejections. All 133 general-value and
-128 allocation failures now have attributed concrete definitions/types. See
-[the active handoff](next_steps.md) for the measured groups and boundaries.
+That checkpoint identified 326 symbolic integer call-argument cases and 225
+readonly-table global rejections. The focused slice above implements the address
+repair and classifies the tables; cumulative acceptance is still required.
+General-value and allocation failures retain concrete definitions/types. See
+[the active handoff](next_steps.md) for the current order and remaining boundaries.
 
 The preceding [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
 at `4b8eac2a` established shared general-dynamic TLS, scalar intrinsic widths and

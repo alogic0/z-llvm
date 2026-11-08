@@ -1,6 +1,13 @@
 # Symbolic integer call arguments and the next selection frontier
 
-Status: implementing. Baseline implementation `111f2e0a`, documented at
+Status: implementation and focused checks complete at `b43dd3dc`; production
+replays and cumulative acceptance are waiting for disk headroom. Complete
+censuses select 7,441 compiler and 284 runtime definitions, adding 325 with no
+losses. All 225 table failures are classified. Debug/ReleaseSafe units,
+structural checks, readiness and focused Debug/ReleaseFast native execution pass.
+See the [focused evidence](../evidence/symbolic_call_addresses.md).
+
+Baseline implementation `111f2e0a`, documented at
 `088ae654`, selects 7,116 of 8,928 compiler definitions and 284 of 455 runtime
 definitions. All 17 integration gates and 60 native populations pass. See the
 [baseline evidence](../evidence/syscall_selection_reduction.md).
@@ -11,8 +18,9 @@ i64 `ptrtoint` of a constant byte GEP into
 or poison and require a separate semantic decision. Group size does not predict
 completed functions: every repaired first failure may expose another boundary.
 
-1. Preserve input, baseline evidence and scratch identities. Finish any removal
-   of inactive, rebuildable project caches before validation starts.
+1. Preserve input, baseline evidence and scratch identities. Retire inactive,
+   rebuildable project caches before compilation or between completed focused
+   checks and cumulative validation, while all cache consumers are idle.
 2. Extend the shared symbolic-address contract for default-space, integral
    64-bit pointers cast to i64. Expose accepted constant addresses as private
    SSA GEP/cast instructions, retaining symbol identity, checked signed addends,

@@ -1,5 +1,21 @@
 # Active direction
 
+The [symbolic integer call-address plan](plans/2026-11-08-symbolic-call-addresses.md)
+is implemented at `b43dd3dc`. Complete censuses select 7,441 compiler and 284
+runtime definitions, adding 325 without losses. Debug/ReleaseSafe units,
+structural checks, readiness and the new native population pass. Both production
+replays and all 17 cumulative gates still need admission headroom; the initial
+attempts stopped before compilation. See the [focused evidence](evidence/symbolic_call_addresses.md).
+Do not repeat this repair. First complete its production/event and cumulative
+acceptance checks under `local-state/validations/symbolic-call-20261108/`.
+The accepted checkpoint below remains authoritative until those checks pass.
+
+The next implementation slice should address canonical quoted symbol names:
+all 225 readonly-table failures refer to two resolved private integer arrays,
+`[4 x i64]` (213 functions) and `[8 x i64]` (twelve). Their actual private GEPs
+already use byte offsets. Preserve ordinary shared addressing, aliases and ELF
+symbol identity; test quoted/escaped names and replay every original definition.
+
 The [syscall and measured selection-reduction plan](plans/2026-11-08-syscall-selection-reduction.md)
 is complete and accepted at `111f2e0a`. Both complete production replays and
 event audits pass: compiler selection is 7,116 of 8,928 and runtime selection
@@ -18,16 +34,17 @@ call machinery. Named `samesign ult i64` comparisons use the existing full-width
 transfer action. All 328 assembly first failures and 179 comparison-RHS first
 failures advance; many expose later boundaries. These repairs are implemented.
 
-Next, prioritize shared symbolic-address materialization for integer
-call arguments. Of 440 unknown-argument failures, 326 calls contain the same
+That accepted checkpoint identified shared symbolic-address materialization for
+integer call arguments. Of 440 unknown-argument failures, 326 calls contained the same
 unresolved i64 `ptrtoint` of a constant GEP into
 `Io.Threaded.global_single_threaded_instance`. Preserve symbol/relocation identity,
 checked addends, aliases, simultaneous transfers and register effects. The other
 nonliteral candidates are i32 undef (86), i64 poison (22) and i64 undef (six);
-their semantics need an explicit separate decision.
+their semantics need an explicit separate decision. The focused implementation
+above resolves the symbolic-address candidates and awaits cumulative acceptance.
 
-Next classify the 225 readonly-table global rejections, including 112 exposed by
-the comparison repair. All 133 general-value failures now have concrete private
+The focused slice also classifies all 225 readonly-table global rejections,
+including 112 exposed by the comparison repair. All 133 general-value failures have concrete private
 definitions: the largest is 67 `<16 x i1>` comparison results, followed by thirteen
 `<2 x ptr>` loads. Allocation failures comprise 123 main and five varargs cases;
 all have observed types/attributes. Leading shapes are fp128 slots (30), arrays
