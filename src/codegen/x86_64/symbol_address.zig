@@ -4,36 +4,49 @@ const ir = @import("../../ir.zig");
 const target = @import("../../target.zig");
 
 pub const Address = struct { symbol: []const u8, addend: i32 = 0 };
-pub const GlobalProperties = struct { alignment: ?u32 = null, local: bool = false, visibility: u8 = 0 };
+pub const GlobalProperties = struct { alignment: ?u32 = null, local: bool = false, visibility: u8 = 0, tls: bool = false };
 
 pub fn globalProperties(global: ir.Global) !GlobalProperties {
+    return checkedGlobalProperties(global) catch return error.UnsupportedSymbolicGlobal;
+}
+
+/// Read-only diagnostic detail from the same property contract used by emission.
+pub fn globalPropertyFailure(global: ir.Global) ?[]const u8 {
+    _ = checkedGlobalProperties(global) catch |err| return @errorName(err);
+    return null;
+}
+
+fn checkedGlobalProperties(global: ir.Global) !GlobalProperties {
     var result: GlobalProperties = .{ .local = global.linkage == .internal or global.linkage == .private };
     switch (global.linkage) {
         .default, .external, .internal, .private => {},
-        else => return error.UnsupportedSymbolicGlobal,
+        else => return error.UnsupportedGlobalLinkage,
     }
     var address_attrs = std.mem.tokenizeAny(u8, global.address_attrs orelse "", " \t");
     while (address_attrs.next()) |attr| {
-        if (std.mem.eql(u8, attr, "hidden")) {
+        if (std.mem.eql(u8, attr, "thread_local") or std.mem.eql(u8, attr, "thread_local(generaldynamic)")) {
+            if (result.tls) return error.DuplicateGlobalTlsModel;
+            result.tls = true;
+        } else if (std.mem.eql(u8, attr, "hidden")) {
             result.visibility = 2;
         } else if (std.mem.eql(u8, attr, "protected")) {
             result.visibility = 3;
         } else if (!std.mem.eql(u8, attr, "unnamed_addr") and !std.mem.eql(u8, attr, "local_unnamed_addr") and
             !std.mem.eql(u8, attr, "dso_local") and !std.mem.eql(u8, attr, "dso_preemptable"))
-            return error.UnsupportedSymbolicGlobal;
+            return error.UnsupportedGlobalAddressAttribute;
     }
     var attributes = std.mem.splitScalar(u8, global.attrs orelse "", ',');
     while (attributes.next()) |raw| {
         const attr = trim(raw);
         if (attr.len == 0) continue;
         if (std.mem.startsWith(u8, attr, "align ")) {
-            if (result.alignment != null) return error.UnsupportedSymbolicGlobal;
-            const alignment = std.fmt.parseUnsigned(u32, trim(attr[6..]), 10) catch return error.UnsupportedSymbolicGlobal;
-            if (alignment == 0 or alignment > 4096 or !std.math.isPowerOfTwo(alignment)) return error.UnsupportedSymbolicGlobal;
+            if (result.alignment != null) return error.DuplicateGlobalAlignment;
+            const alignment = std.fmt.parseUnsigned(u32, trim(attr[6..]), 10) catch return error.InvalidGlobalAlignment;
+            if (alignment == 0 or alignment > 4096 or !std.math.isPowerOfTwo(alignment)) return error.UnsupportedGlobalAlignment;
             result.alignment = alignment;
         } else if (std.mem.startsWith(u8, attr, "!dbg !")) {
-            _ = std.fmt.parseUnsigned(u32, attr[6..], 10) catch return error.UnsupportedSymbolicGlobal;
-        } else return error.UnsupportedSymbolicGlobal;
+            _ = std.fmt.parseUnsigned(u32, attr[6..], 10) catch return error.InvalidGlobalDebugAttachment;
+        } else return error.UnsupportedGlobalAttribute;
     }
     return result;
 }
@@ -204,7 +217,7 @@ test "symbolic global properties preserve explicit alignment linkage and visibil
         try std.testing.expectError(error.UnsupportedSymbolicGlobal, globalProperties(global));
     }
     global.attrs = null;
-    global.address_attrs = "thread_local";
+    global.address_attrs = "thread_local(initialexec)";
     try std.testing.expectError(error.UnsupportedSymbolicGlobal, globalProperties(global));
     global.address_attrs = null;
     global.linkage = .weak;

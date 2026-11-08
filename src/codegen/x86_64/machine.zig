@@ -749,6 +749,9 @@ pub const Instruction = union(enum) {
     load_global_ptr_rax: []const u8,
     lea_global_rax: []const u8,
     lea_global_offset_rax: @import("symbol_address.zig").Address,
+    /// TLSGD descriptor + __tls_get_addr call, followed by a checked byte offset.
+    /// Defines RAX and clobbers every SysV caller-saved register and flags.
+    tls_address_rax: @import("symbol_address.zig").Address,
     lea_global_rdi: []const u8,
     lea_global_rsi: []const u8,
     lea_global_rdx: []const u8,

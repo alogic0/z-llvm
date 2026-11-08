@@ -51,6 +51,17 @@ const Capture = struct {
             .function_return_attrs = rejection.function.ret_attrs,
             .function_calling_convention = rejection.function.calling_conv,
             .parameter = if (rejection.parameter) |param| .{ .name = param.name, .type = try std.fmt.allocPrint(a, "{f}", .{param.ty}), .attrs = param.attrs } else null,
+            .global_address = if (rejection.global_address) |address| .{
+                .symbol = address.symbol,
+                .addend = address.addend,
+                .resolved_global = address.global.name,
+                .linkage = @tagName(address.global.linkage),
+                .kind = @tagName(address.global.kind),
+                .type = try std.fmt.allocPrint(a, "{f}", .{address.global.ty}),
+                .address_attrs = address.global.address_attrs,
+                .attrs = address.global.attrs,
+                .property_failure = address.property_failure,
+            } else null,
             .call = if (rejection.call) |call| .{
                 .callee = call.callee,
                 .indirect = call.callee_value != null,
@@ -212,5 +223,47 @@ test "selection census observer preserves selected machine bytes" {
     defer std.testing.allocator.free(plain_bytes);
     try std.testing.expectEqualSlices(u8, plain_bytes, observed_bytes);
     try std.testing.expectEqual(plain.selection_owner, observed.selection_owner);
+    try std.testing.expect(capture.payload == null);
+}
+
+test "selection census copies resolved global properties and original alias identity" {
+    const text =
+        \\@data = internal thread_local(initialexec) global i64 0, align 8
+        \\@alias = internal alias i64, ptr @data
+        \\define ptr @observed() {
+        \\entry:
+        \\  %result = getelementptr i8, ptr @alias, i64 3
+        \\  ret ptr %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const context: x86.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .aliases = module.aliases.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+        .require_resolved_aliases = true,
+    };
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    var machine = x86.MachineFunction.init("observed", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    const result = try @import("codegen/x86_64/generic_cfg_selector.zig").tryLowerObserved(std.testing.allocator, &machine, module.functions.items[0], &context, null, &observer);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expect(capture.matches(result.unsupported.tagName(), result.unsupported.detail()));
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const address = payload.value.object.get("global_address").?.object;
+    try std.testing.expectEqualStrings("alias", address.get("symbol").?.string);
+    try std.testing.expectEqualStrings("data", address.get("resolved_global").?.string);
+    try std.testing.expectEqualStrings("thread_local(initialexec)", address.get("address_attrs").?.string);
+    try std.testing.expectEqualStrings("align 8", address.get("attrs").?.string);
+    try std.testing.expectEqualStrings("UnsupportedGlobalAddressAttribute", address.get("property_failure").?.string);
+    try std.testing.expectEqual(@as(i64, 3), address.get("addend").?.integer);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    observations.Observer.reset(&observer);
     try std.testing.expect(capture.payload == null);
 }

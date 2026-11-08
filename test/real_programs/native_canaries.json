@@ -2,6 +2,25 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "tls_address",
+      "codegen_args": ["--codegen-reachable"],
+      "prefix": "tls-address",
+      "fixture": "tls_address",
+      "functions": ["tls_address_counter", "tls_address_alias", "tls_address_offset", "tls_address_update", "tls_address_double", "tls_address_choose"],
+      "observations": 2560,
+      "stdout": "tls-address observations=2560 threads=5 initialization=alignment=aliases=live=phi=preserved\n"
+    },
+    {
+      "population": "tls_address_shared",
+      "codegen_args": ["--codegen-reachable"],
+      "prefix": "tls-address-shared",
+      "fixture": "tls_address",
+      "shared_object": true,
+      "functions": ["tls_address_counter", "tls_address_alias", "tls_address_offset", "tls_address_update", "tls_address_double", "tls_address_choose"],
+      "observations": 2560,
+      "stdout": "tls-address observations=2560 threads=5 initialization=alignment=aliases=live=phi=preserved\n"
+    },
+    {
       "population": "narrow_abi_facts",
       "prefix": "narrow-abi-facts",
       "fixture": "narrow_abi_facts",

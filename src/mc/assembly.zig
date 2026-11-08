@@ -1626,6 +1626,10 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .lea_global_arg64 => |lea| try writer.print("\tleaq {s}(%rip), {s}\n", .{ lea.symbol, lea.reg.name64() }),
             .store_eax_global_i32 => |symbol| try writer.print("\tmovl %eax, {s}(%rip)\n", .{symbol}),
             .load_tls_i32_eax => |symbol| try writer.print("\tmovl %fs:{s}@TPOFF, %eax\n", .{symbol}),
+            .tls_address_rax => |address| {
+                try writer.print("\tdata16 leaq {s}@TLSGD(%rip), %rdi\n\t.value 0x6666\n\trex64 call __tls_get_addr@PLT\n", .{address.symbol});
+                if (address.addend != 0) try writer.print("\tleaq {d}(%rax), %rax\n", .{address.addend});
+            },
             .add_tls_i32_eax => |symbol| try writer.print("\taddl %fs:{s}@TPOFF, %eax\n", .{symbol}),
             .store_eax_tls_i32 => |symbol| try writer.print("\tmovl %eax, %fs:{s}@TPOFF\n", .{symbol}),
             .atomic_xadd_global_eax => |symbol| try writer.print("\tlock xaddl %eax, {s}(%rip)\n", .{symbol}),

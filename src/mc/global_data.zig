@@ -14,6 +14,7 @@ pub const Decoded = struct {
     alignment: u32,
     local: bool,
     visibility: u8,
+    tls: bool,
 
     pub fn deinit(value: *Decoded, allocator: std.mem.Allocator) void {
         allocator.free(value.relocations);
@@ -133,6 +134,9 @@ const Encoder = struct {
                 }
             }
             if (addresses.fromValue(input)) |address| {
+                if (encoder.context.dataAddress(address.symbol)) |data| {
+                    if ((try addresses.globalProperties(data.global)).tls) return error.UnsupportedGlobalData;
+                }
                 try encoder.relocations.append(encoder.allocator, .{ .offset = offset, .address = address });
                 return;
             }
@@ -247,7 +251,7 @@ pub fn decode(allocator: std.mem.Allocator, context: constants.ReadOnlyModuleCon
         .@"opaque", .c_string => |text| try encoder.text(global.ty, text, 0, 0),
         .none => unreachable,
     }
-    return .{ .bytes = encoder.bytes, .relocations = try encoder.relocations.toOwnedSlice(allocator), .alignment = properties.alignment orelse layout.alignment, .local = properties.local, .visibility = properties.visibility };
+    return .{ .bytes = encoder.bytes, .relocations = try encoder.relocations.toOwnedSlice(allocator), .alignment = properties.alignment orelse layout.alignment, .local = properties.local, .visibility = properties.visibility, .tls = properties.tls };
 }
 
 test "global data lays out named nested arrays and symbolic pointer fields" {
@@ -332,7 +336,7 @@ test "global data rejects incomplete unsupported and unbounded definitions" {
         "@bad = global [1048577 x i8] zeroinitializer",
         "%Recursive = type { %Recursive }\n@bad = global %Recursive zeroinitializer",
         "@bad = external global i64",
-        "@bad = thread_local global i64 0",
+        "@bad = thread_local(initialexec) global i64 0",
         "@bad = weak global i64 0",
         "@bad = global i64 0, section \"custom\"",
         "target datalayout = \"e-p:32:32\"\n@bad = global ptr null",

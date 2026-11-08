@@ -8,6 +8,73 @@ const selector = @import("../generic_cfg_selector.zig");
 const global_memory = @import("global_memory.zig");
 const support = @import("value_use/test_support.zig");
 
+test "TLS addresses retain alias identity call alignment and ELF TLS properties" {
+    const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/tls_address.ll", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(source);
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .require_resolved_aliases = true };
+    var functions: std.ArrayList(machine.MachineFunction) = .empty;
+    defer {
+        for (functions.items) |*function| function.deinit(std.testing.allocator);
+        functions.deinit(std.testing.allocator);
+    }
+    var tls_count: usize = 0;
+    var alias_count: usize = 0;
+    for (module.functions.items) |function| {
+        var lowered = machine.MachineFunction.init(function.name, function.ret_ty);
+        errdefer lowered.deinit(std.testing.allocator);
+        const result = try selector.tryLowerWithContext(std.testing.allocator, &lowered, function, &context);
+        if (result == .unsupported) std.debug.print("TLS {s}: {s}\n", .{ function.name, result.unsupported.detail() });
+        try std.testing.expect(result == .selected);
+        try verify.verifyFunction(lowered);
+        for (lowered.instructions.items) |instruction| if (instruction == .tls_address_rax) {
+            tls_count += 1;
+            if (std.mem.eql(u8, instruction.tls_address_rax.symbol, "tls_alias")) alias_count += 1;
+        };
+        try functions.append(std.testing.allocator, lowered);
+    }
+    try std.testing.expect(tls_count >= 6 and alias_count != 0);
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, functions.items, module.aliases.items, context);
+    defer std.testing.allocator.free(object);
+    const shoff = std.mem.readInt(u64, object[40..48], .little);
+    const tls_header = object[shoff + 3 * 64 ..][0..64];
+    try std.testing.expectEqual(@as(u64, 0x403), std.mem.readInt(u64, tls_header[8..16], .little));
+    try std.testing.expectEqual(@as(u64, 64), std.mem.readInt(u64, tls_header[48..56], .little));
+    const tls_offset = std.mem.readInt(u64, tls_header[24..32], .little);
+    try std.testing.expectEqual(@as(u64, 0), tls_offset % 64);
+    try std.testing.expectEqual(@as(u64, 17), std.mem.readInt(u64, object[tls_offset..][0..8], .little));
+    const rela_header = object[shoff + 4 * 64 ..][0..64];
+    const offset = std.mem.readInt(u64, rela_header[24..32], .little);
+    const size = std.mem.readInt(u64, rela_header[32..40], .little);
+    try std.testing.expectEqual(tls_count * 48, size);
+    var index: usize = 0;
+    while (index < size) : (index += 48) {
+        try std.testing.expectEqual(@as(u32, 19), std.mem.readInt(u32, object[offset + index + 8 ..][0..4], .little));
+        try std.testing.expectEqual(@as(u32, 4), std.mem.readInt(u32, object[offset + index + 32 ..][0..4], .little));
+        try std.testing.expectEqual(@as(i64, -4), std.mem.readInt(i64, object[offset + index + 16 ..][0..8], .little));
+    }
+}
+
+test "TLS call encoding verifies alignment and ordinary addresses cannot name TLS" {
+    var function = machine.MachineFunction.init("tls", .ptr);
+    defer function.deinit(std.testing.allocator);
+    try function.instructions.append(std.testing.allocator, .{ .tls_address_rax = .{ .symbol = "slot", .addend = -7 } });
+    try function.instructions.append(std.testing.allocator, .ret);
+    try std.testing.expectError(error.MisalignedStackBeforeCall, verify.verifyFunction(function));
+    try function.instructions.insert(std.testing.allocator, 0, .sub_rsp_8);
+    try function.instructions.insert(std.testing.allocator, 2, .add_rsp_8);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, function);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0x66, 0x48, 0x8d, 0x3d, 0, 0, 0, 0, 0x66, 0x66, 0x48, 0xe8, 0, 0, 0, 0, 0x48, 0x8d, 0x80, 0xf9, 0xff, 0xff, 0xff }, bytes[4..27]);
+    var module = try ir.Module.parse(std.testing.allocator, "@slot = internal thread_local global i64 0");
+    defer module.deinit();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    function.instructions.items[1] = .{ .lea_global_offset_rax = .{ .symbol = "slot" } };
+    try std.testing.expectError(error.SymbolAddressClassMismatch, elf.buildObjectWithModuleContext(std.testing.allocator, &.{function}, &.{}, context));
+}
+
 test "symbolic address definition preserves live accumulator values and flags" {
     var output = support.MachineFunction.init("global-address-definition", .ptr);
     defer output.deinit(std.testing.allocator);
@@ -142,7 +209,8 @@ test "flagged constant pointers share private memory normalization and global ad
     for ([_]struct { definition: []const u8, accepted: bool, address_attrs: ?[]const u8 = null }{
         .{ .definition = "private constant", .accepted = true },
         .{ .definition = "internal hidden global", .accepted = true },
-        .{ .definition = "internal thread_local global", .accepted = false },
+        .{ .definition = "internal thread_local global", .accepted = true },
+        .{ .definition = "internal thread_local(initialexec) global", .accepted = false },
         .{ .definition = "weak global", .accepted = false },
         .{ .definition = "internal global", .accepted = false, .address_attrs = "addrspace(1)" },
     }) |case| {

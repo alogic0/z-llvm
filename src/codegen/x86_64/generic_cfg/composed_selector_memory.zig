@@ -1024,7 +1024,23 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
         const context = selector.module_context orelse return .{ .no_emitter = "composed-block-gep-global-context" };
         if (!symbol_address.supportsLayout(context.target_datalayout)) return .{ .no_emitter = "composed-block-gep-global-layout" };
         const symbol = if (context.dataAddress(address.symbol)) |data| global_symbol: {
-            _ = symbol_address.globalProperties(data.global) catch return .{ .no_emitter = "composed-block-gep-global-properties" };
+            const properties = symbol_address.globalProperties(data.global) catch {
+                if (selector.rejection_observer) |observer| try observer.reject(.{
+                    .function = selector.function.?.*,
+                    .position = selector.current_position,
+                    .tag = "no_emitter",
+                    .detail = "composed-block-gep-global-properties",
+                    .result = result,
+                    .global_address = .{
+                        .symbol = data.symbol,
+                        .addend = address.addend,
+                        .global = data.global,
+                        .property_failure = symbol_address.globalPropertyFailure(data.global),
+                    },
+                });
+                return .{ .no_emitter = "composed-block-gep-global-properties" };
+            };
+            if (properties.tls) return selector_state.defineTlsAddress(selector, result_name, .{ .symbol = data.symbol, .addend = address.addend });
             break :global_symbol data.symbol;
         } else function: {
             if (address.addend != 0) return .{ .no_emitter = "composed-block-gep-function-offset" };

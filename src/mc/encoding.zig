@@ -1763,6 +1763,15 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .load_global_ptr_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x8b, 0x05, 0, 0, 0, 0 }),
             .lea_global_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x05, 0, 0, 0, 0 }),
             .lea_global_offset_rax => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x05, 0, 0, 0, 0 }),
+            .tls_address_rax => |address| {
+                // The ABI's 16-byte TLSGD sequence permits linker relaxation
+                // to initial/local exec without changing instruction offsets.
+                try bytes.appendSlice(allocator, &.{ 0x66, 0x48, 0x8d, 0x3d, 0, 0, 0, 0, 0x66, 0x66, 0x48, 0xe8, 0, 0, 0, 0 });
+                if (address.addend != 0) {
+                    try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x80 });
+                    try appendI32(&bytes, allocator, address.addend);
+                }
+            },
             .lea_global_rdi => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x3d, 0, 0, 0, 0 }),
             .lea_global_rsi => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x35, 0, 0, 0, 0 }),
             .lea_global_rdx => try bytes.appendSlice(allocator, &.{ 0x48, 0x8d, 0x15, 0, 0, 0, 0 }),
@@ -2289,6 +2298,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .load_global_i32_eax, .store_eax_global_i32 => 6,
         .load_global_ptr_rax, .lea_global_rax, .lea_global_offset_rax, .lea_global_rdi, .lea_global_rsi, .lea_global_rdx, .lea_global_arg64 => 7,
         .load_tls_i32_eax, .add_tls_i32_eax, .store_eax_tls_i32 => 8,
+        .tls_address_rax => |address| if (address.addend == 0) 16 else 23,
         .atomic_xadd_global_eax => 8,
         .mov_rsp_rdi => 3,
         .and_rsp_neg16 => 4,

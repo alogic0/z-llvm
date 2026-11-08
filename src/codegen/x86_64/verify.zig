@@ -448,6 +448,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .mov_rsp_rdi,
         .and_rsp_neg16,
         .direct_call,
+        .tls_address_rax,
         .direct_jump,
         .indirect_call_rax,
         .noreturn_direct_call,
@@ -490,6 +491,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
             };
         }
         recordXmmDefinitions(instruction, &xmm_defined_bits);
+        // Generic register loads/transfers also restore scalar XMM0 after a
+        // call has invalidated it; they do not all use an XMM0-specific opcode.
+        if (returns_scalar_sse and xmm_defined_bits[0] >= (if (function.ret_ty == .half) @as(u16, 16) else if (function.ret_ty == .float) @as(u16, 32) else @as(u16, 64))) xmm0_defined = true;
         switch (instruction) {
             .linux_syscall, .register_snapshot_rdi => eax_defined = true,
             .indirect_jump => saw_terminator = true,
@@ -553,6 +557,12 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(call.ret_ty) or sysv_abi.isVector128AbiType(call.ret_ty);
                 eax_defined = function.ret_ty == .void or (!call_returns_scalar_sse and call.ret_ty != .void);
                 if (call_returns_scalar_sse) xmm0_defined = true;
+            },
+            .tls_address_rax => {
+                if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
+                eax_defined = true;
+                xmm0_defined = false;
+                @memset(&xmm_defined_bits, 0);
             },
             .direct_jump => {},
             .indirect_call_rax => |ret_ty| {
@@ -819,6 +829,10 @@ fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u
         .reload_xmm128ps_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
         .load_stack_disp8_xmm0, .load_stack_disp32_xmm0 => defined_bits[0] = 64,
         .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32 => defined_bits[0] = 32,
+        .load_stack_disp8_xmm => |load| defined_bits[@intFromEnum(load.reg)] = 64,
+        .load_stack_disp32_xmm => |load| defined_bits[@intFromEnum(load.reg)] = 64,
+        .load_stack_disp8_xmm_f32 => |load| defined_bits[@intFromEnum(load.reg)] = 32,
+        .load_stack_disp32_xmm_f32 => |load| defined_bits[@intFromEnum(load.reg)] = 32,
         .load_arg_ptr_disp8_xmm => |load| defined_bits[@intFromEnum(load.dst)] = 64,
         .movd_eax_xmm => |reg| defined_bits[@intFromEnum(reg)] = 32,
         .movq_rax_xmm => |reg| defined_bits[@intFromEnum(reg)] = 64,
@@ -1283,6 +1297,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .mov_rsp_rdi,
         .and_rsp_neg16,
         .direct_call,
+        .tls_address_rax,
         .direct_jump,
         .indirect_call_rax,
         .noreturn_direct_call,

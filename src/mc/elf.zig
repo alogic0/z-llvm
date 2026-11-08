@@ -154,7 +154,8 @@ fn buildObjectWithOptionalModuleContext(
     var data_fixups: std.ArrayList(DataFixup) = .empty;
     defer data_fixups.deinit(allocator);
     var data_alignment: u32 = 16;
-    try appendReachableGlobals(allocator, &data, &data_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
+    var tdata_alignment: u32 = 4;
+    try appendReachableGlobals(allocator, &data, &data_alignment, &tdata, &tdata_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
     try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals, module_context);
     try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases, if (module_context) |context| context.require_resolved_aliases else false);
@@ -224,7 +225,7 @@ fn buildObjectWithOptionalModuleContext(
 
     const data_offset = cursor;
     cursor += data.items.len;
-    cursor = alignForward(cursor, 16);
+    cursor = alignForward(cursor, @max(@as(u32, 16), tdata_alignment));
 
     const tdata_offset = cursor;
     cursor += tdata.items.len;
@@ -272,7 +273,7 @@ fn buildObjectWithOptionalModuleContext(
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
         .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
         .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = data_alignment },
-        .{ .name_offset = tdata_name, .kind = 1, .flags = 0x403, .offset = tdata_offset, .size = tdata.items.len, .addralign = 4 },
+        .{ .name_offset = tdata_name, .kind = 1, .flags = 0x403, .offset = tdata_offset, .size = tdata.items.len, .addralign = tdata_alignment },
         .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },
         .{ .name_offset = symtab_name, .kind = 2, .flags = 0, .offset = symtab_offset, .size = symtab_size, .link = 6, .info = first_global, .addralign = 8, .entsize = 24 },
         .{ .name_offset = strtab_name, .kind = 3, .flags = 0, .offset = strtab_offset, .size = strtab.items.len },
@@ -303,6 +304,8 @@ fn appendReachableGlobals(
     allocator: std.mem.Allocator,
     data: *std.ArrayList(u8),
     data_alignment: *u32,
+    tdata: *std.ArrayList(u8),
+    tdata_alignment: *u32,
     fixups: *std.ArrayList(DataFixup),
     symbols: *std.ArrayList(Symbol),
     indices: *symbol_names.Index,
@@ -319,7 +322,13 @@ fn appendReachableGlobals(
         for (context.globals) |global| try queue.append(allocator, global.name);
     }
     for (functions) |function| for (function.instructions.items) |instruction| switch (instruction) {
-        .lea_global_offset_rax => |address| try queue.append(allocator, address.symbol),
+        .lea_global_offset_rax, .tls_address_rax => |address| {
+            if (context.dataAddress(address.symbol)) |resolved| {
+                const properties = try symbol_address.globalProperties(resolved.global);
+                if (properties.tls != (instruction == .tls_address_rax)) return error.SymbolAddressClassMismatch;
+            }
+            try queue.append(allocator, address.symbol);
+        },
         else => {},
     };
     var cursor: usize = 0;
@@ -338,25 +347,35 @@ fn appendReachableGlobals(
             continue; // A referenced function or an external symbol.
         };
         if (global.initializer == .none) {
-            _ = try symbol_address.globalProperties(global);
+            const properties = try symbol_address.globalProperties(global);
+            if (properties.tls) {
+                try symbols.append(allocator, .{ .name = global.name, .value = 0, .size = 0, .section_index = 0, .info = 0x16, .other = properties.visibility });
+                try indices.put(global.name, @intCast(symbols.items.len));
+            }
             continue;
         }
         var decoded = try global_data.decode(allocator, context, global);
         defer decoded.deinit(allocator);
+        const properties = try symbol_address.globalProperties(global);
+        // Static initializer relocations in TLS need a separate relocation
+        // section. Keep that representation closed until it is implemented.
+        if (properties.tls and decoded.relocations.len != 0) return error.UnsupportedTlsInitializer;
+        const section = if (properties.tls) tdata else data;
+        const section_alignment = if (properties.tls) tdata_alignment else data_alignment;
         // Zero-sized symbol placement depends on section/linkage conventions.
         // Keep it outside this ordinary, nonempty global-object envelope.
         if (decoded.bytes.len == 0) return error.UnsupportedGlobalData;
-        if (data.items.len + decoded.bytes.len + decoded.alignment > 16 * 1024 * 1024) return error.UnsupportedGlobalData;
-        try alignArrayList(data, allocator, decoded.alignment);
-        const start: u64 = data.items.len;
-        try data.appendSlice(allocator, decoded.bytes);
-        data_alignment.* = @max(data_alignment.*, decoded.alignment);
+        if (section.items.len + decoded.bytes.len + decoded.alignment > 16 * 1024 * 1024) return error.UnsupportedGlobalData;
+        try alignArrayList(section, allocator, decoded.alignment);
+        const start: u64 = section.items.len;
+        try section.appendSlice(allocator, decoded.bytes);
+        section_alignment.* = @max(section_alignment.*, decoded.alignment);
         try symbols.append(allocator, .{
             .name = global.name,
             .value = start,
             .size = decoded.bytes.len,
-            .section_index = 2,
-            .info = if (decoded.local) 0x01 else 0x11,
+            .section_index = if (properties.tls) 3 else 2,
+            .info = @as(u8, if (decoded.local) 0 else 0x10) | @as(u8, if (properties.tls) 6 else 1),
             .other = decoded.visibility,
         });
         try indices.put(global.name, @intCast(symbols.items.len));
@@ -925,6 +944,12 @@ fn collectCallRelocations(
                     .addend = 0,
                 });
             },
+            .tls_address_rax => |address| {
+                const symbol_index = try symbolIndexForTls(allocator, symbols, symbol_indices, address.symbol);
+                try relocations.append(allocator, .{ .offset = function_offset + offset + 4, .symbol_index = symbol_index, .kind = 19, .addend = -4 }); // R_X86_64_TLSGD
+                const resolver = try symbolIndexForCall(allocator, symbols, symbol_indices, "__tls_get_addr");
+                try relocations.append(allocator, .{ .offset = function_offset + offset + 12, .symbol_index = resolver, .kind = 4, .addend = -4 }); // R_X86_64_PLT32
+            },
             else => {},
         }
         offset += encoding.instructionSize(instruction);
@@ -956,7 +981,10 @@ fn symbolIndexForTls(
     symbol_indices: *symbol_names.Index,
     name: []const u8,
 ) !u32 {
-    if (symbol_indices.get(name)) |index| return index;
+    if (symbol_indices.get(name)) |index| {
+        if (symbols.items[index - 1].info & 0x0f != 6) return error.SymbolAddressClassMismatch;
+        return index;
+    }
     try symbols.append(allocator, .{
         .name = name,
         .value = 0,

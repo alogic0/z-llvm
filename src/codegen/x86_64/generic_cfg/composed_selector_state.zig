@@ -1494,6 +1494,23 @@ pub fn defineGlobalAddress(selector: *ComposedBlockSelector, result: []const u8,
     return null;
 }
 
+/// General-dynamic TLS performs a real ABI call. Preserve all live caller
+/// values through the same transaction used by ordinary pointer-returning calls.
+pub fn defineTlsAddress(selector: *ComposedBlockSelector, result: []const u8, address: @import("../symbol_address.zig").Address) !?Diagnostic {
+    var definition = try AccumulatorDefinitionTransaction.begin(selector);
+    defer definition.deinit();
+    if (try definition.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
+    try definition.finishCallPreparationAfterArguments();
+    const frame = @import("composed_selector_frame.zig");
+    const needs_alignment = selector.stack_frame_bytes == 0;
+    if (needs_alignment) try frame.appendSubRsp(selector, 8);
+    try emitEflagsInstruction(selector, .{ .tls_address_rax = address }, .clobber);
+    if (needs_alignment) try frame.appendAddRsp(selector, 8);
+    try definition.define(result, .fullRax());
+    try definition.commit();
+    return null;
+}
+
 pub fn bindAccumulator(selector: *ComposedBlockSelector, name: []const u8, bits: u16) !void {
     if (bits == 64) try bindRax(selector, name) else try bindEax(selector, name);
 }

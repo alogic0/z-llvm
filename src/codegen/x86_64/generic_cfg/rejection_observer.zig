@@ -7,6 +7,13 @@ pub const Operand = struct {
     location: ?[]const u8,
 };
 
+pub const GlobalAddress = struct {
+    symbol: []const u8,
+    addend: i32,
+    global: ir.Global,
+    property_failure: ?[]const u8,
+};
+
 pub const Rejection = struct {
     function: ir.Function,
     position: usize,
@@ -15,6 +22,7 @@ pub const Rejection = struct {
     call: ?ir.CallInst = null,
     result: ?[]const u8 = null,
     parameter: ?ir.Param = null,
+    global_address: ?GlobalAddress = null,
     operands: []const Operand = &.{},
 };
 

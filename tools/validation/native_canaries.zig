@@ -18,6 +18,7 @@ pub fn load(c: *u.Context) ![]u.Value {
         }
         if (try u.json.integer(try u.get(canary, "observations")) <= 0) return error.InvalidNativeObservations;
         _ = try u.str(canary, "stdout");
+        if (canary.object.get("shared_object")) |shared| if (shared != .bool) return error.InvalidNativeSharedObject;
         var functions = std.StringHashMap(void).init(c.a);
         for (try u.stringSlice(c.a, try u.get(canary, "functions"))) |function| if (function.len == 0 or (try functions.getOrPut(function)).found_existing) return error.InvalidNativeFunctionSet;
         if (functions.count() == 0) return error.InvalidNativeFunctionSet;
@@ -60,12 +61,14 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
     const c = runner.context;
     const population = try u.str(canary, "population");
     const prefix = try u.str(canary, "prefix");
+    const shared = if (canary.object.get("shared_object")) |value| value.bool else false;
     const fixture = try c.join(&.{ "test/real_programs", try c.fmt("{s}.ll", .{try u.str(canary, "fixture")}) });
     const driver = try c.join(&.{ "test/real_programs", try c.fmt("{s}_driver.c", .{try u.str(canary, "fixture")}) });
     const reference = try c.join(&.{ directory, try c.fmt("{s}-reference.o", .{prefix}) });
-    try runner.require(&.{ "clang-22", "-x", "ir", try llvmOpt(mode), "-c", fixture, "-o", reference }, try c.join(&.{ directory, try c.fmt("{s}-reference-object", .{prefix}) }), env);
+    const reference_args = &.{ "clang-22", "-x", "ir", try llvmOpt(mode), "-c", fixture, "-o", reference };
+    try runner.require(if (shared) try p.argv(c, reference_args, &.{"-fPIC"}) else reference_args, try c.join(&.{ directory, try c.fmt("{s}-reference-object", .{prefix}) }), env);
     const reference_exe = try c.join(&.{ directory, try c.fmt("{s}-reference", .{prefix}) });
-    try runner.require(&.{ "cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, reference, "-o", reference_exe }, try c.join(&.{ directory, try c.fmt("{s}-reference-link", .{prefix}) }), env);
+    try link(runner, driver, reference, reference_exe, shared, env);
     try runner.observe(reference_exe, &.{}, 0, try u.str(canary, "stdout"), try c.join(&.{ directory, try c.fmt("{s}-reference-run", .{prefix}) }), env);
     const observations = try u.json.integer(try u.get(canary, "observations"));
     try u.increment(c.a, report, try c.fmt("{s}_reference_observations", .{population}), observations);
@@ -102,7 +105,7 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         try runner.require(try p.argv(c, &.{ zllvm, "--emit=selection-owner-manifest" }, arguments), owner_stem, env);
         try owners(c, try c.read(try c.fmt("{s}.stdout", .{owner_stem})), try u.stringSlice(c.a, try u.get(canary, "functions")));
         const exe = try c.join(&.{ directory, try c.fmt("{s}-{s}", .{ prefix, route }) });
-        try runner.require(&.{ "cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, obj, "-o", exe }, try c.fmt("{s}-link", .{exe}), env);
+        try link(runner, driver, obj, exe, shared, env);
         try runner.observe(exe, &.{}, 0, try u.str(canary, "stdout"), try c.fmt("{s}-run", .{exe}), env);
         try u.increment(c.a, report, try c.fmt("{s}_local_observations", .{population}), observations);
         if (canary.object.get("guard_probe")) |guard| {
@@ -114,6 +117,13 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         }
     }
     if (std.mem.eql(u8, population, "module_dependencies")) try moduleControls(runner, directory, zllvm, env, report);
+}
+
+fn link(runner: *Runner, driver: []const u8, object: []const u8, exe: []const u8, shared: bool, env: *const std.process.Environ.Map) !void {
+    const c = runner.context;
+    const library = if (shared) try c.fmt("{s}.so", .{object}) else object;
+    if (shared) try runner.require(&.{ "cc", "-shared", "-Wl,-z,noexecstack", object, "-o", library }, try c.fmt("{s}-shared-link", .{exe}), env);
+    try runner.require(&.{ "cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, library, "-o", exe }, try c.fmt("{s}-link", .{exe}), env);
 }
 
 fn moduleObject(c: *u.Context, path: []const u8) !void {
