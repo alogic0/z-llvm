@@ -5282,4 +5282,3 @@ join:
   %result = xor i64 %wide, %called
   ret i64 %result
 }
-

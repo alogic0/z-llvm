@@ -20,7 +20,8 @@ pub fn main(init: std.process.Init) !void {
             if (i == 0) try w.print("  %sum_{d} = add i{d} %weight_{d}, 0\n", .{ i, bits, i }) else try w.print("  %sum_{d} = add i{d} %sum_{d}, %weight_{d}\n", .{ i, bits, i - 1, i });
         }
         if (bits == 32) try w.print("  %wide = zext i32 %sum_{d} to i64\n", .{count - 1}) else try w.print("  %wide = add i64 %sum_{d}, 0\n", .{count - 1});
-        try w.writeAll("  %result = xor i64 %wide, %called\n  ret i64 %result\n}\n\n");
+        try w.writeAll("  %result = xor i64 %wide, %called\n  ret i64 %result\n}\n");
+        if (bits != 64 or count != 288) try w.writeByte('\n');
     };
     try w.flush();
 }
