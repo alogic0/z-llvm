@@ -414,6 +414,7 @@ pub fn verify(module: core.Module) !void {
     }
 
     for (module.globals.items) |global| {
+        if (!identifiers.isValid(global.name)) return error.InvalidGlobalIdentifier;
         if (global_defs.contains(global.name)) return error.DuplicateDefinition;
         try global_defs.put(global.name, {});
         try verifyGlobalAddressAttrs(global.address_attrs);
@@ -475,12 +476,14 @@ pub fn verify(module: core.Module) !void {
     }
 
     for (module.aliases.items) |alias| {
+        if (!identifiers.isValid(alias.name)) return error.InvalidGlobalIdentifier;
         if (global_defs.contains(alias.name)) return error.DuplicateDefinition;
         try global_defs.put(alias.name, {});
         if (alias.target_ty != .ptr) return error.UnsupportedGlobalAlias;
     }
 
     for (module.declarations.items, 0..) |decl, decl_index| {
+        if (!identifiers.isValid(decl.name)) return error.InvalidGlobalIdentifier;
         if (global_defs.contains(decl.name)) return error.DuplicateDefinition;
         if (decl_defs.contains(decl.name)) return error.DuplicateDefinition;
         try verifyDeclAbiAttrs(decl);
@@ -489,6 +492,7 @@ pub fn verify(module: core.Module) !void {
     }
 
     for (module.functions.items, 0..) |function, function_index| {
+        if (!identifiers.isValid(function.name)) return error.InvalidGlobalIdentifier;
         if (global_defs.contains(function.name)) return error.DuplicateDefinition;
         if (decl_indices.get(function.name)) |decl_index| try verifyDeclMatchesFunction(module.declarations.items[decl_index], function);
         try verifyFunctionAbiAttrs(function);

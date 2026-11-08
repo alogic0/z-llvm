@@ -330,6 +330,7 @@ pub fn lowerCompatible(
         generic_lowering_functions += 1;
     }
 
+    try @import("zig_air_symbol_names.zig").normalize(&module);
     try addMissingCallDeclarations(allocator, &module);
     var mem2reg_context: pass_manager.Context = .{
         .allocator = allocator,

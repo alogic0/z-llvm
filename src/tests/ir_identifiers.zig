@@ -2,6 +2,46 @@ const std = @import("std");
 const identifiers = @import("../ir/identifiers.zig");
 const ir = @import("../ir.zig");
 
+test "literal symbol bytes encode quotes backslashes control bytes and numeric names" {
+    for ([_][2][]const u8{
+        .{ "plain", "plain" },     .{ "0", "\"0\"" },           .{ "a,b", "\"a,b\"" },
+        .{ "a\"b", "\"a\\22b\"" }, .{ "a\\31", "\"a\\5C31\"" }, .{ "line\n", "\"line\\0A\"" },
+    }) |case| {
+        const encoded = try identifiers.fromBytes(std.testing.allocator, case[0]);
+        defer std.testing.allocator.free(encoded);
+        try std.testing.expectEqualStrings(case[1], encoded);
+        try std.testing.expect(identifiers.isValid(encoded));
+    }
+    for ([_][]const u8{ "", "a\x00b" }) |bytes|
+        try std.testing.expectError(error.InvalidGlobalIdentifier, identifiers.fromBytes(std.testing.allocator, bytes));
+}
+
+test "quoted symbol maps validate all definition classes before insertion" {
+    for ([_][]const u8{ "", "raw name", "\"broken\\GG\"", "\"embedded\\00nul\"", "\"unterminated", "0suffix" }) |name| {
+        for (0..4) |kind| {
+            var module = try ir.Module.parse(std.testing.allocator,
+                \\@object = global i64 1
+                \\@alias = alias i64, ptr @object
+                \\declare i64 @helper()
+                \\define i64 @entry() {
+                \\entry:
+                \\ %result = call i64 @helper()
+                \\ ret i64 %result
+                \\}
+            );
+            defer module.deinit();
+            switch (kind) {
+                0 => module.globals.items[0].name = name,
+                1 => module.aliases.items[0].name = name,
+                2 => module.declarations.items[0].name = name,
+                3 => module.functions.items[0].name = name,
+                else => unreachable,
+            }
+            try std.testing.expectError(error.InvalidGlobalIdentifier, module.verify());
+        }
+    }
+}
+
 test "quoted symbol module verification shares canonical definition and call identity" {
     for ([_][]const u8{
         "@plain = global i64 1\n@\"pla\\69n\" = global i64 2\n",

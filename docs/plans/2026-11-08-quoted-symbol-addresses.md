@@ -18,7 +18,9 @@ already has a shared decoder that retains escapes until the object boundary.
    decode names once at the existing MC boundary. Keep width, layout, addend,
    global-property and unresolved-alias admission unchanged.
 2. Use canonical names for verifier symbol maps, module global lookup and alias
-   closure. Preserve quotes in structured construction, matching textual IR. Cover
+   closure. Preserve quotes in structured construction, matching textual IR.
+   Validate names before canonical-map insertion, and encode AIR's literal symbol
+   bytes once at its IR construction boundary. Cover
    equivalent quoted/escaped references, literal backslashes, punctuation,
    checked offsets, runtime indexes, pointer initializers and alias relocations.
    Verify malformed names fail closed, private rewrites preserve input IR, and
@@ -49,5 +51,8 @@ The new `quoted_symbols` population checks seven functions and 1,024 observation
 per executable. The development run passes both routes in all three release
 modes. Verifier regression tests reject equivalent duplicate names and mismatched
 call signatures; direct/text construction preserves identical name spellings.
+AIR conversion separately covers punctuation, literal quotes/backslashes and
+direct-call/returned-global identity. All 1,979 development units and 23 structural
+checks pass after this adapter correction.
 The diagnostic readonly-table negative now uses an unsupported 32-bit pointer
 layout because quoted names on the default 64-bit layout are admitted.

@@ -64,6 +64,24 @@ pub fn isValid(text: []const u8) bool {
     return parse(text) != null;
 }
 
+/// Encode a producer's literal symbol bytes as a complete LLVM named identifier.
+/// Unlike an LLVM spelling, these bytes have no quoting or escape semantics.
+pub fn fromBytes(allocator: std.mem.Allocator, bytes: []const u8) ![]u8 {
+    if (bytes.len == 0 or std.mem.indexOfScalar(u8, bytes, 0) != null) return error.InvalidGlobalIdentifier;
+    if (bytes[0] != '"' and !std.ascii.isDigit(bytes[0]) and isValid(bytes)) return allocator.dupe(u8, bytes);
+    var text: std.ArrayList(u8) = .empty;
+    errdefer text.deinit(allocator);
+    try text.append(allocator, '"');
+    const hex = "0123456789ABCDEF";
+    for (bytes) |byte| {
+        if (!std.ascii.isPrint(byte) or byte == '"' or byte == '\\') {
+            try text.appendSlice(allocator, &.{ '\\', hex[byte >> 4], hex[byte & 15] });
+        } else try text.append(allocator, byte);
+    }
+    try text.append(allocator, '"');
+    return text.toOwnedSlice(allocator);
+}
+
 /// Match a named identifier made from a prefix and the canonical decimal
 /// spelling of an index. Quoted/escaped aliases retain the same identity;
 /// numbered slots, leading zeroes and malformed spellings do not match.
