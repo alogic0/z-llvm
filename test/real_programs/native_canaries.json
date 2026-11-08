@@ -1765,6 +1765,21 @@
       "stdout": "global-addresses observations=32 layout=pointers=alignment=live=preserved\n"
     },
     {
+      "population": "wide_abi_carriers",
+      "prefix": "wide-abi-carriers",
+      "fixture": "wide_abi_carriers",
+      "functions": [
+        "wide_abi_call33",
+        "wide_abi_call49",
+        "wide_abi_entry33",
+        "wide_abi_phi37",
+        "wide_abi_range63",
+        "wide_abi_stack37"
+      ],
+      "observations": 1536,
+      "stdout": "wide-abi-carriers observations=1536 bits=33,37,49,63 padding=stack=phi=live=guards=preserved\n"
+    },
+    {
       "population": "intrinsic_facts",
       "prefix": "intrinsic-facts",
       "fixture": "intrinsic_facts",

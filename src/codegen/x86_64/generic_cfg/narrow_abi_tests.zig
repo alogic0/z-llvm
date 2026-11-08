@@ -21,8 +21,9 @@ fn compile(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     return executable;
 }
 
-test "narrow ABI entry normalizes dirty register bits at widths one through sixteen" {
-    for (1..17) |bits| {
+test "integer ABI entry normalizes dirty register bits at every non-native scalar width" {
+    for (1..64) |bits| {
+        if (bits == 32) continue;
         const text = try std.fmt.allocPrint(std.testing.allocator,
             \\define i64 @narrow_entry(i{d} %input, i64 %take) {{
             \\entry:
@@ -133,8 +134,9 @@ test "narrow ABI mixed parameters survive normalization and direct boolean branc
     };
 }
 
-test "narrow ABI validated payload facts do not constrain dirty carrier padding" {
-    for (1..32) |bits| {
+test "integer ABI validated payload facts do not constrain dirty carrier padding" {
+    for (1..64) |bits| {
+        if (bits == 32) continue;
         const text = try std.fmt.allocPrint(std.testing.allocator,
             \\define noundef range(i{d} -1, 0) i{d} @facts(i{d} noundef range(i{d} -1, 0) %input, ptr %output) {{
             \\entry:
@@ -153,8 +155,8 @@ test "narrow ABI validated payload facts do not constrain dirty carrier padding"
         const view = (try legalization.legalize(arena.allocator(), original)).?;
         try std.testing.expect(view.ret_attrs == null and view.params.items[0].attrs == null);
         try std.testing.expect(original.ret_attrs != null and original.params.items[0].attrs != null);
-        try std.testing.expectEqual(@as(u16, 32), view.ret_ty.int);
-        try std.testing.expectEqual(@as(u16, 32), view.params.items[0].ty.int);
+        try std.testing.expectEqual(@as(u16, if (bits < 32) 32 else 64), view.ret_ty.int);
+        try std.testing.expectEqual(@as(u16, if (bits < 32) 32 else 64), view.params.items[0].ty.int);
         try std.testing.expect(try legalization.legalize(arena.allocator(), view) == null);
         const executable = try compile(module);
         defer std.posix.munmap(executable);
@@ -206,6 +208,60 @@ test "narrow ABI range and noundef calls retain source contracts while widening 
     try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, source));
     try verify.verifyFunction(output);
     try module.verify();
+}
+
+test "wide integer ABI reuses mixed carriers and preserves source call attributes" {
+    const text =
+        \\declare noundef i49 @helper(i33, i37, i49, i63, i8)
+        \\define noundef i37 @caller(i33 %a, i37 %b, i49 %c, i63 %d, i8 %e) {
+        \\entry:
+        \\ %r = call noundef i49 @helper(i33 noundef %a, i37 noundef %b, i49 noundef %c, i63 noundef %d, i8 noundef %e)
+        \\ %result = trunc i49 %r to i37
+        \\ ret i37 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const original = module.functions.items[0];
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const view = (try legalization.legalize(arena.allocator(), original)).?;
+    try std.testing.expectEqual(@as(u16, 64), view.ret_ty.int);
+    var calls: usize = 0;
+    for (view.blocks.items[0].instructions.items) |inst| if (inst.kind == .call) {
+        calls += 1;
+        try std.testing.expectEqual(@as(u16, 64), inst.kind.call.ret_ty.int);
+        try std.testing.expect(inst.kind.call.ret_attrs == null);
+        for (inst.kind.call.args.items, [_]u16{ 64, 64, 64, 64, 32 }) |arg, bits| {
+            try std.testing.expectEqual(bits, arg.ty.int);
+            try std.testing.expect(arg.attrs == null);
+        }
+    };
+    try std.testing.expectEqual(@as(usize, 1), calls);
+    for (original.params.items, [_]u16{ 33, 37, 49, 63, 8 }) |param, bits| try std.testing.expectEqual(bits, param.ty.int);
+    const source_call = original.blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("noundef", source_call.ret_attrs.?);
+    for (source_call.args.items) |arg| try std.testing.expectEqualStrings("noundef", arg.attrs.?);
+    try std.testing.expect(try legalization.legalize(arena.allocator(), view) == null);
+    var output = machine.MachineFunction.init(original.name, original.ret_ty);
+    defer output.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, original));
+    try verify.verifyFunction(output);
+    try module.verify();
+}
+
+test "wide integer ABI retains explicit extension and unsupported call boundaries" {
+    for ([_]u16{ 33, 37, 49, 63 }) |bits| for ([_][]const u8{ "signext", "zeroext", "inreg", "range(i32 0, 32)" }) |attrs| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @invalid(i{d} {s} %a) {{\nentry:\n %r = call i64 @helper(i{d} {s} %a)\n ret i64 %r\n}}\n", .{ bits, attrs, bits, attrs });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try legalization.legalize(arena.allocator(), module.functions.items[0]) == null);
+        try std.testing.expectEqual(bits, module.functions.items[0].params.items[0].ty.int);
+    };
 }
 
 test "narrow ABI rejects malformed facts and extension promises before changing private contracts" {

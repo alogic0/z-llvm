@@ -1,4 +1,4 @@
-//! Private register carriers for narrow integer ABI values and advisory facts.
+//! Private 32/64-bit carriers for non-native integer ABI widths and advisory facts.
 //! The low bits retain their source width; only the selector's view is widened.
 const std = @import("std");
 const ir = @import("../../../ir.zig");
@@ -7,10 +7,12 @@ const helpers = @import("composed_helpers.zig");
 const temporary_names = @import("scalar_forms.zig");
 const TemporaryNames = temporary_names.TemporaryNames;
 
-const carrier: ir.Type = .{ .int = 32 };
+fn carrier(ty: ir.Type) ir.Type {
+    return .{ .int = if (ty.int < 32) 32 else 64 };
+}
 
 fn narrow(ty: ir.Type) bool {
-    return ty == .int and ty.int > 0 and ty.int < 32;
+    return ty == .int and ty.int > 0 and ty.int < 64 and ty.int != 32;
 }
 
 fn advisory(ty: ir.Type, attrs: ?[]const u8) bool {
@@ -78,7 +80,7 @@ fn widen(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBl
         .op = .zext,
         .from_ty = ty,
         .value = value,
-        .to_ty = carrier,
+        .to_ty = carrier(ty),
     } } });
     return .{ .named = name };
 }
@@ -87,7 +89,7 @@ fn receive(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Basic
     const masked = try temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = masked, .kind = .{ .binary = .{
         .op = .@"and",
-        .ty = carrier,
+        .ty = carrier(ty),
         .lhs = value,
         .rhs = .{ .int = (@as(i128, 1) << @intCast(ty.int)) - 1 },
     } } });
@@ -95,7 +97,7 @@ fn receive(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Basic
     // original narrow name, including booleans consumed directly by a branch.
     try block.instructions.append(allocator, .{ .result = name, .kind = .{ .cast = .{
         .op = .trunc,
-        .from_ty = carrier,
+        .from_ty = carrier(ty),
         .value = .{ .named = masked },
         .to_ty = ty,
     } } });
@@ -124,14 +126,14 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     // attached to a dirty i32 return before the receive mask. Preserve source
     // attributes and conservatively omit them only on the private widened view.
     if (return_value) {
-        result.ret_ty = carrier;
+        result.ret_ty = carrier(function.ret_ty);
         result.ret_attrs = null;
     }
     var serial: TemporaryNames = .{ .prefix = "__zllvm_narrow_" };
     defer serial.deinit(allocator);
     for (result.params.items) |*param| if (parameter(param.*)) {
         param.name = try temporary(allocator, function, &serial);
-        param.ty = carrier;
+        param.ty = carrier(param.ty);
         param.attrs = null;
     };
     for (function.blocks.items, 0..) |original, index| {
@@ -146,12 +148,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 const binary = inst.kind.binary;
                 copy.kind.binary.lhs = try widen(allocator, function, &block, &serial, binary.ty, binary.lhs);
                 copy.kind.binary.rhs = try widen(allocator, function, &block, &serial, binary.ty, binary.rhs);
-                copy.kind.binary.ty = carrier;
+                copy.kind.binary.ty = carrier(binary.ty);
                 copy.result = try temporary(allocator, function, &serial);
                 try block.instructions.append(allocator, copy);
                 try block.instructions.append(allocator, .{ .result = inst.result, .kind = .{ .cast = .{
                     .op = .trunc,
-                    .from_ty = carrier,
+                    .from_ty = carrier(binary.ty),
                     .value = .{ .named = copy.result.? },
                     .to_ty = binary.ty,
                 } } });
@@ -162,11 +164,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 copy.kind.call.args = try call.args.clone(allocator);
                 for (copy.kind.call.args.items) |*arg| if (narrow(arg.ty)) {
                     arg.value = try widen(allocator, function, &block, &serial, arg.ty, arg.value);
-                    arg.ty = carrier;
+                    arg.ty = carrier(arg.ty);
                     arg.attrs = null;
                 };
                 if (callReturn(function, call)) {
-                    copy.kind.call.ret_ty = carrier;
+                    copy.kind.call.ret_ty = carrier(call.ret_ty);
                     copy.kind.call.ret_attrs = null;
                     if (inst.result != null) copy.result = try temporary(allocator, function, &serial);
                 }
@@ -179,7 +181,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         }
         if (return_value) if (block.terminator) |*term| if (term.* == .ret) {
             if (term.ret.value) |value| term.ret.value = try widen(allocator, function, &block, &serial, function.ret_ty, value);
-            term.ret.ty = carrier;
+            term.ret.ty = carrier(function.ret_ty);
         };
         try result.blocks.append(allocator, block);
     }
