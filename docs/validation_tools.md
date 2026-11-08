@@ -28,6 +28,7 @@ remain in this repository.
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
+| Final selection rejection types, attributes and locations | `src/selection_census.zig` |
 | Upstream C program and 45 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
 | Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
 | Unchanged Zig tool with runtime document inputs and exact file outputs | `tools/run_real_program.zig` / `zig-input-program` |
@@ -86,7 +87,21 @@ disables binary/runtime emission, exports optimized LLVM IR and attempts local
 object emission. The original runtime rejection remains a build blocker; this
 continuation provides no link or self-hosting credit.
 
-Three read-only census tools provide additional attribution after an early
+The selection rejection census parses and verifies the complete module, then
+uses the production selection API with an optional observer. It records the
+failing composed operation after private normalization/legalization, including
+call and parameter types, attributes, operand origins and resolved locations.
+Each new selection attempt clears the prior observation; only a context matching
+the final selector diagnostic is published. An unattributed rejection stays null.
+The original module is unchanged. Complete traversal is marked explicitly; an
+optional function filter is diagnostic only and never counts as a full census.
+Output creation is exclusive, so retained results cannot be overwritten.
+
+```sh
+zig run -O ReleaseFast src/selection_census.zig -- captured-compiler.ll new-census.jsonl
+```
+
+Three read-only syntax/verification census tools provide additional attribution after an early
 failure. Global syntax census parses every complete global/alias line
 independently and saves the first rejected line to a new file. Definition syntax
 census parses each complete `define` body independently, records its original

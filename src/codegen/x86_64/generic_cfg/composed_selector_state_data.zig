@@ -30,6 +30,7 @@ pub const EflagsSemanticRecord = struct {
 };
 
 pub const ComposedBlockSelector = struct {
+    rejection_observer: ?*@import("rejection_observer.zig").Observer = null,
     allocator: std.mem.Allocator,
     machine: *MachineFunction,
     module_context: ?*const x86_64_types.ReadOnlyModuleContext = null,

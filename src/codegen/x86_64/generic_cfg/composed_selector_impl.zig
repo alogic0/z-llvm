@@ -115,6 +115,17 @@ pub fn tryLowerComposedCfgWithContextAndAddressDependencies(
     module_context: ?*const x86_64_types.ReadOnlyModuleContext,
     dependency_domain: *AddressDependencyDomain,
 ) !SelectionResult {
+    return tryLowerComposedCfgObserved(allocator, machine, function, module_context, dependency_domain, null);
+}
+
+pub fn tryLowerComposedCfgObserved(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext,
+    dependency_domain: *AddressDependencyDomain,
+    observer: ?*@import("rejection_observer.zig").Observer,
+) !SelectionResult {
     if (!isComposedCfgReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "stage2-ret-type" });
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
@@ -124,6 +135,7 @@ pub fn tryLowerComposedCfgWithContextAndAddressDependencies(
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
+    composed.rejection_observer = observer;
     composed.module_context = module_context;
     composed.function = &function;
     composed.allocation_plan = &allocation_plan;
@@ -214,8 +226,16 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
                 // SysV zeroext guarantees a canonical low byte. Other narrow
                 // ABI forms remain outside this composed entry envelope.
                 1, 2, 3, 5, 7, 8 => {
-                    if (param.attrs == null or !hasAttrToken(param.attrs.?, "zeroext"))
+                    if (param.attrs == null or !hasAttrToken(param.attrs.?, "zeroext")) {
+                        if (selector.rejection_observer) |observer| try observer.reject(.{
+                            .function = function,
+                            .position = selector.current_position,
+                            .tag = "no_emitter",
+                            .detail = "composed-block-param-i8-extension",
+                            .parameter = param,
+                        });
                         return .{ .no_emitter = "composed-block-param-i8-extension" };
+                    }
                     try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg });
                 },
                 4, 6, 16, 23, 24 => try selector_state.bindValueLoc(selector, param.name, .{ .arg32 = reg }),
@@ -464,7 +484,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         .cmpxchg => |cmp| selector_atomic.lowerCmpxchg(selector, instruction.result, cmp) catch |err| return instructionValueError(selector, err, "stage2-atomic-cmpxchg-value"),
         .store => |store| selector_memory.lowerStore(selector, store) catch |err| return instructionValueError(selector, err, "stage2-store-value"),
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),
-        .call => |call| selector_calls.lowerCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
+        .call => |call| lowerObservedCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
         .extractvalue => |extract| selector_calls.lowerExtractValue(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-extractvalue-value"),
         .insertvalue => |insert| selector_aggregate.lowerInsertValue(selector, instruction.result, insert) catch |err| return instructionValueError(selector, err, "stage2-insertvalue-value"),
         .select => |select| if (select.ty == .vector)
@@ -476,6 +496,12 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         .shufflevector => |shuffle| selector_vector.lowerShuffleVector(selector, instruction.result, shuffle) catch |err| return instructionValueError(selector, err, "stage2-vector-shuffle-value"),
         else => .{ .no_emitter = "composed-block-instruction-not-owned" },
     };
+}
+
+fn lowerObservedCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    const diagnostic = try selector_calls.lowerCall(selector, result, call);
+    if (diagnostic) |failure| try selector_state.observeRejectedCall(selector, result, call, failure);
+    return diagnostic;
 }
 
 fn instructionValueError(selector: *ComposedBlockSelector, err: anyerror, detail: []const u8) anyerror!?Diagnostic {
@@ -517,6 +543,17 @@ pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
     module_context: ?*const x86_64_types.ReadOnlyModuleContext,
     dependency_domain: *AddressDependencyDomain,
 ) !SelectionResult {
+    return tryLowerComposedBlockObserved(allocator, machine, function, module_context, dependency_domain, null);
+}
+
+pub fn tryLowerComposedBlockObserved(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    module_context: ?*const x86_64_types.ReadOnlyModuleContext,
+    dependency_domain: *AddressDependencyDomain,
+    observer: ?*@import("rejection_observer.zig").Observer,
+) !SelectionResult {
     if (!isComposedReturnType(function.ret_ty)) return unsupported(.{ .no_emitter = "composed-block-ret-type" });
     if (function.blocks.items.len != 1) return unsupported(.{ .no_emitter = "composed-block-not-single-block" });
 
@@ -525,6 +562,7 @@ pub fn tryLowerComposedBlockWithContextAndAddressDependencies(
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
+    composed.rejection_observer = observer;
     composed.module_context = module_context;
     composed.function = &function;
     composed.allocation_plan = &allocation_plan;

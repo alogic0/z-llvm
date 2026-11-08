@@ -76,6 +76,30 @@ const i32BitPattern = composed_helpers.i32BitPattern;
 const i64Value = composed_helpers.i64Value;
 
 pub const ComposedBlockSelector = state_data.ComposedBlockSelector;
+
+/// Diagnostic-only observation through the state authority. Consumers receive
+/// location tags, never ValueLoc operands that could bypass transfer planning.
+/// The observer copies borrowed data before the selector or private IR expires.
+pub fn observeRejectedCall(selector: *const ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, failure: Diagnostic) !void {
+    const observer = selector.rejection_observer orelse return;
+    const Operand = @import("rejection_observer.zig").Operand;
+    const operands = try selector.allocator.alloc(Operand, call.args.items.len);
+    defer selector.allocator.free(operands);
+    for (call.args.items, operands) |arg, *operand| operand.* = .{
+        .argument = arg,
+        .location = if (resolveValue(selector, arg.value)) |loc| @tagName(loc) else null,
+    };
+    try observer.reject(.{
+        .function = selector.function.?.*,
+        .position = selector.current_position,
+        .tag = failure.tagName(),
+        .detail = failure.detail(),
+        .call = call,
+        .result = result,
+        .operands = operands,
+    });
+}
+
 pub const EflagsEffect = eflags.Effect;
 pub const EflagsLiveness = eflags.Liveness;
 pub const EflagsDefinitionPurpose = eflags.DefinitionPurpose;

@@ -254,6 +254,7 @@ pub const SelectionOwner = enum {
 };
 
 pub const CodegenOptions = struct {
+    rejection_observer: ?*@import("generic_cfg/rejection_observer.zig").Observer = null,
     profile: ?*@import("../../compilation_profile.zig").Profile = null,
     generic_cfg_selector: bool = false,
     generic_cfg_selector_diagnostic_tag: ?*?[]const u8 = null,

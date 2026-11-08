@@ -266,7 +266,7 @@ pub fn lowerFunctionWithOptions(
     errdefer machine.deinit(allocator);
 
     if (options.generic_cfg_selector) {
-        switch (try x86_64_generic_cfg_selector.tryLowerProfiled(allocator, &machine, function, options.module_context, options.profile)) {
+        switch (try x86_64_generic_cfg_selector.tryLowerObserved(allocator, &machine, function, options.module_context, options.profile, options.rejection_observer)) {
             .selected => {
                 machine.codegen_path = .generic_cfg;
                 if (machine.selection_owner == .unassigned) return error.UnassignedSelectionOwner;

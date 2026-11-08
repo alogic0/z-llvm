@@ -8,6 +8,7 @@ const composed_selector = @import("generic_cfg/composed_selector.zig");
 const address_dependencies = @import("generic_cfg/composed_selector_address_dependencies.zig");
 const switch_phi_edges = @import("generic_cfg/switch_phi_edges.zig");
 const semantic_normalization = @import("generic_cfg/semantic_normalization.zig");
+const Observer = @import("generic_cfg/rejection_observer.zig").Observer;
 
 pub const MachineFunction = x86_64_machine.MachineFunction;
 
@@ -43,6 +44,17 @@ pub fn tryLowerProfiled(
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
     profile: ?*@import("../../compilation_profile.zig").Profile,
 ) !SelectionResult {
+    return tryLowerObserved(allocator, machine, source, module_context, profile, null);
+}
+
+pub fn tryLowerObserved(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    source: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    profile: ?*@import("../../compilation_profile.zig").Profile,
+    observer: ?*Observer,
+) !SelectionResult {
     const profiling = @import("../../compilation_profile.zig");
     const optional = @import("generic_cfg/optional_legalization.zig");
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -52,6 +64,7 @@ pub fn tryLowerProfiled(
     var budget: optional.Budget = .{};
     var iterations: u64 = 0;
     while (true) {
+        Observer.reset(observer);
         iterations += 1;
         if (profile) |p| p.iteration(iterations);
         const normalized = blk: {
@@ -78,7 +91,7 @@ pub fn tryLowerProfiled(
                     if (profile) |p| p.counters.original_form_retries += 1;
                     const retry_scope = profiling.retry(profile);
                     defer retry_scope.end();
-                    if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected)) {
+                    if (try tryOriginalComposedForm(allocator, machine, function, module_context, inspected, observer)) {
                         if (profile) |p| {
                             p.counters.original_form_selected += 1;
                             p.discardCandidate(rewrite.profile_stage, rewrite.profile_allocation_bytes);
@@ -92,7 +105,8 @@ pub fn tryLowerProfiled(
                 function = rewrite.function;
                 continue;
             }
-            break :blk try selectReady(allocator, machine, function, module_context, inspected);
+            Observer.reset(observer);
+            break :blk try selectReady(allocator, machine, function, module_context, inspected, observer);
         };
         if (result == .selected) {
             // Match recursive unwind order; labels must outlive the private IR.
@@ -112,6 +126,7 @@ fn selectReady(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
     inspected: SelectionResult,
+    observer: ?*Observer,
 ) !SelectionResult {
     switch (inspected) {
         .selected => unreachable,
@@ -128,7 +143,7 @@ fn selectReady(
                 if (function.blocks.items.len > 1) {
                     const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
                     if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-                    return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context);
+                    return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context, observer);
                 }
                 return inspected;
             },
@@ -138,9 +153,9 @@ fn selectReady(
     if (function.blocks.items.len > 1) {
         const stage_two = try analyzeStageTwoNoSpillEnvelope(allocator, function);
         if (stage_two.exceedsSpillEnvelope()) return .{ .unsupported = .{ .no_spill_envelope = "stage2-register-pressure" } };
-        return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context);
+        return tryLowerComposedCfgFailClosed(allocator, machine, function, module_context, observer);
     }
-    switch (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context)) {
+    switch (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context, observer)) {
         .selected => return .selected,
         .unsupported => |diagnostic| switch (diagnostic) {
             .no_emitter => {
@@ -263,6 +278,7 @@ fn tryOriginalComposedForm(
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
     inspected: SelectionResult,
+    observer: ?*Observer,
 ) !bool {
     try semantic_normalization.check(function);
     switch (inspected) {
@@ -275,9 +291,9 @@ fn tryOriginalComposedForm(
     if (function.blocks.items.len > 1) {
         const pressure = try analyzeStageTwoNoSpillEnvelope(allocator, function);
         if (pressure.exceedsSpillEnvelope()) return false;
-        return (try tryLowerComposedCfgFailClosed(allocator, machine, function, module_context)) == .selected;
+        return (try tryLowerComposedCfgFailClosed(allocator, machine, function, module_context, observer)) == .selected;
     }
-    return (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context)) == .selected;
+    return (try tryLowerComposedBlockFailClosed(allocator, machine, function, module_context, observer)) == .selected;
 }
 
 fn tryLowerComposedBlockFailClosed(
@@ -285,11 +301,12 @@ fn tryLowerComposedBlockFailClosed(
     machine: *MachineFunction,
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    observer: ?*Observer,
 ) !SelectionResult {
     var transaction = SelectionTransaction.begin(allocator, machine);
     defer transaction.rollbackUnlessCommitted();
     errdefer transaction.rollback();
-    const result = composed_selector.tryLowerComposedBlockWithContextAndAddressDependencies(allocator, machine, function, module_context, &transaction.address_dependencies) catch |err| {
+    const result = composed_selector.tryLowerComposedBlockObserved(allocator, machine, function, module_context, &transaction.address_dependencies, observer) catch |err| {
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
             error.ValueUseForwardPlanMissing => unsupported(.{ .no_emitter = "value-use-forward-plan-missing" }),
@@ -308,11 +325,12 @@ fn tryLowerComposedCfgFailClosed(
     machine: *MachineFunction,
     function: ir.Function,
     module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    observer: ?*Observer,
 ) !SelectionResult {
     var transaction = SelectionTransaction.begin(allocator, machine);
     defer transaction.rollbackUnlessCommitted();
     errdefer transaction.rollback();
-    const result = composed_selector.tryLowerComposedCfgWithContextAndAddressDependencies(allocator, machine, function, module_context, &transaction.address_dependencies) catch |err| {
+    const result = composed_selector.tryLowerComposedCfgObserved(allocator, machine, function, module_context, &transaction.address_dependencies, observer) catch |err| {
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),
             error.ValueUseForwardPlanMissing => unsupported(.{ .no_emitter = "value-use-forward-plan-missing" }),

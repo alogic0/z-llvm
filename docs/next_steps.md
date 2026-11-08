@@ -1,5 +1,28 @@
 # Active direction
 
+The [complete selection census](evidence/selection_census_completion.md) is
+accepted at `5ad6c51c`. It attempts all 8,928 compiler definitions: 3,524 select
+and 5,404 reject. Runtime selection succeeds for 274 of 455 definitions and
+rejects 181. All 17 integration gates and 49 native populations pass. See the
+[acceptance record](evidence/selection_census_completion_acceptance_20261107.json).
+
+The active [census classification and integer ABI plan](plans/2026-11-07-census-integer-abi.md)
+first classifies final rejection points after legalization: call argument widths
+(1,086 functions), intrinsics (785), call return widths (771), and memcpy source
+representations (751). Shared integer ABI handling, including 314 parameter
+extension failures, is the initial repair candidate; classification determines
+its exact scope. Replay both complete inputs after the shared repair, preserving
+every previously selected function and reporting newly exposed boundaries.
+
+Allocation attributes, runtime memory and parser/vector-cast repairs are already
+accepted. They are historical work, not the next implementation slice. Current
+raw census evidence is under `local-state/validations/selection-census-20261107/`.
+No complete compiler/runtime object, compiler startup or self-rebuild is claimed.
+Preserve the 12-function core cohort, ratchet 130 and all existing populations.
+Admission and runtime reserve remain 32.95 GB and 24.36 GB. Create no archives.
+
+## Preceding checkpoints
+
 The [compiler parser and runtime cast plan](plans/2026-11-07-compiler-parser-vector-casts.md)
 is complete at `57a78095`. All 8,928 compiler definitions and the full unchanged
 compiler module parse; all 455 runtime definitions verify. All 17 integration
@@ -7,14 +30,13 @@ gates and 47 native populations pass. See the
 [evidence](evidence/compiler_parser_vector_casts.md) and
 [acceptance record](evidence/compiler_parser_vector_casts_acceptance_20261107.json).
 
-The next compiler slice is allocation-related parameter attributes. Verification
-first rejects `allocptr` on `free`'s declaration at input line 737421. Use the
+At that checkpoint, the next slice was allocation-related parameter attributes.
+Verification first rejected `allocptr` on `free`'s declaration at input line 737421. The
 LLVM-valid `local-state/validations/parser-vector-20261107/next-allocptr.ll`
-reproducer, preserve ABI/optimization semantics and negative checks, then replay
-the exact full input to expose the next boundary. Vector GEP result semantics
-remain a known separate gap after their syntax repair.
+reproducer led to the accepted [allocation/runtime-memory repair](evidence/allocation_runtime_memory.md).
+Vector GEP result semantics were a separate gap after their syntax repair.
 
-Runtime selection now examines all 455 definitions: 265 succeed and 190 reject,
+That earlier runtime census examined all 455 definitions: 265 succeeded and 190 rejected,
 with complete diagnostics and capability grouping retained under
 `local-state/validations/parser-vector-20261107/`. The first failure is memset
 attributes; `sincos_f32` next rejects ordinary scalar FP pointer loads. Continue

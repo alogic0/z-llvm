@@ -7,9 +7,11 @@ pub const SelectionResult = impl.SelectionResult;
 pub const tryLowerComposedCfg = impl.tryLowerComposedCfg;
 pub const tryLowerComposedCfgWithContext = impl.tryLowerComposedCfgWithContext;
 pub const tryLowerComposedCfgWithContextAndAddressDependencies = impl.tryLowerComposedCfgWithContextAndAddressDependencies;
+pub const tryLowerComposedCfgObserved = impl.tryLowerComposedCfgObserved;
 pub const tryLowerComposedBlock = impl.tryLowerComposedBlock;
 pub const tryLowerComposedBlockWithContext = impl.tryLowerComposedBlockWithContext;
 pub const tryLowerComposedBlockWithContextAndAddressDependencies = impl.tryLowerComposedBlockWithContextAndAddressDependencies;
+pub const tryLowerComposedBlockObserved = impl.tryLowerComposedBlockObserved;
 pub const ValueUseTransaction = value_use_transaction.ValueUseTransaction;
 
 test {
