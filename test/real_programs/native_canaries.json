@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "comparison_facts",
+      "prefix": "comparison-facts",
+      "fixture": "comparison_facts",
+      "functions": ["same_direct", "same_swapped", "same_phi", "same_call", "same_load", "same_pressure"],
+      "observations": 3584,
+      "stdout": "comparison-facts observations=3584 same-sign=boundaries=aliases=calls=phis=spills=preserved\n"
+    },
+    {
       "population": "syscall_facts",
       "prefix": "syscall-facts",
       "fixture": "syscall_facts",

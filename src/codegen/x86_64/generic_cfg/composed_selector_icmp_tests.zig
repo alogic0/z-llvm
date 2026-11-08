@@ -532,20 +532,22 @@ test "generic cfg selector lowers exact named i64 unsigned less-than" {
         .setb_eax,
     }, machine.instructions.items);
 
-    var near_miss_machine = MachineFunction.init("named-i64-ult-samesign", .{ .int = 1 });
-    defer near_miss_machine.deinit(std.testing.allocator);
-    var near_miss_selector = ComposedBlockSelector.init(std.testing.allocator, &near_miss_machine);
-    defer near_miss_selector.deinit();
-    try selector_state.bindValueLoc(&near_miss_selector, "lhs", .{ .arg64 = .rdi });
-    try selector_state.bindValueLoc(&near_miss_selector, "rhs", .{ .arg64 = .rsi });
-    const near_miss = (try selector_icmp.lowerIcmp(&near_miss_selector, "cmp", .{
+    var same_sign_machine = MachineFunction.init("named-i64-ult-samesign", .{ .int = 1 });
+    defer same_sign_machine.deinit(std.testing.allocator);
+    var same_sign_selector = ComposedBlockSelector.init(std.testing.allocator, &same_sign_machine);
+    defer same_sign_selector.deinit();
+    same_sign_selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&same_sign_selector, "lhs", .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&same_sign_selector, "rhs", .{ .arg64 = .rsi });
+    const same_sign = try selector_icmp.lowerIcmp(&same_sign_selector, "cmp", .{
         .predicate = .ult,
         .samesign = true,
         .operand_ty = .{ .int = 64 },
         .lhs = .{ .named = "lhs" },
         .rhs = .{ .named = "rhs" },
-    })).?;
-    try std.testing.expectEqualStrings("composed-block-icmp-rhs", near_miss.detail());
+    });
+    try std.testing.expect(same_sign == null);
+    try std.testing.expectEqualSlices(x86_64_machine.Instruction, machine.instructions.items, same_sign_machine.instructions.items);
 }
 
 test "generic cfg selector executes named i64 unsigned less-than operand order" {
@@ -562,15 +564,6 @@ test "generic cfg selector executes named i64 unsigned less-than operand order" 
     defer module.deinit();
     try module.verify();
 
-    var machine = MachineFunction.init("named_i64_ult", .{ .int = 32 });
-    defer machine.deinit(std.testing.allocator);
-    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
-    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
-    defer std.testing.allocator.free(bytes);
-    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
-    defer std.posix.munmap(mapping);
-    @memcpy(mapping, bytes);
-    const less: *const fn (u64, u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
     const cases = [_]struct { lhs: u64, rhs: u64 }{
         .{ .lhs = 0, .rhs = 0 },
         .{ .lhs = 0, .rhs = 1 },
@@ -583,7 +576,22 @@ test "generic cfg selector executes named i64 unsigned less-than operand order" 
         .{ .lhs = std.math.maxInt(u64), .rhs = @as(u64, 1) << 63 },
         .{ .lhs = std.math.maxInt(u64), .rhs = std.math.maxInt(u64) },
     };
-    for (cases) |case| try std.testing.expectEqual(@intFromBool(case.lhs < case.rhs), less(case.lhs, case.rhs));
+    for ([_]bool{ false, true }) |same_sign| {
+        module.functions.items[0].blocks.items[0].instructions.items[0].kind.icmp.samesign = same_sign;
+        var machine = MachineFunction.init("named_i64_ult", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const less: *const fn (u64, u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+        for (cases) |case| {
+            if (same_sign and (case.lhs >> 63) != (case.rhs >> 63)) continue;
+            try std.testing.expectEqual(@intFromBool(case.lhs < case.rhs), less(case.lhs, case.rhs));
+        }
+    }
 }
 
 test "generic cfg selector executes named i64 unsigned greater-equal operand order" {

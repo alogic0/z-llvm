@@ -330,7 +330,9 @@ pub fn classifyScratchCompare(
                 .lhs_register = .r8,
                 .rhs_register = .rcx,
             };
-            if (!action.samesign and action.predicate == .ult and bits == 64) return .{
+            // samesign constrains defined inputs; it does not change the
+            // unsigned ordering or the full-width register transfer contract.
+            if (action.predicate == .ult and bits == 64) return .{
                 .kind = .ult_i64_named,
                 .bits = bits,
                 .lhs_register = .r8,

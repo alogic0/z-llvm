@@ -143,10 +143,7 @@ fn classifyScratchCompare(icmp: ir.IcmpInst) !ScratchCompareDispatch {
         if (bits == 64) {
             return switch (icmp.rhs) {
                 .int => scratchCompareAction(icmp, .{ .immediate = icmp.rhs.int }),
-                .named => if (!icmp.samesign)
-                    scratchCompareAction(icmp, .named)
-                else
-                    .{ .diagnostic = .{ .no_emitter = "composed-block-icmp-rhs" } },
+                .named => scratchCompareAction(icmp, .named),
                 .fp,
                 .undef,
                 .poison,

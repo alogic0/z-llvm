@@ -326,7 +326,7 @@ test "value-use scratch compare preservation leaves EFLAGS unchanged through can
     try std.testing.expectEqual(ValueLoc.eax, selector.values.get("live-accumulator").?.loc);
     try std.testing.expectEqual(ValueLoc{ .arg32 = .rsi }, selector.values.get("lhs").?.loc);
 }
-test "value-use dormant scratch compare action classifies the complete twenty-form matrix" {
+test "value-use scratch compare action classifies supported forms and comparison facts" {
     const RhsKind = enum { immediate, null_pointer, named };
     const Case = struct {
         ty: ir.Type,
@@ -355,6 +355,7 @@ test "value-use dormant scratch compare action classifies the complete twenty-fo
         .{ .ty = .{ .int = 32 }, .predicate = .sgt, .rhs = .named },
         .{ .ty = .{ .int = 32 }, .predicate = .ult, .rhs = .named },
         .{ .ty = .{ .int = 64 }, .predicate = .ult, .rhs = .named },
+        .{ .ty = .{ .int = 64 }, .predicate = .ult, .samesign = true, .rhs = .named },
         .{ .ty = .{ .int = 64 }, .predicate = .ult, .rhs = .immediate, .immediate = 7 },
         .{ .ty = .{ .int = 32 }, .predicate = .uge, .rhs = .named },
         .{ .ty = .{ .int = 64 }, .predicate = .uge, .rhs = .named },
