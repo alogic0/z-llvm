@@ -13,6 +13,11 @@ fn memcpy(call: ir.CallInst) bool {
         call.args.items[0].ty == .ptr and call.args.items[1].ty == .ptr;
 }
 
+fn integerAddresses(call: ir.CallInst) bool {
+    for (call.args.items) |arg| if (addresses.fromIntegerValue(arg.ty, arg.value) != null) return true;
+    return false;
+}
+
 fn rewriteReturn(allocator: std.mem.Allocator, context: *const machine.ReadOnlyModuleContext, value: ir.Value) !bool {
     const address = addresses.fromValue(value) orelse return false;
     const global = context.findGlobal(address.symbol) orelse return false;
@@ -39,8 +44,8 @@ fn needsRewrite(allocator: std.mem.Allocator, function: ir.Function, context: *c
             if (inst.removed) continue;
             switch (inst.kind) {
                 .gep => |gep| if (gep.ptr_addrspace == null and gep.ptr == .constant_expr and addresses.fromValue(gep.ptr) != null) return true,
-                .call => |call| if (memcpy(call) and
-                    (addresses.fromValue(call.args.items[0].value) != null or addresses.fromValue(call.args.items[1].value) != null)) return true,
+                .call => |call| if (integerAddresses(call) or (memcpy(call) and
+                    (addresses.fromValue(call.args.items[0].value) != null or addresses.fromValue(call.args.items[1].value) != null))) return true,
                 .store => |store| if (store.ptr_addrspace == null and (addresses.fromValue(store.ptr) != null or (store.ty == .ptr and store.ty_addrspace == null and addresses.fromValue(store.value) != null))) return true,
                 .load => |load| if (load.attrs.isAtomic() and load.ptr_addrspace == null and addresses.fromValue(load.ptr) != null) return true,
                 .atomicrmw => |rmw| if (addresses.fromValue(rmw.ptr) != null or (rmw.ty == .ptr and addresses.fromValue(rmw.value) != null)) return true,
@@ -60,11 +65,11 @@ fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize
         const name = try std.fmt.allocPrint(allocator, "__zllvm_global_{d}", .{serial.*});
         serial.* += 1;
         var collision = false;
-        for (function.params.items) |param| if (std.mem.eql(u8, name, param.name)) {
+        for (function.params.items) |param| if (ir.identifiers.eql(name, param.name)) {
             collision = true;
         };
         for (function.blocks.items) |block| for (block.instructions.items) |inst| {
-            if (inst.result) |result| if (std.mem.eql(u8, name, result)) {
+            if (inst.result) |result| if (ir.identifiers.eql(name, result)) {
                 collision = true;
             };
         };
@@ -74,6 +79,10 @@ fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize
 
 fn materialize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, value: ir.Value) !ir.Value {
     const address = addresses.fromValue(value) orelse return value;
+    return materializeAddress(allocator, function, block, serial, address);
+}
+
+fn materializeAddress(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, address: addresses.Address) !ir.Value {
     const name = try temporary(allocator, function, serial);
     var indices: std.ArrayList(ir.GepIndex) = .empty;
     try indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = address.addend } });
@@ -100,10 +109,22 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 .gep => |gep| if (gep.ptr_addrspace == null and gep.ptr == .constant_expr) {
                     copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);
                 },
-                .call => |call| if (memcpy(call)) {
+                .call => |call| if (memcpy(call) or integerAddresses(call)) {
                     copy.kind.call.args = try call.args.clone(allocator);
-                    for (copy.kind.call.args.items[0..2]) |*arg|
+                    if (memcpy(call)) for (copy.kind.call.args.items[0..2]) |*arg| {
                         arg.value = try materialize(allocator, function, &block, &serial, arg.value);
+                    };
+                    for (copy.kind.call.args.items) |*arg| if (addresses.fromIntegerValue(arg.ty, arg.value)) |address| {
+                        const pointer = try materializeAddress(allocator, function, &block, &serial, address);
+                        const name = try temporary(allocator, function, &serial);
+                        try block.instructions.append(allocator, .{ .result = name, .kind = .{ .cast = .{
+                            .op = .ptrtoint,
+                            .from_ty = .ptr,
+                            .to_ty = arg.ty,
+                            .value = pointer,
+                        } } });
+                        arg.value = .{ .named = name };
+                    };
                 },
                 .store => |store| if (store.ptr_addrspace == null) {
                     copy.kind.store.ptr = try materialize(allocator, function, &block, &serial, store.ptr);

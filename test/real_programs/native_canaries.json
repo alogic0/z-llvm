@@ -2,6 +2,15 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "symbolic_call",
+      "codegen_args": ["--codegen-reachable"],
+      "prefix": "symbolic-call",
+      "fixture": "symbolic_call",
+      "functions": ["symbolic_direct", "symbolic_indirect", "symbolic_negative", "symbolic_stack", "symbolic_live", "symbolic_write", "symbolic_read"],
+      "observations": 1152,
+      "stdout": "symbolic-call observations=1152 addresses=aliases=stack=syscalls=live=phis=spills=preserved\n"
+    },
+    {
       "population": "comparison_facts",
       "prefix": "comparison-facts",
       "fixture": "comparison_facts",

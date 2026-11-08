@@ -116,6 +116,19 @@ pub fn pointerBits(value: ir.Value) ?u64 {
     return i64Bits(std.fmt.parseInt(i128, trim(inner[4..]), 10) catch return null);
 }
 
+/// A same-width pointer cast keeps the admitted symbolic address intact. The
+/// caller must also prove supportsLayout; other integer widths/spaces stay
+/// outside this contract. Reuse the pointer grammar and checked addend once.
+pub fn fromIntegerValue(ty: ir.Type, value: ir.Value) ?Address {
+    if (!ty.eql(.{ .int = 64 }) or value != .constant_expr) return null;
+    const text = trim(value.constant_expr);
+    const prefix = "ptrtoint (ptr ";
+    const suffix = " to i64)";
+    if (text.len <= prefix.len + suffix.len or !std.mem.startsWith(u8, text, prefix) or !std.mem.endsWith(u8, text, suffix)) return null;
+    const pointer = trim(text[prefix.len .. text.len - suffix.len]);
+    return fromValue(if (std.mem.startsWith(u8, pointer, "@")) .{ .named = pointer } else .{ .constant_expr = pointer });
+}
+
 pub fn supportsLayout(text: ?[]const u8) bool {
     const raw = text orelse "";
     const layout = target.DataLayout.parse(raw) catch return false;
@@ -163,6 +176,40 @@ test "symbol byte addresses retain signed offsets and integer bit patterns" {
         try std.testing.expectEqual(case.offset, address.addend);
     }
     try std.testing.expectEqualStrings("named.object", fromValue(.{ .named = "@named.object" }).?.symbol);
+}
+
+test "integer symbolic addresses preserve pointer identity and reject other representations" {
+    const cases = [_]struct { text: []const u8, symbol: []const u8, offset: i32 }{
+        .{ .text = "ptrtoint (ptr @object to i64)", .symbol = "object", .offset = 0 },
+        .{ .text = "ptrtoint (ptr getelementptr inbounds nuw (i8, ptr @Io.Threaded.global_single_threaded_instance, i64 1120) to i64)", .symbol = "Io.Threaded.global_single_threaded_instance", .offset = 1120 },
+        .{ .text = "ptrtoint (ptr getelementptr (i8, ptr @alias, i64 -8) to i64)", .symbol = "alias", .offset = -8 },
+        .{ .text = "ptrtoint (ptr getelementptr (i8, ptr @object, i64 18446744073709551615) to i64)", .symbol = "object", .offset = -1 },
+    };
+    for (cases) |case| {
+        const value: ir.Value = .{ .constant_expr = case.text };
+        const address = fromIntegerValue(.{ .int = 64 }, value).?;
+        try std.testing.expectEqualStrings(case.symbol, address.symbol);
+        try std.testing.expectEqual(case.offset, address.addend);
+        try std.testing.expect(fromIntegerValue(.{ .int = 32 }, value) == null);
+        try std.testing.expect(fromIntegerValue(.ptr, value) == null);
+    }
+    for ([_][]const u8{
+        "ptrtoint (ptr @object to i32)",
+        "ptrtoint (ptr @object to i128)",
+        "ptrtoint (ptr addrspace(1) @object to i64)",
+        "ptrtoint (ptr %local to i64)",
+        "ptrtoint (ptr null to i64)",
+        "ptrtoint (ptr getelementptr (i32, ptr @object, i64 1) to i64)",
+        "ptrtoint (ptr getelementptr (i8, ptr @object, i64 2147483648) to i64)",
+        "ptrtoint (ptr getelementptr (i8, ptr @object, i64 -2147483649) to i64)",
+        "ptrtoint (ptr getelementptr (i8, ptr @object, i64 %index) to i64)",
+        "ptrtoint (ptr @object to i64) trailing",
+        "ptrtoint (ptr @object to i64) to i64)",
+        "ptrtoint (ptr to i64)",
+        "ptrtoint (ptr inttoptr (i64 1 to ptr) to i64)",
+    }) |text| try std.testing.expect(fromIntegerValue(.{ .int = 64 }, .{ .constant_expr = text }) == null);
+    for ([_]ir.Value{ .undef, .poison, .null_value, .{ .int = 1 }, .{ .named = "@object" } }) |value|
+        try std.testing.expect(fromIntegerValue(.{ .int = 64 }, value) == null);
 }
 
 test "symbol byte addresses reject unproved sources spaces indexes and ranges" {

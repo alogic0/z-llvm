@@ -8,6 +8,115 @@ const selector = @import("../generic_cfg_selector.zig");
 const global_memory = @import("global_memory.zig");
 const support = @import("value_use/test_support.zig");
 
+test "integer call address native fixture retains relocation identity and real GPR SSE spills" {
+    const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/symbolic_call.ll", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(source);
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .require_resolved_aliases = true };
+    var functions: std.ArrayList(machine.MachineFunction) = .empty;
+    defer {
+        for (functions.items) |*function| function.deinit(std.testing.allocator);
+        functions.deinit(std.testing.allocator);
+    }
+    var alias = false;
+    var negative = false;
+    var gpr_spill = false;
+    var fp_spill = false;
+    for (module.functions.items) |function| {
+        var lowered = machine.MachineFunction.init(function.name, function.ret_ty);
+        errdefer lowered.deinit(std.testing.allocator);
+        const result = try selector.tryLowerWithContext(std.testing.allocator, &lowered, function, &context);
+        if (result == .unsupported) std.debug.print("symbolic call {s}: {s}\n", .{ function.name, result.unsupported.detail() });
+        try std.testing.expect(result == .selected);
+        try verify.verifyFunction(lowered);
+        for (lowered.instructions.items) |instruction| switch (instruction) {
+            .lea_global_offset_rax => |address| {
+                alias = alias or std.mem.eql(u8, address.symbol, "sc_alias");
+                negative = negative or address.addend == -8;
+            },
+            .spill_arg64_rsp, .spill_rax_rsp => gpr_spill = gpr_spill or std.mem.eql(u8, function.name, "symbolic_live"),
+            .spill_xmm64_rsp => fp_spill = fp_spill or std.mem.eql(u8, function.name, "symbolic_live"),
+            else => {},
+        };
+        try functions.append(std.testing.allocator, lowered);
+    }
+    try std.testing.expect(alias and negative and gpr_spill and fp_spill);
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, functions.items, module.aliases.items, context);
+    defer std.testing.allocator.free(object);
+    try std.testing.expect(std.mem.indexOf(u8, object, "sc_alias") != null);
+}
+
+test "integer call addresses normalize privately with canonical names and unchanged contracts" {
+    const source =
+        \\@object = internal global [128 x i8] zeroinitializer, align 16
+        \\declare i64 @consume(i64, i64, i64)
+        \\define i64 @addresses(i64 %"__zllvm_global_0") {
+        \\entry:
+        \\ %__zllvm_global_1 = tail call noundef i64 @consume(i64 noundef ptrtoint (ptr @object to i64), i64 %"__zllvm_global_0", i64 ptrtoint (ptr getelementptr inbounds nuw (i8, ptr @object, i64 17) to i64)) #0
+        \\ ret i64 %__zllvm_global_1
+        \\}
+        \\attributes #0 = { nounwind }
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    const original = module.functions.items[0];
+    const original_call = original.blocks.items[0].instructions.items[0].kind.call;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const normalized = (try global_memory.legalize(arena.allocator(), original, &context)).?;
+    const instructions = normalized.blocks.items[0].instructions.items;
+    try std.testing.expectEqual(@as(usize, 5), instructions.len);
+    try std.testing.expectEqualStrings("__zllvm_global_2", instructions[0].result.?);
+    try std.testing.expectEqualStrings("__zllvm_global_3", instructions[1].result.?);
+    try std.testing.expectEqual(@as(i128, 17), instructions[2].kind.gep.indices.items[0].value.int);
+    const call = instructions[4].kind.call;
+    try std.testing.expectEqual(original_call.tail_kind, call.tail_kind);
+    try std.testing.expectEqualStrings(original_call.ret_attrs.?, call.ret_attrs.?);
+    try std.testing.expectEqualStrings(original_call.attrs.?, call.attrs.?);
+    try std.testing.expectEqualStrings("noundef", call.args.items[0].attrs.?);
+    try std.testing.expectEqualStrings("__zllvm_global_3", call.args.items[0].value.named);
+    try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+    try std.testing.expectEqualStrings("ptrtoint (ptr @object to i64)", original_call.args.items[0].value.constant_expr);
+    try std.testing.expect(try global_memory.legalize(arena.allocator(), normalized, &context) == null);
+    var lowered = machine.MachineFunction.init(original.name, original.ret_ty);
+    defer lowered.deinit(std.testing.allocator);
+    try std.testing.expect(try selector.tryLowerWithContext(std.testing.allocator, &lowered, original, &context) == .selected);
+    try verify.verifyFunction(lowered);
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, &.{lowered}, &.{}, context);
+    defer std.testing.allocator.free(object);
+    try std.testing.expect(std.mem.indexOf(u8, object, "object") != null);
+}
+
+test "integer call address normalization keeps layout and global admission boundaries" {
+    for ([_]struct { layout: ?[]const u8 = null, definition: []const u8 = "internal global", normalize: bool = true, accepted: bool = false }{
+        .{ .accepted = true },
+        .{ .definition = "internal thread_local global", .accepted = true },
+        .{ .definition = "internal thread_local(initialexec) global" },
+        .{ .definition = "weak global" },
+        .{ .layout = "e-p:32:32", .normalize = false },
+        .{ .layout = "e-p:64:64:64:32", .normalize = false },
+        .{ .layout = "e-ni:0", .normalize = false },
+    }) |case| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "@object = {s} [128 x i8] zeroinitializer, align 16\ndeclare i64 @consume(i64)\ndefine i64 @address() {{\nentry:\n %result = call i64 @consume(i64 ptrtoint (ptr getelementptr (i8, ptr @object, i64 17) to i64))\n ret i64 %result\n}}\n", .{case.definition});
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = case.layout };
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const function = module.functions.items[0];
+        try std.testing.expectEqual(case.normalize, (try global_memory.legalize(arena.allocator(), function, &context)) != null);
+        var lowered = machine.MachineFunction.init(function.name, function.ret_ty);
+        defer lowered.deinit(std.testing.allocator);
+        try std.testing.expectEqual(case.accepted, try selector.tryLowerWithContext(std.testing.allocator, &lowered, function, &context) == .selected);
+    }
+}
+
 test "TLS addresses retain alias identity call alignment and ELF TLS properties" {
     const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/tls_address.ll", std.testing.allocator, .limited(1024 * 1024));
     defer std.testing.allocator.free(source);
