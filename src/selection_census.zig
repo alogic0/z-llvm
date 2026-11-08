@@ -94,6 +94,7 @@ pub fn main(init: std.process.Init) !void {
     try writer.flush();
     const context: x86.ReadOnlyModuleContext = .{
         .globals = module.globals.items,
+        .aliases = module.aliases.items,
         .named_types = module.named_types.items,
         .target_datalayout = module.target_datalayout,
         .functions = module.functions.items,

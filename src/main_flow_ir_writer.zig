@@ -503,6 +503,7 @@ pub fn emitCodegenModule(
     }
     const module_context: codegen.x86_64.ReadOnlyModuleContext = .{
         .globals = if (reachable != null) selected_globals.items else module.globals.items,
+        .aliases = if (reachable != null) selected_aliases.items else module.aliases.items,
         .named_types = module.named_types.items,
         .target_datalayout = module.target_datalayout,
         .emit_all_globals = options.codegen_reachable,

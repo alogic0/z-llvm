@@ -138,6 +138,97 @@ test "global memory legalization is private idempotent and avoids SSA name colli
     try std.testing.expect(std.mem.indexOf(u8, object, "object") != null);
 }
 
+test "flagged constant pointers share private memory normalization and global admission" {
+    for ([_]struct { definition: []const u8, accepted: bool, address_attrs: ?[]const u8 = null }{
+        .{ .definition = "private constant", .accepted = true },
+        .{ .definition = "internal hidden global", .accepted = true },
+        .{ .definition = "internal thread_local global", .accepted = false },
+        .{ .definition = "weak global", .accepted = false },
+        .{ .definition = "internal global", .accepted = false, .address_attrs = "addrspace(1)" },
+    }) |case| {
+        const expression = "getelementptr inbounds nuw (i8, ptr @object, i64 9)";
+        const source = try std.fmt.allocPrint(std.testing.allocator, "@object = {s} [16 x i8] zeroinitializer, align 1\ndeclare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)\ndefine void @copy(ptr %destination) {{\nentry:\n call void @llvm.memcpy.p0.p0.i64(ptr %destination, ptr {s}, i64 3, i1 false)\n ret void\n}}\n", .{ case.definition, expression });
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        // Exercise the selector boundary even for properties the text parser
+        // does not yet admit; ordinary source cases above are fully verified.
+        if (case.address_attrs) |attrs| module.globals.items[0].address_attrs = attrs;
+        const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const normalized = (try global_memory.legalize(arena.allocator(), original, &context)).?;
+        try std.testing.expectEqualStrings(expression, original.blocks.items[0].instructions.items[0].kind.call.args.items[1].value.constant_expr);
+        try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 2), normalized.blocks.items[0].instructions.items.len);
+        try std.testing.expectEqual(@as(i128, 9), normalized.blocks.items[0].instructions.items[0].kind.gep.indices.items[0].value.int);
+        try std.testing.expect(try global_memory.legalize(arena.allocator(), normalized, &context) == null);
+        var lowered = machine.MachineFunction.init(original.name, original.ret_ty);
+        defer lowered.deinit(std.testing.allocator);
+        const result = try selector.tryLowerWithContext(std.testing.allocator, &lowered, original, &context);
+        try std.testing.expectEqual(case.accepted, result == .selected);
+        if (case.accepted) {
+            try verify.verifyFunction(lowered);
+            const object = try elf.buildObjectWithModuleContext(std.testing.allocator, &.{lowered}, &.{}, context);
+            defer std.testing.allocator.free(object);
+            try std.testing.expect(std.mem.indexOf(u8, object, "object") != null);
+        } else try std.testing.expectEqualStrings("composed-block-gep-global-properties", result.unsupported.detail());
+    }
+}
+
+test "constant pointer alias proof retains relocation identity and rejects unclosed chains" {
+    const source =
+        \\@object = internal global [16 x i8] zeroinitializer, align 1
+        \\@first = hidden alias [16 x i8], ptr @second
+        \\@second = internal alias [16 x i8], ptr @object
+        \\declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+        \\define void @copy(ptr %destination) {
+        \\entry:
+        \\ call void @llvm.memcpy.p0.p0.i64(ptr %destination, ptr getelementptr inbounds nuw (i8, ptr @first, i64 9), i64 3, i1 false)
+        \\ ret void
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var context: machine.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .aliases = module.aliases.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+        .require_resolved_aliases = true,
+    };
+    const address = context.dataAddress("@first").?;
+    try std.testing.expectEqualStrings("first", address.symbol);
+    try std.testing.expectEqualStrings("object", address.global.name);
+    var lowered = machine.MachineFunction.init("copy", .void);
+    defer lowered.deinit(std.testing.allocator);
+    try std.testing.expect(try selector.tryLowerWithContext(std.testing.allocator, &lowered, module.functions.items[0], &context) == .selected);
+    var found = false;
+    for (lowered.instructions.items) |inst| if (inst == .lea_global_offset_rax) {
+        try std.testing.expectEqualStrings("first", inst.lea_global_offset_rax.symbol);
+        try std.testing.expectEqual(@as(i32, 9), inst.lea_global_offset_rax.addend);
+        found = true;
+    };
+    try std.testing.expect(found);
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, &.{lowered}, module.aliases.items, context);
+    defer std.testing.allocator.free(object);
+    try std.testing.expect(std.mem.indexOf(u8, object, "object") != null);
+    try std.testing.expect(std.mem.indexOf(u8, object, "first") != null);
+    context.require_resolved_aliases = false;
+    try std.testing.expect(context.dataAddress("first") == null);
+    context.require_resolved_aliases = true;
+    module.aliases.items[1].linkage = .weak;
+    try std.testing.expect(context.dataAddress("first") == null);
+    module.aliases.items[1].linkage = .internal;
+    for ([_][]const u8{ "first", "missing", "copy" }) |target| {
+        module.aliases.items[1].target = target;
+        try std.testing.expect(context.dataAddress("first") == null);
+    }
+}
+
 test "immediate memcpy lengths execute zero and bounded copies with dying ABI operands" {
     const counts = [_]usize{ 0, 1, 2, 12, 16, 80 };
     const lives = [_]u64{ 0, 1, 4294967295, 4294967296, 0x8000_0000_0000_0000, 0xffff_ffff_ffff_ffff };

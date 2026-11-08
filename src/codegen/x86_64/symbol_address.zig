@@ -71,7 +71,18 @@ pub fn fromValue(value: ir.Value) ?Address {
     const text = trim(value.constant_expr);
     if (!std.mem.startsWith(u8, text, "getelementptr ")) return null;
     var rest = trim(text["getelementptr ".len..]);
-    if (std.mem.startsWith(u8, rest, "inbounds ")) rest = trim(rest["inbounds ".len..]);
+    // These flags constrain when the source expression is non-poison; they
+    // do not change the address on any defined execution. Recognize only the
+    // supported vocabulary, retaining the same checked pointer/index form.
+    var flags: u3 = 0;
+    while (rest.len != 0 and rest[0] != '(') {
+        const end = std.mem.indexOfAny(u8, rest, " \t") orelse return null;
+        const token = rest[0..end];
+        const flag: u3 = if (std.mem.eql(u8, token, "inbounds")) 1 else if (std.mem.eql(u8, token, "nuw")) 2 else if (std.mem.eql(u8, token, "nusw")) 4 else return null;
+        if (flags & flag != 0) return null;
+        flags |= flag;
+        rest = trim(rest[end..]);
+    }
     if (rest.len < 2 or rest[0] != '(' or rest[rest.len - 1] != ')') return null;
     var fields = std.mem.splitScalar(u8, rest[1 .. rest.len - 1], ',');
     if (!std.mem.eql(u8, trim(fields.next() orelse return null), "i8")) return null;
@@ -124,6 +135,10 @@ pub fn supportsLayout(text: ?[]const u8) bool {
 test "symbol byte addresses retain signed offsets and integer bit patterns" {
     const cases = [_]struct { text: []const u8, offset: i32 }{
         .{ .text = "getelementptr inbounds (i8, ptr @object, i64 888)", .offset = 888 },
+        .{ .text = "getelementptr inbounds nuw (i8, ptr @object, i64 9)", .offset = 9 },
+        .{ .text = "getelementptr nuw (i8, ptr @object, i64 1)", .offset = 1 },
+        .{ .text = "getelementptr nusw (i8, ptr @object, i64 -8)", .offset = -8 },
+        .{ .text = "getelementptr inbounds nusw nuw (i8, ptr @object, i64 0)", .offset = 0 },
         .{ .text = "getelementptr (i8, ptr @object, i64 -8)", .offset = -8 },
         .{ .text = "getelementptr (i8, ptr @object, i64 2147483647)", .offset = std.math.maxInt(i32) },
         .{ .text = "getelementptr (i8, ptr @object, i64 -2147483648)", .offset = std.math.minInt(i32) },
@@ -147,7 +162,12 @@ test "symbol byte addresses reject unproved sources spaces indexes and ranges" {
         "getelementptr (i8, ptr @object, i64 2147483648)",
         "getelementptr (i8, ptr @object, i64 -2147483649)",
         "getelementptr (i8, ptr @object, i64 18446744073709551616)",
-        "getelementptr nuw (i8, ptr @object, i64 1)",
+        "getelementptr nsw (i8, ptr @object, i64 1)",
+        "getelementptr inrange(0, 4) (i8, ptr @object, i64 1)",
+        "getelementptr nuw nuw (i8, ptr @object, i64 1)",
+        "getelementptr inbounds nuw (i8, ptr addrspace(1) @object, i64 1)",
+        "getelementptr inbounds nuw (i8, ptr @object, i64 2147483648)",
+        "getelementptr inbounds nuw (i8, ptr @object, i64 1) trailing",
     }) |text| try std.testing.expect(fromValue(.{ .constant_expr = text }) == null);
     try std.testing.expect(fromValue(.{ .named = "local" }) == null);
     try std.testing.expect(fromValue(.null_value) == null);

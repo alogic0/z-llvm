@@ -1765,6 +1765,23 @@
       "stdout": "global-addresses observations=32 layout=pointers=alignment=live=preserved\n"
     },
     {
+      "population": "constant_pointer_memory",
+      "prefix": "constant-pointer-memory",
+      "fixture": "constant_pointer_memory",
+      "functions": [
+        "constant_pointer_alias",
+        "constant_pointer_both",
+        "constant_pointer_copy3",
+        "constant_pointer_copy7",
+        "constant_pointer_dynamic",
+        "constant_pointer_negative",
+        "constant_pointer_output"
+      ],
+      "codegen_args": ["--codegen-reachable"],
+      "observations": 96,
+      "stdout": "constant-pointer-memory observations=96 flags=aliases=negative=dynamic=live=guards=preserved\n"
+    },
+    {
       "population": "global_memory",
       "prefix": "global-memory",
       "fixture": "global_memory",

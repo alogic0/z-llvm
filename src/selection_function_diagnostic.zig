@@ -43,6 +43,7 @@ pub fn main(init: std.process.Init) !void {
     }
     const context: codegen.x86_64.ReadOnlyModuleContext = .{
         .globals = module.globals.items,
+        .aliases = module.aliases.items,
         .named_types = module.named_types.items,
         .target_datalayout = module.target_datalayout,
         .emit_all_globals = true,

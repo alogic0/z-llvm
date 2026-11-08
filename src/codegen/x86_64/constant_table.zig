@@ -12,6 +12,32 @@ pub const ReadOnlyModuleContext = struct {
     require_resolved_aliases: bool = false,
     functions: []const ir.Function = &.{},
     declarations: []const ir.FunctionDecl = &.{},
+    aliases: []const ir.GlobalAlias = &.{},
+
+    pub const DataAddress = struct { symbol: []const u8, global: ir.Global };
+
+    /// Prove an alias chain reaches ordinary data while retaining the original
+    /// symbol for relocation, visibility and interposition. Alias emission is
+    /// owned by the complete dependency route; cycles and weak links stay closed.
+    pub fn dataAddress(context: ReadOnlyModuleContext, symbol: []const u8) ?DataAddress {
+        if (context.findGlobal(symbol)) |global| return .{ .symbol = global.name, .global = global };
+        if (!context.require_resolved_aliases) return null;
+        var current = if (std.mem.startsWith(u8, symbol, "@")) symbol[1..] else symbol;
+        var original: ?[]const u8 = null;
+        for (0..context.aliases.len) |_| {
+            const alias = for (context.aliases) |candidate| {
+                if (ir.identifiers.eql(candidate.name, current)) break candidate;
+            } else return null;
+            switch (alias.linkage) {
+                .default, .external, .internal, .private => {},
+                else => return null,
+            }
+            if (original == null) original = alias.name;
+            current = alias.target;
+            if (context.findGlobal(current)) |global| return .{ .symbol = original.?, .global = global };
+        }
+        return null;
+    }
 
     /// Return a module-owned name only for an admitted function definition or
     /// declaration. Unknown and weak symbols keep their separate boundaries.

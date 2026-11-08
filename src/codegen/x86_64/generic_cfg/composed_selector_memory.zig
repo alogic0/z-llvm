@@ -1023,9 +1023,9 @@ pub fn lowerGep(selector: *ComposedBlockSelector, result: ?[]const u8, gep: ir.G
     if (symbol_address.fromGep(gep)) |address| {
         const context = selector.module_context orelse return .{ .no_emitter = "composed-block-gep-global-context" };
         if (!symbol_address.supportsLayout(context.target_datalayout)) return .{ .no_emitter = "composed-block-gep-global-layout" };
-        const symbol = if (context.findGlobal(address.symbol)) |global| global_symbol: {
-            _ = symbol_address.globalProperties(global) catch return .{ .no_emitter = "composed-block-gep-global-properties" };
-            break :global_symbol global.name;
+        const symbol = if (context.dataAddress(address.symbol)) |data| global_symbol: {
+            _ = symbol_address.globalProperties(data.global) catch return .{ .no_emitter = "composed-block-gep-global-properties" };
+            break :global_symbol data.symbol;
         } else function: {
             if (address.addend != 0) return .{ .no_emitter = "composed-block-gep-function-offset" };
             break :function context.functionAddress(address.symbol) orelse return .{ .no_emitter = "composed-block-gep-global-symbol" };
