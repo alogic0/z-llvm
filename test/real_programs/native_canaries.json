@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "register_pressure",
+      "prefix": "register-pressure",
+      "fixture": "register_pressure",
+      "functions": ["pressure_i32_48", "pressure_i32_96", "pressure_i32_288", "pressure_i64_48", "pressure_i64_96", "pressure_i64_288"],
+      "observations": 768,
+      "stdout": "register-pressure observations=768 values=48,96,288 widths=32,64 calls=phis=aliases=preserved\n"
+    },
+    {
       "population": "integer_bit_intrinsics",
       "prefix": "integer-bit-intrinsics",
       "fixture": "integer_bit_intrinsics",

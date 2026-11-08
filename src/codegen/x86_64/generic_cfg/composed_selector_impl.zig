@@ -147,7 +147,7 @@ pub fn tryLowerComposedCfgObserved(
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindPhiResults(&composed, function)) |diagnostic| return unsupported(diagnostic);
-    if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try prepareObservedStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedPhiDestinations(&composed)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
@@ -572,7 +572,7 @@ pub fn tryLowerComposedBlockObserved(
     defer dependency_domain.* = composed.address_dependencies;
 
     if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
-    if (try selector_frame.prepareStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try prepareObservedStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
 
@@ -596,4 +596,16 @@ pub fn tryLowerComposedBlockObserved(
 
 fn unsupported(diagnostic: Diagnostic) SelectionResult {
     return .{ .unsupported = diagnostic };
+}
+
+fn prepareObservedStackFrame(composed: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+    const diagnostic = (try selector_frame.prepareStackFrame(composed, function)) orelse return null;
+    if (composed.rejection_observer) |observer| try observer.reject(.{
+        .function = function,
+        .position = 0,
+        .tag = diagnostic.tagName(),
+        .detail = diagnostic.detail(),
+        .pressure = try @import("stage2_planning.zig").analyzeStageTwoNoSpillEnvelope(composed.allocator, function),
+    });
+    return diagnostic;
 }

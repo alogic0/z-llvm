@@ -1352,7 +1352,7 @@ test "generic cfg selector stage two reports intra-block pressure" {
     try std.testing.expectEqualStrings("-", summary.first_exceeding_block);
 }
 
-test "generic cfg selector stage two rejects pressure above spill envelope" {
+test "generic cfg selector stage two allocates pressure above minimum spill reservation" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -1453,13 +1453,8 @@ test "generic cfg selector stage two rejects pressure above spill envelope" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_spill_envelope", diagnostic.tagName());
-    try std.testing.expectEqualStrings("stage2-register-pressure", diagnostic.detail());
-    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try codegen.x86_64.verifyFunction(machine);
 }
 
 test "generic cfg selector stage two excludes stack objects from register pressure" {

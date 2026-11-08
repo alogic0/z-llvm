@@ -38,6 +38,8 @@ pub const StageTwoSummary = struct {
     }
 
     pub fn exceedsSpillEnvelope(summary: StageTwoSummary) bool {
+        // Diagnostic comparison with the minimum reserved spill area. Selection
+        // uses the allocation plan's concrete, checked frame size instead.
         return summary.max_pressure > summary.spill_envelope_limit;
     }
 };

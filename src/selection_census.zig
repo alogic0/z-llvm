@@ -268,3 +268,42 @@ test "selection census copies resolved global properties and original alias iden
     observations.Observer.reset(&observer);
     try std.testing.expect(capture.payload == null);
 }
+
+test "selection census observes concrete frame rejection and preserves rollback" {
+    const text =
+        \\define i64 @too_large(i64 %value) {
+        \\entry:
+        \\  %buffer = alloca [262144 x i32], align 16
+        \\  br label %exit
+        \\exit:
+        \\  ret i64 %value
+        \\}
+        \\define i64 @small(i64 %value) {
+        \\entry:
+        \\  %result = add i64 %value, 1
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator), .payload = "stale" };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    var machine = x86.MachineFunction.init("too_large", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    const selector = @import("codegen/x86_64/generic_cfg_selector.zig");
+    const result = try selector.tryLowerObserved(std.testing.allocator, &machine, module.functions.items[0], null, null, &observer);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expectEqualStrings("composed-block-stack-frame-limit", result.unsupported.detail());
+    try std.testing.expect(capture.matches(result.unsupported.tagName(), result.unsupported.detail()));
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const pressure = payload.value.object.get("pressure").?.object;
+    try std.testing.expectEqual(@as(i64, 2), pressure.get("blocks").?.integer);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(.unassigned, machine.selection_owner);
+    // A subsequent successful attempt clears every borrowed failure field.
+    try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLowerObserved(std.testing.allocator, &machine, module.functions.items[1], null, null, &observer));
+    try std.testing.expect(capture.payload == null);
+}
