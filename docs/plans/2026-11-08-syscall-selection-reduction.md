@@ -10,8 +10,12 @@ All 328 assembly rejections are `syscall`, in four concrete forms; 325 share
 three syscall arguments with a typed range on the last argument. The shared
 syscall matcher now reuses validated call facts and optional tail hints. Its
 eight-function native population passes 6,912 local and 3,456 reference
-observations. The syscall census is running, with comparison operands retained
-for the next measured repair. Final cumulative acceptance remains outstanding.
+observations. The subsequent comparison repair admits named `samesign ult i64`
+operands through the existing full-width transfer action. Six native functions
+pass 21,504 local and 10,752 reference observations, including clobbering calls,
+PHIs and memory canaries. The census now retains actual rejected allocation-plan
+definitions and inspected allocation types. Final replays and cumulative
+acceptance remain outstanding.
 
 1. Retain the baseline, immutable original inputs and scratch hashes. Extend
    diagnostic observations with the exact inline assembly and call attributes.

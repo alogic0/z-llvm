@@ -128,6 +128,21 @@ fn selectReady(
     inspected: SelectionResult,
     observer: ?*Observer,
 ) !SelectionResult {
+    if (observer) |sink| if (inspected == .unsupported and inspected.unsupported == .unsupported_type) {
+        if (inspection.firstRejectedInstruction(function, module_context)) |rejected| {
+            if (std.mem.eql(u8, rejected.diagnostic.tagName(), inspected.unsupported.tagName()) and
+                std.mem.eql(u8, rejected.diagnostic.detail(), inspected.unsupported.detail()))
+            {
+                try sink.reject(.{
+                    .function = function,
+                    .position = rejected.position,
+                    .tag = rejected.diagnostic.tagName(),
+                    .detail = rejected.diagnostic.detail(),
+                    .definition = rejected.instruction,
+                });
+            }
+        }
+    };
     switch (inspected) {
         .selected => unreachable,
         .unsupported => |diagnostic| switch (diagnostic) {

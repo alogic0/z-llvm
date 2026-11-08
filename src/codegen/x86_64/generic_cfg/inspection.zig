@@ -92,6 +92,34 @@ fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types
     };
 }
 
+pub const RejectedInstruction = struct {
+    position: usize,
+    instruction: ir.Instruction,
+    diagnostic: Diagnostic,
+};
+
+/// Diagnostic-only attribution. Selection still uses inspectFunctionWithContext
+/// and retains its parameter, return-type and terminator precedence.
+pub fn firstRejectedInstruction(function: ir.Function, context: ?*const x86_64_types.ReadOnlyModuleContext) ?RejectedInstruction {
+    var position: usize = 1;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |instruction| {
+            if (instruction.removed) continue;
+            if (inspectInstruction(instruction, context)) |diagnostic| return .{
+                .position = position,
+                .instruction = instruction,
+                .diagnostic = diagnostic,
+            };
+            position += 1;
+        }
+        if (block.terminator) |terminator| {
+            if (inspectTerminator(block, terminator) != null) return null;
+        } else return null;
+        position += 1;
+    }
+    return null;
+}
+
 fn isPackedF32x2(ty: ir.Type) bool {
     return ty == .vector and ty.vector.len == 2 and ty.vector.elem_ty == .float;
 }

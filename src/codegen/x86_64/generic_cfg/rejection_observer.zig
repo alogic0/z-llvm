@@ -21,6 +21,7 @@ pub const Rejection = struct {
     detail: []const u8,
     call: ?ir.CallInst = null,
     comparison: ?ir.IcmpInst = null,
+    definition: ?ir.Instruction = null,
     result: ?[]const u8 = null,
     parameter: ?ir.Param = null,
     global_address: ?GlobalAddress = null,

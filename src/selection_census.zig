@@ -52,6 +52,14 @@ const Capture = struct {
             .function_return_attrs = rejection.function.ret_attrs,
             .function_calling_convention = rejection.function.calling_conv,
             .parameter = if (rejection.parameter) |param| .{ .name = param.name, .type = try std.fmt.allocPrint(a, "{f}", .{param.ty}), .attrs = param.attrs } else null,
+            .definition = if (rejection.definition) |definition| .{
+                .kind = @tagName(definition.kind),
+                .result = definition.result,
+                .type = if (definition.resultType()) |ty| try std.fmt.allocPrint(a, "{f}", .{ty}) else null,
+                .callee = if (definition.kind == .call) definition.kind.call.callee else null,
+                .allocated_type = if (definition.kind == .alloca) try std.fmt.allocPrint(a, "{f}", .{definition.kind.alloca.allocated_ty}) else null,
+                .allocation_attrs = if (definition.kind == .alloca) definition.kind.alloca.attrs else null,
+            } else null,
             .comparison = if (rejection.comparison) |comparison| .{
                 .predicate = @tagName(comparison.predicate),
                 .samesign = comparison.samesign,
@@ -307,6 +315,32 @@ test "selection census retains rejected comparison operands after rollback" {
     try std.testing.expectEqualStrings("parameter", operands[0].object.get("origin").?.string);
     try std.testing.expectEqualStrings("constant_expr", operands[1].object.get("origin").?.string);
     try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
+    observations.Observer.reset(&observer);
+    try std.testing.expect(capture.payload == null);
+}
+
+test "selection census identifies allocation-plan representation failures" {
+    const text =
+        \\define i32 @observed(ptr %p) {
+        \\entry:
+        \\  %wide = load x86_fp80, ptr %p, align 16
+        \\  ret i32 0
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    try std.testing.expectError(error.UnsupportedCodegenValue, @import("codegen/x86_64/generic_cfg/stage2_planning.zig").buildSelectorAllocationPlanObserved(std.testing.allocator, module.functions.items[0], &observer));
+    try std.testing.expect(capture.matches("unsupported_value", "stage2-unsupported-value"));
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const definition = payload.value.object.get("definition").?.object;
+    try std.testing.expectEqualStrings("load", definition.get("kind").?.string);
+    try std.testing.expectEqualStrings("wide", definition.get("result").?.string);
+    try std.testing.expectEqualStrings("x86_fp80", definition.get("type").?.string);
     observations.Observer.reset(&observer);
     try std.testing.expect(capture.payload == null);
 }

@@ -413,6 +413,12 @@ pub const SpillSlotAssignment = struct {
 };
 
 pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Function) !SelectorAllocationPlan {
+    return buildSelectorAllocationPlanObserved(allocator, function, null);
+}
+
+/// Observe the exact private definition that lacks a register representation.
+/// The ordinary plan and its failure remain unchanged when no observer is used.
+pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, function: ir.Function, observer: ?*@import("rejection_observer.zig").Observer) !SelectorAllocationPlan {
     var pressure_exempt_values = NameSet.init(allocator);
     defer pressure_exempt_values.deinit();
     try collectPressureExemptValues(&pressure_exempt_values, function);
@@ -441,7 +447,16 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
 
     var position: usize = 0;
     for (function.params.items) |param| {
-        const metadata = selectorValueMetadata(param.ty) orelse return error.UnsupportedCodegenValue;
+        const metadata = selectorValueMetadata(param.ty) orelse {
+            if (observer) |sink| try sink.reject(.{
+                .function = function,
+                .position = position,
+                .tag = "unsupported_value",
+                .detail = "stage2-unsupported-value",
+                .parameter = param,
+            });
+            return error.UnsupportedCodegenValue;
+        };
         try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, param.name, metadata, position);
     }
 
@@ -451,7 +466,16 @@ pub fn buildSelectorAllocationPlan(allocator: std.mem.Allocator, function: ir.Fu
             if (instruction.removed) continue;
             if (instruction.result) |result| {
                 if (!pressure_exempt_values.contains(result)) {
-                    const metadata = selectorInstructionResultMetadata(instruction) orelse return error.UnsupportedCodegenValue;
+                    const metadata = selectorInstructionResultMetadata(instruction) orelse {
+                        if (observer) |sink| try sink.reject(.{
+                            .function = function,
+                            .position = position,
+                            .tag = "unsupported_value",
+                            .detail = "stage2-unsupported-value",
+                            .definition = instruction,
+                        });
+                        return error.UnsupportedCodegenValue;
+                    };
                     try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, result, metadata, position);
                 }
             }

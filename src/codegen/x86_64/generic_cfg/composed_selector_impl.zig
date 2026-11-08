@@ -130,7 +130,7 @@ pub fn tryLowerComposedCfgObserved(
     if (function.blocks.items.len == 0) return unsupported(.{ .unsupported_control_flow = "stage2-empty-function" });
     if (function.blocks.items.len > stage2_max_blocks) return unsupported(.{ .no_spill_envelope = "stage2-block-count" });
 
-    var allocation_plan = try buildSelectorAllocationPlan(allocator, function);
+    var allocation_plan = try stage2_planning.buildSelectorAllocationPlanObserved(allocator, function, observer);
     defer allocation_plan.deinit();
 
     const start_len = machine.instructions.items.len;
