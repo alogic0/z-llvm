@@ -1,10 +1,10 @@
 const std = @import("std");
 
 pub const schema_version: u32 = 3;
-// User-directed 2026-11-03: lower the previous 32 GiB reserve by exactly
-// 10 decimal GB. Admission falls by the same amount; the working allowance
-// remains separate and unchanged.
-pub const serial_reserve_floor_bytes: u64 = 24_359_738_368;
+// User-directed 2026-11-08: require exactly 20 decimal GB at admission.
+// Keep the working allowance separate; derive the execution reserve from it.
+pub const serial_required_start_bytes: u64 = 20_000_000_000;
+pub const serial_reserve_floor_bytes: u64 = serial_required_start_bytes - serial_projected_peak_bytes;
 // The 2026-11-02 full fresh run sampled a 6,048,505,856-byte global
 // decrease. Round its 25% margin upward to a whole GiB. The observation
 // includes worker caches and filesystem activity, not just published AIR.
@@ -84,7 +84,7 @@ pub fn forFilesystem(filesystem_total_bytes: u64) Policy {
         .filesystem_total_bytes = filesystem_total_bytes,
         .reserve_bytes = serial_reserve_floor_bytes,
         .projected_peak_bytes = serial_projected_peak_bytes,
-        .required_start_bytes = serial_reserve_floor_bytes + serial_projected_peak_bytes,
+        .required_start_bytes = serial_required_start_bytes,
     };
 }
 
@@ -101,12 +101,12 @@ pub fn shardingForFilesystem(filesystem_total_bytes: u64) ShardingPolicy {
 
 test "serial policy keeps the approved fixed reserve across filesystem capacities" {
     try std.testing.expectEqual(@as(u32, 3), schema_version);
-    for ([_]u64{ 32_949_672_960, 982_240_026_624, 4 * 1024 * 1024 * 1024 * 1024, std.math.maxInt(u64) }) |total| {
+    for ([_]u64{ 20_000_000_000, 982_240_026_624, 4 * 1024 * 1024 * 1024 * 1024, std.math.maxInt(u64) }) |total| {
         const policy = forFilesystem(total);
         try std.testing.expectEqual(total, policy.filesystem_total_bytes);
-        try std.testing.expectEqual(@as(u64, 24_359_738_368), policy.reserve_bytes);
+        try std.testing.expectEqual(@as(u64, 11_410_065_408), policy.reserve_bytes);
         try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
-        try std.testing.expectEqual(@as(u64, 32_949_672_960), policy.required_start_bytes);
+        try std.testing.expectEqual(@as(u64, 20_000_000_000), policy.required_start_bytes);
     }
     try std.testing.expect(serial_projected_peak_bytes >= measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);
     try std.testing.expect(serial_projected_peak_bytes - 1024 * 1024 * 1024 < measured_serial_peak_bytes + (measured_serial_peak_bytes + 3) / 4);

@@ -1,6 +1,6 @@
 # Artifact retention and disk headroom
 
-Updated 2026-11-07 for the user-authorized storage simplification and cleanup.
+Updated 2026-11-08 for the user-directed 20 GB admission threshold.
 Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 
 ## Retained state
@@ -202,6 +202,20 @@ permanent net reduction or a standing instruction to clear other projects' cache
 
 ## Headroom
 
+At the user's direction on 2026-11-08, serial validation now requires exactly
+20,000,000,000 bytes (20 decimal GB) free before starting. The existing
+8,589,934,592-byte (8 GiB) working allowance remains, so the execution reserve is
+11,410,065,408 bytes (about 11.41 GB). The serial suite, standalone compiler-core
+workers and whole-compiler runner all use this shared budget. Nested workers
+inherit an admitted parent's allowance and continue enforcing the reserve;
+stronger caller floors and the separate opt-in sharding policy still apply.
+The telemetry layout remains schema 3 and records the actual numerical limits.
+Historical acceptance records retain the limits used for those runs.
+Focused validation passes 53 runner/policy tests, 43 comparison tests and the
+whole-compiler runner build/help check. Full distribution and fresh/cache
+validation of this setting remain for the next infrastructure acceptance;
+the existing compiler acceptance record is unchanged.
+
 The runner's numerical headroom checks remain owned by
 `tools/distribution_headroom_policy.zig` and
 `tools/distribution_real_rows_parallel_policy.zig`. Storage simplification does
@@ -214,11 +228,11 @@ roots against the current keep-list before removing them.
 The [headroom calibration](evidence/headroom_calibration_20261102.json) established
 the 8 GiB forecast: a 25% margin over the retained 6.05 GB fresh-run free-space
 decrease, rounded upward to a whole GiB. At the user's direction on 2026-11-03,
-headroom policy schema 3 lowers the former fixed 32 GiB reserve by exactly
-10,000,000,000 bytes (10 decimal GB). It reserves 24,359,738,368 bytes
-(approximately 24.36 GB) and keeps the 8 GiB working allowance. Serial admission
-therefore requires 32,949,672,960 bytes (approximately 32.95 GB) free, also
-10 GB below policy schema 2. This supersedes both the 42.95 GB fixed requirement
+headroom policy schema 3 lowered the former fixed 32 GiB reserve by exactly
+10,000,000,000 bytes (10 decimal GB). It reserved 24,359,738,368 bytes
+(approximately 24.36 GB) and kept the 8 GiB working allowance. Serial admission
+then required 32,949,672,960 bytes (approximately 32.95 GB) free, also
+10 GB below policy schema 2. That superseded both the 42.95 GB fixed requirement
 and the earlier capacity-based 57.70 GB requirement on this filesystem. Nested workers
 continue to inherit and enforce the caller's reserve, including any stronger
 caller floor, and their transient minimum enters the serial report before cleanup.

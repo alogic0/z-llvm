@@ -43,9 +43,9 @@ pub fn forFilesystemWithFloor(filesystem_total_bytes: u64, caller_floor_bytes: u
 test "real-row parallel policy uses exact fixed floor projected peak and checked start" {
     const policy = try forFilesystem(982_240_026_624);
     try std.testing.expectEqual(@as(u32, 3), schema_version);
-    try std.testing.expectEqual(@as(u64, 24_359_738_368), policy.post_run_free_floor_bytes);
+    try std.testing.expectEqual(@as(u64, 11_410_065_408), policy.post_run_free_floor_bytes);
     try std.testing.expectEqual(@as(u64, 8_589_934_592), policy.projected_peak_bytes);
-    try std.testing.expectEqual(@as(u64, 32_949_672_960), policy.required_start_bytes);
+    try std.testing.expectEqual(@as(u64, 20_000_000_000), policy.required_start_bytes);
     try std.testing.expectEqual(@as(usize, 3), worker_count);
 }
 

@@ -41,7 +41,11 @@ scratch and prior artifact audits pass; reference-wrapper metadata is reviewed
 separately from selected objects and observations.
 No complete compiler/runtime object, startup or self-rebuild is claimed.
 Preserve the 12-function core cohort, ratchet 130 and every existing execution
-population. Admission and execution reserve remain 32.95 GB and 24.36 GB.
+population. The user-directed 2026-11-08 limits are 20 GB at admission and
+11.41 GB during execution, with the existing 8 GiB working allowance. See the
+[current headroom policy](retention_headroom_policy.md#headroom).
+The numerical change passes focused policy checks; include it in the next
+full distribution and fresh/cache acceptance before advancing accepted status.
 Finish cache cleanup before validation starts. Preserve original inputs,
 accepted evidence, AIR caches and user scratch files; create no archives.
 
@@ -705,7 +709,7 @@ That pair reports 5.86 GB fresh and 2.16 GB cached decreases; reported minima
 are 44.09 GB and 43.31 GB, above the 34.36 GB reserve. The 51 runner/policy and
 41 comparison tests pass. These filesystem observations do not establish a speedup.
 The user subsequently lowered both admission and reserve by 10 decimal GB.
-Policy schema 3 now requires 32.95 GB at admission and maintains a 24.36 GB
+At that checkpoint, policy schema 3 required 32.95 GB at admission and a 24.36 GB
 runtime reserve, with the same 8 GiB working budget. Its accepted fresh/cached
 pair reports 7.09 GB and 1.97 GB decreases. Independent sampled minima are
 30.71 GB and 33.65 GB, above the reduced reserve; all 1,406 canonical records match.

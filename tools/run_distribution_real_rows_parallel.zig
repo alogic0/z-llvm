@@ -1677,9 +1677,9 @@ test "fixed capacity admits exact start boundary emits schema three and rejects 
     try writeEvidence(&evidence_writer, &result.evidence);
     const evidence = evidence_writer.buffered();
     try std.testing.expect(std.mem.indexOf(u8, evidence, "schema_version=3 normalization_schema=3") != null);
-    try std.testing.expect(std.mem.indexOf(u8, evidence, "post_run_free_floor_bytes=24359738368") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "post_run_free_floor_bytes=11410065408") != null);
     try std.testing.expect(std.mem.indexOf(u8, evidence, "projected_peak_bytes=8589934592") != null);
-    try std.testing.expect(std.mem.indexOf(u8, evidence, "required_start_bytes=32949672960") != null);
+    try std.testing.expect(std.mem.indexOf(u8, evidence, "required_start_bytes=20000000000") != null);
 
     audit = .{};
     test_options.filesystem_sample = .{ .total_bytes = policy_authority.required_start_bytes, .free_bytes = policy_authority.required_start_bytes - 1 };

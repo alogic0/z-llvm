@@ -25,6 +25,12 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
+The user-directed 2026-11-08 headroom setting is **20 GB free at admission**.
+Keeping the existing 8 GiB working allowance sets the execution reserve to
+11,410,065,408 bytes (about 11.41 GB). The serial suite, compiler-core workers
+and whole-compiler runner share these limits. Historical results below retain
+their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
+
 The [symbolic integer call-address slice](evidence/symbolic_call_addresses.md)
 is accepted at `b43dd3dc`: all 17 integration gates and 61 native populations pass.
 Debug and ReleaseSafe each pass 1,970 units and 22 structural checks. Readiness,
@@ -698,10 +704,11 @@ payload into the cache. The IR/headroom pair authenticates three fresh exports,
 then verifies three cache hits while rerunning execution checks. That checkpoint
 used `local-state/caches/ir-headroom-20261103`; current exports use
 `local-state/caches/execution-breadth-20261106`. The [project cleanup](evidence/project_space_cleanup_20261106.json)
-retires the superseded payloads and retains their historical evidence. The user reduced serial admission
-and its runtime reserve by 10 decimal GB: policy schema 3 requires
+retires the superseded payloads and retains their historical evidence. At that
+checkpoint, the user reduced serial admission and its runtime reserve by
+10 decimal GB: policy schema 3 required
 32,949,672,960 bytes (about 32.95 GB)
-at the start and reserves 24,359,738,368 bytes (about 24.36 GB) during execution.
+at the start and reserved 24,359,738,368 bytes (about 24.36 GB) during execution.
 The working budget remains 8 GiB. Nested workers inherit that admission and
 continue enforcing the reserve, including stronger caller floors. The accepted
 pair reports 7.09 GB fresh and 1.97 GB cached decreases, within the 8 GiB forecast.
