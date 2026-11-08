@@ -52,6 +52,13 @@ const Capture = struct {
             .function_return_attrs = rejection.function.ret_attrs,
             .function_calling_convention = rejection.function.calling_conv,
             .parameter = if (rejection.parameter) |param| .{ .name = param.name, .type = try std.fmt.allocPrint(a, "{f}", .{param.ty}), .attrs = param.attrs } else null,
+            .comparison = if (rejection.comparison) |comparison| .{
+                .predicate = @tagName(comparison.predicate),
+                .samesign = comparison.samesign,
+                .type = try std.fmt.allocPrint(a, "{f}", .{comparison.operand_ty}),
+                .result = rejection.result,
+                .operands = operands,
+            } else null,
             .global_address = if (rejection.global_address) |address| .{
                 .symbol = address.symbol,
                 .addend = address.addend,
@@ -71,6 +78,9 @@ const Capture = struct {
                 .calling_convention = call.calling_conv,
                 .tail_kind = call.tail_kind,
                 .callee_function_type = call.callee_function_ty,
+                .inline_asm = call.inline_asm,
+                .attributes = call.attrs,
+                .operand_bundle = call.operand_bundle,
                 .result = rejection.result,
                 .arguments = operands,
             } else null,
@@ -198,6 +208,43 @@ test "selection census retains final private call context and clears stale attem
     try std.testing.expect(capture.payload == null);
 }
 
+test "selection census owns rejected assembly templates constraints and typed facts" {
+    const text =
+        \\define i64 @observed(i64 %word) {
+        \\entry:
+        \\  br label %body
+        \\body:
+        \\  %result = tail call i64 asm sideeffect "syscall; nop", "={rax},{rax},~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags}"(i64 range(i64 0, 1024) %word)
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    var output = x86.MachineFunction.init("observed", .{ .int = 64 });
+    defer output.deinit(std.testing.allocator);
+    var dependencies: @import("codegen/x86_64/generic_cfg/composed_selector_address_dependencies.zig").AddressDependencyDomain = .{};
+    const result = try @import("codegen/x86_64/generic_cfg/composed_selector.zig").tryLowerComposedCfgObserved(std.testing.allocator, &output, module.functions.items[0], null, &dependencies, &observer);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expect(capture.matches(result.unsupported.tagName(), result.unsupported.detail()));
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const call = payload.value.object.get("call").?.object;
+    const assembly = call.get("inline_asm").?.object;
+    try std.testing.expectEqualStrings("syscall; nop", assembly.get("template").?.string);
+    try std.testing.expectEqualStrings("={rax},{rax},~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags}", assembly.get("constraints").?.string);
+    try std.testing.expect(assembly.get("sideeffect").?.bool);
+    try std.testing.expect(assembly.get("has_memory_clobber").?.bool);
+    try std.testing.expectEqualStrings("tail", call.get("tail_kind").?.string);
+    try std.testing.expectEqualStrings("range(i64 0, 1024)", call.get("arguments").?.array.items[0].object.get("attrs").?.string);
+    try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
+    observations.Observer.reset(&observer);
+    try std.testing.expect(capture.payload == null);
+}
+
 test "selection census observer preserves selected machine bytes" {
     const text =
         \\define i32 @selected(i1 %flag) {
@@ -224,6 +271,43 @@ test "selection census observer preserves selected machine bytes" {
     defer std.testing.allocator.free(plain_bytes);
     try std.testing.expectEqualSlices(u8, plain_bytes, observed_bytes);
     try std.testing.expectEqual(plain.selection_owner, observed.selection_owner);
+    try std.testing.expect(capture.payload == null);
+}
+
+test "selection census retains rejected comparison operands after rollback" {
+    const text =
+        \\@data = external global i8
+        \\define i1 @observed(ptr %p) {
+        \\entry:
+        \\  br label %body
+        \\body:
+        \\  %result = icmp eq ptr %p, getelementptr (i8, ptr @data, i64 3)
+        \\  ret i1 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    var output = x86.MachineFunction.init("observed", .{ .int = 1 });
+    defer output.deinit(std.testing.allocator);
+    var dependencies: @import("codegen/x86_64/generic_cfg/composed_selector_address_dependencies.zig").AddressDependencyDomain = .{};
+    const result = try @import("codegen/x86_64/generic_cfg/composed_selector.zig").tryLowerComposedCfgObserved(std.testing.allocator, &output, module.functions.items[0], null, &dependencies, &observer);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expect(capture.matches(result.unsupported.tagName(), result.unsupported.detail()));
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const comparison = payload.value.object.get("comparison").?.object;
+    try std.testing.expectEqualStrings("eq", comparison.get("predicate").?.string);
+    try std.testing.expectEqualStrings("ptr", comparison.get("type").?.string);
+    const operands = comparison.get("operands").?.array.items;
+    try std.testing.expectEqual(@as(usize, 2), operands.len);
+    try std.testing.expectEqualStrings("parameter", operands[0].object.get("origin").?.string);
+    try std.testing.expectEqualStrings("constant_expr", operands[1].object.get("origin").?.string);
+    try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
+    observations.Observer.reset(&observer);
     try std.testing.expect(capture.payload == null);
 }
 

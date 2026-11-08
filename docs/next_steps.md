@@ -1,5 +1,11 @@
 # Active direction
 
+The [syscall and measured selection-reduction plan](plans/2026-11-08-syscall-selection-reduction.md)
+is in progress. All 328 result-bearing assembly rejections are classified as
+Linux syscalls; the matcher repair and new native regressions pass focused
+checks. Complete-input replays and a comparison-operand repair are the active
+work. The accepted checkpoint below remains unchanged until full acceptance.
+
 The [global TLS, scalar intrinsic and pressure plan](plans/2026-11-08-global-intrinsics-pressure.md)
 is complete and accepted at `4b8eac2a`. Both complete diagnostic inputs have
 replayed: compiler selection is 7,040 of 8,928 and runtime selection 284 of 455,

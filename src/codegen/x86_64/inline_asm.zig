@@ -2,6 +2,7 @@
 //! and typed operands must all agree; no general assembly parsing is implied.
 const std = @import("std");
 const ir = @import("../../ir.zig");
+const sysv = @import("sysv_abi.zig");
 
 pub const Operation = union(enum) {
     linux_syscall: u3,
@@ -16,19 +17,27 @@ pub const syscall_clobbers = "~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags
 pub fn classify(call: ir.CallInst) ?Operation {
     const asm_value = call.inline_asm orelse return null;
     if (!asm_value.sideeffect or call.callee_value != null or call.callee_function_ty != null or
-        call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or
+        call.calling_conv != null or
         call.raw_args != null or call.operand_bundle != null) return null;
-    for (call.args.items) |arg| if (arg.attrs != null) return null;
     if (std.mem.eql(u8, asm_value.template, snapshot_template) and
         std.mem.eql(u8, asm_value.constraints, snapshot_constraints) and
-        call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr)
+        call.ret_attrs == null and call.tail_kind == null and
+        call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr and
+        call.args.items[0].attrs == null)
         return .register_snapshot;
     if (!std.mem.eql(u8, asm_value.template, "syscall") or !call.ret_ty.eql(.{ .int = 64 }) or
         call.args.items.len == 0 or call.args.items.len > syscall_inputs.len) return null;
+    // This exact instruction contract supplies the assembly effects. Reuse the
+    // ordinary call validators for typed facts and optional tail hints without
+    // changing the source IR or admitting a mandatory tail-call guarantee.
+    var envelope = call;
+    envelope.inline_asm = null;
+    sysv.rejectUnsupportedCallEnvelope(envelope) catch return null;
     var constraints = std.mem.splitScalar(u8, asm_value.constraints, ',');
     if (!std.mem.eql(u8, constraints.next() orelse return null, "={rax}")) return null;
     for (call.args.items, 0..) |arg, index| {
         if (!arg.ty.eql(.{ .int = 64 }) or !std.mem.eql(u8, constraints.next() orelse return null, syscall_inputs[index])) return null;
+        sysv.rejectUnsupportedCallArgAttrs(arg) catch return null;
     }
     if (!std.mem.eql(u8, constraints.rest(), syscall_clobbers)) return null;
     return .{ .linux_syscall = @intCast(call.args.items.len - 1) };

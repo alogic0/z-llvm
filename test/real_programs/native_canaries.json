@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "syscall_facts",
+      "prefix": "syscall-facts",
+      "fixture": "syscall_facts",
+      "functions": ["sysfact0", "sysfact1", "sysfact2", "sysfact3", "sysfact4", "sysfact5", "sysfact6", "sysfact_live"],
+      "observations": 1152,
+      "stdout": "syscall-facts observations=1152 arity=0-6 arguments=memory=errors=live=phis=preserved\n"
+    },
+    {
       "population": "register_pressure",
       "prefix": "register-pressure",
       "fixture": "register_pressure",

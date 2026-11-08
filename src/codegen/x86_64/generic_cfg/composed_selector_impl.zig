@@ -471,10 +471,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         else
             selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
         .freeze => |freeze| selector_scalar.lowerFreeze(selector, instruction.result, freeze) catch |err| return instructionValueError(selector, err, "stage2-freeze-value"),
-        .icmp => |icmp| if (icmp.operand_ty == .vector)
-            selector_vector.lowerIcmp(selector, instruction.result, icmp) catch |err| return instructionValueError(selector, err, "stage2-vector-icmp-value")
-        else
-            selector_scalar.lowerIcmp(selector, instruction.result, icmp) catch |err| return instructionValueError(selector, err, "stage2-icmp-value"),
+        .icmp => |icmp| lowerObservedIcmp(selector, instruction.result, icmp),
         .fcmp => |fcmp| if (fcmp.operand_ty == .vector)
             selector_vector.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-vector-fcmp-value")
         else
@@ -501,6 +498,15 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
 fn lowerObservedCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const diagnostic = try selector_calls.lowerCall(selector, result, call);
     if (diagnostic) |failure| try selector_state.observeRejectedCall(selector, result, call, failure);
+    return diagnostic;
+}
+
+fn lowerObservedIcmp(selector: *ComposedBlockSelector, result: ?[]const u8, comparison: ir.IcmpInst) !?Diagnostic {
+    const diagnostic = if (comparison.operand_ty == .vector)
+        try (selector_vector.lowerIcmp(selector, result, comparison) catch |err| instructionValueError(selector, err, "stage2-vector-icmp-value"))
+    else
+        try (selector_scalar.lowerIcmp(selector, result, comparison) catch |err| instructionValueError(selector, err, "stage2-icmp-value"));
+    if (diagnostic) |failure| try selector_state.observeRejectedIcmp(selector, result, comparison, failure);
     return diagnostic;
 }
 

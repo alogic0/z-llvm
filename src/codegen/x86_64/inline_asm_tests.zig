@@ -41,6 +41,39 @@ test "system assembly validates constraints and preserves simultaneous inputs" {
         defer std.testing.allocator.free(bytes);
         try std.testing.expect(std.mem.indexOf(u8, bytes, &.{ 0x0f, 0x05 }) != null);
         if (count >= 4) try std.testing.expect(std.mem.indexOf(u8, bytes, &.{ 0x49, 0x89, 0xca, 0x0f, 0x05 }) != null);
+        // Hints and validated facts must preserve the exact simultaneous input
+        // transfer and machine effects, across every supported syscall arity.
+        for ([_]?[]const u8{ null, "tail", "notail" }) |tail| {
+            for ([_]?[]const u8{ null, "noundef", "range(i64 -4096, 4096)", "noundef range(i64 32, 0)" }) |facts| {
+                var decorated = call;
+                decorated.tail_kind = tail;
+                decorated.ret_attrs = facts;
+                decorated.attrs = "#0";
+                for (decorated.args.items) |*arg| arg.attrs = facts;
+                try std.testing.expectEqual(@as(u3, @intCast(count)), asm_forms.classify(decorated).?.linux_syscall);
+                module.functions.items[0].blocks.items[0].instructions.items[0].kind.call = decorated;
+                var with_facts = try codegen.x86_64.lowerFunctionWithOptions(std.testing.allocator, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+                defer with_facts.deinit(std.testing.allocator);
+                const decorated_bytes = try encoding.encodeFunction(std.testing.allocator, with_facts);
+                defer std.testing.allocator.free(decorated_bytes);
+                try std.testing.expectEqualSlices(u8, bytes, decorated_bytes);
+                try std.testing.expectEqual(facts, decorated.args.items[0].attrs);
+            }
+        }
+        for (call.args.items) |*arg| arg.attrs = null;
+        module.functions.items[0].blocks.items[0].instructions.items[0].kind.call = call;
+        for ([_][]const u8{ "signext", "zeroext", "inreg", "noalias", "range(i32 0, 32)", "range(i64 1, 1)", "range(i64 0, 18446744073709551616)", "noundef unknown" }) |facts| {
+            var invalid = call;
+            invalid.ret_attrs = facts;
+            try std.testing.expect(asm_forms.classify(invalid) == null);
+            invalid.ret_attrs = null;
+            invalid.args.items[0].attrs = facts;
+            try std.testing.expect(asm_forms.classify(invalid) == null);
+            invalid.args.items[0].attrs = null;
+        }
+        var invalid_attributes = call;
+        invalid_attributes.attrs = "#0 byval(i64)";
+        try std.testing.expect(asm_forms.classify(invalid_attributes) == null);
     }
 }
 

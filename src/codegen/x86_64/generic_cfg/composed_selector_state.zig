@@ -100,6 +100,24 @@ pub fn observeRejectedCall(selector: *const ComposedBlockSelector, result: ?[]co
     });
 }
 
+pub fn observeRejectedIcmp(selector: *const ComposedBlockSelector, result: ?[]const u8, comparison: ir.IcmpInst, failure: Diagnostic) !void {
+    const observer = selector.rejection_observer orelse return;
+    var operands: [2]@import("rejection_observer.zig").Operand = undefined;
+    for ([_]ir.Value{ comparison.lhs, comparison.rhs }, &operands) |value, *operand| operand.* = .{
+        .argument = .{ .ty = comparison.operand_ty, .value = value },
+        .location = if (resolveValue(selector, value)) |loc| @tagName(loc) else null,
+    };
+    try observer.reject(.{
+        .function = selector.function.?.*,
+        .position = selector.current_position,
+        .tag = failure.tagName(),
+        .detail = failure.detail(),
+        .comparison = comparison,
+        .result = result,
+        .operands = &operands,
+    });
+}
+
 pub const EflagsEffect = eflags.Effect;
 pub const EflagsLiveness = eflags.Liveness;
 pub const EflagsDefinitionPurpose = eflags.DefinitionPurpose;

@@ -20,6 +20,7 @@ pub const Rejection = struct {
     tag: []const u8,
     detail: []const u8,
     call: ?ir.CallInst = null,
+    comparison: ?ir.IcmpInst = null,
     result: ?[]const u8 = null,
     parameter: ?ir.Param = null,
     global_address: ?GlobalAddress = null,
