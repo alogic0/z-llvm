@@ -1,9 +1,11 @@
-//! Private register carriers for unannotated narrow integer ABI values.
+//! Private register carriers for narrow integer ABI values and advisory facts.
 //! The low bits retain their source width; only the selector's view is widened.
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const sysv = @import("../sysv_abi.zig");
 const helpers = @import("composed_helpers.zig");
+const temporary_names = @import("scalar_forms.zig");
+const TemporaryNames = temporary_names.TemporaryNames;
 
 const carrier: ir.Type = .{ .int = 32 };
 
@@ -11,12 +13,12 @@ fn narrow(ty: ir.Type) bool {
     return ty == .int and ty.int > 0 and ty.int < 32;
 }
 
-fn advisory(attrs: ?[]const u8) bool {
-    return attrs == null or std.mem.eql(u8, std.mem.trim(u8, attrs.?, " \t"), "noundef");
+fn advisory(ty: ir.Type, attrs: ?[]const u8) bool {
+    return sysv.callReturnAttrsSupported(.{ .callee = "", .ret_ty = ty, .ret_attrs = attrs, .args = .empty });
 }
 
 fn parameter(param: ir.Param) bool {
-    return narrow(param.ty) and advisory(param.attrs);
+    return narrow(param.ty) and advisory(param.ty, param.attrs);
 }
 
 fn callForm(call: ir.CallInst) bool {
@@ -39,7 +41,8 @@ fn stackObject(function: ir.Function, value: ir.Value) bool {
 }
 
 fn callReturn(function: ir.Function, call: ir.CallInst) bool {
-    if (!narrow(call.ret_ty) or call.ret_attrs != null) return false;
+    if (!narrow(call.ret_ty) or !advisory(call.ret_ty, call.ret_attrs)) return false;
+    if (call.ret_attrs != null) return true;
     if (call.ret_ty.int != 1 or call.callee_value != null) return true;
     // The established typed boolean action owns up to six named scalar or
     // stack-object arguments. Other ordinary calls use the general ABI path,
@@ -64,25 +67,11 @@ fn booleanXor(inst: ir.Instruction) bool {
         inst.kind.binary.ty.eql(.{ .int = 1 }) and !inst.kind.binary.flags.any();
 }
 
-fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *usize) ![]const u8 {
-    while (true) {
-        const name = try std.fmt.allocPrint(allocator, "__zllvm_narrow_{d}", .{serial.*});
-        serial.* += 1;
-        var collision = false;
-        for (function.params.items) |param| if (ir.identifiers.eql(name, param.name)) {
-            collision = true;
-        };
-        for (function.blocks.items) |block| {
-            if (ir.identifiers.eql(name, block.name)) collision = true;
-            for (block.instructions.items) |inst| if (inst.result) |result| {
-                if (ir.identifiers.eql(name, result)) collision = true;
-            };
-        }
-        if (!collision) return name;
-    }
+fn temporary(allocator: std.mem.Allocator, function: ir.Function, serial: *TemporaryNames) ![]const u8 {
+    return temporary_names.temporary(allocator, function, serial);
 }
 
-fn widen(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, value: ir.Value) !ir.Value {
+fn widen(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *TemporaryNames, ty: ir.Type, value: ir.Value) !ir.Value {
     if (value == .int) return .{ .int = value.int & ((@as(i128, 1) << @intCast(ty.int)) - 1) };
     const name = try temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = name, .kind = .{ .cast = .{
@@ -94,7 +83,7 @@ fn widen(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBl
     return .{ .named = name };
 }
 
-fn receive(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, value: ir.Value, name: []const u8) !void {
+fn receive(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *TemporaryNames, ty: ir.Type, value: ir.Value, name: []const u8) !void {
     const masked = try temporary(allocator, function, serial);
     try block.instructions.append(allocator, .{ .result = masked, .kind = .{ .binary = .{
         .op = .@"and",
@@ -116,8 +105,8 @@ fn receive(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Basic
 // nested operands. C/fastcc integer register carriers occupy the same ABI homes.
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     if (!helpers.isDefaultOrFastcc(function.calling_conv) or function.blocks.items.len == 0) return null;
-    if (narrow(function.ret_ty) and function.ret_attrs != null) return null;
-    const return_value = narrow(function.ret_ty) and function.ret_attrs == null;
+    if (narrow(function.ret_ty) and !advisory(function.ret_ty, function.ret_attrs)) return null;
+    const return_value = narrow(function.ret_ty);
     var needed = return_value;
     for (function.params.items) |param| if (parameter(param)) {
         needed = true;
@@ -130,11 +119,20 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     var result = function;
     result.params = try function.params.clone(allocator);
     result.blocks = .empty;
-    if (return_value) result.ret_ty = carrier;
-    var serial: usize = 0;
+    // Validated facts describe the original logical payload, not unspecified
+    // bits in its ABI register carrier. In particular, a range on i8 cannot be
+    // attached to a dirty i32 return before the receive mask. Preserve source
+    // attributes and conservatively omit them only on the private widened view.
+    if (return_value) {
+        result.ret_ty = carrier;
+        result.ret_attrs = null;
+    }
+    var serial: TemporaryNames = .{ .prefix = "__zllvm_narrow_" };
+    defer serial.deinit(allocator);
     for (result.params.items) |*param| if (parameter(param.*)) {
         param.name = try temporary(allocator, function, &serial);
         param.ty = carrier;
+        param.attrs = null;
     };
     for (function.blocks.items, 0..) |original, index| {
         var block = original;
@@ -165,9 +163,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 for (copy.kind.call.args.items) |*arg| if (narrow(arg.ty)) {
                     arg.value = try widen(allocator, function, &block, &serial, arg.ty, arg.value);
                     arg.ty = carrier;
+                    arg.attrs = null;
                 };
                 if (callReturn(function, call)) {
                     copy.kind.call.ret_ty = carrier;
+                    copy.kind.call.ret_attrs = null;
                     if (inst.result != null) copy.result = try temporary(allocator, function, &serial);
                 }
                 try block.instructions.append(allocator, copy);

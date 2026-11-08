@@ -133,6 +133,100 @@ test "narrow ABI mixed parameters survive normalization and direct boolean branc
     };
 }
 
+test "narrow ABI validated payload facts do not constrain dirty carrier padding" {
+    for (1..32) |bits| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\define noundef range(i{d} -1, 0) i{d} @facts(i{d} noundef range(i{d} -1, 0) %input, ptr %output) {{
+            \\entry:
+            \\  %wide = zext i{d} %input to i64
+            \\  store i64 %wide, ptr %output, align 8
+            \\  ret i{d} %input
+            \\}}
+        , .{ bits, bits, bits, bits, bits, bits });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try legalization.legalize(arena.allocator(), original)).?;
+        try std.testing.expect(view.ret_attrs == null and view.params.items[0].attrs == null);
+        try std.testing.expect(original.ret_attrs != null and original.params.items[0].attrs != null);
+        try std.testing.expectEqual(@as(u16, 32), view.ret_ty.int);
+        try std.testing.expectEqual(@as(u16, 32), view.params.items[0].ty.int);
+        try std.testing.expect(try legalization.legalize(arena.allocator(), view) == null);
+        const executable = try compile(module);
+        defer std.posix.munmap(executable);
+        const run: *const fn (u64, *u64) callconv(.c) u64 = @ptrCast(executable.ptr);
+        const mask = (@as(u64, 1) << @intCast(bits)) - 1;
+        for ([_]u64{ 0, 0xdeadbeefcafe0000, std.math.maxInt(u64) }) |padding| {
+            var stored: u64 = 0;
+            try std.testing.expectEqual(mask, run((padding & ~mask) | mask, &stored) & mask);
+            try std.testing.expectEqual(mask, stored);
+        }
+        try module.verify();
+    }
+}
+
+test "narrow ABI range and noundef calls retain source contracts while widening private operands" {
+    const text =
+        \\declare noundef range(i8 -16, 16) i8 @helper(i8, i16)
+        \\define range(i16 0, 32768) i16 @caller(i8 range(i8 -16, 16) %a, i16 noundef %b) {
+        \\entry:
+        \\  %r = call noundef range(i8 -16, 16) i8 @helper(i8 range(i8 -16, 16) %a, i16 noundef %b)
+        \\  %wide = zext i8 %r to i16
+        \\  ret i16 %wide
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const source = module.functions.items[0];
+    const call = source.blocks.items[0].instructions.items[0].kind.call;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const view = (try legalization.legalize(arena.allocator(), source)).?;
+    var found = false;
+    for (view.blocks.items[0].instructions.items) |inst| if (inst.kind == .call) {
+        found = true;
+        try std.testing.expectEqual(@as(u16, 32), inst.kind.call.ret_ty.int);
+        try std.testing.expect(inst.kind.call.ret_attrs == null);
+        for (inst.kind.call.args.items) |arg| {
+            try std.testing.expectEqual(@as(u16, 32), arg.ty.int);
+            try std.testing.expect(arg.attrs == null);
+        }
+    };
+    try std.testing.expect(found);
+    try std.testing.expectEqualStrings("noundef range(i8 -16, 16)", call.ret_attrs.?);
+    try std.testing.expectEqualStrings("range(i8 -16, 16)", call.args.items[0].attrs.?);
+    try std.testing.expectEqualStrings("noundef", call.args.items[1].attrs.?);
+    var output = machine.MachineFunction.init(source.name, source.ret_ty);
+    defer output.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, source));
+    try verify.verifyFunction(output);
+    try module.verify();
+}
+
+test "narrow ABI rejects malformed facts and extension promises before changing private contracts" {
+    const text =
+        \\define i8 @invalid(i8 %input) {
+        \\entry:
+        \\  ret i8 %input
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    for ([_][]const u8{ "signext", "zeroext", "nonnull", "range(i16 0, 8)", "range(i8 5, 5)", "range(i8 0, 256)", "noundef noundef" }) |attrs| {
+        var function = module.functions.items[0];
+        function.ret_attrs = attrs;
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try legalization.legalize(arena.allocator(), function) == null);
+        try std.testing.expectEqual(@as(u16, 8), function.params.items[0].ty.int);
+    }
+}
+
 test "narrow ABI retains unsupported extension call convention and intrinsic boundaries" {
     const calls = [_][]const u8{
         "%result = call signext i8 @callee()",

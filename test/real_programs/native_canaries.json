@@ -2,6 +2,20 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "narrow_abi_facts",
+      "prefix": "narrow-abi-facts",
+      "fixture": "narrow_abi_facts",
+      "functions": [
+        "facts_call",
+        "facts_stack",
+        "facts_phi",
+        "facts_boolean",
+        "facts_ignored"
+      ],
+      "observations": 1280,
+      "stdout": "narrow-abi-facts observations=1280 all=match\n"
+    },
+    {
       "population": "call_attributes",
       "prefix": "call-attributes",
       "fixture": "call_attributes",
