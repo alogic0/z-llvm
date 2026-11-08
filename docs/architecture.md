@@ -123,6 +123,21 @@ and flags effects. Shared call-preservation transactions protect live GPR/SSE
 values, and ELF emission checks TLS symbol types, section alignment and aliases.
 Relocated TLS initializers remain outside this address contract.
 
+The closed Linux x86-64 syscall matcher validates typed facts and optional tail
+hints through the shared call contract. Exact assembly constraints, i64 carriers,
+memory/register effects and the zero-through-six-argument boundary remain
+authoritative. Mandatory tail calls and arbitrary assembly reject. Existing
+simultaneous transfers and call-preservation transactions implement the operation.
+Named `samesign ult i64` comparisons use the same full-width scratch action as
+ordinary unsigned comparisons; the flag restricts defined inputs without
+changing the predicate or register effects.
+
+The diagnostic census copies final private assembly, comparison operands and
+rejected value/allocation definitions before candidate rollback. It retains
+unattributed cases explicitly. Its complete-input comparisons check selected
+identities and failure tuples against production replay; adding observations
+does not confer code-generation or execution credit.
+
 `--selection-owner-output=PATH` writes the same sorted ownership manifest from
 the successful object-emission selection run. It sorts references to machine
 functions, preserving object order and bytes. The standalone manifest route

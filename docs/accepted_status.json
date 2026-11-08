@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "4b8eac2a1add1b29d92c11b7aec47b8166aa9e8a",
-  "accepted_tree": "b3b558b647bb0d765fa5c4cb5257d9d528500295",
+  "accepted_revision": "111f2e0af7a345732b057ec5e2d7889caeb4638b",
+  "accepted_tree": "f24780b4def2de371a9903ca754d5b8051528a97",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "4b8eac2a",
+  "declaration_revision": "111f2e0a",
   "evidence": [
+    "docs/evidence/syscall_selection_reduction_acceptance_20261108.json",
+    "docs/evidence/syscall_selection_reduction.md",
     "docs/evidence/global_intrinsics_pressure_acceptance_20261108.json",
     "docs/evidence/global_intrinsics_pressure.md",
     "docs/evidence/address_intrinsic_wide_abi_acceptance_20261108.json",

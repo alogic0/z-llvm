@@ -1,45 +1,55 @@
 # Active direction
 
 The [syscall and measured selection-reduction plan](plans/2026-11-08-syscall-selection-reduction.md)
-is in progress. All 328 result-bearing assembly rejections are classified as
-Linux syscalls; the matcher repair and new native regressions pass focused
-checks. Complete-input replays and a comparison-operand repair are the active
-work. The accepted checkpoint below remains unchanged until full acceptance.
+is complete and accepted at `111f2e0a`. Both complete production replays and
+event audits pass: compiler selection is 7,116 of 8,928 and runtime selection
+284 of 455. All 7,040 compiler and 284 runtime baseline successes remain.
+Compiler failures fall from 1,888 to 1,812, a reduction of 76 (4.03%). Debug and
+ReleaseSafe each pass 1,965 units and 21 structural checks; both new native
+populations pass with Debug and ReleaseFast. All 17 integration gates and 60
+native populations pass; all 58 preceding native records and 36 core
+object/observation records are preserved. Source, input, scratch and prior
+artifact audits pass. Reference-wrapper metadata differences are recorded
+separately. See the [evidence](evidence/syscall_selection_reduction.md) and
+[acceptance record](evidence/syscall_selection_reduction_acceptance_20261108.json).
 
-The [global TLS, scalar intrinsic and pressure plan](plans/2026-11-08-global-intrinsics-pressure.md)
-is complete and accepted at `4b8eac2a`. Both complete diagnostic inputs have
-replayed: compiler selection is 7,040 of 8,928 and runtime selection 284 of 455,
-preserving all 6,752 and 274 baseline successes. Debug and ReleaseSafe each pass
-1,962 units and 21 structural checks. All 17 integration gates and 58 native
-populations pass. The five new populations also pass with both Debug and
-ReleaseFast compilers. See the [evidence](evidence/global_intrinsics_pressure.md)
-and [acceptance record](evidence/global_intrinsics_pressure_acceptance_20261108.json).
+The syscall contract now validates facts and optional tail hints through shared
+call machinery. Named `samesign ult i64` comparisons use the existing full-width
+transfer action. All 328 assembly first failures and 179 comparison-RHS first
+failures advance; many expose later boundaries. These repairs are implemented.
 
-The original 217 main intrinsic failures all advance: 177 select after that slice
-and forty expose later failures. The original 184 main pressure failures all
-advance: 61 select and 123 expose other boundaries. Shared general-dynamic TLS
-addresses use checked call preservation and ELF relocations. Scalar bit intrinsics
-cover logical widths and funnel-count boundaries. Register pressure uses the
-existing dynamic allocation/frame authority, retaining its one-MiB frame and
-1,024-block limits.
+Next, prioritize shared symbolic-address materialization for integer
+call arguments. Of 440 unknown-argument failures, 326 calls contain the same
+unresolved i64 `ptrtoint` of a constant GEP into
+`Io.Threaded.global_single_threaded_instance`. Preserve symbol/relocation identity,
+checked addends, aliases, simultaneous transfers and register effects. The other
+nonliteral candidates are i32 undef (86), i64 poison (22) and i64 undef (six);
+their semantics need an explicit separate decision.
 
-Next, classify the 327 first rejections at
-`composed-block-inline-asm-result`: inspect the actual assembly, constraints,
-types and clobbers, then choose a shared instruction-effect repair. Keep arbitrary
-assembly text outside that contract. The next large groups are comparison RHS
-forms (179), general stage-two values (133), alloca types (123), and unknown call
-arguments and readonly-table globals (113 each). Replay both complete inputs
-after any shared repair; group sizes do not predict completed functions.
+Next classify the 225 readonly-table global rejections, including 112 exposed by
+the comparison repair. All 133 general-value failures now have concrete private
+definitions: the largest is 67 `<16 x i1>` comparison results, followed by thirteen
+`<2 x ptr>` loads. Allocation failures comprise 123 main and five varargs cases;
+all have observed types/attributes. Leading shapes are fp128 slots (30), arrays
+of two `%sort.block.Pull` values (20), 4,096-byte arrays (17), and one-element
+arrays of `{ ptr, i64 }` (10). Replay both complete inputs after each shared
+repair; group sizes do not predict completed functions.
 
-Current raw evidence is under
-`local-state/validations/global-intrinsics-pressure-20261108/`. No complete
-compiler/runtime object, startup or self-rebuild is claimed. Preserve the
-12-function core cohort, ratchet 130 and every existing execution population.
-Admission and runtime reserve remain 32.95 GB and 24.36 GB. Finish cache cleanup
-before validation starts: absence of open cache files does not prove that later
-steps will not reuse them. Preserve original inputs and evidence; create no archives.
+Raw evidence is under `local-state/validations/syscall-selection-20261108/`.
+No complete compiler/runtime object, startup or self-rebuild is claimed.
+Preserve the 12-function core cohort, ratchet 130 and every existing execution
+population. Admission and execution reserve remain 32.95 GB and 24.36 GB.
+Finish cache cleanup before validation starts. Preserve original inputs,
+accepted evidence, AIR caches and user scratch files; create no archives.
 
 ## Preceding checkpoints
+
+The [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
+at `4b8eac2a` selects 7,040 compiler and 284 runtime definitions, with all 17 gates
+and 58 native populations passing. It establishes shared general-dynamic TLS,
+scalar bit-intrinsic widths/facts and dynamic allocation/frame admission. Its
+syscall and comparison recommendations are implemented by the current frozen
+accepted slice above.
 
 The [constant-address, intrinsic-fact and wide ABI checkpoint](evidence/address_intrinsic_wide_abi.md)
 at `761ea199` selects 6,752 of 8,928 compiler definitions and 274 of 455 runtime

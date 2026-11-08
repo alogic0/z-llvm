@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `4b8eac2a1add1b29d92c11b7aec47b8166aa9e8a`; tree: `b3b558b647bb0d765fa5c4cb5257d9d528500295`.
+Accepted revision: `111f2e0af7a345732b057ec5e2d7889caeb4638b`; tree: `f24780b4def2de371a9903ca754d5b8051528a97`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -25,32 +25,45 @@ Compiler-rt bypass ratchet: 130 (separate 285-function population).
 
 <!-- accepted-status:end -->
 
-The [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
-is accepted at `4b8eac2a`: all 17 integration gates and 58 native populations pass.
-Debug and ReleaseSafe each pass 1,962 units and 21 structural checks; profiling
-process tests, readiness, both input corpora and fixed programs pass. Native
-coverage totals 1,914,372 local observations against 957,186 LLVM references.
+The [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
+is accepted at `111f2e0a`: all 17 integration gates and 60 native populations pass.
+Debug and ReleaseSafe each pass 1,965 units and 21 structural checks. Readiness,
+profiling checks, both input corpora and fixed programs pass. Native coverage
+totals 1,942,788 local observations against 971,394 LLVM references; all 58 prior
+population records are preserved.
 
-The unchanged compiler replay attempts all 8,928 definitions, selecting 7,040
-and rejecting 1,888. All 6,752 previous successes remain, with 288 additions.
-Runtime selection rises from 274 to 284 of 455 definitions without losses. Both
-complete event streams are audited. Dependency coverage remains conservative;
-no complete compiler/runtime object, startup or self-rebuild is claimed.
+The unchanged compiler replay attempts all 8,928 definitions, selecting 7,116
+and rejecting 1,812. All 7,040 previous successes remain, with 76 additions.
+Failures decrease by 4.03%. Runtime retains all 284 of 455 selections. Both
+production replays match diagnostic selected identities and failure tuples,
+with complete event audits. Dependency coverage remains conservative; no complete
+compiler/runtime object, startup or self-rebuild is claimed.
 
-Shared general-dynamic TLS addresses preserve alias and dependency identity,
-use explicit resolver-call effects and shared live-register preservation, and
-emit checked ELF TLS relocations. Scalar bit intrinsics cover logical widths,
-dirty padding and funnel-count boundaries through shared native operations.
-Register pressure now uses the existing dynamic allocation/frame authority;
-the obsolete 38-value admission rule is removed while the one-MiB frame and
-1,024-block limits remain. Original IR types and attributes remain unchanged.
+The exact Linux x86-64 syscall contract now validates typed facts and optional
+tail hints through shared call machinery. Named `samesign ult i64` comparisons
+reuse the existing full-width transfer action. All 328 assembly first failures
+and 179 comparison-RHS first failures advance; many reach later boundaries.
+The two new native populations pass with both frozen Debug and ReleaseFast
+compilers, preserving original IR, register effects and rollback contracts.
 
-All 217 original main intrinsic failures advance: 177 select and forty expose
-later failures. All 184 original main pressure failures advance: 61 select and
-123 expose other boundaries. The next priority is to classify the actual
-operations, constraints and clobbers behind 327 result-bearing inline-assembly
-first rejections before extending shared instruction effects. See
-[the active handoff](next_steps.md).
+All 36 core records preserve selected objects and execution observations, and
+local linked sizes match. Twenty-four LLVM reference wrappers shrink by 32 or
+40 bytes; the exact metadata differences and their review are retained separately.
+No section-level executable identity is claimed. The 12-function core cohort,
+ratchet 130, all 603 Zig and 552 C observation controls, and 54 core fault
+detections remain intact.
+
+Next, prioritize symbolic-address materialization for integer call arguments:
+326 of 440 unknown-argument calls contain the same unresolved constant `ptrtoint`.
+Then classify 225 readonly-table global rejections. All 133 general-value and
+128 allocation failures now have attributed concrete definitions/types. See
+[the active handoff](next_steps.md) for the measured groups and boundaries.
+
+The preceding [global TLS, scalar intrinsic and pressure checkpoint](evidence/global_intrinsics_pressure.md)
+at `4b8eac2a` established shared general-dynamic TLS, scalar intrinsic widths and
+facts, and dynamic frame admission. It selected 7,040 compiler and 284 runtime
+definitions, with all 17 gates and 58 native populations passing. Its syscall
+and comparison recommendations are completed by the accepted checkpoint above.
 
 The preceding [constant-address, intrinsic-fact and wide ABI checkpoint](evidence/address_intrinsic_wide_abi.md)
 established constant GEP flags, resolved data aliases, validated intrinsic facts
@@ -62,10 +75,9 @@ established final private-call/parameter observations and validated narrow ABI
 facts. The [complete census](evidence/selection_census_completion.md) established
 flushed progress events, shared temporary/allocation indexes and validated
 call/memory facts. Core counts stay at 100 lowered/emitted/linked and twelve
-executed functions per mode; bypass ratchet 130 is unchanged. All 36 core records
-preserve selected objects, observations, reference sizes and linked sizes.
-Reference-wrapper and linked hash differences are recorded separately, without
-a blanket executable byte-identity claim. The preceding
+executed functions per mode; bypass ratchet 130 is unchanged. Core records
+preserve selected objects and observations; executable metadata is compared
+separately, without a blanket executable byte-identity claim. The preceding
 [allocation and runtime-memory repair](evidence/allocation_runtime_memory.md)
 established complete module verification, scalar FP memory rewriting and the
 allocation-attribute contract. The [parser and runtime-cast checkpoint](evidence/compiler_parser_vector_casts.md)

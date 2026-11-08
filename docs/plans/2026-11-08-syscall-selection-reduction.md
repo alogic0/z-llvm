@@ -1,6 +1,9 @@
 # Syscall contracts and measured selection reduction
 
-Status: in progress. Baseline implementation `4b8eac2a`, documented at
+Status: complete and accepted at `111f2e0a`. See the
+[evidence](../evidence/syscall_selection_reduction.md) and
+[acceptance record](../evidence/syscall_selection_reduction_acceptance_20261108.json).
+Baseline implementation `4b8eac2a`, documented at
 `d4292871`, selects 7,040 of 8,928 compiler definitions and 284 of 455 runtime
 definitions. All 17 integration gates and 58 native populations pass. See the
 [preceding evidence](../evidence/global_intrinsics_pressure.md).
@@ -14,8 +17,15 @@ observations. The subsequent comparison repair admits named `samesign ult i64`
 operands through the existing full-width transfer action. Six native functions
 pass 21,504 local and 10,752 reference observations, including clobbering calls,
 PHIs and memory canaries. The census now retains actual rejected allocation-plan
-definitions and inspected allocation types. Final replays and cumulative
-acceptance remain outstanding.
+definitions and inspected allocation types. Both final production replays and
+complete event audits pass: 7,116 compiler and 284 runtime definitions select,
+with no lost successes. Compiler failures fall by 76, from 1,888 to 1,812.
+Debug and ReleaseSafe each pass 1,965 units and 21 structural checks. Both new
+native populations pass with frozen Debug and ReleaseFast compilers. All 17
+integration gates and 60 native populations pass, preserving the preceding 58
+population records and all 36 core object/observation records. The recorded
+reference-wrapper size differences are reviewed separately. Final source,
+input, scratch and prior-artifact checks pass.
 
 1. Retain the baseline, immutable original inputs and scratch hashes. Extend
    diagnostic observations with the exact inline assembly and call attributes.
