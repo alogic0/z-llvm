@@ -1,0 +1,290 @@
+{
+  "schema": "project-space-cleanup-v1",
+  "recorded_utc": "2026-11-08T02:00:04Z",
+  "status": "completed",
+  "scope": "project only",
+  "base_revision": "a2bb81970ac8e78b1af4d48faa8ab97ce6d94626",
+  "allocated_bytes_removed": 8939589632,
+  "retired_air": {
+    "root": "local-state/caches/execution-breadth-20261106",
+    "payload_count": 3,
+    "allocated_bytes_removed": 3923881984,
+    "payloads": [
+      {
+        "sha256": "e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995",
+        "path": "local-state/caches/execution-breadth-20261106/ReleaseFast/export/c9c82507b354f7d9d05c78abb44ec140c67bd80e2ec90c90ceac1a6f627701ea.e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995.air"
+      },
+      {
+        "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+        "path": "local-state/caches/execution-breadth-20261106/ReleaseSafe/export/ed4223764d0a676b7f25fb6a6e64efeab0eff34bcedec2db05a9b110ee523362.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air"
+      },
+      {
+        "sha256": "30f38ab3bc72f079931079598b1c97cfc3a53a0fce0a11ca25f5649a7aded489",
+        "path": "local-state/caches/execution-breadth-20261106/ReleaseSmall/export/b4b68dc91b87fde101e6e1c2fbe655980008f1e35b2c59cbc8096302cae73178.30f38ab3bc72f079931079598b1c97cfc3a53a0fce0a11ca25f5649a7aded489.air"
+      }
+    ],
+    "retained": [
+      "all six original metadata and lock files",
+      "verified payload identities",
+      "historical acceptance evidence",
+      "retirement.json"
+    ],
+    "replacement": {
+      "root": "local-state/caches/core-execution-20261107",
+      "accepted_revision": "c08b98d11009c6967997448c88fa073a27f27152",
+      "proof": "docs/evidence/compiler_core_memory_width_acceptance_20261107.json",
+      "accepted_fresh_cached_canonical_records": 45,
+      "full_gates": 17,
+      "payloads": [
+        {
+          "sha256": "e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995",
+          "path": "local-state/caches/core-execution-20261107/ReleaseFast/export/71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6.e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995.air"
+        },
+        {
+          "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+          "path": "local-state/caches/core-execution-20261107/ReleaseSafe/export/c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air"
+        },
+        {
+          "sha256": "0092b4db7596a504b2a7e3f43f3adfa7e046fd6c0cf289d8a5960c5053ff5958",
+          "path": "local-state/caches/core-execution-20261107/ReleaseSmall/export/db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7.0092b4db7596a504b2a7e3f43f3adfa7e046fd6c0cf289d8a5960c5053ff5958.air"
+        }
+      ],
+      "comparison": "ReleaseFast and ReleaseSafe payload bytes match. ReleaseSmall differs; retirement relies on the accepted replacement fresh/cached execution proof."
+    }
+  },
+  "idle_compiler_caches": {
+    "complete_roots_removed": 52,
+    "allocated_bytes_removed": 1167106048,
+    "files_hardlinked_outside_removed_roots": 0,
+    "inventories": [
+      "cache-roots.txt",
+      "cache-files-before.tsv",
+      "cache-files-pre-delete.tsv",
+      "cache-sizes.tsv"
+    ]
+  },
+  "temporary_binaries": {
+    "files_removed": 5472,
+    "allocated_bytes_removed": 299515904,
+    "classification": "Single-link ELF executables, shared objects, relocatable objects and static libraries in completed temporary runs, outside removed cache roots; tmp/o2_calls_perf excluded.",
+    "retained_tmp_files_hash_verified": 18656,
+    "inventory": "tmp-binaries-outside-caches.tsv"
+  },
+  "duplicate_replay_inputs": {
+    "paths_retained": 9,
+    "paths_relinked": 8,
+    "allocated_bytes_removed": 3549085696,
+    "canonical": "local-state/validations/selection-census-20261107/compiler-replay-accepted/backend/input.ll",
+    "bytes_per_path": 443624107,
+    "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+    "operation": "Byte comparison and matching modes before atomic replacement with hardlinks; every path and content hash preserved.",
+    "lifecycle": "Completed immutable replay inputs share storage. The diagnostic runner rejects existing output roots; future runs use new directories.",
+    "original_frontend_backend_and_runtime_captures": "Independent inodes, link counts and content hashes unchanged."
+  },
+  "deletion_interval": {
+    "project_allocated_bytes_before": 27185221632,
+    "project_allocated_bytes_after": 18245644288,
+    "project_net_allocated_bytes_decrease": 8939577344,
+    "filesystem_available_bytes_before": 29789945856,
+    "filesystem_available_bytes_after": 38729506816,
+    "measured_filesystem_free_increase": 8939560960,
+    "limits": "Project measurements include small audit-file writes. Filesystem free space also changes with unrelated activity; later cache regeneration is not permanent savings."
+  },
+  "preservation": {
+    "tracked_files_verified_before_documentation_updates": 3014,
+    "latest_implementation_inputs_verified": 1737,
+    "latest_acceptance_artifacts_verified": 316,
+    "replacement_acceptance_artifacts_verified": 59,
+    "original_scratch_files_verified": 13,
+    "current_air_payloads_verified": 3,
+    "current_and_baseline_compiler_identities_verified": true,
+    "installed_compiler_verified": true,
+    "focused_probe_binaries_verified": true,
+    "source_modified": false,
+    "accepted_proofs": [
+      {
+        "sha256": "a797fafb3c99562c0ba4977f5f4e338f22a1acf2b7aeea49198a30a89f011272",
+        "path": "docs/evidence/compiler_core_memory_width_acceptance_20261107.json"
+      },
+      {
+        "sha256": "902af62ec640483483dc5c0de58745fe91aa4857e53dd885faa48ab5b32d8610",
+        "path": "docs/evidence/selection_census_completion_acceptance_20261107.json"
+      }
+    ]
+  },
+  "active_consumer_audit": {
+    "candidate_path_matches": 0,
+    "method": "lsof checks for file descriptors, executable mappings and directory consumers, plus compiler process working-directory review.",
+    "limitation": "lsof emitted warnings for inaccessible unrelated Docker overlay/network mounts. The visible Zig builds belonged to /home/oleg/caspian/zg-front; their shared cache was not touched."
+  },
+  "artifact_store": {
+    "dry_run": "artifact-store gc --pins docs/evidence/artifacts",
+    "unpinned_files": 0,
+    "unpinned_bytes": 0,
+    "objects_deleted": 0
+  },
+  "shared_cache_removed": false,
+  "dependency_repositories_modified": false,
+  "diagnostic_worktrees_removed": false,
+  "performance_inputs_removed": false,
+  "archives_created": false,
+  "headroom_policy": {
+    "admission_bytes": 32949672960,
+    "reserve_bytes": 24359738368,
+    "changed": false
+  },
+  "local_audit_root": "local-state/validations/selection-cleanup-20261107",
+  "audit_artifacts": [
+    {
+      "sha256": "4c2e730aaf6ddf863e19988dc51b4885bbf2794549c0675b38757b886bcc458b",
+      "path": "local-state/validations/selection-cleanup-20261107/air-payloads.sha256"
+    },
+    {
+      "sha256": "b0f0868cc749873aa11332c7525ea02dde65ae6a708cb2e6d4673c172b64ee67",
+      "path": "local-state/validations/selection-cleanup-20261107/air-metadata.sha256"
+    },
+    {
+      "sha256": "5a923306b8962404aeebf402b979f27f3398b12792bc2b3ab15f4eda68652730",
+      "path": "local-state/validations/selection-cleanup-20261107/retired-air.tsv"
+    },
+    {
+      "sha256": "84eeb9d1725e428c4bdd23259411449f72b8b02bee0f269f7968f550a3cf66c1",
+      "path": "local-state/validations/selection-cleanup-20261107/current-air.sha256"
+    },
+    {
+      "sha256": "854fedcde25fa8cc8817097f6260752aed77694677eeac346420cc93e42ced82",
+      "path": "local-state/validations/selection-cleanup-20261107/cache-roots.txt"
+    },
+    {
+      "sha256": "0a51c0518f79b20ad95587e9410391698114883a5de010a9b9aa8f71775b886f",
+      "path": "local-state/validations/selection-cleanup-20261107/cache-files-before.tsv"
+    },
+    {
+      "sha256": "0a51c0518f79b20ad95587e9410391698114883a5de010a9b9aa8f71775b886f",
+      "path": "local-state/validations/selection-cleanup-20261107/cache-files-pre-delete.tsv"
+    },
+    {
+      "sha256": "e581abb554fa47fb5f1a4c636c27ee63535070dbdf74c03c24ce60acda4647af",
+      "path": "local-state/validations/selection-cleanup-20261107/cache-sizes.tsv"
+    },
+    {
+      "sha256": "3eccb1fe8a871dcc04af5133f057db76909aa5c12ee787268b588df91c933e0a",
+      "path": "local-state/validations/selection-cleanup-20261107/tmp-binaries-outside-caches.tsv"
+    },
+    {
+      "sha256": "6512f9eedf256c46df91bd00f70c6c8630bda8a473b618832d84514d6b3d7097",
+      "path": "local-state/validations/selection-cleanup-20261107/retained-tmp.sha256"
+    },
+    {
+      "sha256": "c36c760feb8942b62726d9c8b4a6ede9ebe6171177a0a6701c58a0463e9324b3",
+      "path": "local-state/validations/selection-cleanup-20261107/replay-inputs.sha256"
+    },
+    {
+      "sha256": "bfe0caf0128ab75bb50736cce04c4c5ff5b1d071a668911fd94264565ea1d688",
+      "path": "local-state/validations/selection-cleanup-20261107/replay-inputs-before.tsv"
+    },
+    {
+      "sha256": "4dffc98d396e2cb472bf00c291ba22c4f26132d8a1f1f61efc9b7c26215555f9",
+      "path": "local-state/validations/selection-cleanup-20261107/replay-inputs-after.tsv"
+    },
+    {
+      "sha256": "05625cbd790b4ba8221f2a3f439cc9c3680e3acda742405a290500b3f18e8dbc",
+      "path": "local-state/validations/selection-cleanup-20261107/original-inputs-stat-before.tsv"
+    },
+    {
+      "sha256": "05625cbd790b4ba8221f2a3f439cc9c3680e3acda742405a290500b3f18e8dbc",
+      "path": "local-state/validations/selection-cleanup-20261107/original-inputs-stat-after.tsv"
+    },
+    {
+      "sha256": "a68c56702f29ce64b7e8ad78b3167b6f08f4d62ffb2a341f78ff9f7e72f6ebac",
+      "path": "local-state/validations/selection-cleanup-20261107/protected-outputs-inputs.sha256"
+    },
+    {
+      "sha256": "4b38644d2bbae8b7e82a8be339ba43788a2c7381849396597d70a3e4be712e9f",
+      "path": "local-state/validations/selection-cleanup-20261107/tracked-before.sha256"
+    },
+    {
+      "sha256": "3a538e11538029e855c4588780e32ce40953a624864d241571e2bc6a9eb71d29",
+      "path": "local-state/validations/selection-cleanup-20261107/scratch-before.sha256"
+    },
+    {
+      "sha256": "939d5faf90bee7e9a5a252d229d52a22677c7912f4a95627b6346e7c3bde9285",
+      "path": "local-state/validations/selection-cleanup-20261107/preservation-checks.tsv"
+    },
+    {
+      "sha256": "39a881e255d0e8ad4d1527ae38334f22c78a385f1c6d8ff60255d003d2a2e670",
+      "path": "local-state/validations/selection-cleanup-20261107/consumer-paths.txt"
+    },
+    {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "local-state/validations/selection-cleanup-20261107/consumer-check.log"
+    },
+    {
+      "sha256": "59b3ebbcb94d47fd1c336f2da24da89a475844101931ec4728756a93e07dd88b",
+      "path": "local-state/validations/selection-cleanup-20261107/consumer-warning-summary.txt"
+    },
+    {
+      "sha256": "7d9d134f1a152145485a00158016f6a3d6fcd753912e335d5fca99775e596888",
+      "path": "local-state/validations/selection-cleanup-20261107/artifact-store-dry-run.log"
+    },
+    {
+      "sha256": "237ed1abffc1e13459fac0f3be7a80187b63370f481418d2b2e0db59ddc48bfa",
+      "path": "local-state/validations/selection-cleanup-20261107/apply-cleanup.sh"
+    },
+    {
+      "sha256": "7eda9b4c7153dc1954d988a6e11e94c3ee8fb125f808f3c9427c0c8e9364a758",
+      "path": "local-state/validations/selection-cleanup-20261107/apply-cleanup.log"
+    },
+    {
+      "sha256": "702efe94a75b14f0d4456e7908e9fd69b648ce639b90aaf90eaff4ab83bf3794",
+      "path": "local-state/validations/selection-cleanup-20261107/project-allocation-before.tsv"
+    },
+    {
+      "sha256": "42dae301bf5e384c7d5bdb613bad7b8748d5d71cdce251f551cb9c48804780d4",
+      "path": "local-state/validations/selection-cleanup-20261107/project-allocation-after.tsv"
+    },
+    {
+      "sha256": "3c6f7be62510e88d83852b31afed1814964e03a5527fd87aca1e80b87846b53f",
+      "path": "local-state/validations/selection-cleanup-20261107/df-pre-delete.txt"
+    },
+    {
+      "sha256": "12fd5d78c0447e777cbd373bd270032dff1f18c39ec2314844d596b77dbe1110",
+      "path": "local-state/validations/selection-cleanup-20261107/df-after-delete.txt"
+    },
+    {
+      "sha256": "6cf72f7c2fcbae80ac7178e9fabfbd6c60bdfa0cb2435a268f3c8c4c7685a2ab",
+      "path": "local-state/caches/execution-breadth-20261106/retirement.json"
+    },
+    {
+      "sha256": "dc881cf3255f1b5971c4ef85a98ef985dc1cebe32f4663bf08f027f07c5c3b37",
+      "path": "local-state/validations/selection-cleanup-20261107/docs-check.log"
+    },
+    {
+      "sha256": "3403afefee72c94a4cd67764ac467c037e25ff05e389f38f0e529615095db1d2",
+      "path": "local-state/validations/selection-cleanup-20261107/tool-cache-sizes.tsv"
+    },
+    {
+      "sha256": "9c7e8324d08ca570c80b9fe7e88070e95cf9fbca4399b163eb1882f1e75fb945",
+      "path": "local-state/validations/selection-cleanup-20261107/df-final.txt"
+    },
+    {
+      "sha256": "8382aa8fbf44a2718112e49272f8b429f0284604375dae028b3d2f0171f46281",
+      "path": "local-state/validations/selection-cleanup-20261107/project-allocation-final.tsv"
+    }
+  ],
+  "completed_utc": "2026-11-08T02:04:13Z",
+  "documentation_check": {
+    "status": "passed",
+    "result": "documentation check ok: 19 current documents, 337 internal file links, 2 status blocks",
+    "command": "zig run --cache-dir local-state/validations/selection-cleanup-20261107/tool-local-cache --global-cache-dir local-state/validations/selection-cleanup-20261107/tool-global-cache tools/check_project_docs.zig"
+  },
+  "cleanup_tool_caches": {
+    "created_and_removed_roots": 2,
+    "allocated_bytes": 76148736,
+    "included_in_original_data_reclaimed": false
+  },
+  "final_observation": {
+    "filesystem_available_bytes": 37652516864,
+    "project_allocated_bytes": 18181767168
+  }
+}
