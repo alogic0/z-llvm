@@ -4,7 +4,7 @@ const std = @import("std");
 const Candidate = @import("rewrite_candidate.zig").Candidate;
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
-const sysv = @import("../sysv_abi.zig");
+const intrinsic_attrs = @import("intrinsic_attrs.zig");
 
 const Operation = enum { uadd_sat, usub_sat, reverse, umin, umax, smin, smax };
 
@@ -29,13 +29,11 @@ fn extend(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicB
 }
 
 fn operation(call: ir.CallInst) ?Operation {
-    if (call.ret_ty != .int or call.ret_ty.int == 0 or call.ret_ty.int > 64 or
-        call.callee_value != null or call.inline_asm != null or call.raw_args != null or
-        call.operand_bundle != null or call.callee_function_ty != null or call.calling_conv != null or call.ret_attrs != null) return null;
-    sysv.rejectUnsupportedCallEnvelope(call) catch return null;
+    if (!std.mem.startsWith(u8, call.callee, "llvm.") or
+        !intrinsic_attrs.scalarIntegerCallSupported(call) or call.ret_ty.int > 64) return null;
     const bits = call.ret_ty.int;
     for (call.args.items) |arg| {
-        if (!arg.ty.eql(call.ret_ty) or arg.attrs != null or (arg.value != .named and arg.value != .int)) return null;
+        if (!arg.ty.eql(call.ret_ty) or (arg.value != .named and arg.value != .int)) return null;
         if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
         if (arg.value == .int and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(bits - 1))) or
             arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(bits))))) return null;
@@ -102,6 +100,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     const reversed = try forms.temporary(allocator, function, &serial);
                     var extended = call;
                     extended.ret_ty = wide;
+                    extended.ret_attrs = null;
                     extended.callee = try std.fmt.allocPrint(allocator, "llvm.bitreverse.i{d}", .{wide.int});
                     extended.args = .empty;
                     try extended.args.append(allocator, .{ .ty = wide, .value = input });
@@ -126,6 +125,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     const pair_type: ir.Type = .{ .aggregate = try std.fmt.allocPrint(allocator, "{{ i{d}, i1 }}", .{bits}) };
                     var checked = call;
                     checked.ret_ty = pair_type;
+                    // Facts on the saturated scalar do not describe this
+                    // overflow aggregate. Keep source facts untouched and omit
+                    // validated advisory facts only on the private expansion.
+                    checked.ret_attrs = null;
+                    checked.args = try call.args.clone(allocator);
+                    for (checked.args.items) |*arg| arg.attrs = null;
                     checked.callee = try std.fmt.allocPrint(allocator, "llvm.{s}.with.overflow.i{d}", .{ if (op == .uadd_sat) "uadd" else "usub", bits });
                     try block.instructions.append(allocator, .{ .result = pair_name, .kind = .{ .call = checked } });
                     try block.instructions.append(allocator, .{ .result = value_name, .kind = .{ .extractvalue = .{

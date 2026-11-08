@@ -931,6 +931,37 @@ test "integer intrinsics narrow extrema preserve signed and unsigned ordering" {
     };
 }
 
+test "integer intrinsic expansion does not copy scalar facts to aggregates or wider results" {
+    const intrinsics = @import("integer_intrinsics.zig");
+    for ([_][]const u8{
+        "%result = call noundef range(i8 32, 0) i8 @llvm.uadd.sat.i8(i8 noundef %a, i8 range(i8 32, 0) 32)",
+        "%result = call noundef range(i8 0, 255) i8 @llvm.usub.sat.i8(i8 noundef %a, i8 range(i8 1, 0) 1)",
+        "%result = call noundef i8 @llvm.bitreverse.i8(i8 noundef %a)",
+    }) |instruction| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i8 @probe(i8 %a) {{\nentry:\n {s}\n ret i8 %result\n}}\n", .{instruction});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        const original = module.functions.items[0];
+        const original_call = original.blocks.items[0].instructions.items[0].kind.call;
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try intrinsics.legalize(arena.allocator(), original)).?;
+        var generated: usize = 0;
+        for (view.blocks.items[0].instructions.items) |inst| if (inst.kind == .call) {
+            generated += 1;
+            try std.testing.expect(!inst.kind.call.ret_ty.eql(original_call.ret_ty));
+            try std.testing.expect(inst.kind.call.ret_attrs == null);
+            for (inst.kind.call.args.items) |arg| try std.testing.expect(arg.attrs == null);
+        };
+        try std.testing.expectEqual(@as(usize, 1), generated);
+        try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+        try std.testing.expectEqualStrings(original_call.ret_attrs.?, original.blocks.items[0].instructions.items[0].kind.call.ret_attrs.?);
+        try std.testing.expect(original.blocks.items[0].instructions.items[0].kind.call.args.items[0].attrs != null);
+        try std.testing.expect(try intrinsics.legalize(arena.allocator(), view) == null);
+    }
+}
+
 test "integer intrinsics private legalization preserves inputs and rejects invalid envelopes" {
     const intrinsics = @import("integer_intrinsics.zig");
     for ([_][]const u8{

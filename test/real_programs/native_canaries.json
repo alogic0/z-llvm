@@ -1765,6 +1765,21 @@
       "stdout": "global-addresses observations=32 layout=pointers=alignment=live=preserved\n"
     },
     {
+      "population": "intrinsic_facts",
+      "prefix": "intrinsic-facts",
+      "fixture": "intrinsic_facts",
+      "functions": [
+        "intrinsic_facts_add",
+        "intrinsic_facts_add23",
+        "intrinsic_facts_min6",
+        "intrinsic_facts_reverse23",
+        "intrinsic_facts_sub",
+        "intrinsic_facts_wrapped"
+      ],
+      "observations": 1536,
+      "stdout": "intrinsic-facts observations=1536 ranges=saturation=permutation=live=guards=preserved\n"
+    },
+    {
       "population": "constant_pointer_memory",
       "prefix": "constant-pointer-memory",
       "fixture": "constant_pointer_memory",

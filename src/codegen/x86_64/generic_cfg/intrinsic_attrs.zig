@@ -1,5 +1,52 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const sysv = @import("../sysv_abi.zig");
+
+/// Shared admission for scalar integer intrinsic facts. Each consumer still
+/// proves its exact intrinsic signature and operand forms. The ordinary ABI
+/// validators distinguish advisory facts from representation-changing promises.
+pub fn scalarIntegerCallSupported(call: ir.CallInst) bool {
+    if (call.ret_ty != .int or call.ret_ty.int == 0 or call.callee_value != null or
+        call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or
+        call.callee_function_ty != null or call.calling_conv != null) return false;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return false;
+    for (call.args.items) |arg| {
+        if (arg.ty != .int or arg.ty.int == 0) return false;
+        sysv.rejectUnsupportedCallArgAttrs(arg) catch return false;
+    }
+    return true;
+}
+
+test "scalar integer intrinsic facts validate ranges without admitting ABI promises" {
+    var args = [_]ir.CallArg{.{ .ty = .{ .int = 64 }, .value = .{ .named = "value" } }};
+    var call: ir.CallInst = .{ .callee = "llvm.bitreverse.i64", .ret_ty = .{ .int = 64 }, .args = .fromOwnedSlice(&args) };
+    for ([_]?[]const u8{ null, "noundef", "range(i64 32, 0)", "noundef range(i64 -32, 32)" }) |facts| {
+        call.ret_attrs = facts;
+        args[0].attrs = facts;
+        try std.testing.expect(scalarIntegerCallSupported(call));
+    }
+    for ([_][]const u8{ "signext", "zeroext", "inreg", "noalias", "range(i32 0, 32)", "range(i64 1, 1)", "range(i64 0, 18446744073709551616)", "range(i64 0, 32) unknown" }) |facts| {
+        call.ret_attrs = facts;
+        args[0].attrs = null;
+        try std.testing.expect(!scalarIntegerCallSupported(call));
+        call.ret_attrs = null;
+        args[0].attrs = facts;
+        try std.testing.expect(!scalarIntegerCallSupported(call));
+    }
+    args[0].attrs = null;
+    call.tail_kind = "musttail";
+    try std.testing.expect(!scalarIntegerCallSupported(call));
+    call.tail_kind = "tail";
+    try std.testing.expect(scalarIntegerCallSupported(call));
+    call.calling_conv = "fastcc";
+    try std.testing.expect(!scalarIntegerCallSupported(call));
+    call.calling_conv = null;
+    call.operand_bundle = "[\"deopt\"(i64 1)]";
+    try std.testing.expect(!scalarIntegerCallSupported(call));
+    call.operand_bundle = null;
+    call.callee_value = .{ .named = "indirect" };
+    try std.testing.expect(!scalarIntegerCallSupported(call));
+}
 
 // Alias scopes constrain optimization, not machine execution. Only the exact
 // metadata-only declaration form can be discarded during instruction selection.
