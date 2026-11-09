@@ -448,10 +448,8 @@ fn appendImmediateRhsDestinationNodes(
             );
             if (destination) |reg|
                 try result.append(nodeForArgReg(reg))
-            else if (current == .spill64)
-                try result.append(.accumulator)
             else
-                return error.ValueUseImmediateScalarScratchUnavailable;
+                try result.append(.accumulator);
         },
         .shl => if (bits <= 32 and current == .scratch32) {
             try result.append(.accumulator);

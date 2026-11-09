@@ -562,14 +562,16 @@ fn executeImmediateR01(
         return;
     }
 
-    const current = transaction.prepared_views[source_index].canonical_source_loc;
-    if (current != .spill64)
-        return immediateScalarRequestError(
-            Authority,
-            transaction,
-            source_index,
-            error.ValueUseImmediateScalarScratchUnavailable,
-        );
+    // The sealed action also owns RAX when every scratch GPR is occupied.
+    // Its accumulator session preserves live aliases before consuming the
+    // validated register or spill source through the same typed authority.
+    if (transaction.prepared_views[source_index].canonical_source_loc == .rax) {
+        if (try selector_state.spillValue(transaction.selector, source_name)) |diagnostic| {
+            transaction.action_diagnostic = diagnostic;
+            return error.ValueUseActionDiagnostic;
+        }
+        try refreshImmediateScalarSource(Authority, transaction, source_index);
+    }
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
     if (try session.prepare(.preserve, .spill_live)) |diagnostic| {
         transaction.action_diagnostic = diagnostic;

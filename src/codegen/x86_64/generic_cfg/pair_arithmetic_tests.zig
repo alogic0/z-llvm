@@ -74,3 +74,36 @@ test "pair arithmetic reuses product words after observing the low word" {
     try std.testing.expectEqual(ir.BinaryOp.lshr, original.blocks.items[0].instructions.items[6].kind.binary.op);
     try std.testing.expect((try forms.legalize(arena.allocator(), expanded)) == null);
 }
+
+test "pair arithmetic reuses expanded words for immediate high projections" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i64 @carry(i64 %a, i64 %b, ptr %out) {
+        \\entry:
+        \\ %wide_a = zext i64 %a to i128
+        \\ %wide_b = zext i64 %b to i128
+        \\ %sum = add i128 %wide_a, %wide_b
+        \\ %alias = or i128 %sum, 0
+        \\ %high = lshr i128 %alias, 64
+        \\ %carry = trunc i128 %high to i64
+        \\ store i128 %sum, ptr %out, align 1
+        \\ ret i64 %carry
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const original = module.functions.items[0];
+    const expanded = (try forms.legalize(arena.allocator(), original)).?;
+    for (expanded.blocks.items[0].instructions.items) |inst| {
+        if (inst.kind == .binary and inst.kind.binary.ty.eql(.{ .int = 128 }))
+            try std.testing.expect(inst.kind.binary.op != .lshr);
+    }
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    private.functions.items[0] = expanded;
+    try private.verify();
+    try std.testing.expectEqual(original.params.items.ptr, expanded.params.items.ptr);
+    try std.testing.expectEqual(ir.BinaryOp.lshr, original.blocks.items[0].instructions.items[4].kind.binary.op);
+    try std.testing.expect((try forms.legalize(arena.allocator(), expanded)) == null);
+}

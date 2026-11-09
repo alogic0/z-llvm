@@ -2,6 +2,22 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "vector_graphs",
+      "prefix": "vector-graphs",
+      "fixture": "vector_graphs",
+      "functions": ["vector_graph_phi8", "vector_graph_parallel", "vector_graph_wide", "vector_graph_repack", "vector_graph_pointers", "vector_graph_freeze", "vector_graph_intrinsics", "vector_graph_ctpop6"],
+      "observations": 1024,
+      "stdout": "vector-graphs observations=1024 phi=wide=pointer=intrinsics=guards=preserved\n"
+    },
+    {
+      "population": "vector_masks",
+      "prefix": "vector-masks",
+      "fixture": "vector_masks",
+      "functions": ["vector_mask_compare16", "vector_mask_compare8", "vector_mask_unpack16", "vector_mask_nibbles", "vector_mask_reverse128", "vector_mask_three", "vector_mask_live", "vector_mask_reverse8", "vector_mask_returned8"],
+      "observations": 2304,
+      "stdout": "vector-masks observations=2304 bits=lanes=roundtrips=clobbers=guards=preserved\n"
+    },
+    {
       "population": "call_values",
       "prefix": "call-values",
       "fixture": "call_values",

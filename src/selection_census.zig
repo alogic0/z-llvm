@@ -59,6 +59,12 @@ const Capture = struct {
                 .callee = if (definition.kind == .call) definition.kind.call.callee else null,
                 .allocated_type = if (definition.kind == .alloca) try std.fmt.allocPrint(a, "{f}", .{definition.kind.alloca.allocated_ty}) else null,
                 .allocation_attrs = if (definition.kind == .alloca) definition.kind.alloca.attrs else null,
+                .operation = switch (definition.kind) {
+                    .binary => |binary| @tagName(binary.op),
+                    .cast => |cast| @tagName(cast.op),
+                    else => null,
+                },
+                .operands = operands,
             } else null,
             .comparison = if (rejection.comparison) |comparison| .{
                 .predicate = @tagName(comparison.predicate),

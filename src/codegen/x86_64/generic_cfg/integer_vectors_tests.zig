@@ -28,7 +28,9 @@ test "integer vector lane expansion rejects unsupported memory ABI and indices" 
     for ([_][]const u8{
         "define <8 x i32> @f(<8 x i32> %v) {\nentry:\n ret <8 x i32> %v\n}\n",
         "define void @f(ptr %p) {\nentry:\n %v = load volatile <4 x i32>, ptr %p\n ret void\n}\n",
+        "define void @f(ptr %p) {\nentry:\n %v = load volatile <2 x ptr>, ptr %p\n ret void\n}\n",
         "define void @f(ptr %p) {\nentry:\n %v = load <4 x i32>, ptr addrspace(1) %p\n ret void\n}\n",
+        "define <2 x i128> @f(<2 x i128> %v) {\nentry:\n ret <2 x i128> %v\n}\n",
         "define i32 @f(ptr %p, i128 %index) {\nentry:\n %v = load <4 x i32>, ptr %p\n %r = extractelement <4 x i32> %v, i128 %index\n ret i32 %r\n}\n",
         "declare void @callee(<8 x i32>)\ndefine void @f(ptr %p) {\nentry:\n %v = load <8 x i32>, ptr %p\n call void @callee(<8 x i32> %v)\n ret void\n}\n",
     }) |source| {
@@ -58,4 +60,56 @@ test "integer vector ABI expansion keeps public signatures and verifies private 
     }
     try private.verify();
     try module.verify();
+}
+
+test "integer vector scalar bitcasts preserve exact source widths and private ownership" {
+    const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/vector_masks.ll", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(source);
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    for (module.functions.items, private.functions.items) |original, *replacement| {
+        replacement.* = (try forms.legalize(arena.allocator(), original, null)).?;
+        try std.testing.expectEqual(original.params.items.ptr, replacement.params.items.ptr);
+        try std.testing.expect(original.ret_ty.eql(replacement.ret_ty));
+        try std.testing.expect((try forms.legalize(arena.allocator(), replacement.*, null)) == null);
+        try std.testing.expect(replacement.blocks.items.ptr != original.blocks.items.ptr);
+    }
+    try private.verify();
+    try module.verify();
+    try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[4].kind.cast.from_ty == .vector);
+}
+
+test "integer vector graphs retain forward PHI identities and typed pointer lanes" {
+    const source = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "test/real_programs/vector_graphs.ll", std.testing.allocator, .limited(1024 * 1024));
+    defer std.testing.allocator.free(source);
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    var scalar_freezes: usize = 0;
+    for (module.functions.items, private.functions.items) |original, *replacement| {
+        replacement.* = (try forms.legalize(arena.allocator(), original, null)).?;
+        try std.testing.expectEqual(original.params.items.ptr, replacement.params.items.ptr);
+        try std.testing.expect(original.ret_ty.eql(replacement.ret_ty));
+        try std.testing.expect((try forms.legalize(arena.allocator(), replacement.*, null)) == null);
+        for (replacement.blocks.items) |block| for (block.instructions.items) |inst| {
+            if (!inst.removed and inst.kind == .phi) try std.testing.expect(inst.kind.phi.ty != .vector);
+            if (!inst.removed and inst.kind == .freeze) {
+                try std.testing.expect(inst.kind.freeze.ty != .vector);
+                scalar_freezes += 1;
+            }
+        };
+    }
+    try std.testing.expect(scalar_freezes > 0);
+    try private.verify();
+    try module.verify();
+    try std.testing.expect(module.functions.items[0].blocks.items[1].instructions.items[1].kind.phi.ty == .vector);
 }

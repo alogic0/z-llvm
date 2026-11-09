@@ -32,7 +32,7 @@ const PlanRow = struct {
 
 const immediate_plan = [_]PlanRow{
     .{ .id = "R00", .direction = .rhs, .operation = .sdiv, .bits = 32, .literal = 2, .accumulator = true, .scratch = false, .writes = 3, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "none; session owns liveness-aware displacement", .displacement_authority = "Q2 strict-after; scratch-preferred fallback" },
-    .{ .id = "R01", .direction = .rhs, .operation = .lshr, .bits = 64, .literal = 7, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "spill fallback reloads RAX; scratch form has none", .accumulator_preamble = "none", .displacement_authority = "sessionless scratch; hard spill-live only on spill-through-RAX fallback" },
+    .{ .id = "R01", .direction = .rhs, .operation = .lshr, .bits = 64, .literal = 7, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "pressure fallback materializes RAX; scratch form has none", .accumulator_preamble = "none", .displacement_authority = "sessionless scratch; hard spill-live on accumulator fallback" },
     .{ .id = "R02", .direction = .rhs, .operation = .shl, .bits = 32, .literal = 3, .accumulator = true, .scratch = true, .writes = 1, .first_accumulator_write = "session materializes EAX/RAX; scratch32 form stages EAX", .accumulator_preamble = "scratch-preferred <=32; spill-source at 64", .displacement_authority = "<=32 Q2 strict-after; i64 inclusive preserve-current" },
     .{ .id = "R03", .direction = .rhs, .operation = .ashr, .bits = 64, .literal = 5, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "accumulator form materializes EAX; scratch64 form has none", .accumulator_preamble = "scratch-preferred accumulator; none scratch64", .displacement_authority = "<=32 Q2 strict-after; i64 sessionless scratch" },
     .{ .id = "R04", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "scratch-preferred", .displacement_authority = "Q2 strict-after; scratch-preferred fallback" },
@@ -470,6 +470,73 @@ test "value-use immediate scalar R01 spill source falls back through RAX when sc
         ValueLoc.rax,
         selector_state.resolveValue(&selector, .{ .named = "result" }).?,
     );
+}
+
+test "value-use immediate scalar R01 register pressure preserves aliases and rolls back fallback" {
+    const homes = [_]ValueLoc{ .{ .arg64 = .rdi }, .{ .scratch64 = .rdi }, .rax, .{ .spill64 = .slot0 } };
+    const boundaries = [_]?Transaction.ImmediateScalarTestFailure{ null, .after_accumulator_preparation, .after_rax_staging, .after_result_definition };
+    for (homes) |home| for (boundaries) |boundary| {
+        var machine = MachineFunction.init("R01-register-pressure", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        try addAtCurrent(&plan, "result");
+        try support.addLive(&plan, "wide-accumulator");
+        try support.addLive(&plan, "narrow-accumulator");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 512;
+        selector.next_spill_slot = 1;
+        try selector_state.bindValueLoc(&selector, "source", home);
+        try selector_state.bindValueLoc(&selector, "wide-accumulator", .rax);
+        try selector_state.bindValueLoc(&selector, "narrow-accumulator", .eax);
+        const blockers = [_][]const u8{ "blocked-rdi", "blocked-rsi", "blocked-rdx", "blocked-rcx", "blocked-r8", "blocked-r9" };
+        for (selector_types.selector_allocatable_regs, blockers) |reg, name| {
+            try support.addLive(&plan, name);
+            try selector_state.bindValueLoc(&selector, name, .{ .scratch64 = reg });
+        }
+        const saved_source = selector.values.get("source").?;
+        const saved_wide = selector.values.get("wide-accumulator").?;
+        const saved_narrow = selector.values.get("narrow-accumulator").?;
+        const saved_flags = selector.eflags.snapshot();
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const handle = try registerImmediate(&transaction, immediate_plan[1]);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        if (boundary) |point| {
+            try transaction.setImmediateScalarTestFailure(point);
+            try std.testing.expectError(error.ValueUseImmediateScalarTestFailure, transaction.executePreparedAction(try transaction.preparedView(handle)));
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+            try std.testing.expectEqual(saved_wide, selector.values.get("wide-accumulator").?);
+            try std.testing.expectEqual(saved_narrow, selector.values.get("narrow-accumulator").?);
+            try std.testing.expectEqual(@as(usize, 1), selector.next_spill_slot);
+            try std.testing.expectEqual(saved_flags, selector.eflags.snapshot());
+            try std.testing.expect(selector.values.get("result") == null);
+        } else {
+            transaction.executePreparedAction(try transaction.preparedView(handle)) catch |err| {
+                std.debug.print("R01 pressure home={any}\n", .{home});
+                return err;
+            };
+            try transaction.commit();
+            try std.testing.expect(selector.values.get("wide-accumulator").?.loc == .spill64);
+            try std.testing.expect(selector.values.get("narrow-accumulator").?.loc == .spill64);
+            try std.testing.expectEqual(@as(u16, 64), selector.values.get("wide-accumulator").?.vreg.bits);
+            try std.testing.expectEqual(ValueLoc.rax, selector_state.resolveValue(&selector, .{ .named = "result" }).?);
+            var shifts: usize = 0;
+            for (machine.instructions.items) |instruction| if (instruction == .shr_rax_imm6) {
+                try std.testing.expect(instruction.shr_rax_imm6 == 7);
+                shifts += 1;
+            };
+            try std.testing.expectEqual(@as(usize, 1), shifts);
+        }
+        for (selector_types.selector_allocatable_regs, blockers) |reg, name|
+            try std.testing.expectEqual(ValueLoc{ .scratch64 = reg }, selector.values.get(name).?.loc);
+    };
 }
 
 test "value-use immediate scalar displacement distinguishes live-after from dies-at-current RAX" {

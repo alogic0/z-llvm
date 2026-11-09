@@ -118,6 +118,10 @@ const Builder = struct {
         };
     }
     fn shift(self: Builder, op: ir.BinaryOp, parts: Parts, count: ir.Value) !Parts {
+        if (count == .int and count.int == 64) return if (op == .shl)
+            .{ .lo = .{ .int = 0 }, .hi = parts.lo }
+        else
+            .{ .lo = parts.hi, .hi = if (op == .ashr) try self.sign(parts) else .{ .int = 0 } };
         // Every defined i128 shift count is below 128, so only its low word is
         // consumed. Do not create an unused high-word projection.
         const low_count = if (count == .int) (try self.split(count)).lo else try self.cast(.trunc, pair, count, word);
@@ -164,7 +168,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .add, .sub, .mul, .@"and", .xor => true,
                         .@"or" => value.lhs == .int or value.rhs == .int,
                         .shl => value.rhs == .named or value.rhs.int != 64,
-                        .lshr => value.rhs == .named or value.rhs.int > 64,
+                        // Expanded arithmetic already owns scalar words. A
+                        // high-word projection can reuse them without loading
+                        // a second pair while other vector lanes remain live.
+                        .lshr => value.rhs == .named or value.rhs.int > 64 or
+                            (value.rhs.int == 64 and value.lhs == .named and known_parts.contains(value.lhs.named)),
                         .ashr => value.rhs == .named or value.rhs.int != 127,
                         .udiv, .urem, .sdiv, .srem => divisor(value) != null,
                         else => false,

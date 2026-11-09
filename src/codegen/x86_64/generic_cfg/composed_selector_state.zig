@@ -117,6 +117,37 @@ pub fn observeRejectedFreeze(selector: *const ComposedBlockSelector, result: ?[]
     });
 }
 
+pub fn observeRejectedInstruction(selector: *const ComposedBlockSelector, instruction: ir.Instruction, failure: Diagnostic) !void {
+    const observer = selector.rejection_observer orelse return;
+    var arguments: [2]ir.CallArg = undefined;
+    const count: usize = switch (instruction.kind) {
+        .binary => |binary| count: {
+            arguments[0] = .{ .ty = binary.ty, .value = binary.lhs };
+            arguments[1] = .{ .ty = binary.ty, .value = binary.rhs };
+            break :count 2;
+        },
+        .cast => |cast| count: {
+            arguments[0] = .{ .ty = cast.from_ty, .value = cast.value };
+            break :count 1;
+        },
+        else => return,
+    };
+    var operands: [2]@import("rejection_observer.zig").Operand = undefined;
+    for (arguments[0..count], operands[0..count]) |argument, *operand| operand.* = .{
+        .argument = argument,
+        .location = if (resolveValue(selector, argument.value)) |loc| @tagName(loc) else null,
+    };
+    try observer.reject(.{
+        .function = selector.function.?.*,
+        .position = selector.current_position,
+        .tag = failure.tagName(),
+        .detail = failure.detail(),
+        .definition = instruction,
+        .result = instruction.result,
+        .operands = operands[0..count],
+    });
+}
+
 pub fn observeRejectedIcmp(selector: *const ComposedBlockSelector, result: ?[]const u8, comparison: ir.IcmpInst, failure: Diagnostic) !void {
     const observer = selector.rejection_observer orelse return;
     var operands: [2]@import("rejection_observer.zig").Operand = undefined;

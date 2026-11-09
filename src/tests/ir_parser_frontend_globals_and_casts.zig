@@ -36,6 +36,42 @@ const sccp = ir_common.sccp;
 const simplifycfg = ir_common.simplifycfg;
 const slp_vectorizer = ir_common.slp_vectorizer;
 const sroa = ir_common.sroa;
+
+test "verifier pointer vector casts require matching lanes and integer elements" {
+    for ([_]u16{ 8, 64, 128 }) |bits| {
+        const source = try std.fmt.allocPrint(
+            std.testing.allocator,
+            "define <2 x ptr> @roundtrip(<2 x ptr> %value) {{\nentry:\n %bits = ptrtoint <2 x ptr> %value to <2 x i{d}>\n %result = inttoptr <2 x i{d}> %bits to <2 x ptr>\n ret <2 x ptr> %result\n}}\n",
+            .{ bits, bits },
+        );
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+    }
+    const Case = struct { op: []const u8, from: []const u8, to: []const u8 };
+    for ([_]Case{
+        .{ .op = "ptrtoint", .from = "<2 x ptr>", .to = "<4 x i32>" },
+        .{ .op = "ptrtoint", .from = "<2 x ptr>", .to = "<2 x double>" },
+        .{ .op = "ptrtoint", .from = "<2 x ptr>", .to = "i128" },
+        .{ .op = "ptrtoint", .from = "ptr", .to = "<2 x i64>" },
+        .{ .op = "inttoptr", .from = "<2 x i64>", .to = "<4 x ptr>" },
+        .{ .op = "inttoptr", .from = "<2 x double>", .to = "<2 x ptr>" },
+        .{ .op = "inttoptr", .from = "i128", .to = "<2 x ptr>" },
+        .{ .op = "inttoptr", .from = "<2 x i64>", .to = "ptr" },
+    }) |case| {
+        const source = try std.fmt.allocPrint(
+            std.testing.allocator,
+            "define {s} @invalid({s} %value) {{\nentry:\n %result = {s} {s} %value to {s}\n ret {s} %result\n}}\n",
+            .{ case.to, case.from, case.op, case.from, case.to, case.to },
+        );
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try std.testing.expectError(error.InvalidCast, module.verify());
+    }
+}
+
 test "alias modref refines direct call memory effects" {
     const input =
         \\declare i32 @pure(i32) #0

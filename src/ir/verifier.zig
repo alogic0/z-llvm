@@ -1804,20 +1804,14 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
 fn verifyCast(cast: core.CastInst) !void {
     try verifyCastFlags(cast);
     switch (cast.op) {
-        .ptrtoint => {
-            if (cast.from_ty != .ptr) return error.InvalidCast;
-            switch (cast.to_ty) {
-                .int => {},
-                else => return error.InvalidCast,
-            }
-            return;
-        },
-        .inttoptr => {
-            switch (cast.from_ty) {
-                .int => {},
-                else => return error.InvalidCast,
-            }
-            if (cast.to_ty != .ptr) return error.InvalidCast;
+        .ptrtoint, .inttoptr => {
+            const pointer_ty = if (cast.op == .ptrtoint) cast.from_ty else cast.to_ty;
+            const integer_ty = if (cast.op == .ptrtoint) cast.to_ty else cast.from_ty;
+            if (pointer_ty == .ptr and integer_ty == .int) return;
+            if (pointer_ty != .vector or integer_ty != .vector or
+                pointer_ty.vector.len != integer_ty.vector.len or
+                pointer_ty.vector.elem_ty != .ptr or integer_ty.vector.elem_ty != .int)
+                return error.InvalidCast;
             return;
         },
         .bitcast => {

@@ -451,25 +451,9 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
     defer selector.current_position += 1;
     return switch (instruction.kind) {
         .phi => null,
-        .binary => |binary| if (binary.ty == .vector)
-            selector_vector.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-vector-binary-value")
-        else if (binary.op == .fadd or binary.op == .fsub or binary.op == .fmul or binary.op == .fdiv)
-            selector_fp.lowerFpBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-fp-binary-value")
-        else
-            selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| return instructionValueError(selector, err, "stage2-binary-value"),
+        .binary => lowerObservedBinary(selector, instruction),
         .alloca => |alloca| selector_memory.lowerAlloca(selector, instruction.result, alloca) catch |err| return instructionValueError(selector, err, "stage2-alloca-value"),
-        .cast => |cast| if (cast.from_ty == .vector or cast.to_ty == .vector)
-            selector_vector.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-vector-cast-value")
-        else if (cast.op == .sitofp or cast.op == .uitofp)
-            selector_conversion.lowerIntToFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-fp-cast-value")
-        else if (selector_conversion.isFpToSignedI32Cast(cast))
-            selector_conversion.lowerFpToSignedIntCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-int-cast-value")
-        else if (cast.op == .fpext or cast.op == .fptrunc or (cast.op == .bitcast and selector_fp.isFpIntBitcast(cast)))
-            selector_fp.lowerFpCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-fp-cast-value")
-        else if (cast.op == .inttoptr)
-            selector_scalar.lowerIntToPtr(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-pointer-cast-value")
-        else
-            selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
+        .cast => lowerObservedCast(selector, instruction),
         .freeze => |freeze| lowerObservedFreeze(selector, instruction.result, freeze),
         .icmp => |icmp| lowerObservedIcmp(selector, instruction.result, icmp),
         .fcmp => |fcmp| if (fcmp.operand_ty == .vector)
@@ -498,6 +482,36 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
 fn lowerObservedCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const diagnostic = try selector_calls.lowerCall(selector, result, call);
     if (diagnostic) |failure| try selector_state.observeRejectedCall(selector, result, call, failure);
+    return diagnostic;
+}
+
+fn lowerObservedBinary(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
+    const binary = instruction.kind.binary;
+    const diagnostic = if (binary.ty == .vector)
+        try (selector_vector.lowerBinary(selector, instruction.result, binary) catch |err| instructionValueError(selector, err, "stage2-vector-binary-value"))
+    else if (binary.op == .fadd or binary.op == .fsub or binary.op == .fmul or binary.op == .fdiv)
+        try (selector_fp.lowerFpBinary(selector, instruction.result, binary) catch |err| instructionValueError(selector, err, "stage2-fp-binary-value"))
+    else
+        try (selector_scalar.lowerBinary(selector, instruction.result, binary) catch |err| instructionValueError(selector, err, "stage2-binary-value"));
+    if (diagnostic) |failure| try selector_state.observeRejectedInstruction(selector, instruction, failure);
+    return diagnostic;
+}
+
+fn lowerObservedCast(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
+    const cast = instruction.kind.cast;
+    const diagnostic = if (cast.from_ty == .vector or cast.to_ty == .vector)
+        try (selector_vector.lowerCast(selector, instruction.result, cast) catch |err| instructionValueError(selector, err, "stage2-vector-cast-value"))
+    else if (cast.op == .sitofp or cast.op == .uitofp)
+        try (selector_conversion.lowerIntToFpCast(selector, instruction.result, cast) catch |err| instructionValueError(selector, err, "stage2-int-fp-cast-value"))
+    else if (selector_conversion.isFpToSignedI32Cast(cast))
+        try (selector_conversion.lowerFpToSignedIntCast(selector, instruction.result, cast) catch |err| instructionValueError(selector, err, "stage2-fp-int-cast-value"))
+    else if (cast.op == .fpext or cast.op == .fptrunc or (cast.op == .bitcast and selector_fp.isFpIntBitcast(cast)))
+        try (selector_fp.lowerFpCast(selector, instruction.result, cast) catch |err| instructionValueError(selector, err, "stage2-fp-cast-value"))
+    else if (cast.op == .inttoptr)
+        try (selector_scalar.lowerIntToPtr(selector, instruction.result, cast) catch |err| instructionValueError(selector, err, "stage2-int-pointer-cast-value"))
+    else
+        try (selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| instructionValueError(selector, err, "stage2-cast-value"));
+    if (diagnostic) |failure| try selector_state.observeRejectedInstruction(selector, instruction, failure);
     return diagnostic;
 }
 
