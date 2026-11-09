@@ -1,7 +1,8 @@
 # Complete compiler selection
 
-Status: active, explicitly authorized by the user's request to continue until
-all 8,928 original compiler definitions select.
+Status: paused at the user's request after finishing the integer intrinsic
+slice at `f955509f`. The original work plan below applies when the user resumes
+the goal.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -95,7 +96,18 @@ attempt timed out; the completed same-source retry with an explicit existing
 two-hour deadline supplies the matched production proof. The 2,759-file seal
 verifies. See the [accepted evidence](../evidence/scalable_cfg_indirect_phi.md).
 
-The objective remains active with 264 failures. Continue with measured large
-frames and spill bookkeeping, aggregate PHIs/freezes, pointer flows, scalar
-intrinsics and wide/FP ABI limits. Subsequent work remains authorized through
-complete original-input selection and required validation.
+The accepted remaining count is 264 compiler definitions. The following frame
+source at `726a7c55` passed all 17 integration gates and 75 native populations;
+its incomplete whole-input attempts were explicitly superseded. The integer
+intrinsic slice at `f955509f` then passed all 17 gates and 76 populations,
+preserving the previous populations. It adds signed saturation, i128 leading-zero
+count, signed comparison, poison-enabled scalar absolute value, and the observed
+fixed-product and shift forms. Its current-source original probes select eleven
+of nineteen targeted definitions, with eight later boundaries; the complete
+runtime census retains 285/455 without lost successes. The accepted whole-compiler
+count remains 8,664/8,928 because complete current-input acceptance is pending.
+See the [slice evidence](../evidence/integer_intrinsic_slice.md).
+
+The user requested **finish the current slice and stop**. The slice is finished,
+and the all-8,928 goal is paused. No further capability work or full compiler
+replay is running.

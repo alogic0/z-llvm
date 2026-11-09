@@ -31,14 +31,35 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
+The user requested that work stop after the current integer intrinsic slice.
+That slice is complete at `f955509f`; the
+[all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) is **paused**.
+The [slice evidence](evidence/integer_intrinsic_slice.md) records all 17 serial
+gates and 76 native populations passing, with 2,200,836 local observations
+against 1,100,418 references. The new 43-function native population passes with
+frozen Debug and ReleaseFast compilers, and eight valid-IR mutants are detected
+by both LLVM and local execution. Debug/ReleaseSafe each pass 2,043 units and
+24 fresh structural checks; Debug units use a valid same-source cached result.
+Readiness, corpus preservation, all 36 core object/observation comparisons and
+final source/artifact checks pass. The sealed record preserves the original
+inputs, AIR cache and thirteen scratch files.
+
+Private owned expansions cover signed saturating add/subtract at 8/16/32/64/96
+bits, i128 leading-zero count, signed i32 three-way comparison, poison-enabled
+32/64-bit absolute value, and the observed scale-zero i16 fixed product and
+shift-by-one i64 saturation. Public IR and ABI remain unchanged. Targeted
+original-function probes and the complete runtime census do not advance the
+accepted whole-compiler count; no complete current compiler census or production
+replay is claimed.
+
 The [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
 is accepted at `bb74a371`: **8,664/8,928**, adding 112 selections without
 losing any preceding success. Runtime retains **285/455**. Complete terminal
 censuses and independent production replays match every selected identity and
 remaining diagnostic tuple. Owner preservation is checked between censuses;
 blocked production profiles have no per-function owner fields. The
-[all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains active
-with 264 failures and authorizes continued implementation.
+accepted compiler checkpoint has 264 remaining rejections; the broader goal is
+paused after the completed capability slice above.
 
 All 17 serial integration gates and 74 native populations pass, preserving all
 72 preceding populations. Debug/ReleaseSafe each pass 2,030 units and 24 fresh
@@ -62,8 +83,7 @@ The preceding [integer vector graph checkpoint](evidence/integer_vector_graphs.m
 is accepted at `d06659d1`. Compiler selection reaches **8,422/8,928**, adding
 252 without losing any preceding selection. Runtime retains **285/455**.
 Both complete production replays match their censuses and pass event audits.
-The [all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains
-active with 506 failures and authorizes continued implementation.
+At that checkpoint, 506 compiler definitions remained unsupported.
 
 All 17 integration gates and 69 native populations pass, preserving all 67
 preceding populations. Debug/ReleaseSafe each pass 2,004 units and 24 structural
@@ -92,8 +112,7 @@ The preceding [comparison and pointer-freeze checkpoint](evidence/scalar_compari
 is accepted at `9ba5e61c`. Compiler selection reaches **7,943/8,928**, adding
 144 without losing any preceding success; runtime reaches **285/455**. Both
 complete production replays match their censuses and pass event audits.
-The [all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains
-active with 985 failures and authorizes continued implementation.
+At that checkpoint, 985 compiler definitions remained unsupported.
 
 All 17 integration gates and 66 native populations pass, preserving all 64
 preceding populations. Debug/ReleaseSafe each pass 1,995 units and 23 structural

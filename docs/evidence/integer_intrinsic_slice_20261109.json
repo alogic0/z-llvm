@@ -1,0 +1,2237 @@
+{
+  "schema": "integer-intrinsic-slice-validation-v1",
+  "status": "passed",
+  "recorded_utc": "2026-11-09T23:28:29.950205+00:00",
+  "validated_revision": "f955509fa34bbdbdf5649db307796cdaa868e9e9",
+  "validated_tree": "07be9fd65123184c60ba7ea05454d497a0b21986",
+  "goal_status": "paused",
+  "user_requested_stop_after_slice": true,
+  "accepted_whole_input_checkpoint": {
+    "revision": "bb74a371b7b84c023da8356ef4d7a13da3b7ca35",
+    "compiler_selected": 8664,
+    "compiler_definitions": 8928,
+    "scope": "Unchanged accepted count; no complete current compiler census or production claim"
+  },
+  "implementation": {
+    "signed_saturation_widths": [
+      8,
+      16,
+      32,
+      64,
+      96
+    ],
+    "signed_saturation_operations": [
+      "add",
+      "subtract"
+    ],
+    "signed_comparison": "llvm.scmp.i32.i32",
+    "leading_zero_count": "llvm.ctlz.i128, both constant poison flags",
+    "absolute_value": "Private true-to-false poison refinement at32/64 bits",
+    "fixed_unsigned_product": "llvm.umul.fix.sat.i16 with constant scale0",
+    "saturating_shift": "llvm.ushl.sat.i64 with constant amount1",
+    "source_ir_and_public_abi_preserved": true,
+    "new_machine_opcodes": 0,
+    "compiler_rt_bypass_ratchet": 130,
+    "lowerFreeze_fingerprint_unchanged": "998d5607e54ad21229f4200922a2b1d123c8a20183afa74836721e37a46d4193"
+  },
+  "development_tier2": {
+    "status": "passed",
+    "recorded_utc": "2026-11-09T21:20:19.326346+00:00",
+    "units_per_mode": 2043,
+    "unit_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "debug_unit_result_cached": true,
+    "debug_cache_scope": "Valid same-source test result reused during concurrent readiness and unit builds; no fresh Debug unit-run claim",
+    "structural_per_mode": 24,
+    "readiness_commands": 9,
+    "readiness_includes_abi_differential": true,
+    "captured_object": true,
+    "new_native_functions": 43,
+    "new_native_local_per_build": 67584,
+    "new_native_reference_per_build": 33792,
+    "native_builds": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "prior_registry_members_preserved": 75,
+    "prior_fixture_and_driver_files_preserved": 150,
+    "valid_ir_mutants": 8,
+    "valid_ir_mutation_detections": 16,
+    "runtime_complete_census": {
+      "examined": 455,
+      "selected": 285,
+      "lost_successes": []
+    },
+    "primary_current_original_probes": {
+      "examined": 6,
+      "selected": 6,
+      "prior_success_neighbors": 3
+    },
+    "secondary_current_original_probes": {
+      "examined": 13,
+      "selected": 5,
+      "later_failures": 8
+    },
+    "large_original_probes": {
+      "revision": "development-v2",
+      "examined": 2,
+      "selected": 2,
+      "scope": "Retained pre-expansion abs/ctlz probes; current v3 adds two separate scalar forms. Final whole-input current-source proofs remain required."
+    },
+    "scope": "Provisional Tier2. Fresh Tier3 before another capability family; complete unchanged8928 census and production selection at final cumulative acceptance."
+  },
+  "full_integration": {
+    "actual_checked_returncode": 0,
+    "gates": [
+      {
+        "id": "selected-object-suite",
+        "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+        "exit_status": "0",
+        "duration_ms": "63727",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "1987",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "3574",
+        "cache_status": "none"
+      },
+      {
+        "id": "selected-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "3558",
+        "cache_status": "none"
+      },
+      {
+        "id": "zig-source-native-link",
+        "tool": "tools/run_distribution_zig_source_native_link.zig",
+        "exit_status": "0",
+        "duration_ms": "19608",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-postopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "77189",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-preopt",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "--pipeline": "preopt",
+        "exit_status": "0",
+        "duration_ms": "35039",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-ir-writer",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "16242",
+        "cache_status": "none"
+      },
+      {
+        "id": "integrated-object-release",
+        "tool": "tools/run_distribution_zig_integrated_object.zig",
+        "exit_status": "0",
+        "duration_ms": "10933",
+        "cache_status": "none"
+      },
+      {
+        "id": "real-rows-release-fast",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseFast",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "708073",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-safe",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSafe",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "736666",
+        "cache_status": "hit"
+      },
+      {
+        "id": "real-rows-release-small",
+        "tool": "src/distribution_real_rows_gate.zig",
+        "--mode": "ReleaseSmall",
+        "--limit": "100",
+        "exit_status": "0",
+        "duration_ms": "409250",
+        "cache_status": "hit"
+      },
+      {
+        "id": "integrated-executable",
+        "tool": "tools/run_distribution_zig_integrated_exe.zig",
+        "exit_status": "0",
+        "duration_ms": "3009131",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-object-inspection",
+        "tool": "tools/run_native_link_object_inspection.zig",
+        "exit_status": "0",
+        "duration_ms": "543",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-link",
+        "tool": "tools/run_distribution_native_link_m5.zig",
+        "exit_status": "0",
+        "duration_ms": "1220",
+        "cache_status": "none"
+      },
+      {
+        "id": "release-native-probe",
+        "tool": "tools/probe_native_linker_compatibility.zig",
+        "exit_status": "0",
+        "duration_ms": "1126",
+        "cache_status": "none"
+      },
+      {
+        "id": "boundary-gates",
+        "tool": "tools/run_distribution_boundary_gates.zig",
+        "exit_status": "0",
+        "duration_ms": "9242",
+        "cache_status": "none"
+      }
+    ],
+    "native_population_count": 76,
+    "native_local_observations": 2200836,
+    "native_reference_observations": 1100418,
+    "serial_wall_ms": 4113152,
+    "disk": {
+      "schema_version": "1",
+      "run_id": "51dac9f5cf9eeed508af25198c5ff4ff",
+      "scratch_path": "tmp/integer-intrinsics-20261109-isolated-full",
+      "bundle_path": "tmp/integer-intrinsics-20261109-isolated-full/release_source_object_bundle",
+      "target": "x86_64-unknown-linux-gnu",
+      "mode": "serial",
+      "real_rows_concurrency": "3",
+      "subgates": "17",
+      "wall_ms": "4113152",
+      "starting_free_bytes": "61215182848",
+      "minimum_observed_free_bytes": "54276579328",
+      "final_free_bytes": "54276579328",
+      "observed_peak_bytes": "6938603520",
+      "reserve_bytes": "11410065408",
+      "required_start_bytes": "20000000000",
+      "local_fail": "0"
+    },
+    "air_cache": {
+      "cache_hits": 3,
+      "prior_keys_and_descriptor_sizes_preserved": true
+    }
+  },
+  "source_binding": {
+    "source_snapshot": "local-state/validations/compiler-selection-completion-20261108/batch-07-isolated/source-snapshot.json",
+    "source_snapshot_members": 3150,
+    "source_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-07-isolated/sources.sha256",
+    "source_files": 1816,
+    "compiler_hashes": {
+      "debug": "55d0f98d9b354f3b432c9b664a44345234ceb76bb834437c28227e37d489179d",
+      "safe": "9c683be135657d355e6578cc24c9f28713ceafdd5c781d807549dbc54c9c6eb2",
+      "fast": "60c5d0f8f46d6a11a5f9b48b2df5f50db03e8a76508913029f5938f62b3e2ed0"
+    },
+    "build_origin": {
+      "status": "verified",
+      "development_worktree": "/home/oleg/prog/z_llvm_integer_intrinsics",
+      "development_revision": "ae8cca04ff68693b46e65612e430adef976eb08a",
+      "integrated_revision": "f955509fa34bbdbdf5649db307796cdaa868e9e9",
+      "integrated_tree": "07be9fd65123184c60ba7ea05454d497a0b21986",
+      "validation_worktree": "/home/oleg/prog/z_llvm_integer_validation",
+      "source_byte_equivalence_manifest": "sources-dev-v3.sha256",
+      "source_files_byte_equivalent": 1816,
+      "fast_safe_and_census_binaries_copied_without_change": true,
+      "debug_built_at_isolated_root": true,
+      "default_suite_debug_equals_frozen_debug": true,
+      "isolated_debug_native_population_rerun": true,
+      "scope": "Original same-code Tier2 evidence retained in batch-07; isolated full retry restores a frozen f955509f source after external edits invalidated first full-run provenance. No concurrent main-worktree changes are overwritten."
+    },
+    "all_final_source_binary_input_and_scratch_checks_passed": true
+  },
+  "original_target_probes": {
+    "scope": "Versioned original-input target probes; no complete compiler census count",
+    "current_revision": "f955509fa34bbdbdf5649db307796cdaa868e9e9",
+    "current_probes": [
+      {
+        "name": "targets-light-dev-v3",
+        "complete": {
+          "event": "complete",
+          "examined": 6,
+          "selected": 6,
+          "failed": 0
+        },
+        "new_successes": [
+          "link.Elf.Atom.resolveRelocsNonAlloc__func_14559",
+          "link.Elf.Atom.resolveRelocsAlloc",
+          "codegen.riscv64.CodeGen.generate"
+        ],
+        "retained_successes": [
+          "InternPool.typeOf",
+          "Io.Threaded.posixExec",
+          "Target.toElfMachine"
+        ],
+        "lost_successes": [],
+        "later_rejections": []
+      },
+      {
+        "name": "targets-secondary-dev-v3",
+        "complete": {
+          "event": "complete",
+          "examined": 13,
+          "selected": 5,
+          "failed": 8
+        },
+        "new_successes": [
+          "Compilation.Timer.finish",
+          "Zcu.TrackedUnitSema.end",
+          "Zcu.PerThread.runCodegen",
+          "Zcu.trackUnitSema",
+          "Zcu.PerThread.workerUpdateFile"
+        ],
+        "retained_successes": [],
+        "lost_successes": [],
+        "later_rejections": [
+          {
+            "event": "function",
+            "selected": false,
+            "function": "Io.Threaded.Group.waitForCancelWithSignaling",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "rejection": {
+              "position": 48,
+              "pressure": null,
+              "selector_tag": "unsupported_value",
+              "selector_detail": "stage2-unsupported-value",
+              "function_return_type": "void",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "phi",
+                "result": ".pn.i.i",
+                "type": "{ i64, i1 }",
+                "callee": null,
+                "allocated_type": null,
+                "allocation_attrs": null,
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "Io.Threaded.Future.waitForCancelWithSignaling",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "rejection": {
+              "position": 39,
+              "pressure": null,
+              "selector_tag": "unsupported_value",
+              "selector_detail": "stage2-unsupported-value",
+              "function_return_type": "void",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "phi",
+                "result": ".pn.i",
+                "type": "{ i64, i1 }",
+                "callee": null,
+                "allocated_type": null,
+                "allocation_attrs": null,
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "Compilation.update",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "alloca",
+            "rejection": {
+              "position": 1,
+              "pressure": null,
+              "selector_tag": "unsupported_type",
+              "selector_detail": "alloca",
+              "function_return_type": "i32",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "alloca",
+                "result": "3",
+                "type": "ptr",
+                "callee": null,
+                "allocated_type": "%Io.Timestamp",
+                "allocation_attrs": "align 16",
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "Compilation.flush",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "phi",
+            "rejection": {
+              "position": 124,
+              "pressure": null,
+              "selector_tag": "unsupported_type",
+              "selector_detail": "phi",
+              "function_return_type": "i32",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "phi",
+                "result": "94",
+                "type": "{ i32, i1 }",
+                "callee": null,
+                "allocated_type": null,
+                "allocation_attrs": null,
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "link.C.flush",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "phi",
+            "rejection": {
+              "position": 292,
+              "pressure": null,
+              "selector_tag": "unsupported_type",
+              "selector_detail": "phi",
+              "function_return_type": "i32",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "phi",
+                "result": "256",
+                "type": "{ i32, i1 }",
+                "callee": null,
+                "allocated_type": null,
+                "allocation_attrs": null,
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "link.doZcuTask",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "rejection": {
+              "position": 263,
+              "pressure": null,
+              "selector_tag": "unsupported_value",
+              "selector_detail": "stage2-unsupported-value",
+              "function_return_type": "void",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "phi",
+                "result": "422",
+                "type": "{ i32, i1 }",
+                "callee": null,
+                "allocated_type": null,
+                "allocation_attrs": null,
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "link.doPrelinkTask",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "rejection": {
+              "position": 171,
+              "pressure": null,
+              "selector_tag": "unsupported_value",
+              "selector_detail": "stage2-unsupported-value",
+              "function_return_type": "void",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "phi",
+                "result": "553",
+                "type": "{ i32, i1 }",
+                "callee": null,
+                "allocated_type": null,
+                "allocation_attrs": null,
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          },
+          {
+            "event": "function",
+            "selected": false,
+            "function": "Zcu.PerThread.update",
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "alloca",
+            "rejection": {
+              "position": 3,
+              "pressure": null,
+              "selector_tag": "unsupported_type",
+              "selector_detail": "alloca",
+              "function_return_type": "i32",
+              "function_return_attrs": null,
+              "function_calling_convention": "fastcc",
+              "parameter": null,
+              "definition": {
+                "kind": "alloca",
+                "result": "3",
+                "type": "ptr",
+                "callee": null,
+                "allocated_type": "{ i32, i16, [2 x i8] }",
+                "allocation_attrs": "align 4",
+                "operation": null,
+                "operands": []
+              },
+              "comparison": null,
+              "freeze": null,
+              "global_address": null,
+              "readonly_table": null,
+              "call": null
+            }
+          }
+        ]
+      }
+    ],
+    "prior_version_large_probes": {
+      "version": "development-v2",
+      "complete": {
+        "event": "complete",
+        "examined": 2,
+        "selected": 2,
+        "failed": 0
+      },
+      "functions": [
+        "zig.llvm.Builder.toBitcode",
+        "codegen.llvm.FuncGen.genBody"
+      ],
+      "scope": "Retained source/binary version before two independent scalar forms were added; final cumulative current-source original-input validation remains required"
+    }
+  },
+  "runtime_census": {
+    "examined": 455,
+    "selected": 285,
+    "failed": 170,
+    "new_successes": [],
+    "lost_successes": [],
+    "transitions": [
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          }
+        },
+        "functions": 67
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-param-type"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-param-type"
+          }
+        },
+        "functions": 19
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          }
+        },
+        "functions": 16
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width"
+          }
+        },
+        "functions": 11
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedLongDoubleAbi",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedLongDoubleAbi",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          }
+        },
+        "functions": 10
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-llvm-intrinsic"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-llvm-intrinsic"
+          }
+        },
+        "functions": 8
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load"
+          }
+        },
+        "functions": 4
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-from-not-int"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-from-not-int"
+          }
+        },
+        "functions": 3
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fptoui"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fptoui"
+          }
+        },
+        "functions": 3
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "sitofp"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "sitofp"
+          }
+        },
+        "functions": 3
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-binary-value"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-binary-value"
+          }
+        },
+        "functions": 3
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "uitofp"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "uitofp"
+          }
+        },
+        "functions": 3
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load"
+          }
+        },
+        "functions": 3
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-load-fp-ptr"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-load-fp-ptr"
+          }
+        },
+        "functions": 2
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-vector-shuffle-form"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-vector-shuffle-form"
+          }
+        },
+        "functions": 2
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-zext-pair"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-zext-pair"
+          }
+        },
+        "functions": 2
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "binary"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "binary"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-half-binary-op"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-half-binary-op"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fmul"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fmul"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "inline-asm-call"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "inline-asm-call"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "insertelement"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "insertelement"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "shufflevector"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "shufflevector"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fsub"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fsub"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-binary-value"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-binary-value"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenType",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-call-value"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenType",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-call-value"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedCodegenType",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedCodegenType",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          }
+        },
+        "functions": 1
+      },
+      {
+        "transition": {
+          "before": {
+            "diagnostic": "UnsupportedLongDoubleAbi",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-param-type"
+          },
+          "after": {
+            "selected": false,
+            "diagnostic": "UnsupportedLongDoubleAbi",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-param-type"
+          }
+        },
+        "functions": 1
+      }
+    ],
+    "failure_groups": [
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-return-type"
+        },
+        "functions": 67
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-param-type"
+        },
+        "functions": 19
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-return-type"
+        },
+        "functions": 16
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-width"
+        },
+        "functions": 11
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedLongDoubleAbi",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-return-type"
+        },
+        "functions": 10
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-llvm-intrinsic"
+        },
+        "functions": 8
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "load"
+        },
+        "functions": 4
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-from-not-int"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "fptoui"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "sitofp"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-binary-value"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "uitofp"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "load"
+        },
+        "functions": 3
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-load-fp-ptr"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-vector-shuffle-form"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "composed-block-zext-pair"
+        },
+        "functions": 2
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "binary"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-half-binary-op"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "fmul"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "inline-asm-call"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "insertelement"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "shufflevector"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "fsub"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-binary-value"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-call-value"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-return-type"
+        },
+        "functions": 1
+      },
+      {
+        "failure": {
+          "diagnostic": "UnsupportedLongDoubleAbi",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "unsupported-param-type"
+        },
+        "functions": 1
+      }
+    ]
+  },
+  "prior_accepted_population_comparison": {
+    "prior_native_populations": 74,
+    "current_native_populations": 76,
+    "prior_populations_preserved": true,
+    "population_differences": [],
+    "new_populations": [
+      {
+        "population": "standalone-large-frame",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "384",
+        "reference_observations": "192",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      {
+        "population": "standalone-integer-intrinsic-frontier",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "67584",
+        "reference_observations": "33792",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    ],
+    "core": {
+      "records": 36,
+      "all_selected_object_and_observation_fields_match": true,
+      "strict_records_equal": false,
+      "excluded_fields": [
+        "reference_bytes",
+        "reference_sha256",
+        "linked_bytes",
+        "linked_sha256"
+      ],
+      "scope": "Executable metadata is compared separately; selected-object bytes and all observation fields must match",
+      "executable_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153744",
+          "reference_bytes_after": "4153784",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153752",
+          "reference_bytes_after": "4153784",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151536",
+          "reference_bytes_after": "4151568",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154296",
+          "reference_bytes_after": "4154336",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148368",
+          "reference_bytes_after": "4148400",
+          "linked_bytes_before": "6287753",
+          "linked_bytes_after": "6287753",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153904",
+          "reference_bytes_after": "4153936",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152384",
+          "reference_bytes_after": "4152424",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147800",
+          "reference_bytes_after": "4147832",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148216",
+          "reference_bytes_after": "4148256",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148304",
+          "reference_bytes_after": "4148344",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148280",
+          "reference_bytes_after": "4148312",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148568",
+          "reference_bytes_after": "4148608",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039600",
+          "reference_bytes_after": "4039632",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039600",
+          "reference_bytes_after": "4039640",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035680",
+          "reference_bytes_after": "4035712",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040312",
+          "reference_bytes_after": "4040352",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034168",
+          "reference_bytes_after": "4034208",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039784",
+          "reference_bytes_after": "4039824",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038496",
+          "reference_bytes_after": "4038528",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034448",
+          "reference_bytes_after": "4034480",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034304",
+          "reference_bytes_after": "4034344",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034360",
+          "reference_bytes_after": "4034392",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034328",
+          "reference_bytes_after": "4034368",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034416",
+          "reference_bytes_after": "4034448",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        }
+      ]
+    }
+  },
+  "prior_frame_population_comparison": {
+    "prior_native_populations": 75,
+    "current_native_populations": 76,
+    "prior_populations_preserved": true,
+    "population_differences": [],
+    "new_populations": [
+      {
+        "population": "standalone-integer-intrinsic-frontier",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "67584",
+        "reference_observations": "33792",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    ],
+    "core": {
+      "records": 36,
+      "all_selected_object_and_observation_fields_match": true,
+      "strict_records_equal": false,
+      "excluded_fields": [
+        "reference_bytes",
+        "reference_sha256",
+        "linked_bytes",
+        "linked_sha256"
+      ],
+      "scope": "Executable metadata is compared separately; selected-object bytes and all observation fields must match",
+      "executable_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153744",
+          "reference_bytes_after": "4153784",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153752",
+          "reference_bytes_after": "4153784",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151536",
+          "reference_bytes_after": "4151568",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154296",
+          "reference_bytes_after": "4154336",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148368",
+          "reference_bytes_after": "4148400",
+          "linked_bytes_before": "6287753",
+          "linked_bytes_after": "6287753",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153904",
+          "reference_bytes_after": "4153936",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152384",
+          "reference_bytes_after": "4152424",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147800",
+          "reference_bytes_after": "4147832",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148216",
+          "reference_bytes_after": "4148256",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148304",
+          "reference_bytes_after": "4148344",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148280",
+          "reference_bytes_after": "4148312",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148568",
+          "reference_bytes_after": "4148608",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039600",
+          "reference_bytes_after": "4039632",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039600",
+          "reference_bytes_after": "4039640",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035680",
+          "reference_bytes_after": "4035712",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040312",
+          "reference_bytes_after": "4040352",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034168",
+          "reference_bytes_after": "4034208",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039784",
+          "reference_bytes_after": "4039824",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038496",
+          "reference_bytes_after": "4038528",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034448",
+          "reference_bytes_after": "4034480",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034304",
+          "reference_bytes_after": "4034344",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034360",
+          "reference_bytes_after": "4034392",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034328",
+          "reference_bytes_after": "4034368",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034416",
+          "reference_bytes_after": "4034448",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        }
+      ]
+    }
+  },
+  "core_metadata_review": {
+    "records": 36,
+    "selected_object_and_observation_fields_match": true,
+    "linked_sizes_match": true,
+    "groups": [
+      {
+        "fields": {
+          "mode": "ReleaseFast",
+          "reference_delta": 32,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseFast",
+          "reference_delta": 40,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSafe",
+          "reference_delta": 32,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSafe",
+          "reference_delta": 40,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSmall",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        "records": 8
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSmall",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        "records": 4
+      }
+    ]
+  },
+  "zig_corpus_counter_deltas": {
+    "scope": "Selected IDs and owners preserved; extra optional-stage attempts are distinguished from machine instruction/spill deltas",
+    "modes": [
+      {
+        "mode": "ReleaseFast",
+        "changed_any_counters": 0,
+        "changed_machine_counters": 0,
+        "changed_legalizer_attempts": 0,
+        "aggregate_instruction_delta": 0,
+        "aggregate_spill_delta": 0,
+        "aggregate_legalizer_attempt_delta": 0,
+        "machine_counter_examples": []
+      },
+      {
+        "mode": "ReleaseSafe",
+        "changed_any_counters": 0,
+        "changed_machine_counters": 0,
+        "changed_legalizer_attempts": 0,
+        "aggregate_instruction_delta": 0,
+        "aggregate_spill_delta": 0,
+        "aggregate_legalizer_attempt_delta": 0,
+        "machine_counter_examples": []
+      },
+      {
+        "mode": "ReleaseSmall",
+        "changed_any_counters": 0,
+        "changed_machine_counters": 0,
+        "changed_legalizer_attempts": 0,
+        "aggregate_instruction_delta": 0,
+        "aggregate_spill_delta": 0,
+        "aggregate_legalizer_attempt_delta": 0,
+        "machine_counter_examples": []
+      }
+    ]
+  },
+  "report_retention": {
+    "full_command_supervision": "setsid detached checked runner completed with actual returncode0",
+    "full_serial_passed_gates": 17,
+    "terminal_success_line_verified": true,
+    "retention_helper_exit": 0,
+    "fifo_removed": true,
+    "retained_files": 116,
+    "filenames_match_preceding_checkpoint": true,
+    "all_required_final_reports_verified": true,
+    "collector_returncode": 0,
+    "scope": "All durable gate exits, checked process exit, final serial summary and every required final report verified. No interrupted supervision or inferred return codes."
+  },
+  "negative_controls": {
+    "status": "passed",
+    "valid_ir_mutants": 8,
+    "reference_detections": 8,
+    "local_detections": 8,
+    "total_detections": 16,
+    "scope": "Every mutant is valid LLVM IR and locally selected. Independent unchanged C expectations detect wrong signed saturation, lost high input word, reversed comparison, omitted absolute value, lost live result, dirty high result word, wrong product and lost shift saturation. No compiler source mutation."
+  },
+  "raw_evidence": "local-state/validations/compiler-selection-completion-20261108/batch-07-isolated",
+  "development_raw_evidence": "local-state/validations/compiler-selection-completion-20261108/batch-07",
+  "invalidated_main_full_attempt": {
+    "status": "retry-required",
+    "recorded_utc": "2026-11-09T22:16:17.578806+00:00",
+    "original_full_actual_returncode": 1,
+    "original_failure": "ValidationToolsChanged",
+    "all_three_while_loop_program_modes_matched": true,
+    "concurrent_source_change": "tools/check_project_docs.zig",
+    "concurrent_commits": [
+      "8d630cef",
+      "ee1b8317"
+    ],
+    "isolated_worktree": "/home/oleg/prog/z_llvm_integer_validation",
+    "isolated_revision": "f955509fa34bbdbdf5649db307796cdaa868e9e9",
+    "isolated_source_files_match_original_frozen_manifest": 1816,
+    "scope": "Only finish current integer-intrinsic slice and stop; original failed run retained without complete-run credit. Isolated retry restores atomic source provenance without overwriting concurrent work."
+  },
+  "isolated_cache_binding": {
+    "status": "verified",
+    "canonical_isolated_cache": "/home/oleg/prog/z_llvm_integer_validation/local-state/caches/quoted-symbols-20261108",
+    "original_cache": "/home/oleg/prog/z_llvm/local-state/caches/quoted-symbols-20261108",
+    "shared_unchanged_payload_inodes": [
+      {
+        "mode": "ReleaseSmall",
+        "bytes": 1106432911,
+        "inode": 57577645,
+        "device": 66306,
+        "payload_not_copied": true
+      },
+      {
+        "mode": "ReleaseSafe",
+        "bytes": 1473501276,
+        "inode": 57577644,
+        "device": 66306,
+        "payload_not_copied": true
+      },
+      {
+        "mode": "ReleaseFast",
+        "bytes": 1343891552,
+        "inode": 57577646,
+        "device": 66306,
+        "payload_not_copied": true
+      }
+    ],
+    "scope": "Canonical in-project directories with hard links to authenticated existing payloads; no eviction, archive or new AIR generation."
+  },
+  "isolated_validation_worktree": "/home/oleg/prog/z_llvm_integer_validation",
+  "scope": "Current capability slice completed with Tier3, native execution and versioned original-target probes. The unchanged8928 compiler census and production selection remain final cumulative work, paused at user request.",
+  "artifact_manifests": [
+    {
+      "status": "passed",
+      "batch": "batch-07",
+      "manifest": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-07/slice-artifacts.sha256",
+      "sha256": "65419b0fe2293dcbfad7e5c31857893f823cba2234aa8f8a9fd0f62885ef8839",
+      "files": 1353,
+      "artifact_verification_actual_returncode": 0,
+      "artifacts_readonly": true,
+      "scope": "Current integer-intrinsic slice; original Tier2 and invalidated main full attempt retained separately from completed isolated Tier3. The all8928-selection goal remains paused and its accepted count is unchanged."
+    },
+    {
+      "status": "passed",
+      "batch": "batch-07-isolated",
+      "manifest": "/home/oleg/prog/z_llvm_integer_validation/local-state/validations/compiler-selection-completion-20261108/batch-07-isolated/slice-artifacts.sha256",
+      "sha256": "252cb36b10d7b4efe87cb939808a64b02646e21af0315f8f40916a8cd4322d5b",
+      "files": 338,
+      "artifact_verification_actual_returncode": 0,
+      "artifacts_readonly": true,
+      "scope": "Current integer-intrinsic slice; original Tier2 and invalidated main full attempt retained separately from completed isolated Tier3. The all8928-selection goal remains paused and its accepted count is unchanged."
+    }
+  ]
+}

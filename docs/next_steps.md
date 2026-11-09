@@ -1,63 +1,37 @@
-# Active direction
+# Paused after the integer intrinsic slice
 
-Continue until **all 8,928 definitions** in the unchanged original compiler
-input select. The user's [complete-selection plan](plans/2026-11-08-complete-compiler-selection.md)
-authorizes the successive necessary groups without further per-slice permission.
+The user requested **finish the current slice and stop**. The integer intrinsic
+slice at `f955509f` is complete, and the
+[all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) is paused.
+No successor capability family or complete compiler replay is running.
 
-The [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
-is accepted at `bb74a371`: **8,664/8,928**, adding 112 selections with no lost
-successes. Runtime retains **285/455**. Complete terminal censuses and independent
-production replays match all selections and remaining diagnostic tuples. Census
-owner preservation is checked separately; blocked production profiles have no
-per-function owner fields.
-[Acceptance record](evidence/scalable_cfg_indirect_phi_acceptance_20261109.json).
+The [slice evidence](evidence/integer_intrinsic_slice.md) records all 17 serial
+gates and 76 native populations passing, with 2,200,836 local observations against
+1,100,418 references. The new 43-function population passes with frozen Debug
+and ReleaseFast compilers; eight deliberately faulty variants are detected by
+both LLVM and local execution. The full source and artifact checks verify.
 
-All 17 serial gates and 74 native populations pass, preserving the preceding 72.
-Debug/ReleaseSafe each pass 2,030 units and 24 fresh structural checks.
-Readiness, both corpora, five fixed programs and all 54 core fault controls pass.
-The suite records 2,132,868 local observations against 1,066,434 references.
-All 36 selected core objects, observations and
-executable sizes match. Wrapper hashes and corpus counter changes are reviewed
-separately. The 2,759-file seal verifies. Full/census commands have durable actual
-return codes. The incomplete first compiler replay is excluded; its completed
-same-source retry with the existing two-hour override supplies production proof.
+The accepted [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
+remains `bb74a371`: **8,664/8,928** compiler definitions and **285/455** runtime
+definitions. The current slice adds versioned targeted probes and a complete
+runtime census, without a complete current compiler census or production replay.
+The [accepted record](evidence/scalable_cfg_indirect_phi_acceptance_20261109.json)
+and `accepted_status.json` remain unchanged.
 
-The remaining **264 failures** are still authorized work. Next:
+The preceding frame source at `726a7c55` passed all 17 integration gates and
+75 native populations. Its incomplete whole-input attempts were explicitly
+superseded. Its frame and spill implementation is included in the current source;
+its earlier full execution evidence remains separate from complete-input acceptance.
 
-1. Finish the current private integer-intrinsic slice: signed saturation,
-   i128 leading-zero count, signed three-way comparison, poison-enabled scalar
-   absolute value, and the observed fixed-product and saturating-shift forms.
-   The preceding source at `726a7c55` passed all 17 integration gates and 75
-   native populations with bounded 8 MiB page-probed frames and owned spill
-   checkpoints. Its incomplete whole-input probes were explicitly superseded;
-   the accepted count remains 8,664. Preserve checked layout, page touches,
-   stack/call alignment, exact rollback and owned names. Current intrinsic
-   work needs its own Tier 3 before moving to another capability family.
-2. Continue through aggregate PHIs/freezes, frame-pointer flows, scalar
-   intrinsics, atomic stack views and wide/FP ABI limits. Reclassify later
-   boundaries, including `llvm.abs` poison mode, from actual original-input
-   retries. Private normalization must preserve defined behavior and public ABI.
+Future work, if the user resumes the goal, follows measured aggregate PHIs and
+freezes, pointer flows, atomic stack views, and wide/FP ABI limits. A complete
+unchanged-input census and production replay remain final cumulative acceptance
+checks. Selection does not establish complete objects, startup or self-rebuild.
 
-The complete original-input census and production replay are final cumulative
-acceptance checks. Targeted original-function retries guide intermediate work;
-provisional gains do not advance the accepted count. Both final runs must select
-all 8,928 definitions with complete event and preservation audits.
-
-Replay affected original functions after each cohesive change, preserve all
-accepted selected identities, and reclassify later limits. Use the validation
-tiers, including immediate Tier 3 for correctness or shared ABI/frame changes.
-Keep this checkpoint authoritative until the next cumulative acceptance.
-
-Raw batch evidence is sealed under
-`local-state/validations/compiler-selection-completion-20261108/batch-05/`;
-ongoing notes and read-only classifications are in its parent. Preserve the
-100-row prefix, twelve-function core cohort, ratchet 130, every execution
-population, original inputs, prior evidence, AIR payloads, and thirteen scratch
-files. Selection does not establish complete objects, startup, or self-rebuild.
-
-Admission remains 20 GB with an 8 GiB working allowance and 11.41 GB reserve.
-Reuse the authenticated `local-state/caches/quoted-symbols-20261108` generation
-when producer identities match. Create no archives. See the
+Preserve the 100-row prefix, twelve-function core cohort, ratchet 130, every
+execution population, original inputs, prior evidence, authenticated AIR payloads
+and thirteen scratch files. Admission remains 20 GB, with an 8 GiB working
+allowance and 11.41 GB reserve. Create no archives. See the
 [headroom policy](retention_headroom_policy.md#headroom).
 
 For performance diagnosis during this work, follow
