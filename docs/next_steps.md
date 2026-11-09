@@ -1,55 +1,65 @@
 # Active direction
 
-The [symbolic integer call-address plan](plans/2026-11-08-symbolic-call-addresses.md)
-is complete and accepted at `b43dd3dc`. Both complete production replays and event
-audits pass: compiler selection is 7,441 of 8,928 and runtime selection is 284
-of 455. All 7,116 prior compiler successes remain, with 325 additions. Compiler
-failures fall from 1,812 to 1,487, a reduction of 17.94%. All 17 integration
-gates and 61 native populations pass; all 60 preceding native records and 36
-core object/observation records are preserved. Debug/ReleaseSafe each pass
-1,970 units and 22 structural checks. Readiness, both input corpora, fixed
-programs and fault controls pass. See the [evidence](evidence/symbolic_call_addresses.md)
-and [acceptance record](evidence/symbolic_call_addresses_acceptance_20261108.json).
+The [quoted-symbol plan](plans/2026-11-08-quoted-symbol-addresses.md) is complete
+and accepted at `a9e9c0f1`, following `b51fc4aa`. Compiler selection is
+**7,657/8,928**, with 216 additions and no lost successes; runtime remains
+**284/455**. Both complete production replays and event audits pass. Fresh and
+cached full runs each pass 17 gates and 62 native populations, preserving all
+61 preceding populations and all 36 stable core records. The full comparator
+matches 1,501 records. See the [evidence](evidence/quoted_symbol_addresses.md)
+and [acceptance record](evidence/quoted_symbol_addresses_acceptance_20261108.json).
 
-The next implementation slice should address canonical quoted symbol names:
-all 225 readonly-table failures refer to two resolved private integer arrays,
-`[4 x i64]` (213 functions) and `[8 x i64]` (twelve). Their actual private GEPs
-already use byte offsets. Extend canonical identifier handling through ordinary
-shared addressing, aliases and ELF symbol identity. Test quoted/escaped names,
-checked offsets and rollback, then replay every original definition. Preserve
-all 7,441 compiler and 284 runtime successes; later rejections may be exposed.
-These ordinary integer arrays do not require a specialized table-shape extension.
+All 225 quoted-table first failures advance: 216 select, five reach an
+overflow-multiply operand limit, three a load-width limit and one a store-width
+limit. Canonical names now span shared addressing, verification, aliases and
+ELF. Structured construction preserves LLVM spelling; AIR literal names are
+encoded at its producer boundary. Do not repeat this repair or the earlier
+symbolic integer call-address work.
 
-The symbolic call repair advances all 326 targeted functions: 325 now select,
-and `main.lldMain` reaches a later i64 poison call argument. The remaining 115
-unknown-call candidates are i32 undef (86), i64 poison (23) and i64 undef (six).
-Their semantics require a separate decision. All 133 general-value failures
-have concrete private definitions: the largest is 67 `<16 x i1>` comparison
-results, followed by thirteen `<2 x ptr>` loads. Allocation failures comprise
-123 main and five varargs cases;
-all have observed types/attributes. Leading shapes are fp128 slots (30), arrays
-of two `%sort.block.Pull` values (20), 4,096-byte arrays (17), and one-element
-arrays of `{ ptr, i64 }` (10). Replay both complete inputs after each shared
-repair; group sizes do not predict completed functions.
+The next shared repair should target the **59 `composed-block-smulo-i64-rhs`
+failures**. Their observed calls are all `llvm.umul.with.overflow.i64`, despite
+the diagnostic tag's spelling. Each has a spilled i64 left operand and constant
+i64 right operand. Fifty-eight left values come from selects and one from binary
+arithmetic; common constants are 24, 40, 12, 48, 20 and 56. The complete concrete
+classification is `local-state/validations/quoted-symbols-20261108/checked-multiply-frontier.json`.
 
-Raw evidence is under `local-state/validations/symbolic-call-20261108/`.
-The suite rebuilt default Debug after cache retirement. Its separately retained
-binary has identical instructions and declared data objects; the initial exact
-hash mismatch and bounded ELF review are recorded. Keep focused and suite
-compiler identities distinct when extending this evidence. Source, input,
-scratch and prior artifact audits pass; reference-wrapper metadata is reviewed
-separately from selected objects and observations.
+1. Materialize the constant operand through the common value-transfer and
+   register-effect contracts. Preserve live values around the RAX/RDX multiply
+   sequence and preserve transactional rollback.
+2. Cover overflow/no-overflow, aliases, spills, calls and live neighboring
+   values with focused checks and independent native execution in all modes.
+3. Replay both unchanged complete inputs, preserving all 7,657 compiler and
+   284 runtime successes. Report actual additions and later rejections, then
+   complete the required cumulative gate before promoting the next checkpoint.
+
+Group size does not predict completed functions. The other leading groups are
+133 general-value failures, 123 main allocation failures, 115 unknown call
+arguments, 102 comparisons, 92 freeze-width failures, 90 call-attribute ABI
+failures and 72 load-type failures. General-value observations include 67
+`<16 x i1>` comparisons and thirteen `<2 x ptr>` loads. Allocation observations
+include fp128 slots, `%sort.block.Pull` arrays and large byte arrays. The 115
+unknown call arguments are i32 undef (86), i64 poison (23) and i64 undef (six);
+keep their semantics as a separate decision.
+
+Raw evidence is under `local-state/validations/quoted-symbols-20261108/`.
+Preserve the twelve-function core cohort, ratchet 130 and every execution
+population. Keep focused and suite Debug identities distinct and review
+executable metadata separately from selected objects and observations.
 No complete compiler/runtime object, startup or self-rebuild is claimed.
-Preserve the 12-function core cohort, ratchet 130 and every existing execution
-population. The user-directed 2026-11-08 limits are 20 GB at admission and
-11.41 GB during execution, with the existing 8 GiB working allowance. See the
-[current headroom policy](retention_headroom_policy.md#headroom).
-The numerical change passes focused policy checks; include it in the next
-full distribution and fresh/cache acceptance before advancing accepted status.
-Finish cache cleanup before validation starts. Preserve original inputs,
-accepted evidence, AIR caches and user scratch files; create no archives.
+
+The 20 GB admission and 11.41 GB execution-reserve settings now have complete
+fresh/cache acceptance with the unchanged 8 GiB working allowance. Reuse the
+authenticated `local-state/caches/quoted-symbols-20261108` generation when its
+inputs match. Finish any cache retirement before validation; preserve original
+inputs, accepted evidence, AIR payloads and all thirteen scratch files. Create
+no archives. See the [headroom policy](retention_headroom_policy.md#headroom).
 
 ## Preceding checkpoints
+
+The [symbolic integer call-address checkpoint](evidence/symbolic_call_addresses.md)
+at `b43dd3dc` selected 7,441 compiler and 284 runtime definitions, with all 17
+gates and 61 native populations passing. Its quoted-table recommendation is
+completed by the current accepted slice.
 
 The [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
 at `111f2e0a` selects 7,116 compiler and 284 runtime definitions, with all 17 gates

@@ -212,9 +212,15 @@ stronger caller floors and the separate opt-in sharding policy still apply.
 The telemetry layout remains schema 3 and records the actual numerical limits.
 Historical acceptance records retain the limits used for those runs.
 Focused validation passes 53 runner/policy tests, 43 comparison tests and the
-whole-compiler runner build/help check. Full distribution and fresh/cache
-validation of this setting remain for the next infrastructure acceptance;
-the existing compiler acceptance record is unchanged.
+whole-compiler runner build/help check. The accepted
+[quoted-symbol/headroom pair](evidence/quoted_symbol_addresses_acceptance_20261108.json)
+passes all 17 gates in both fresh and cached runs, with 1,501 canonical records
+matching. Reported decreases are 7.84 GB and 2.63 GB, within the unchanged 8 GiB
+allowance; reported minima are 40.06 GB and 40.13 GB. An additional 240 samples
+reach 40.06 GB. Both runs start above 20 GB: this validates the configured
+admission/reserve contract, not a guarantee that every workload finishes from
+exactly 20 GB free. The authenticated AIR generation is
+`local-state/caches/quoted-symbols-20261108`; the preceding generation is retained.
 
 The runner's numerical headroom checks remain owned by
 `tools/distribution_headroom_policy.zig` and

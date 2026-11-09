@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `b43dd3dc7faf3ecd3f88e6ad25e7bc528f52a3dc`; tree: `971db4fa54baee19f3435d3126414c4b9764a80c`.
+Accepted revision: `a9e9c0f1404b3b4e98ff0f66e25760b91990b286`; tree: `a8b95d4326653055fdf1e2b04a093c7f4ebd521b`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,46 +31,53 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [symbolic integer call-address slice](evidence/symbolic_call_addresses.md)
-is accepted at `b43dd3dc`: all 17 integration gates and 61 native populations pass.
-Debug and ReleaseSafe each pass 1,970 units and 22 structural checks. Readiness,
-profiling checks, both input corpora and fixed programs pass. Native coverage
-totals 1,949,700 local observations against 974,850 references; all 60 prior
-population records are preserved.
+The [quoted-symbol slice](evidence/quoted_symbol_addresses.md) is accepted at
+`a9e9c0f1`: fresh and cached full runs each pass all 17 gates and 62 native
+populations. All 1,501 canonical records match between runs. Debug and
+ReleaseSafe each pass 1,979 units and 23 structural checks. Readiness, profiling,
+both input corpora and all five fixed programs pass. Each full run records
+1,955,844 local observations against 977,922 references, preserving all 61
+preceding native populations.
 
-The unchanged compiler replay attempts all 8,928 definitions, selecting 7,441
-and rejecting 1,487. All 7,116 previous successes remain, with 325 additions.
-Failures decrease by 17.94%. Runtime retains all 284 of 455 selections. Both
-production replays match diagnostic selected identities and failure tuples,
-with complete event audits. Dependency coverage remains conservative; no complete
-compiler/runtime object, startup or self-rebuild is claimed.
+The unchanged compiler replay attempts all 8,928 definitions, selecting 7,657
+and rejecting 1,271. All 7,441 preceding successes remain, with 216 additions:
+a 14.53% reduction in failures. Runtime retains all 284 of 455 selections.
+Both production replays match diagnostic identities and failure tuples, with
+complete event audits. All 225 quoted-table first failures advance: 216 select,
+five reach an overflow-multiply operand limit, three a load-width limit and one
+a store-width limit. No complete compiler/runtime object, startup or self-rebuild
+is claimed.
 
-Symbolic i64 pointer constants now use shared address materialization and
-existing ordinary/indirect/stack/syscall argument transfers. All 326 targeted
-functions advance: 325 select and `main.lldMain` reaches a later poison argument.
-The new seven-function native population passes with frozen Debug and
-ReleaseFast, preserving original IR, register effects and rollback contracts.
+Canonical quoted names now work through shared addressing, verifier maps,
+aliases and ELF identity. Structured construction preserves LLVM spelling;
+AIR literal names are encoded at the producer boundary. The new native
+population checks seven functions with frozen Debug and ReleaseFast builds.
+Layout, width, addend, register-effect and rollback contracts remain enforced.
 
-All 36 core records preserve selected objects and execution observations, and
-local linked sizes match. Twenty-four reference wrappers shrink by 16 bytes;
-the exact metadata differences and their review are retained separately.
-No section-level executable identity is claimed. The 12-function core cohort,
+All 36 core records preserve selected objects, descriptors and observations.
+Linked sizes match; Fast/Safe reference wrappers grow by 24 or 32 bytes, reviewed
+separately without a section-level identity claim. The twelve-function cohort,
 ratchet 130, all 603 Zig and 552 C observation controls, and 54 core fault
-detections remain intact.
+detections remain intact. Focused and suite Debug identities are retained
+separately; their machine code and all 22,151 declared readonly objects match.
 
-The suite rebuilt default Debug after cache retirement. Both binary hashes are
-retained and authenticated. Its instructions, ordinary data and all 22,132
-declared readonly data objects match the focused binary; the bounded ELF review
-records differing bytes outside those object ranges and debug/symbol metadata.
-Source, input, frontend, scratch and prior evidence audits pass. Full acceptance
-seals 831 files; the lowest additional resumed disk sample is 30.82 GB and final
-postcheck free space is 31.92 GB. No cleanup occurred during resumed validation,
-and no archives were created.
+Source, input, frontend, scratch, AIR and prior evidence audits pass. The new
+manifest seals 1,057 files. The fresh/cache runs validate the 20 GB admission
+and 11.41 GB reserve settings; observed free-space decreases are 7.84 GB and
+2.63 GB. The lowest additional sample is 40.06 GB and final postcheck free
+space is 42.61 GB. No cache retirement occurred during the pair and no archives
+were created. The evidence also records an earlier process-stop mistake whose
+impact on unrelated jobs is unconfirmed.
 
-All 225 readonly-table failures refer to two resolved quoted private integer
-arrays. Shared canonical quoted-symbol handling is the next repair. Remaining
-general-value and allocation failures retain concrete definitions/types. See
-[the active handoff](next_steps.md) for the current order and remaining boundaries.
+The next shared repair is the 59 observed unsigned overflow-multiply calls with
+a spilled left operand and constant right operand. See [the active handoff](next_steps.md)
+for its scope and the remaining classified groups.
+
+The preceding [symbolic integer call-address checkpoint](evidence/symbolic_call_addresses.md)
+at `b43dd3dc` selected 7,441 compiler and 284 runtime definitions, with 17 gates
+and 61 native populations passing. It established symbolic i64 address
+materialization through ordinary, indirect, stack and syscall transfers. Its
+quoted-table recommendation is completed by the accepted checkpoint above.
 
 The preceding [syscall and comparison checkpoint](evidence/syscall_selection_reduction.md)
 at `111f2e0a` selected 7,116 compiler and 284 runtime definitions, with all 17

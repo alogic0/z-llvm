@@ -1,15 +1,18 @@
 # Quoted symbol addresses and cumulative policy acceptance
 
-Status: implementation complete; cumulative validation pending. Baseline compiler acceptance is `b43dd3dc`,
+Status: complete and accepted at `a9e9c0f1`, following `b51fc4aa`.
+Fresh and cached full runs pass all 17 gates; all 1,501 canonical records match.
+Baseline compiler acceptance is `b43dd3dc`,
 documented at `4ed60955`: 7,441 of 8,928 compiler definitions and 284 of 455
 runtime definitions select, with 17 gates and 61 native populations passing.
 The subsequent `1d725945` setting requires 20 GB at admission and an
-11,410,065,408-byte execution reserve; its full fresh/cache validation is pending.
+11,410,065,408-byte execution reserve; this plan completes its full fresh/cache
+validation.
 
-All 225 readonly-table first failures refer to two quoted private integer arrays:
-213 use `[4 x i64]`, and twelve use `[8 x i64]`. Their final GEPs already carry
-byte offsets. The shared address parser rejects quoted names, and its constant
-GEP field splitting does not respect quoted commas. Global lookup and alias
+At baseline, all 225 readonly-table first failures referred to two quoted private
+integer arrays: 213 used `[4 x i64]`, and twelve used `[8 x i64]`. Their final
+GEPs already carried byte offsets. The shared address parser rejected quoted
+names, and its constant GEP field splitting did not respect quoted commas. Global lookup and alias
 closure must use the existing canonical identifier contract. ELF emission
 already has a shared decoder that retains escapes until the object boundary.
 
@@ -56,3 +59,14 @@ direct-call/returned-global identity. All 1,979 development units and 23 structu
 checks pass after this adapter correction.
 The diagnostic readonly-table negative now uses an unsupported 32-bit pointer
 layout because quoted names on the default 64-bit layout are admitted.
+
+Final acceptance selects 7,657 of 8,928 compiler definitions and 284 of 455
+runtime definitions, preserving every prior success. All 225 targeted table
+failures advance: 216 functions select and nine reach later limitations.
+Production replays and complete event audits agree with the census. Each full
+run preserves all 61 prior native populations and adds the quoted-symbol
+population, totaling 1,955,844 local and 977,922 reference observations.
+Units, structural checks, readiness, both input corpora, fixed programs, fault
+controls and preservation audits pass. The accepted record seals 1,057 files;
+no archives were created. See the [evidence](../evidence/quoted_symbol_addresses.md)
+and [receipt](../evidence/quoted_symbol_addresses_acceptance_20261108.json).
