@@ -54,6 +54,17 @@ Unit tests and storage tests do not require the patched sibling compiler,
 historical worktrees, or LLVM utilities. `zig build test` additionally runs the
 ABI integration gate and retains its external requirements.
 
+## Local experiments
+
+Use `scratch/` for local compiler experiments and their generated IR or assembly.
+The directory is ignored by Git. Preserve the original thirteen probes under the
+[retention policy](docs/retention_headroom_policy.md); ignoring them does not make
+them disposable.
+
+When a probe demonstrates a useful regression case, copy a minimal reproduction
+into the appropriate `test/` suite, add explicit assertions, and connect it to
+the existing test runner with a documented command. Keep the original probe intact.
+
 ## Compiler profiling
 
 For compiler performance investigations, use the [profiling guide](docs/compiler_profiling.md).
