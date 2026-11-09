@@ -70,7 +70,17 @@ pub fn validateRequest(
                 if (request.prepared_action) |action| if (action == .form_byte_address) {
                     const extent: u32 = switch (current) {
                         .stack128 => 16,
-                        .stack_i32_array => |array| if (array.len > 0 and array.len <= selector_types.max_stack_object_bytes / 4) array.len * 4 else return error.ValueUseUnsupportedAddressForm,
+                        .stack_i32_array => |array| blk: {
+                            if (array.len == 0 or array.len > selector_types.max_stack_frame_bytes / 4)
+                                return error.ValueUseUnsupportedAddressForm;
+                            const bytes = array.len * 4;
+                            if (bytes > selector_types.max_stack_object_bytes) {
+                                const frame_bytes = transaction.selector.stack_frame_bytes;
+                                if (array.base_disp > frame_bytes or bytes > frame_bytes - array.base_disp)
+                                    return error.ValueUseUnsupportedAddressForm;
+                            }
+                            break :blk bytes;
+                        },
                         else => return error.ValueUseUnsupportedAddressForm,
                     };
                     if (action.form_byte_address.offset != .constant or

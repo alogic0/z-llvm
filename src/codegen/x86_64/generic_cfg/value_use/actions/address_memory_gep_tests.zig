@@ -1,5 +1,40 @@
 const support = @import("../test_support.zig");
 
+test "large frame address authority requires the entire array to fit its allocated frame" {
+    for ([_]struct { bytes: u32, base: u32, words: u32, offset: i32, accepted: bool }{
+        .{ .bytes = 0, .base = 256, .words = 262144, .offset = 0, .accepted = false },
+        .{ .bytes = 1048831, .base = 256, .words = 262144, .offset = 0, .accepted = false },
+        .{ .bytes = 1048832, .base = 256, .words = 262144, .offset = 0, .accepted = true },
+        .{ .bytes = 1048832, .base = 256, .words = 262144, .offset = 1048576, .accepted = true },
+        .{ .bytes = 1048832, .base = 256, .words = 262144, .offset = 1048577, .accepted = false },
+        .{ .bytes = 8388608, .base = 8388609, .words = 262144, .offset = 0, .accepted = false },
+        .{ .bytes = 8388608, .base = 0, .words = 2097153, .offset = 0, .accepted = false },
+    }) |case| {
+        var machine = support.MachineFunction.init("large-frame-address-authority", .ptr);
+        defer machine.deinit(support.std.testing.allocator);
+        var plan = support.SelectorAllocationPlan.init(support.std.testing.allocator);
+        defer plan.deinit();
+        try support.addLive(&plan, "array");
+        var selector = support.ComposedBlockSelector.init(support.std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = case.bytes;
+        try support.selector_state.bindValueLoc(&selector, "array", .{ .stack_i32_array = .{ .base_disp = case.base, .len = case.words } });
+        var transaction = try support.Transaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try transaction.register(support.preparedRequest("array", .ptr, .stack_object, .stack_object_address, .{ .form_byte_address = .{
+            .result = try support.actionIdentity("pointer"),
+            .offset = .{ .constant = case.offset },
+        } }));
+        if (case.accepted) {
+            try transaction.seal();
+        } else {
+            try support.std.testing.expectError(error.ValueUseUnsupportedAddressForm, transaction.seal());
+        }
+        try support.std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
 const std = support.std;
 const ir = support.ir;
 const constant_table = support.constant_table;

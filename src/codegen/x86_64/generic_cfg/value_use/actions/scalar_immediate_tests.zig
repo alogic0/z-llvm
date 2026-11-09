@@ -786,7 +786,7 @@ test "value-use outer rollback frees a subordinate speculative spill key exactly
     selector.allocation_plan = &plan;
     selector.stack_frame_bytes = 128;
     try selector.spill_slots.ensureUnusedCapacity(1);
-    try selector.owned_spill_slot_keys.ensureUnusedCapacity(1);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(allocator, 1);
     try selector.values.ensureUnusedCapacity(2);
     try machine.instructions.ensureUnusedCapacity(allocator, 4);
     try selector_state.bindValueLoc(&selector, "source", .rax);

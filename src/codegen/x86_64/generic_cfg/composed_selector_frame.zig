@@ -73,7 +73,9 @@ const i32BitPattern = composed_helpers.i32BitPattern;
 const i64Value = composed_helpers.i64Value;
 
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
-const max_frame_bytes: u32 = 1024 * 1024;
+// Large compiler functions need multi-megabyte spill areas. This bounded limit
+// still fits signed x86 displacements; allocateFrame touches every crossed page.
+const max_frame_bytes: u32 = selector_types.max_stack_frame_bytes;
 
 pub fn allocaAlignment(attrs: ?[]const u8, natural_alignment: u32) ?u32 {
     const text = attrs orelse return natural_alignment;

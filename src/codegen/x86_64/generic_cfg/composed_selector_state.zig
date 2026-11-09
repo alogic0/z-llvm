@@ -594,7 +594,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     selector: *ComposedBlockSelector,
     instruction_len: usize,
     values: []ValueEntry,
-    spill_slots: []SpillSlotSnapshotEntry,
+    spill_slots: SpillSlotSnapshot,
     next_virtual_reg: usize,
     next_spill_slot: usize,
     accumulator_domain: AccumulatorDomain,
@@ -614,18 +614,13 @@ pub const AccumulatorDefinitionTransaction = struct {
     pub fn begin(selector: *ComposedBlockSelector) !AccumulatorDefinitionTransaction {
         const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
         errdefer selector.allocator.free(values);
-        const spill_slots = try selector.allocator.alloc(SpillSlotSnapshotEntry, selector.spill_slots.count());
-        errdefer selector.allocator.free(spill_slots);
+        const spill_slots = try captureSpillSlots(selector);
+        errdefer spill_slots.deinit(selector.allocator);
 
         var value_index: usize = 0;
         var value_it = selector.values.iterator();
         while (value_it.next()) |entry| : (value_index += 1)
             values[value_index] = .{ .name = entry.key_ptr.*, .binding = entry.value_ptr.* };
-        var spill_index: usize = 0;
-        var spill_it = selector.spill_slots.iterator();
-        while (spill_it.next()) |entry| : (spill_index += 1)
-            spill_slots[spill_index] = .{ .name = entry.key_ptr.*, .assignment = entry.value_ptr.* };
-
         return .{
             .selector = selector,
             .instruction_len = selector.machine.instructions.items.len,
@@ -643,7 +638,7 @@ pub const AccumulatorDefinitionTransaction = struct {
 
     pub fn deinit(transaction: *AccumulatorDefinitionTransaction) void {
         if (transaction.lifecycle == .active) transaction.restore(.rolled_back);
-        transaction.selector.allocator.free(transaction.spill_slots);
+        transaction.spill_slots.deinit(transaction.selector.allocator);
         transaction.selector.allocator.free(transaction.values);
     }
 
@@ -1129,7 +1124,10 @@ pub fn expireExpiredBindings(selector: *ComposedBlockSelector) !void {
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         const end = plan.intervalEnd(entry.key_ptr.*) orelse continue;
-        if (end < selector.current_position) selector.expired_binding_this_position = true;
+        if (end < selector.current_position) {
+            selector.expired_binding_this_position = true;
+            return;
+        }
     }
 }
 
@@ -1837,6 +1835,29 @@ pub const SpillSlotSnapshotEntry = struct {
     assignment: SpillSlotAssignment,
 };
 
+pub const SpillSlotSnapshot = struct {
+    owned_keys_len: usize,
+    // Production inserts only owned, immutable assignments. Explicitly seeded
+    // borrowed entries retain the complete snapshot contract used by callers.
+    entries: ?[]SpillSlotSnapshotEntry = null,
+
+    pub fn deinit(snapshot: SpillSlotSnapshot, allocator: std.mem.Allocator) void {
+        if (snapshot.entries) |entries| allocator.free(entries);
+    }
+};
+
+pub fn captureSpillSlots(selector: *ComposedBlockSelector) !SpillSlotSnapshot {
+    const owned_keys_len = selector.owned_spill_slot_keys.count();
+    if (owned_keys_len == selector.spill_slots.count()) return .{ .owned_keys_len = owned_keys_len };
+
+    const entries = try selector.allocator.alloc(SpillSlotSnapshotEntry, selector.spill_slots.count());
+    var spill_it = selector.spill_slots.iterator();
+    var index: usize = 0;
+    while (spill_it.next()) |entry| : (index += 1)
+        entries[index] = .{ .name = entry.key_ptr.*, .assignment = entry.value_ptr.* };
+    return .{ .owned_keys_len = owned_keys_len, .entries = entries };
+}
+
 fn insertOwnedSpillSlot(
     selector: *ComposedBlockSelector,
     lookup_name: []const u8,
@@ -1844,45 +1865,29 @@ fn insertOwnedSpillSlot(
 ) !void {
     std.debug.assert(selector.spill_slots.get(lookup_name) == null);
     try selector.spill_slots.ensureUnusedCapacity(1);
-    try selector.owned_spill_slot_keys.ensureUnusedCapacity(1);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(selector.allocator, 1);
     const owned_name = try selector.allocator.dupe(u8, lookup_name);
     errdefer selector.allocator.free(owned_name);
     selector.owned_spill_slot_keys.putAssumeCapacity(owned_name, owned_name);
     selector.spill_slots.putAssumeCapacity(owned_name, assignment);
 }
 
-fn snapshotContainsSpillSlot(
-    snapshot: []const SpillSlotSnapshotEntry,
-    name: []const u8,
-) bool {
-    for (snapshot) |entry| {
-        if (std.mem.eql(u8, entry.name, name)) return true;
-    }
-    return false;
-}
-
 pub fn restoreSpillSlots(
     selector: *ComposedBlockSelector,
-    snapshot: []const SpillSlotSnapshotEntry,
+    snapshot: SpillSlotSnapshot,
 ) void {
-    while (true) {
-        var speculative_name: ?[]const u8 = null;
-        var owned_it = selector.owned_spill_slot_keys.keyIterator();
-        while (owned_it.next()) |owned_name| {
-            if (!snapshotContainsSpillSlot(snapshot, owned_name.*)) {
-                speculative_name = owned_name.*;
-                break;
-            }
-        }
-        const name = speculative_name orelse break;
-        std.debug.assert(selector.spill_slots.remove(name));
-        const removed = selector.owned_spill_slot_keys.fetchRemove(name).?;
+    std.debug.assert(selector.owned_spill_slot_keys.count() >= snapshot.owned_keys_len);
+    while (selector.owned_spill_slot_keys.count() > snapshot.owned_keys_len) {
+        const removed = selector.owned_spill_slot_keys.pop().?;
+        const removed_from_spills = selector.spill_slots.remove(removed.key);
+        std.debug.assert(removed_from_spills);
         selector.allocator.free(removed.value);
     }
-
-    selector.spill_slots.clearRetainingCapacity();
-    for (snapshot) |entry|
-        selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+    if (snapshot.entries) |entries| {
+        selector.spill_slots.clearRetainingCapacity();
+        for (entries) |entry|
+            selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment);
+    }
 }
 
 pub fn allocateSpillSlot(selector: *ComposedBlockSelector, name: []const u8) ?FrameIndex {

@@ -516,7 +516,7 @@ test "selection census observes concrete frame rejection and preserves rollback"
     const text =
         \\define i64 @too_large(i64 %value) {
         \\entry:
-        \\  %buffer = alloca [262144 x i32], align 16
+        \\  %buffer = alloca [2097152 x i32], align 16
         \\  br label %exit
         \\exit:
         \\  ret i64 %value

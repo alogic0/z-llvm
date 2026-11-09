@@ -141,7 +141,7 @@ const PhiDestinationEntry = struct {
 const CoreSnapshot = struct {
     instruction_len: usize,
     values: []ValueEntry,
-    spill_slots: []SpillEntry,
+    spill_slots: selector_state.SpillSlotSnapshot,
     phi_destinations: []PhiDestinationEntry,
     next_virtual_reg: usize,
     next_spill_slot: usize,
@@ -161,8 +161,8 @@ const CoreSnapshot = struct {
     fn init(selector: *ComposedBlockSelector) !CoreSnapshot {
         const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
         errdefer selector.allocator.free(values);
-        const spill_slots = try selector.allocator.alloc(SpillEntry, selector.spill_slots.count());
-        errdefer selector.allocator.free(spill_slots);
+        const spill_slots = try selector_state.captureSpillSlots(selector);
+        errdefer spill_slots.deinit(selector.allocator);
         const phi_destinations = try selector.allocator.alloc(PhiDestinationEntry, selector.phi_destinations.count());
         errdefer selector.allocator.free(phi_destinations);
 
@@ -170,11 +170,6 @@ const CoreSnapshot = struct {
         var value_it = selector.values.iterator();
         while (value_it.next()) |entry| : (value_index += 1) {
             values[value_index] = .{ .name = entry.key_ptr.*, .binding = entry.value_ptr.* };
-        }
-        var spill_index: usize = 0;
-        var spill_it = selector.spill_slots.iterator();
-        while (spill_it.next()) |entry| : (spill_index += 1) {
-            spill_slots[spill_index] = .{ .name = entry.key_ptr.*, .assignment = entry.value_ptr.* };
         }
         var phi_index: usize = 0;
         var phi_it = selector.phi_destinations.iterator();
@@ -235,7 +230,7 @@ const CoreSnapshot = struct {
 
     fn deinit(snapshot: *CoreSnapshot, selector: *ComposedBlockSelector) void {
         selector.allocator.free(snapshot.phi_destinations);
-        selector.allocator.free(snapshot.spill_slots);
+        snapshot.spill_slots.deinit(selector.allocator);
         selector.allocator.free(snapshot.values);
     }
 };

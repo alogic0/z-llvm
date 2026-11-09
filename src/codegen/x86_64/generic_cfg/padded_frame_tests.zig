@@ -194,7 +194,8 @@ test "bounded frame address authority checks actual extent before emission and r
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 6 } }, .extent = 24 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 65 } }, .extent = 260 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 16384 } }, .extent = 65536 },
-        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 16385 } }, .extent = 0 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 16385 } }, .extent = 65540 },
+        .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = 262144 } }, .extent = 0 },
         .{ .location = .{ .stack_i32_array = .{ .base_disp = 32, .len = std.math.maxInt(u32) } }, .extent = 0 },
     };
     for (cases) |case| for (0..5) |boundary| {

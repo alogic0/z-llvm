@@ -2077,6 +2077,15 @@
       "functions": ["indirect_phi_integer_1", "indirect_phi_integer_2", "indirect_phi_integer_8", "indirect_phi_integer_16", "indirect_phi_integer_24", "indirect_phi_integer_32", "indirect_phi_integer_40", "indirect_phi_integer_56", "indirect_phi_integer_64", "indirect_phi_integer_65", "indirect_phi_integer_96", "indirect_phi_integer_128", "indirect_phi_floating_16", "indirect_phi_floating_32", "indirect_phi_floating_64", "indirect_phi_pointer_64", "indirect_phi_inactive_poison"],
       "observations": 2176,
       "stdout": "indirect-phi-slots observations=2176 targets=parallel=poison=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "large_frame",
+      "prefix": "large-frame",
+      "fixture": "large_frame",
+      "functions": ["large_frame_2m", "large_frame_4m", "large_frame_7m", "large_frame_probe"],
+      "observations": 64,
+      "guard_probe": true,
+      "stdout": "large-frame observations=64 objects=2m=4m=7m pages=clobbers=live=guards=preserved\n"
     }
   ]
 }

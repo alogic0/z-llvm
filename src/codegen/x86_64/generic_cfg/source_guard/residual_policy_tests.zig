@@ -192,6 +192,30 @@ test "composed selector source guard enforces the durable spill-key insertion bo
         error.SpillSlotRollbackOwnershipMissing,
         validateDurableSpillSlotOwnership("composed_selector_state.zig", missing_free),
     );
+
+    const lost_borrowed_state = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted_state,
+        "if (owned_keys_len == selector.spill_slots.count())",
+        "if (true)",
+    );
+    defer std.testing.allocator.free(lost_borrowed_state);
+    try std.testing.expectError(
+        error.SpillSlotSnapshotOwnershipMissing,
+        validateDurableSpillSlotOwnership("composed_selector_state.zig", lost_borrowed_state),
+    );
+
+    const wrong_prefix = try replaceOnceSentinel(
+        std.testing.allocator,
+        accepted_state,
+        "selector.owned_spill_slot_keys.count() > snapshot.owned_keys_len",
+        "selector.owned_spill_slot_keys.count() > 0",
+    );
+    defer std.testing.allocator.free(wrong_prefix);
+    try std.testing.expectError(
+        error.SpillSlotRollbackOwnershipMissing,
+        validateDurableSpillSlotOwnership("composed_selector_state.zig", wrong_prefix),
+    );
 }
 test "composed selector source guard rejects residual accumulator additions" {
     const source_name = "composed_selector_fixture.zig";

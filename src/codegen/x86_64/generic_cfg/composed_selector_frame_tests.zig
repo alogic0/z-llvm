@@ -274,6 +274,68 @@ test "generic cfg selector lays out mixed scalar and array frame objects" {
     try std.testing.expectEqual(x86_64_machine.Instruction{ .sub_rsp_imm32 = 296 }, machine.instructions.items[0]);
 }
 
+test "large frame probes every crossed page and preserves the exact final stack displacement" {
+    const allocator = std.testing.allocator;
+    for ([_]u32{ 262144, 1048576, 1835008, 2097082 }) |words| {
+        const ty = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{words});
+        defer allocator.free(ty);
+        var function = ir.Function.init("large-frame", .void);
+        defer function.deinit(allocator);
+        var entry = ir.BasicBlock.init("entry");
+        try entry.instructions.append(allocator, .{
+            .result = "array",
+            .kind = .{ .alloca = .{ .allocated_ty = .{ .aggregate = ty }, .attrs = "align 4" } },
+        });
+        entry.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+        try function.blocks.append(allocator, entry);
+        var machine = MachineFunction.init("large-frame", .void);
+        defer machine.deinit(allocator);
+        var selector = ComposedBlockSelector.init(allocator, &machine);
+        defer selector.deinit();
+        try std.testing.expect((try selector_frame.prepareStackFrame(&selector, function)) == null);
+        try std.testing.expect(selector.stack_frame_bytes > 1024 * 1024);
+        const array = selector_state.valueLoc(&selector, "array").?.stack_i32_array;
+        try std.testing.expectEqual(words, array.len);
+        try std.testing.expect(array.base_disp + 4 * words <= selector.stack_frame_bytes);
+        var displacement: u32 = 0;
+        var last_touch: u32 = 0;
+        for (machine.instructions.items) |instruction| switch (instruction) {
+            .sub_rsp_imm32 => |bytes| displacement += bytes,
+            .sub_rsp_imm8 => |bytes| displacement += bytes,
+            .push_imm32 => {
+                displacement += 8;
+                try std.testing.expect(displacement - last_touch <= 4096);
+                last_touch = displacement;
+            },
+            else => return error.UnexpectedFramePrologueInstruction,
+        };
+        try std.testing.expectEqual(selector.stack_frame_bytes, displacement);
+        try std.testing.expectEqual(displacement, last_touch);
+        try std.testing.expectEqual(@as(u32, 8), displacement % 16);
+    }
+}
+
+test "large frame resource bounds reject the first excessive array before emitting a prologue" {
+    const allocator = std.testing.allocator;
+    var function = ir.Function.init("excessive-frame", .void);
+    defer function.deinit(allocator);
+    var entry = ir.BasicBlock.init("entry");
+    try entry.instructions.append(allocator, .{
+        .result = "array",
+        .kind = .{ .alloca = .{ .allocated_ty = .{ .aggregate = "[2097083 x i32]" }, .attrs = "align 4" } },
+    });
+    entry.terminator = .{ .ret = .{ .ty = .void, .value = null } };
+    try function.blocks.append(allocator, entry);
+    var machine = MachineFunction.init("excessive-frame", .void);
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    const diagnostic = (try selector_frame.prepareStackFrame(&selector, function)).?;
+    try std.testing.expectEqualStrings("composed-block-stack-frame-limit", diagnostic.no_spill_envelope);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(u32, 0), selector.stack_frame_bytes);
+}
+
 test "generic cfg selector keeps scalar allocas disjoint from emergency FP spills" {
     const input =
         \\define void @preserve_f32_across_local_store(float %value, ptr %out) {

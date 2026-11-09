@@ -50,9 +50,9 @@ pub fn validateEflagsEmissionAuthority(name: []const u8, source: []const u8) !vo
 
     const markers = [_][]const u8{
         ".cmp_",        ".test_", ".setb_eax", ".seta_eax", ".sete_eax", ".setg_eax", ".setl_eax", ".setne_eax", ".setbe_eax",
-        ".binary_arg_", ".imul_", ".mul_rax",  ".xor_edx",  ".div_arg",  ".add_",     ".sub_",     ".shl_",
-        ".shr_",        ".sar_",  ".and_",     ".or_",      ".adc_",     ".sbb_",     ".je ",      ".jne ",
-        ".jo ",         ".jc ",   ".jp ",      ".js ",      ".jae ",     ".jle ",
+        ".binary_arg_", ".imul_", ".mul_rax",  ".xor_edx",  ".div_arg",  ".add_",     ".sub_",     ".shl_",      ".shr_",
+        ".sar_",        ".and_",  ".or_",      ".adc_",     ".sbb_",     ".je ",      ".jne ",     ".jo ",       ".jc ",
+        ".jp ",         ".js ",   ".jae ",     ".jle ",
     };
     inline for (markers) |marker| {
         var search_from: usize = 0;
@@ -105,11 +105,11 @@ pub fn validateDurableSpillSlotOwnership(
         if (std.mem.eql(u8, name, "composed_selector_state_data.zig")) {
             if (std.mem.indexOf(u8, source, "spill_slots:") == null) return;
             const required = [_][]const u8{
-                "owned_spill_slot_keys: std.StringHashMap([]u8),",
-                ".owned_spill_slot_keys = std.StringHashMap([]u8).init(allocator),",
-                "selector.owned_spill_slot_keys.valueIterator()",
-                "selector.allocator.free(owned_key.*);",
-                "selector.owned_spill_slot_keys.deinit();",
+                "owned_spill_slot_keys: std.array_hash_map.String([]u8),",
+                ".owned_spill_slot_keys = .empty,",
+                "selector.owned_spill_slot_keys.keys()",
+                "selector.allocator.free(owned_key);",
+                "selector.owned_spill_slot_keys.deinit(selector.allocator);",
             };
             for (required) |pattern| {
                 if (countPattern(source, pattern) != 1)
@@ -128,7 +128,7 @@ pub fn validateDurableSpillSlotOwnership(
     const ordered_insert = [_][]const u8{
         "selector.spill_slots.get(lookup_name) == null",
         "selector.spill_slots.ensureUnusedCapacity(1)",
-        "selector.owned_spill_slot_keys.ensureUnusedCapacity(1)",
+        "selector.owned_spill_slot_keys.ensureUnusedCapacity(selector.allocator, 1)",
         "selector.allocator.dupe(u8, lookup_name)",
         "selector.owned_spill_slot_keys.putAssumeCapacity(owned_name, owned_name)",
         "selector.spill_slots.putAssumeCapacity(owned_name, assignment)",
@@ -150,10 +150,11 @@ pub fn validateDurableSpillSlotOwnership(
         return error.SpillSlotRollbackOwnershipMissing;
     const restore = source[restore_body.start..restore_body.end];
     const ordered_restore = [_][]const u8{
-        "snapshotContainsSpillSlot(snapshot, owned_name.*)",
-        "selector.spill_slots.remove(name)",
-        "selector.owned_spill_slot_keys.fetchRemove(name)",
+        "selector.owned_spill_slot_keys.count() > snapshot.owned_keys_len",
+        "selector.owned_spill_slot_keys.pop().?",
+        "selector.spill_slots.remove(removed.key)",
         "selector.allocator.free(removed.value)",
+        "if (snapshot.entries) |entries|",
         "selector.spill_slots.clearRetainingCapacity()",
         "selector.spill_slots.putAssumeCapacity(entry.name, entry.assignment)",
     };
@@ -161,6 +162,24 @@ pub fn validateDurableSpillSlotOwnership(
     for (ordered_restore) |pattern| {
         const found = std.mem.indexOfPos(u8, restore, cursor, pattern) orelse
             return error.SpillSlotRollbackOwnershipMissing;
+        cursor = found + pattern.len;
+    }
+
+    const capture_body = functionBodyNamed(bodies, "captureSpillSlots") orelse
+        return error.SpillSlotSnapshotOwnershipMissing;
+    const capture = source[capture_body.start..capture_body.end];
+    const ordered_capture = [_][]const u8{
+        "const owned_keys_len = selector.owned_spill_slot_keys.count()",
+        "if (owned_keys_len == selector.spill_slots.count()) return .{ .owned_keys_len = owned_keys_len }",
+        "selector.allocator.alloc(SpillSlotSnapshotEntry, selector.spill_slots.count())",
+        "selector.spill_slots.iterator()",
+        "entries[index] = .{ .name = entry.key_ptr.*, .assignment = entry.value_ptr.* }",
+        "return .{ .owned_keys_len = owned_keys_len, .entries = entries }",
+    };
+    cursor = 0;
+    for (ordered_capture) |pattern| {
+        const found = std.mem.indexOfPos(u8, capture, cursor, pattern) orelse
+            return error.SpillSlotSnapshotOwnershipMissing;
         cursor = found + pattern.len;
     }
 

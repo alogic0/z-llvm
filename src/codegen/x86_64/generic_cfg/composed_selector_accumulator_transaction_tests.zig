@@ -716,7 +716,7 @@ test "spill-slot insertion owns transient keys and duplicate lookup allocates no
     var selector = ComposedBlockSelector.init(allocator, &machine);
     defer selector.deinit();
     try selector.spill_slots.ensureUnusedCapacity(80);
-    try selector.owned_spill_slot_keys.ensureUnusedCapacity(80);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(allocator, 80);
 
     var transient = [_]u8{ 't', 'r', 'a', 'n', 's', 'i', 'e', 'n', 't' };
     const allocations_before_insert = failing.allocations;
@@ -753,7 +753,7 @@ test "accumulator rollback frees only speculative owned spill keys" {
     selector.current_position = 1;
     selector.stack_frame_bytes = 64;
     try selector.spill_slots.ensureUnusedCapacity(1);
-    try selector.owned_spill_slot_keys.ensureUnusedCapacity(1);
+    try selector.owned_spill_slot_keys.ensureUnusedCapacity(allocator, 1);
     try selector.values.ensureUnusedCapacity(1);
     try machine.instructions.ensureUnusedCapacity(allocator, 1);
     try state.bindValueLoc(&selector, "source", .rax);
@@ -778,4 +778,108 @@ test "accumulator rollback frees only speculative owned spill keys" {
     try std.testing.expectEqual(@as(usize, 0), selector.owned_spill_slot_keys.count());
     try std.testing.expectEqual(ValueLoc.rax, selector.values.get("source").?.loc);
     after_insert.deinit();
+}
+
+test "spill journal checkpoints allocate nothing regardless of retained history" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init("spill-history", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    for (0..4096) |index| {
+        var storage: [32]u8 = undefined;
+        const name = try std.fmt.bufPrint(&storage, "retained-{d}", .{index});
+        try std.testing.expect(state.allocateSpillSlot(&selector, name) != null);
+    }
+    const allocations = failing.allocations;
+    failing.fail_index = failing.alloc_index;
+    const snapshot = try state.captureSpillSlots(&selector);
+    defer snapshot.deinit(allocator);
+    try std.testing.expect(snapshot.entries == null);
+    try std.testing.expectEqual(@as(usize, 4096), snapshot.owned_keys_len);
+    state.restoreSpillSlots(&selector, snapshot);
+    try std.testing.expectEqual(allocations, failing.allocations);
+    try std.testing.expectEqual(@as(usize, 4096), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.get("retained-0").?.base);
+    try std.testing.expectEqual(@as(usize, 4095), selector.spill_slots.get("retained-4095").?.base);
+}
+
+test "spill journal nested rollback retains the exact owned prefix through rehashes" {
+    const allocator = std.testing.allocator;
+    var machine = MachineFunction.init("spill-nested", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    const retained = state.allocatePairSpillSlots(&selector, "retained-pair").?;
+    var outer = try AccumulatorDefinitionTransaction.begin(&selector);
+    defer outer.deinit();
+    try std.testing.expect(state.allocateSpillSlot(&selector, "outer-value") != null);
+    var inner = try AccumulatorDefinitionTransaction.begin(&selector);
+    defer inner.deinit();
+    for (0..128) |index| {
+        var storage: [32]u8 = undefined;
+        const name = try std.fmt.bufPrint(&storage, "inner-{d}", .{index});
+        try std.testing.expect(state.allocatePairSpillSlots(&selector, name) != null);
+    }
+    try inner.rollback();
+    try std.testing.expectEqual(@as(usize, 2), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 3), selector.next_spill_slot);
+    try std.testing.expect(selector.spill_slots.get("outer-value") != null);
+    try std.testing.expect(state.allocateSpillSlot(&selector, "after-inner") != null);
+    try outer.rollback();
+    try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 2), selector.next_spill_slot);
+    try std.testing.expectEqual(retained, state.allocatePairSpillSlots(&selector, "retained-pair").?);
+    try std.testing.expectEqualStrings("retained-pair", selector.owned_spill_slot_keys.keys()[0]);
+}
+
+test "spill journal preserves complete snapshots for explicitly seeded borrowed assignments" {
+    const allocator = std.testing.allocator;
+    var machine = MachineFunction.init("spill-borrowed", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    try selector.spill_slots.put("borrowed", .{ .base = 0, .slots = 1 });
+    selector.next_spill_slot = 1;
+    try std.testing.expect(state.allocatePairSpillSlots(&selector, "owned") != null);
+    var transaction = try AccumulatorDefinitionTransaction.begin(&selector);
+    defer transaction.deinit();
+    try std.testing.expect(transaction.spill_slots.entries != null);
+    try selector.spill_slots.put("borrowed", .{ .base = 999, .slots = 2 });
+    try std.testing.expect(state.allocateSpillSlot(&selector, "speculative") != null);
+    try transaction.rollback();
+    try std.testing.expectEqual(@as(usize, 2), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 1), selector.owned_spill_slot_keys.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.get("borrowed").?.base);
+    try std.testing.expectEqual(@as(usize, 1), selector.spill_slots.get("borrowed").?.slots);
+    try std.testing.expectEqual(@as(usize, 3), selector.next_spill_slot);
+}
+
+fn checkSpillJournalAllocationFailures(allocator: std.mem.Allocator) !void {
+    var machine = MachineFunction.init("spill-allocation-failures", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    var transaction = try AccumulatorDefinitionTransaction.begin(&selector);
+    defer transaction.deinit();
+    for (0..40) |index| {
+        var storage: [32]u8 = undefined;
+        const name = try std.fmt.bufPrint(&storage, "owned-{d}", .{index});
+        const count = selector.spill_slots.count();
+        if (state.allocatePairSpillSlots(&selector, name) == null) {
+            try std.testing.expectEqual(count, selector.spill_slots.count());
+            try std.testing.expectEqual(count, selector.owned_spill_slot_keys.count());
+            try std.testing.expectEqual(2 * count, selector.next_spill_slot);
+            return error.OutOfMemory;
+        }
+    }
+    try transaction.rollback();
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.owned_spill_slot_keys.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.next_spill_slot);
+}
+
+test "spill journal handles every allocation failure without a partial insertion or leaked key" {
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, checkSpillJournalAllocationFailures, .{});
 }

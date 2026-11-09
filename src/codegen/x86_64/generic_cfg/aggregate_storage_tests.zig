@@ -204,7 +204,7 @@ test "bounded storage rejects huge frame arithmetic and unsupported stack alignm
     try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32)) == null);
     try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32) - 7) == null);
     for ([_][]const u8{
-        "[262144 x i32], align 4", "[1073741823 x i32], align 4", "[4294967295 x i32], align 4", "i64, align 8192", "[1 x i32], align 2147483648",
+        "[2097152 x i32], align 4", "[1073741823 x i32], align 4", "[4294967295 x i32], align 4", "i64, align 8192", "[1 x i32], align 2147483648",
     }) |allocation| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define i32 @large() {{\nentry:\n  %slot = alloca {s}\n  store i32 7, ptr %slot\n  ret i32 7\n}}\n", .{allocation});
         defer std.testing.allocator.free(text);
@@ -477,7 +477,7 @@ test "stack address values retain allocation admission and reject unsupported la
             1 => alloca.attrs = "align 8, inalloca",
             2 => alloca.count = .{ .ty = .{ .int = 64 }, .value = .{ .int = 2 } },
             3 => alloca.allocated_ty_addrspace = "1",
-            4 => alloca.allocated_ty = .{ .aggregate = "[16385 x i32]" },
+            4 => alloca.allocated_ty = .{ .aggregate = "[2097153 x i32]" },
             5 => context.target_datalayout = "E-p:64:64",
             else => unreachable,
         }
@@ -485,5 +485,66 @@ test "stack address values retain allocation admission and reject unsupported la
         defer arena.deinit();
         try std.testing.expect(try addresses.legalize(arena.allocator(), module.functions.items[0], &context) == null);
         try std.testing.expectEqualStrings("slot", module.functions.items[0].blocks.items[0].instructions.items[0].result.?);
+    }
+}
+
+test "large native i32 frame address views preserve source ownership and remain idempotent" {
+    const addresses = @import("stack_addresses.zig");
+    for ([_]u32{ 16385, 262144, 1835008 }) |words| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare void @observe(ptr)
+            \\define void @large() {{
+            \\entry:
+            \\ %slot = alloca [{d} x i32], align 16
+            \\ call void @observe(ptr %slot)
+            \\ ret void
+            \\}}
+        , .{words});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try addresses.legalize(arena.allocator(), module.functions.items[0], null)).?;
+        try std.testing.expect(try addresses.legalize(arena.allocator(), view, null) == null);
+        try std.testing.expectEqualStrings("slot", module.functions.items[0].blocks.items[0].instructions.items[0].result.?);
+        try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].blocks.items[0].instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 3), view.blocks.items[0].instructions.items.len);
+        var private_module = module;
+        private_module.functions = try module.functions.clone(arena.allocator());
+        private_module.functions.items[0] = view;
+        try private_module.verify();
+        try module.verify();
+    }
+}
+
+test "large frame views keep aggregate object limits and non-native layouts closed" {
+    const addresses = @import("stack_addresses.zig");
+    for ([_]struct { ty: []const u8, layout: ?[]const u8 }{
+        .{ .ty = "[2097153 x i32]", .layout = null },
+        .{ .ty = "[2147483647 x i32]", .layout = null },
+        .{ .ty = "[1048576 x i8]", .layout = null },
+        .{ .ty = "{ [262144 x i32] }", .layout = null },
+        .{ .ty = "[262144 x i32]", .layout = "E-p:64:64" },
+        .{ .ty = "[262144 x i32]", .layout = "e-p:32:32" },
+        .{ .ty = "[262144 x i32]", .layout = "e-i32:64" },
+    }) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare void @observe(ptr)
+            \\define void @large() {{
+            \\entry:
+            \\ %slot = alloca {s}, align 16
+            \\ call void @observe(ptr %slot)
+            \\ ret void
+            \\}}
+        , .{case.ty});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = case.layout };
+        try std.testing.expect(try addresses.legalize(arena.allocator(), module.functions.items[0], &context) == null);
+        try module.verify();
     }
 }

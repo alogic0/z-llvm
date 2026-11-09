@@ -7,6 +7,8 @@ pub const FrameIndex = x86_64_types.FrameIndex;
 pub const XmmReg = x86_64_types.XmmReg;
 /// Maximum byte-addressed stack object admitted by the storage view/authority.
 pub const max_stack_object_bytes: u32 = 64 * 1024;
+/// Total private frame capacity, including spills, objects and call storage.
+pub const max_stack_frame_bytes: u32 = 8 * 1024 * 1024;
 
 pub const RegPair = struct {
     lo: ArgReg,
@@ -318,5 +320,5 @@ pub fn argRegIndex(reg: ArgReg) usize {
 }
 
 pub fn xmmRegIndex(reg: XmmReg) usize {
-    return @intFromEnum(reg);
+    return @backingInt(reg);
 }

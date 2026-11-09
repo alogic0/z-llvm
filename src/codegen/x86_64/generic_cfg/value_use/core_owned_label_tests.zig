@@ -10,6 +10,35 @@ const selector_state = support.selector_state;
 const selector_scalar = support.selector_scalar;
 const stage2_planning = support.stage2_planning;
 const value_use = support.value_use;
+
+test "value-use spill checkpoint avoids copying retained history and restores subordinate insertions" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = support.MachineFunction.init("value-use-spill-history", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = support.ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    for (0..1024) |index| {
+        var storage: [32]u8 = undefined;
+        const name = try std.fmt.bufPrint(&storage, "retained-{d}", .{index});
+        try std.testing.expect(selector_state.allocateSpillSlot(&selector, name) != null);
+    }
+    const allocations = failing.allocations;
+    failing.fail_index = failing.alloc_index;
+    var transaction = try support.Transaction.begin(&selector);
+    defer transaction.deinit();
+    try std.testing.expectEqual(allocations, failing.allocations);
+    failing.fail_index = std.math.maxInt(usize);
+    try std.testing.expect(selector_state.allocatePairSpillSlots(&selector, "speculative-pair") != null);
+    try std.testing.expect(selector_state.allocateSpillSlot(&selector, "speculative-scalar") != null);
+    try transaction.rollback();
+    try std.testing.expectEqual(@as(usize, 1024), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 1024), selector.owned_spill_slot_keys.count());
+    try std.testing.expectEqual(@as(usize, 1024), selector.next_spill_slot);
+    try std.testing.expectEqual(@as(usize, 1023), selector.spill_slots.get("retained-1023").?.base);
+    try std.testing.expect(selector.spill_slots.get("speculative-pair") == null);
+    try std.testing.expect(selector.spill_slots.get("speculative-scalar") == null);
+}
 const ComposedBlockSelector = support.ComposedBlockSelector;
 const MachineFunction = support.MachineFunction;
 const SelectorAllocationPlan = support.SelectorAllocationPlan;

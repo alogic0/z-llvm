@@ -6,6 +6,20 @@ const machine = @import("../machine.zig");
 const storage = @import("storage_layout.zig");
 const helpers = @import("composed_helpers.zig");
 const forms = @import("scalar_forms.zig");
+const selector_types = @import("selector_types.zig");
+
+// Native i32 array carriers already have exact frame ownership. Permit their
+// scalar address views up to the total frame bound, without broadening the
+// general aggregate layout contract. Non-native i32 layouts remain closed.
+fn slotLayout(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) ?storage.Layout {
+    if (storage.query(context, ty)) |layout| return layout;
+    const count = helpers.parseI32ArrayType(ty) orelse return null;
+    const word = storage.query(context, .{ .int = 32 }) orelse return null;
+    if (word.bytes != 4 or word.alignment != 4) return null;
+    const bytes = std.math.mul(u32, count, 4) catch return null;
+    if (bytes > selector_types.max_stack_frame_bytes) return null;
+    return .{ .bytes = bytes, .alignment = 4 };
+}
 
 const Use = struct { bytes: u32, scalar: bool = false, bounded: bool = true };
 const Uses = std.HashMap([]const u8, Use, ir.identifiers.Context, std.hash_map.default_max_load_percentage);
@@ -123,7 +137,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         if (inst.removed or inst.result == null or inst.kind != .alloca) continue;
         const ty = inst.kind.alloca.allocated_ty;
         if (ty == .aggregate and helpers.parseI32ArrayType(ty) == null) continue;
-        const layout = storage.query(context, ty) orelse continue;
+        const layout = slotLayout(context, ty) orelse continue;
         try uses.put(inst.result.?, .{ .bytes = layout.bytes });
     };
     if (uses.count() == 0) return null;
@@ -137,7 +151,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         // Aggregate allocation admission belongs to padded_frame. Only its
         // concrete array carrier and native scalar objects enter this view.
         if (alloca.allocated_ty == .aggregate and helpers.parseI32ArrayType(alloca.allocated_ty) == null) continue;
-        const layout = storage.query(context, alloca.allocated_ty) orelse continue;
+        const layout = slotLayout(context, alloca.allocated_ty) orelse continue;
         const usage = uses.get(inst.result.?) orelse continue;
         if (!usage.scalar) continue;
         if (!usage.bounded) return null;
