@@ -4697,6 +4697,24 @@ One line per completed cycle, append-only, newest last. This is the
   objective with 758 remaining failures. Evidence:
   `docs/evidence/call_values_pointer_promises_acceptance_20261109.json`.
 
+- **2026-11-09 — Integer vector graph checkpoint accepted** (`d06659d1`):
+  complete original compiler census and production replay select 8,422/8,928,
+  adding 252 without losing a preceding selection. Runtime retains 285/455.
+  Exact mask bitcasts, stable lane PHIs, wider integer/pointer lanes, freeze,
+  repacking and closed intrinsic expansion use shared typed scalar machinery.
+  The R01 pressure fallback preserves live aliases and transaction rollback.
+  All 17 gates and 69 native populations pass, preserving the preceding 67;
+  2,087,940 local observations and 1,043,970 references are recorded.
+  Debug/ReleaseSafe each pass 2,004 units and 24 structural checks; readiness,
+  both corpora, fifteen fixed program/mode pairs and all 54 fault controls pass.
+  All 36 core selected objects, descriptors, observations and linked/reference
+  sizes match. Executable metadata and changed Zig instruction/spill counters
+  are reviewed separately; selected identities and owners are preserved.
+  The 100-row prefix, twelve-function cohort and ratchet 130 remain unchanged.
+  A 1,593-artifact seal retains the proof. Continue the all-8,928 goal with
+  506 remaining failures. Evidence:
+  `docs/evidence/integer_vector_graphs_acceptance_20261109.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4704,7 +4722,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `636816def582b8bd28fc23f6191363dc975235db`; tree: `f38cdf6393ea2b84816a97849dfec0d9494d0841`.
+Accepted revision: `d06659d1d1e256edc4148f4b3c44770136daa6a0`; tree: `33aa089ed5ee52b201db58579e6785bfe88460c6`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

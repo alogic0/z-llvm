@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `636816def582b8bd28fc23f6191363dc975235db`; tree: `f38cdf6393ea2b84816a97849dfec0d9494d0841`.
+Accepted revision: `d06659d1d1e256edc4148f4b3c44770136daa6a0`; tree: `33aa089ed5ee52b201db58579e6785bfe88460c6`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,27 +31,35 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [call values and pointer-promises checkpoint](evidence/call_values_pointer_promises.md)
-is accepted at `636816de`. Compiler selection reaches **8,170/8,928**, adding
-227 without losing any preceding selection. Runtime retains **285/455**.
+The [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
+is accepted at `d06659d1`. Compiler selection reaches **8,422/8,928**, adding
+252 without losing any preceding selection. Runtime retains **285/455**.
 Both complete production replays match their censuses and pass event audits.
 The [all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains
-active with 758 failures and authorizes continued implementation.
+active with 506 failures and authorizes continued implementation.
 
-All 17 integration gates and 67 native populations pass, preserving all 66
-preceding populations. Debug/ReleaseSafe each pass 1,999 units and 24 structural
-checks; all nine readiness commands pass. The suite records 2,067,972 local
-observations against 1,033,986 references. Both input corpora, all five fixed
+All 17 integration gates and 69 native populations pass, preserving all 67
+preceding populations. Debug/ReleaseSafe each pass 2,004 units and 24 structural
+checks; all nine readiness commands pass. The suite records 2,087,940 local
+observations against 1,043,970 references. Both input corpora, all five fixed
 programs and all 54 core fault controls pass. All 36 core selected objects,
 observation fields and linked/reference sizes match; wrapper hashes are reviewed
 separately. The 100-row prefix, twelve-function cohort and ratchet 130 remain
-unchanged. The raw seal retains 648 artifacts.
+unchanged. The raw seal retains 1,593 artifacts. Zig corpus selected identities
+and owners match; instruction/spill counters change in 19/17/19 functions across
+Fast/Safe/Small and are recorded separately.
 
-Private undefined call arguments become concrete zero/null before ABI widening.
-Validated pointer capture, readnone and initialization promises retain their
-source facts without changing machine ABI. Next work follows vector mask
-bitcasts and the remaining memory, storage, CFG, identity and FP limits.
+Private vector graphs preserve source signatures while expanding exact mask
+bitcasts, forward PHIs, widened lanes, pointer lanes, freeze and closed scalar
+intrinsics. The typed shift fallback preserves aliases under register pressure.
+Next work follows runtime storage copies, exact-width memory accesses, undefined
+select arms, larger CFGs, aggregate/indirect PHIs, owned identities and FP/ABI limits.
 Selection does not establish whole-compiler objects, startup or self-rebuild.
+
+The preceding [call values and pointer-promises checkpoint](evidence/call_values_pointer_promises.md)
+at `636816de` selected **8,170/8,928**, adding 227 without lost successes.
+Runtime retained **285/455**. All 17 gates and 67 native populations passed.
+Its vector recommendations are advanced by the checkpoint above.
 
 The preceding [comparison and pointer-freeze checkpoint](evidence/scalar_comparisons_pointer_freeze.md)
 is accepted at `9ba5e61c`. Compiler selection reaches **7,943/8,928**, adding

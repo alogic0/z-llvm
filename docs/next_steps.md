@@ -4,32 +4,29 @@ Continue until **all 8,928 definitions** in the unchanged original compiler
 input select. The user's [complete-selection plan](plans/2026-11-08-complete-compiler-selection.md)
 authorizes the successive necessary groups without further per-slice permission.
 
-The [call values and pointer-promises checkpoint](evidence/call_values_pointer_promises.md)
-is accepted at `636816de`: **8,170/8,928**, adding 227 selections with no lost
+The [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
+is accepted at `d06659d1`: **8,422/8,928**, adding 252 selections with no lost
 successes. Runtime retains **285/455**. Both complete production replays match
 their censuses and pass event audits.
-[Acceptance record](evidence/call_values_pointer_promises_acceptance_20261109.json).
+[Acceptance record](evidence/integer_vector_graphs_acceptance_20261109.json).
 
-All 17 serial integration gates and 67 native populations pass, preserving
-all 66 preceding populations. Debug and ReleaseSafe each pass 1,999 units
+All 17 serial integration gates and 69 native populations pass, preserving
+all 67 preceding populations. Debug and ReleaseSafe each pass 2,004 units
 and 24 structural checks; all nine readiness commands pass. The suite records
-2,067,972 local observations against 1,033,986 references. Five fixed programs,
+2,087,940 local observations against 1,043,970 references. Five fixed programs,
 both input corpora, and all 54 core fault controls pass. All 36 core selected
 objects, behavioral records and linked/reference sizes match. Executable hashes
-are reviewed separately. The 648-artifact seal is retained.
+are reviewed separately. The 1,593-artifact seal is retained. Zig selected
+identities and owners match; instruction/spill counter changes are recorded.
 
-The remaining **758 failures** are still authorized work. Next:
+The remaining **506 failures** are still authorized work. Next:
 
-1. Extend integer-vector lane expansion for exact-width vector/scalar bitcasts.
-   The 169 mask first failures include `<16 x i1>` to i16 casts. Preserve the
-   public ABI, exact lane bit positions and complete private SSA graphs.
-2. Continue through vector PHIs, explicit undefined lanes, pointer lanes and
-   wider internal vectors. Separate per-lane limits from scalar packing and ABI
-   limits; original internal vectors reach sixteen i128 lanes.
-3. Repair exact-byte non-native integer memory accesses, general storage views
+1. Repair exact-byte non-native integer memory accesses, general storage views
    with runtime copies, and undefined select arms. Keep guards, source ownership
    and unsupported barrier/address-space boundaries explicit.
-4. Continue through wider ABI carriers, aggregate/indirect PHIs, large CFGs,
+   Of 128 allocation-first failures (including five variadic diagnostics),
+   91 use named copy lengths outside the currently resolved literal forms.
+2. Continue through wider ABI carriers, aggregate/indirect PHIs, large CFGs,
    long owned identities and FP limits as observed.
    Original rejected functions include 60 CFGs over 1,024 blocks, with a
    maximum of 20,976; quoted block labels reach 406 bytes. Read-only inspection
@@ -42,7 +39,7 @@ tiers, including immediate Tier 3 for correctness or shared ABI/frame changes.
 Keep this checkpoint authoritative until the next cumulative acceptance.
 
 Raw batch evidence is sealed under
-`local-state/validations/compiler-selection-completion-20261108/batch-02/`;
+`local-state/validations/compiler-selection-completion-20261108/batch-03/`;
 ongoing notes and read-only classifications are in its parent. Preserve the
 100-row prefix, twelve-function core cohort, ratchet 130, every execution
 population, original inputs, prior evidence, AIR payloads, and thirteen scratch
@@ -54,6 +51,11 @@ when producer identities match. Create no archives. See the
 [headroom policy](retention_headroom_policy.md#headroom).
 
 ## Preceding checkpoints
+
+The [call values and pointer-promises checkpoint](evidence/call_values_pointer_promises.md)
+at `636816de` selected 8,170 compiler and 285 runtime definitions, with all 17
+gates and 67 native populations passing. Its vector recommendations are
+advanced by the checkpoint above.
 
 The [comparison and pointer-freeze checkpoint](evidence/scalar_comparisons_pointer_freeze.md)
 at `9ba5e61c` selected 7,943 compiler and 285 runtime definitions, with all 17

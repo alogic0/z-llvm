@@ -63,8 +63,19 @@ pass, preserving the preceding 66, and the twelve-function new call population
 passes both routes and all modes with frozen Debug/Fast builds. See the
 [accepted evidence](../evidence/call_values_pointer_promises.md).
 
-The objective remains active with 758 failures. Continue with vector/scalar
-bitcasts, then the later observed limits. The retained read-only inventory identifies
+The third checkpoint is accepted at `d06659d1`: exact vector/scalar bitcasts,
+stable lane PHIs, wider internal integer and pointer vectors, scalar freeze and
+closed lane intrinsics, with preserving typed shifts under register pressure.
+Compiler census and production replay select 8,422/8,928, adding 252 without
+lost successes; runtime retains 285/455. Debug/ReleaseSafe each pass 2,004 units
+and 24 structural checks. All nine readiness commands and 17 integration gates
+pass. All 69 native populations pass and preserve the preceding 67. Both new
+populations pass both routes and all modes with frozen Debug/Fast builds.
+See the [accepted evidence](../evidence/integer_vector_graphs.md).
+
+The objective remains active with 506 failures. Continue with runtime storage
+copies, exact-byte integer memory and undefined select arms, then the later
+observed limits. The retained read-only inventory identifies
 60 rejected original CFGs exceeding 1,024 blocks, internal vector expansions,
 FP storage/ABI limits, and long labels. These are work groups under the existing
 authorization, not new permission boundaries.
