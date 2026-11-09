@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "checked_multiply",
+      "prefix": "checked-multiply",
+      "fixture": "checked_multiply",
+      "functions": ["checked_select24", "checked_binary40", "checked_rhs_high", "checked_spill_high", "checked_signed120", "checked_alias56", "checked_calls48", "checked_phi12"],
+      "observations": 2048,
+      "stdout": "checked-multiply observations=2048 literals=overflow=aliases=calls=phis=guards=preserved\n"
+    },
+    {
       "population": "quoted_symbols",
       "codegen_args": ["--codegen-reachable"],
       "prefix": "quoted-symbols",

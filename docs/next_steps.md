@@ -1,5 +1,11 @@
 # Active direction
 
+The [checked-multiply operand slice](plans/2026-11-08-checked-multiply-operands.md)
+is implemented and under validation. Debug and ReleaseSafe each pass 1,983
+units and 23 structural checks; the new eight-function native population passes
+all modes with the Debug compiler. Complete compiler replay and cumulative
+Tier-3 acceptance remain pending. The accepted baseline below is unchanged.
+
 The [quoted-symbol plan](plans/2026-11-08-quoted-symbol-addresses.md) is complete
 and accepted at `a9e9c0f1`, following `b51fc4aa`. Compiler selection is
 **7,657/8,928**, with 216 additions and no lost successes; runtime remains
