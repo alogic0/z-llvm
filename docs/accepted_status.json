@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "5d71dc80300b997717563c6e2f20bfc2da42394f",
-  "accepted_tree": "39786e6b79ac0e954ff1ab5b78ca0dc6f8c36e84",
+  "accepted_revision": "bb74a371b7b84c023da8356ef4d7a13da3b7ca35",
+  "accepted_tree": "6efce2b146f61893661aedd10963e93328d05122",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "5d71dc80",
+  "declaration_revision": "bb74a371",
   "evidence": [
+    "docs/evidence/scalable_cfg_indirect_phi_acceptance_20261109.json",
+    "docs/evidence/scalable_cfg_indirect_phi.md",
     "docs/evidence/runtime_integer_storage_acceptance_20261109.json",
     "docs/evidence/runtime_integer_storage.md",
     "docs/evidence/integer_vector_graphs_acceptance_20261109.json",

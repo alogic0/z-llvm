@@ -4733,6 +4733,23 @@ One line per completed cycle, append-only, newest last. This is the
   376 remaining failures. Evidence:
   `docs/evidence/runtime_integer_storage_acceptance_20261109.json`.
 
+- **2026-11-09 — Scalable CFG checkpoint accepted** (`bb74a371`):
+  complete compiler census and independent production replay select 8,664/8,928,
+  adding 112 with no lost successes. Runtime retains 285/455. Canonical graph
+  indexes, complete successor liveness, private indirect scalar PHI slots and
+  longer owned identities preserve original block addresses and source facts.
+  All 17 serial gates and 74 native populations pass, preserving the prior 72;
+  2,132,868 local observations and 1,066,434 references are recorded. Both unit
+  modes pass 2,030 tests and 24 fresh structural checks. Readiness, both corpora,
+  fixed programs and all 54 fault controls pass. Core objects, observations and
+  sizes match; wrapper hashes and profile deltas are separately reviewed.
+  Full/census commands have actual checked exits. The incomplete first compiler
+  replay is excluded; its same-source two-hour retry completes and matches all
+  identities, owners and failure tuples. The prefix/cohort/ratchet stay unchanged.
+  A 2,759-file seal retains the evidence. Continue the all-8,928 objective with
+  264 failures. Evidence:
+  `docs/evidence/scalable_cfg_indirect_phi_acceptance_20261109.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4740,7 +4757,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `5d71dc80300b997717563c6e2f20bfc2da42394f`; tree: `39786e6b79ac0e954ff1ab5b78ca0dc6f8c36e84`.
+Accepted revision: `bb74a371b7b84c023da8356ef4d7a13da3b7ca35`; tree: `6efce2b146f61893661aedd10963e93328d05122`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

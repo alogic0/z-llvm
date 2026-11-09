@@ -96,7 +96,7 @@ updated to preserve their real boundaries after newly supported forms advanced.
 The implementation freezes 1,798 source files and a 3,126-file source snapshot
 at revision `5d71dc80300b997717563c6e2f20bfc2da42394f`, tree
 `39786e6b79ac0e954ff1ab5b78ca0dc6f8c36e84`. Acceptance documentation follows that
-snapshot. The unchanged 443,624,108-byte compiler input retains SHA-256
+snapshot. The unchanged 443,624,107-byte compiler input retains SHA-256
 `de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e`.
 
 The raw seal binds 1,212 files with manifest SHA-256

@@ -4,34 +4,34 @@ Continue until **all 8,928 definitions** in the unchanged original compiler
 input select. The user's [complete-selection plan](plans/2026-11-08-complete-compiler-selection.md)
 authorizes the successive necessary groups without further per-slice permission.
 
-The [runtime storage checkpoint](evidence/runtime_integer_storage.md)
-is accepted at `5d71dc80`: **8,552/8,928**, adding 130 selections with no lost
+The [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
+is accepted at `bb74a371`: **8,664/8,928**, adding 112 selections with no lost
 successes. Runtime retains **285/455**. Complete terminal censuses and independent
 production replays match all selections, owners and remaining diagnostic tuples.
-[Acceptance record](evidence/runtime_integer_storage_acceptance_20261109.json).
+[Acceptance record](evidence/scalable_cfg_indirect_phi_acceptance_20261109.json).
 
-All 17 serial gates and 72 native populations pass, preserving the preceding 69.
-Debug/ReleaseSafe each pass 2,013 units and 24 structural checks; Debug reuses
-its valid cached structural result. Readiness, both corpora, five fixed programs
-and all 54 core fault controls pass. The suite records 2,104,068 local observations
-against 1,052,034 references. All 36 selected core objects, observations and
+All 17 serial gates and 74 native populations pass, preserving the preceding 72.
+Debug/ReleaseSafe each pass 2,030 units and 24 fresh structural checks.
+Readiness, both corpora, five fixed programs and all 54 core fault controls pass.
+The suite records 2,132,868 local observations against 1,066,434 references.
+All 36 selected core objects, observations and
 executable sizes match. Wrapper hashes and corpus counter changes are reviewed
-separately. The 1,212-file seal verifies. Interrupted full/census outer captures
-and unavailable command exit statuses are explicit in the accepted evidence;
-durable final gate records and independent production matching verify the work.
+separately. The 2,759-file seal verifies. Full/census commands have durable actual
+return codes. The incomplete first compiler replay is excluded; its completed
+same-source retry with the existing two-hour override supplies production proof.
 
-The remaining **376 failures** are still authorized work. Next:
+The remaining **264 failures** are still authorized work. Next:
 
-1. Replace linear CFG lookups and the sixteen-successor planning container with
-   canonical indexed graphs and correct indirect-edge liveness. Remove fixed
-   stack arrays before expanding the explicit block resource limit. There are
-   55 block-count and 49 indirect-PHI first failures. Original rejected CFGs
-   reach 20,976 blocks; conservative switch/dispatcher sizing reaches 33,722.
-   Preserve original block addresses, simultaneous PHI copies and rollback.
-2. Continue through aggregate PHIs/freezes, long owned identities, pointer flows,
-   atomic stack views and wide/FP ABI limits. Three current identity failures
-   involve block labels over 192 bytes. Four scalar freeze failures involve i40;
-   a private native-width bridge should preserve source widths and aliases.
+1. Complete the measured large-frame and spill-bookkeeping family. Five current
+   frame rejections need at least 1.18–7.02 MB of reservation before object layout
+   and extra PHI homes. Preserve checked displacements, page touches, stack/call
+   alignment, exact rollback and owned names. The isolated successor's native
+   and unit proofs remain provisional until a fresh Tier 3, complete census and
+   production matching accept the final source.
+2. Continue through aggregate PHIs/freezes, frame-pointer flows, scalar
+   intrinsics, atomic stack views and wide/FP ABI limits. Reclassify later
+   boundaries, including `llvm.abs` poison mode, from actual original-input
+   retries. Private normalization must preserve defined behavior and public ABI.
 
 Replay affected original functions after each cohesive change, preserve all
 accepted selected identities, and reclassify later limits. Use the validation
@@ -39,7 +39,7 @@ tiers, including immediate Tier 3 for correctness or shared ABI/frame changes.
 Keep this checkpoint authoritative until the next cumulative acceptance.
 
 Raw batch evidence is sealed under
-`local-state/validations/compiler-selection-completion-20261108/batch-04/`;
+`local-state/validations/compiler-selection-completion-20261108/batch-05/`;
 ongoing notes and read-only classifications are in its parent. Preserve the
 100-row prefix, twelve-function core cohort, ratchet 130, every execution
 population, original inputs, prior evidence, AIR payloads, and thirteen scratch

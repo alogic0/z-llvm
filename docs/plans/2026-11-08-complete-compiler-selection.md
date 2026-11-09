@@ -84,8 +84,18 @@ durable final gate records and independent production matching verify the work
 without inferring unavailable wrapper exit statuses. See the
 [accepted evidence](../evidence/runtime_integer_storage.md).
 
-The objective remains active with 376 failures. Continue with indexed large
-CFGs, correct successor liveness, indirect/aggregate PHIs and owned identities,
-then pointer/storage and wide/FP ABI limits. The read-only inventory identifies
-60 rejected original CFGs exceeding 1,024 blocks, maximum 20,976; conservative
-switch/dispatcher sizing reaches 33,722. These remain authorized work groups.
+The fifth checkpoint is accepted at `bb74a371`: canonical graph indexes,
+complete successor liveness, scalable traversal storage, private indirect scalar
+PHI slots and 512-byte owned value-use identities. Complete compiler census and
+production replay select 8,664/8,928, adding 112 with no lost successes; runtime
+retains 285/455. Debug/ReleaseSafe pass 2,030 units and 24 fresh structural checks.
+Readiness and all 17 serial gates pass with durable actual checked return codes.
+All 74 native populations preserve the prior 72. The first compiler production
+attempt timed out; the completed same-source retry with an explicit existing
+two-hour deadline supplies the matched production proof. The 2,759-file seal
+verifies. See the [accepted evidence](../evidence/scalable_cfg_indirect_phi.md).
+
+The objective remains active with 264 failures. Continue with measured large
+frames and spill bookkeeping, aggregate PHIs/freezes, pointer flows, scalar
+intrinsics and wide/FP ABI limits. Subsequent work remains authorized through
+complete original-input selection and required validation.

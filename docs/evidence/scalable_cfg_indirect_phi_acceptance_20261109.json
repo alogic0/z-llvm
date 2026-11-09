@@ -1,0 +1,4869 @@
+{
+  "gates": [
+    {
+      "id": "selected-object-suite",
+      "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+      "exit_status": "0",
+      "duration_ms": "60188",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "1985",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "3510",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "3453",
+      "cache_status": "none"
+    },
+    {
+      "id": "zig-source-native-link",
+      "tool": "tools/run_distribution_zig_source_native_link.zig",
+      "exit_status": "0",
+      "duration_ms": "18660",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-postopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "70866",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-preopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "--pipeline": "preopt",
+      "exit_status": "0",
+      "duration_ms": "34871",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-ir-writer",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "16920",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-release",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "11667",
+      "cache_status": "none"
+    },
+    {
+      "id": "real-rows-release-fast",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseFast",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "823332",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-safe",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSafe",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "851637",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-small",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSmall",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "444548",
+      "cache_status": "hit"
+    },
+    {
+      "id": "integrated-executable",
+      "tool": "tools/run_distribution_zig_integrated_exe.zig",
+      "exit_status": "0",
+      "duration_ms": "3376792",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "529",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "1171",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "1108",
+      "cache_status": "none"
+    },
+    {
+      "id": "boundary-gates",
+      "tool": "tools/run_distribution_boundary_gates.zig",
+      "exit_status": "0",
+      "duration_ms": "8805",
+      "cache_status": "none"
+    }
+  ],
+  "compiler_core": [
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseFast",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSafe",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSmall",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    }
+  ],
+  "execution_cohort": [
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "771c812fe0df706e15fecc90163c3918a16f4b8b1bf3efcc001f3dfdda9e63cb",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4148216",
+      "reference_sha256": "33f80dda8b4e80e22876158241d19620650c53ded175384a1e5cc39552f3da04",
+      "linked_bytes": "6291806",
+      "linked_sha256": "62bb2c62bdba2540c53aa97a9f990635d641fc64ab6f0905a4abb51747d58db9",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "b438f39a0529f7137c83a4282b7cb8f1d830a73fff9ac11233852dfc98b9a890",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4148304",
+      "reference_sha256": "3f0d0696dc7479155826fff7702c4a1723b827791fc3bd5a0c89638515e0868a",
+      "linked_bytes": "6291806",
+      "linked_sha256": "327699e606e6083f13086ff0a671110055d1cb026fffcfad46ae2535004fb9a5",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "e7226becbcf2d8c362726684777a76e4cef8e09ef39b8e19044097f7dc60433d",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4148280",
+      "reference_sha256": "43904ac5d929d889b7b655f5128235ddbd21456bb180848a37f9533592136a37",
+      "linked_bytes": "6291806",
+      "linked_sha256": "0352ca50d718568f179069231419753cc11a333e430b85be31cb3e1dc0d598d0",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0757ed24dd920f69a1dd0f4a4f8bf8b40f97ef21f9dd52b4dbe6d46b7c71cbe0",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4148568",
+      "reference_sha256": "d230c4d1604bde988e3e9d1deaa92c368779b6ecbb10241ac2f2d7caf59ee32b",
+      "linked_bytes": "6291806",
+      "linked_sha256": "d1b4b806eb244493688f37af2aed18b6c2e2a35eadaaeee287e5acc44bd03e1d",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "096d9472ae183cfa3719c65a5594248c8d527463f93342de612faf74b3eb8de7",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4151536",
+      "reference_sha256": "9303bfd602b4ddc758948d97913a45f8e26ce3ccda04bfa440ff9c1dca8d9523",
+      "linked_bytes": "6288265",
+      "linked_sha256": "21639cfd5b705098ec56bdf29e831851cdbd66c612d002a25ef70e81ca6b17aa",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "d37472effb4bd393891542a999edbe11f89eea30771f288c51a3091d50585e09",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4153744",
+      "reference_sha256": "4616c7f9195080e4bd293726476aeff1527899222b59adca3f97f88bb3d62b31",
+      "linked_bytes": "6287668",
+      "linked_sha256": "ee0c668b6b2e0c1e7077820e758847bce1a64fb5e20389c111f1ab7fe7aa9bcb",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "61a61fe05c25f9f28cd23c0826ad17410738360b00a6686c55e36b5ef112eb10",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4153752",
+      "reference_sha256": "8453957039eac30ec4628a1262cb3e178db7b7ada1ddec5bd5d52c9245292ee4",
+      "linked_bytes": "6287668",
+      "linked_sha256": "a41a7bf1951927cb68180270f8004f5223a95c1f2c68313bcb31f5ab03623a45",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4154296",
+      "reference_sha256": "8a355b6ac75857bbc935d458adf659c40a57ee706cdd8b41b3d5d541c713cc24",
+      "linked_bytes": "6292446",
+      "linked_sha256": "1efd3b88c8a8f2b72979a4fc0419649ab2a4db55717741759ca981ce44c9157e",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "67dfabcf131de792bd4b8c9c8b4276e8c16bbe5a23cb534fdda95782e84527d0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4153904",
+      "reference_sha256": "aa5a801f08f52ade0bbf62a01bc6b212873ea2f3a0d0be08b48b6db5a3d73b9b",
+      "linked_bytes": "6287625",
+      "linked_sha256": "0b7cd006590ca8da44afc3cc64e468bc2c8dc8e8f66353d72df6b001813fa2b4",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "4dbb2cb74487df4ec7164dd64a99cef5e4cdb798149003035e81f4c23446970f",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4148368",
+      "reference_sha256": "0be2fe7cedc4f7f94134470640f08aa6b4e597ef994565a310d8a763f64cd3a2",
+      "linked_bytes": "6287753",
+      "linked_sha256": "b4229770c6101306f9da737e28a73331fb83dd54b42866494c0db019548c300d",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "cec703a7cc929cf1399c85bb23682a3932ff2937c4aa17f4575f1e6a127da857",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4152384",
+      "reference_sha256": "da1fddec888a49b194b813720a6af3a038bbf929d243ec9ef27931d38dd193c1",
+      "linked_bytes": "6291977",
+      "linked_sha256": "3a9d4f730afc692d43c2ed11c0e67ce3e3b2fece60c3ddbaa54d38b99a2e3866",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "05b7decf31bfa3f305b59b80c43f6f1203a14bcdba17aa78b789363ca6f4b334",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4147800",
+      "reference_sha256": "7304a5adf7d1eaccaac79932f751ae1df16ee4aa01c65570ae159f8650effb46",
+      "linked_bytes": "6291977",
+      "linked_sha256": "de26edf2ba5dd2f7bbbb4396870e42a0a0e02e5154f669d1df2eb7674fc7fbd0",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "ec4c7a087cc6fb0bfc4302bbeb9e2f729322ff2152f4f1b2a4f8eb266303a24d",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4034304",
+      "reference_sha256": "497d78f68031438dcc3b79efd0f0f020a537d90a27b87b15ae8f0c07cd4f33d1",
+      "linked_bytes": "6147062",
+      "linked_sha256": "07ed4cc5f3973e61c19b00bc26ccaa37afaae6e6c2e8c0c60bdb4fccdde628c6",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "673975f12bc2f12983539c9fceb7987e957a9af1b480e35c2af400d2070a5109",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4034360",
+      "reference_sha256": "62d3060929b39913074c40d95172476055ffbbc733c4977fd2efec6c8af18f94",
+      "linked_bytes": "6147062",
+      "linked_sha256": "1a69b3753926e7f019298f259159dc6994e14c92cb867c3c43e953e468b2e415",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "f4d9f0cce93a6a792ec4a31124708e49b79e3c72bdda6bc6eba7df4336819ab2",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4034328",
+      "reference_sha256": "7726684773b4aad4b0cc588b55c522be8f39b904b4a63409c75d04c7485c7e4e",
+      "linked_bytes": "6147062",
+      "linked_sha256": "de1855f02dcb43fe1beeb8738f55662302b1d74bb2e5943d2160013115188ba2",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0f0e86316bfb932fd92a27b50d213d251439538c0700ac70e5eda5654dee373f",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4034416",
+      "reference_sha256": "e43f04a48807d28f8f24bfd77d144bfdca759108d0ff86d91d33561fe914b29b",
+      "linked_bytes": "6147062",
+      "linked_sha256": "4b84332668c5635f1d7d650889e7e7e5b20ab2776fd274035a29e20481ac8da8",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "f6d0b8ccfd56bf25d342984dd53c64dfa3ed7e733c79c8382ea8106d859139d4",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4035680",
+      "reference_sha256": "f98ab37574b17c66e2871b5ba5604a04a78859a20f342367a540a04fbc7080be",
+      "linked_bytes": "6142732",
+      "linked_sha256": "852b8184f4a99a2a8bdf4d968a242f7420b2fc6b94ea43e5cb56969d16077cce",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "4d1fe939c4cf95156e3f1b8b53e0c2a224a2221a1ddc3cf09acab00785b7deb0",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4039600",
+      "reference_sha256": "5938eb983ab4d0fb4bcc0dc6681008ec19cc3fa4fb31700ca19b723c2df9bbe2",
+      "linked_bytes": "6142796",
+      "linked_sha256": "afc353aaa36d9843eed80805ddb89217b14414907358b1fc6cb7ad3e045e3998",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "0c4f15638e021ab253fb2fe0fd0c343a09ff9e06890910b76d2f4c085edd5743",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4039600",
+      "reference_sha256": "69503c27d12339427a971e764db0934ab973a8162557c58c1d9c080fd1b73104",
+      "linked_bytes": "6142796",
+      "linked_sha256": "8f3dec19e689bbfa12be27785296defbb1bba7a53a3c572ce819600dbdccffac",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4040312",
+      "reference_sha256": "1a8dfeb746ae82090b575a41942b40bbed21332f124fe6eccf8be297bc42db68",
+      "linked_bytes": "6147638",
+      "linked_sha256": "bca7f3a3f753263c5b8415e76228edc64dbef154b87f7cf746bdb0f6d53c7b67",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "779b502b10695d9d1e81bf7122b0d50882ab5e6c75e8fa011fd87e7167b64ec6",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4039784",
+      "reference_sha256": "906354208ff2157ebc1c8d37888799dd11331c6a428c4804e255bf7917e1fdf8",
+      "linked_bytes": "6142732",
+      "linked_sha256": "6f063a1f5524178dc0a5ba34b87d13df5a0a347ed282e6038e1ae15205729eb9",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "81641a4e0b55b09f7e522a15636d7cfe97c5e046222b430c1e49402929d00c52",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4034168",
+      "reference_sha256": "cefcceae22ac08760a7d676b5f14a61e2f56e8a34b0e1bf8cba320dc960cdcf6",
+      "linked_bytes": "6142646",
+      "linked_sha256": "229235e94e789da601a219b825b84f9efb4d82e323765fb10812ce996b567845",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "58b67ba6931f90a1854142a7989f32094edeff8fa416a841ffac653b7c3cd233",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4038496",
+      "reference_sha256": "0aa7684f40b2c69e71d8d25c15fb590e6ef26966be40796392dd3cbb6d1aae6e",
+      "linked_bytes": "6147318",
+      "linked_sha256": "191541234415488c05d4d94f8f7852251bf4ea0664223fd959531514569992b7",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "f3ed1a8136b5d2fc6ff566354d364e99078dac14fc918df8dc8d39d0ec04e57e",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4034448",
+      "reference_sha256": "ca8d544bf6d081f9d43f2537a7e8ef44139bfad4ef735460309a980725155a74",
+      "linked_bytes": "6147318",
+      "linked_sha256": "d60df9347774bda6bbfd054b1220088f5b6e73d4e2cf6e5c1ec199b517adb6ac",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "a2a97ff3e5bd48a80f721303693b269112227fd7ef5fc96a4526d72f06c9343e",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "149664",
+      "reference_sha256": "517296ad1fd60856ab22e843f46132e985d92247d21b2c6e23e2eb55c6fa5625",
+      "linked_bytes": "355886",
+      "linked_sha256": "27b3ece3f14bc7da0eb06d6f73a689c9f43e0e614f12abd9b891d427bd4ac846",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "5969dece1d04131c7fc77db02d5b7ba7e35d53c72cb73053f3218a403a53638e",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "149664",
+      "reference_sha256": "e50a6c386ae71b6da538d1cd15a27be2f4d70dbbd450bade592d09a1b978c774",
+      "linked_bytes": "355886",
+      "linked_sha256": "21bef7ac1508f2410159bd0fe1384efc5391938af87db95a37e3b1a7d053ffd3",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "afc10d2b53f59145c9585fa576994f831169b48344efc8b71b50c449388eb439",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "149664",
+      "reference_sha256": "981c89cda9bb178597bf907fdc9ca4a4d96225b0b8ded4bcbf9564e626526a8a",
+      "linked_bytes": "355886",
+      "linked_sha256": "6e0ca4eaef2cd970ced3628a9e93faa20d130827f596821871e41810e05b539e",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "429bfd019f347369b5fa197515435b0ddde1d3304a342b7131ed32e1175a11ff",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "149696",
+      "reference_sha256": "b8e2be571cafd55f9d19259e137c27866fee71be1d45040d038ac8abe9b78402",
+      "linked_bytes": "355886",
+      "linked_sha256": "b83965a3a36dfe5abea79336f9c9c73b85d06d2eec9eb22d1657b435337d4f83",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "9bde311d7a2276fd1d855635eb3f9a3aecd44609a1199362e45e405154d413b2",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "149992",
+      "reference_sha256": "e4ca544afaf896553f640ae6d9c8ba888c723ed004a600696e3cd0cb90537666",
+      "linked_bytes": "356217",
+      "linked_sha256": "35e2d7ab6639afeee93212e2020f42f882d0cc1122f569698db67d1d0e67554d",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "b90f3029c1a86c3e284c3f6b64e2f95191644d7c832395f9eed036bddb542e70",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "84006c8f41289e2b0c65fa13b8ec448f0035923b0b5b4500dc2e381f88868e66",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "d612a4a4d3090ef336ed6df433b50de3dd5c1a51cb0d677dcbff307a972faa3f",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "fbe43fa70a3e53f59508cc1c03b16245672101fb9650059c653fb29c82d1c18e",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "149824",
+      "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+      "linked_bytes": "356198",
+      "linked_sha256": "85fa75b3f5f0e01706475358d6203f5ddcb953a9718e4fea3a1b693ba344be89",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "7e7f85ea61fd2f396425cee8a64b7f32fe4e0bf193dffc27c9e8697e10f530e0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "149872",
+      "reference_sha256": "2fd34967a38babe25d3ab728000c7f7a44b7b38b32caa9670d684f4fa63bc609",
+      "linked_bytes": "356005",
+      "linked_sha256": "47e4329bdb1c07ed765642d83fda0eb9aae66b34dbf8f7ced47fd6cd60c27569",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "28a053d41f368edda8b4a4385fb48b10e3f2152bbb7851060dff9529d58a0093",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "149712",
+      "reference_sha256": "83240aba201a066d7992f6a2e17a80c1317747c5e608d9793c01093ca08172d8",
+      "linked_bytes": "356205",
+      "linked_sha256": "b1aa8842e63a1b04c815bdcf344be5372bd6fa8b2e64bf56029ac34852bff4eb",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "985f961062e1be2560deabefbca27b243be360298f89db15da08eeec80648843",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "149768",
+      "reference_sha256": "ac759d10d2000fdc39a6ed57414035e275261adbaef8cdb366c30e54dd87baa1",
+      "linked_bytes": "356041",
+      "linked_sha256": "50ad7e49d7d0f65da0e5d966a6d3bf96b15870662857e0a9e250a3824aefe7b3",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "9fd2c46b5b3bb636bf1a0ca90695e93d075ad39332c90f96ba4ce2ee40abe025",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "149768",
+      "reference_sha256": "71de76cacc973a3644ee5257ed0d184bb036d0e2c3df77826a8b534fec5f0b46",
+      "linked_bytes": "356042",
+      "linked_sha256": "f4ca8f698c28748c8f2449da7c51350293daedaeddc30ed2f3af8fa837dd3330",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    }
+  ],
+  "native_populations": [
+    {
+      "population": "standalone-two-word-stack-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "384",
+      "reference_observations": "192",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-pointer-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "486",
+      "reference_observations": "243",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-pointer-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-signed-nonnegative",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-type-allocation-padding",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-graphs",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6144",
+      "reference_observations": "3072",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-masks",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "13824",
+      "reference_observations": "6912",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-values",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "24576",
+      "reference_observations": "12288",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-samesign-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-freeze",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "10752",
+      "reference_observations": "5376",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-freeze",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-multiply",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "12288",
+      "reference_observations": "6144",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-quoted-symbols",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6144",
+      "reference_observations": "3072",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-symbolic-call",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-comparison-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "21504",
+      "reference_observations": "10752",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-syscall-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-register-pressure",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-bit-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46080",
+      "reference_observations": "23040",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-relative-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-tls-address",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-tls-address-shared",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-attributes",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14790",
+      "reference_observations": "7395",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "8466",
+      "reference_observations": "4233",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-fp-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-packed-globals",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-parallel-transfer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-scalar",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "110592",
+      "reference_observations": "55296",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-branches",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "18432",
+      "reference_observations": "9216",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aligned-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "36864",
+      "reference_observations": "18432",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-vectors",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "795648",
+      "reference_observations": "397824",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "32256",
+      "reference_observations": "16128",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-integer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "73728",
+      "reference_observations": "36864",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-system-assembly",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "70656",
+      "reference_observations": "35328",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "78336",
+      "reference_observations": "39168",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-accumulator-store",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-contracts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-address-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14208",
+      "reference_observations": "7104",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-atomics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "112908",
+      "reference_observations": "56454",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "87552",
+      "reference_observations": "43776",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-switch-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "26112",
+      "reference_observations": "13056",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-word-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "29568",
+      "reference_observations": "14784",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-integers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46464",
+      "reference_observations": "23232",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-stack-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3456",
+      "reference_observations": "1728",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "5760",
+      "reference_observations": "2880",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "guard_checks": "18"
+    },
+    {
+      "population": "standalone-safe-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-safe-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-stack-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9984",
+      "reference_observations": "4992",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3840",
+      "reference_observations": "1920",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aggregate-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-remainder",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-rax-pointer-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "2688",
+      "reference_observations": "1344",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-general-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1920",
+      "reference_observations": "960",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-frame",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-module-dependencies",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "330",
+      "reference_observations": "165",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "negative_controls": "30",
+      "environment_checks": "3"
+    },
+    {
+      "population": "standalone-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-boolean-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "192",
+      "reference_observations": "96",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-abi-carriers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-intrinsic-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pointer-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "576",
+      "reference_observations": "288",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "240",
+      "reference_observations": "120",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-undefined-selects",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "5376",
+      "reference_observations": "2688",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-large-cfg",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15744",
+      "reference_observations": "7872",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-phi-slots",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "13056",
+      "reference_observations": "6528",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    }
+  ],
+  "disk": {
+    "schema_version": "1",
+    "run_id": "ccf5262ba13cddd6556a8183e5abc849",
+    "scratch_path": "tmp/large-cfg-20261109-full",
+    "bundle_path": "tmp/large-cfg-20261109-full/release_source_object_bundle",
+    "target": "x86_64-unknown-linux-gnu",
+    "mode": "serial",
+    "real_rows_concurrency": "3",
+    "subgates": "17",
+    "wall_ms": "4593977",
+    "starting_free_bytes": "33040187392",
+    "minimum_observed_free_bytes": "23458652160",
+    "final_free_bytes": "23529652224",
+    "observed_peak_bytes": "9581535232",
+    "reserve_bytes": "11410065408",
+    "required_start_bytes": "20000000000",
+    "local_fail": "0"
+  },
+  "cache": [
+    {
+      "mode": "ReleaseFast",
+      "status": "hit",
+      "duration_ms": "17653",
+      "cache_key": "71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6",
+      "descriptor_bytes": "1343891552"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "status": "hit",
+      "duration_ms": "19345",
+      "cache_key": "c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de",
+      "descriptor_bytes": "1473501276"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "status": "hit",
+      "duration_ms": "14088",
+      "cache_key": "db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7",
+      "descriptor_bytes": "1106432911"
+    }
+  ],
+  "native_population_count": 74,
+  "native_local_observations": 2132868,
+  "native_reference_observations": 1066434,
+  "schema": "scalable-cfg-indirect-phi-acceptance-v1",
+  "status": "passed",
+  "returncode": 0,
+  "recorded_utc": "2026-11-09T18:05:35Z",
+  "accepted_revision": "bb74a371b7b84c023da8356ef4d7a13da3b7ca35",
+  "accepted_tree": "6efce2b146f61893661aedd10963e93328d05122",
+  "baseline_accepted_revision": "5d71dc80300b997717563c6e2f20bfc2da42394f",
+  "target": "x86_64-unknown-linux-gnu",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "selector_version": "real-candidate-selector-v3",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "toolchain": {
+    "project_zig": "0.17.0",
+    "fixture_emitter": "0.17.0-dev.11+1c08b09d1",
+    "clang": "Ubuntu clang version 22.1.8 (++20260714014902+ca7933e47d3a-1~exp1~20260714135019.80)",
+    "llvm_reference_revision": "c0262e742787e5997a6df2b4b56830df00a6ff11"
+  },
+  "active_objective": {
+    "selected": 8664,
+    "required": 8928,
+    "remaining": 264,
+    "status": "active",
+    "continue_after_checkpoint": true
+  },
+  "source_binding": {
+    "source_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-05/sources.sha256",
+    "source_files": 1808,
+    "full_snapshot": "local-state/validations/compiler-selection-completion-20261108/batch-05/source-snapshot.json",
+    "source_snapshot_files": 3139,
+    "source_snapshot_verified": true,
+    "compiler_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-05/compilers.sha256",
+    "input_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-05/inputs.sha256",
+    "frontend_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-05/frontend.sha256",
+    "upstream_semantics_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-05/upstream-semantics.sha256",
+    "hashes_verified": true,
+    "scope": "Implementation and complete source membership frozen at the stated revision; acceptance documentation finalized afterward"
+  },
+  "compiler_builds": {
+    "Debug": "287dd683930101041f993f1206d973ca74df9138014acb9514affbcceac38efb",
+    "ReleaseSafe": "0c34feab3f4a6ea526c5902aa1d87ac1c016c55c2bff821080705b1af93aa759",
+    "ReleaseFast": "a213710228bfcc5d09c811c9eee7a88dd40376b85af42fa9e03b2e4906b19f49",
+    "suite_debug_matches_frozen_debug": true
+  },
+  "validation": {
+    "unit_tests_per_build_mode": 2030,
+    "unit_build_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "structural_checks_per_mode": 24,
+    "structural_result": "24 fresh successful checks in each mode",
+    "readiness_commands": 9,
+    "readiness_passed": true,
+    "full_gates": 17,
+    "full_runs": 1,
+    "full_run_kind": "serial with authenticated AIR cache hits and durable actual checked process exit0",
+    "new_native_populations": 2,
+    "new_native_unique_functions": 22,
+    "new_native_compiler_builds": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "new_native_local_observations_per_compiler_build": 28800,
+    "new_native_reference_observations_per_compiler_build": 14400,
+    "oracle_negative_detections": 10,
+    "compiler_rt_bypass_ratchet": 130,
+    "cache": {
+      "cache_hits": 3,
+      "prior_keys_and_descriptor_sizes_preserved": true
+    }
+  },
+  "implementation": {
+    "cfg_indexing": {
+      "canonical_block_identity": true,
+      "numeric_and_quoted_numeric_names_distinct": true,
+      "unique_predecessors": true,
+      "edge_multiplicity_preserved": true,
+      "plan_owns_transferred_index": true,
+      "verifier_block_lookup_indexed": true,
+      "source_function_blockIndex_unchanged": true
+    },
+    "liveness": {
+      "algorithm": "predecessor worklist",
+      "all_terminator_successors_included": true,
+      "indirect_successors_included": true,
+      "loop_self_edges_and_unreachable_blocks_tested": true,
+      "independent_forward_sweep_reference": true,
+      "successor_storage": "actual graph size; previous16-successor container removed"
+    },
+    "resources": {
+      "private_block_ceiling": 65536,
+      "traversal_queues": "allocated from actual block count",
+      "byte_transfer_acyclicity_storage": "actual byte-transfer count",
+      "over_limit_rejection_preserved": true
+    },
+    "indirect_phis": {
+      "method": "Distinct private entry slots, frozen incoming values stored at predecessor exits, and typed loads replacing indirect-target scalar PHIs",
+      "integer_source_widths": "1..128",
+      "floating_source_types": [
+        "half",
+        "float",
+        "double"
+      ],
+      "pointer_source_type": "ptr",
+      "native_payloads": [
+        "i32",
+        "i64",
+        "i128",
+        "ptr"
+      ],
+      "block_addresses_terminators_and_target_lists_unchanged": true,
+      "all_direct_and_indirect_predecessors_covered": true,
+      "parallel_copy_semantics_native_proven": true,
+      "eager_private_writes_keep_inactive_poison_unobserved": true,
+      "unsupported_types_fail_closed": true,
+      "source_and_public_abi_preserved": true
+    },
+    "identities": {
+      "value_use_owned_bytes_before": 192,
+      "value_use_owned_bytes_after": 512,
+      "all_three_length_fields": "u16",
+      "max_plus_one_rejected": true,
+      "shared_prefix_and_owned_source_copy_tested": true,
+      "transaction_bytes_before": 366288,
+      "transaction_bytes_after": 688656,
+      "transaction_byte_increase": 322368,
+      "transaction_alignment": 16,
+      "address_dependency_identity_bound_unchanged": 192
+    },
+    "label_retention": {
+      "indexed_single_instruction_scan": true,
+      "ownership_allocations_finish_before_machine_mutation": true,
+      "all_allocation_failures_restore_owned_label_prefix": true,
+      "canonical_duplicate_identity_rejected": true
+    },
+    "frontend_unchanged": true,
+    "candidate_prefix_unchanged": true,
+    "execution_cohort_unchanged": true,
+    "source_ir_and_public_signatures_preserved": true,
+    "frozen_bypass_inventory_unchanged": true,
+    "lowerFreeze_fingerprint_unchanged": "998d5607e54ad21229f4200922a2b1d123c8a20183afa74836721e37a46d4193"
+  },
+  "diagnostic": {
+    "schema": "compiler-selection-completion-diagnostic-v1",
+    "batch": 5,
+    "compiler_before": {
+      "selected": 8552,
+      "examined": 8928
+    },
+    "runtime_before": {
+      "selected": 285,
+      "examined": 455
+    },
+    "compiler": {
+      "examined": 8928,
+      "selected": 8664,
+      "failed": 264,
+      "new_successes": [
+        "\"zig.llvm.bitcode_writer.BitcodeWriter(&.{ zig.llvm.Builder.Type, zig.llvm.Builder.FunctionAttributes }[0..2]).BlockWriter(zig.llvm.ir.ModuleBlock.MetadataBlock).init__func_17680\"",
+        "Air.Legalize.legalizeBody",
+        "Air.print.Writer.writeBody",
+        "Builtin.append",
+        "Compilation.getAllErrorsAlloc",
+        "InternPool.Key.typeOf",
+        "InternPool.PackedCallingConvention.pack",
+        "InternPool.dump",
+        "InternPool.typeOf",
+        "InternPool.zigTypeTag",
+        "Io.Threaded.fileMemoryMapWrite",
+        "Io.Threaded.linkat",
+        "Io.Threaded.posixExec",
+        "Sema.InMemoryCoercionResult.report",
+        "Sema.analyzeCall",
+        "Sema.analyzeMemoizedState",
+        "Sema.callconvCoerceAllowed",
+        "Sema.coerceInMemoryAllowedErrorSets",
+        "Sema.fieldPtr",
+        "Sema.fieldVal",
+        "Sema.ptrCastFull",
+        "Sema.resolveErrSetIsEmpty",
+        "Sema.zirErrorCast",
+        "Sema.zirTypeInfo",
+        "Target.cCallingConvention",
+        "Target.toElfMachine",
+        "Zcu.PerThread.ensureTypeLayoutUpToDate",
+        "__zig_tag_name_codegen.x86_64.Encoding.Mnemonic",
+        "codegen.aarch64.Assemble.SymbolSpec.parse__func_44353",
+        "codegen.aarch64.Assemble.nextToken__func_37608",
+        "codegen.aarch64.Assemble.nextToken__func_43328",
+        "codegen.aarch64.Select.CallAbiIterator.homogeneousAggregateBaseType",
+        "codegen.aarch64.Select.CallAbiIterator.param",
+        "codegen.aarch64.Select.Value.FieldPartIterator.next",
+        "codegen.aarch64.Select.analyze",
+        "codegen.aarch64.Select.cmp",
+        "codegen.aarch64.encoding.Instruction.add",
+        "codegen.aarch64.encoding.Instruction.adds",
+        "codegen.aarch64.encoding.Instruction.and",
+        "codegen.aarch64.encoding.Instruction.ands",
+        "codegen.aarch64.encoding.Instruction.bic",
+        "codegen.aarch64.encoding.Instruction.eor",
+        "codegen.aarch64.encoding.Instruction.ldp",
+        "codegen.aarch64.encoding.Instruction.ldr",
+        "codegen.aarch64.encoding.Instruction.ldrb",
+        "codegen.aarch64.encoding.Instruction.ldrh",
+        "codegen.aarch64.encoding.Instruction.ldrsb",
+        "codegen.aarch64.encoding.Instruction.ldrsh",
+        "codegen.aarch64.encoding.Instruction.orn",
+        "codegen.aarch64.encoding.Instruction.orr",
+        "codegen.aarch64.encoding.Instruction.prfm",
+        "codegen.aarch64.encoding.Instruction.stp",
+        "codegen.aarch64.encoding.Instruction.str",
+        "codegen.aarch64.encoding.Instruction.strb",
+        "codegen.aarch64.encoding.Instruction.strh",
+        "codegen.aarch64.encoding.Instruction.sub",
+        "codegen.aarch64.encoding.Instruction.subs",
+        "codegen.aarch64.encoding.Register.Alias.encode__func_12863",
+        "codegen.generateFunction",
+        "codegen.llvm.Object.writeZllvmStructuredAirV2",
+        "codegen.llvm.initializeLLVMTarget",
+        "codegen.loongarch.Select.CallAbiIterator.resolve",
+        "codegen.loongarch.Select.Value.Index.split",
+        "codegen.loongarch.Select.moveConstant",
+        "codegen.riscv64.CodeGen.freeValue",
+        "codegen.riscv64.CodeGen.genBody",
+        "codegen.sparc64.CodeGen.processDeath",
+        "codegen.sparc64.CodeGen.reuseOperand",
+        "codegen.wasm.Emit.lower",
+        "codegen.x86_64.CodeGen.airAsm",
+        "codegen.x86_64.CodeGen.genCall",
+        "codegen.x86_64.CodeGen.genCopy",
+        "codegen.x86_64.CodeGen.genShiftBinOpMir",
+        "codegen.x86_64.CodeGen.lowerSwitchBr",
+        "codegen.x86_64.Emit.emitMir",
+        "codegen.x86_64.bits.Condition.negate",
+        "compress.flate.Decompress.streamInner",
+        "hash.xxhash.XxHash64.final",
+        "libs.freebsd.buildSharedObjects",
+        "libs.glibc.buildSharedObjects",
+        "link.Coff.idle",
+        "link.Coff.loadObject",
+        "link.Coff.verifyParentSectionAttributes",
+        "link.Elf.writeSyntheticSections",
+        "link.Elf2.addRelocAssumeCapacity",
+        "link.Elf2.loadDso",
+        "link.Elf2.updateGlobalDynamic",
+        "link.Lld.coffLink",
+        "link.Lld.elfLink",
+        "link.MachO.Object.parse",
+        "link.Spirv.Flush.emitCapabilities",
+        "link.Wasm.Object.parse",
+        "main.ClangSearchSanitizer.addIncludePath",
+        "math.big.int.Const.toFloat__func_8846",
+        "math.big.int.Const.toFloat__func_8861",
+        "math.big.int.Const.toFloat__func_8873",
+        "meta.eql__func_11126",
+        "sort.block.block__func_12807",
+        "sort.block.block__func_13916",
+        "sort.block.block__func_14967",
+        "zig.AstGen.breakExpr",
+        "zig.AstGen.checkLabelRedefinition",
+        "zig.AstGen.continueExpr",
+        "zig.AstGen.detectLocalShadowing",
+        "zig.AstGen.localVarRef",
+        "zig.Parse.assignOpNode",
+        "zig.Parse.parseContainerMembers",
+        "zig.llvm.Builder.Function.Instruction.Tag.toCmpPredicate",
+        "zig.llvm.Builder.attr",
+        "zig.llvm.Builder.print",
+        "zig.llvm.Builder.tripleForTarget",
+        "zig.tokenizer.Tokenizer.next"
+      ],
+      "lost_successes": [],
+      "failure_groups": [
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value"
+          },
+          "functions": 50
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "alloca"
+          },
+          "functions": 39
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width"
+          },
+          "functions": 17
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load"
+          },
+          "functions": 15
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "phi"
+          },
+          "functions": 14
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-unknown-lhs"
+          },
+          "functions": 12
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-param-type"
+          },
+          "functions": 12
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-phi-src-stack-i32-array"
+          },
+          "functions": 11
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-param-width"
+          },
+          "functions": 9
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-form"
+          },
+          "functions": 7
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-memcpy-src"
+          },
+          "functions": 7
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "call-ret"
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-binary-imm-lhs"
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-stack-frame-limit"
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "ValueUseUnsupportedSource",
+            "selector_tag": null,
+            "selector_detail": null
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-freeze-width"
+          },
+          "functions": 4
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-llvm-intrinsic"
+          },
+          "functions": 4
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "insertvalue"
+          },
+          "functions": 4
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-call-arg-reg"
+          },
+          "functions": 3
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-arg-type"
+          },
+          "functions": 3
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-ptr-arg"
+          },
+          "functions": 3
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-load-width"
+          },
+          "functions": 3
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-unknown-byte-gep-ptr"
+          },
+          "functions": 3
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "cast"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-i52-cast-form"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-load-fp-ptr"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-param-reg"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "fcmp"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "inline-asm-call"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "call-arg"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-half-binary-op"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-intbytesize-signature"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-memcpy-dst"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-memset-attrs"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-pair-binary-op"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fptoui"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "freeze"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "sdiv"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-memcpy-dst"
+          },
+          "functions": 1
+        }
+      ]
+    },
+    "runtime": {
+      "examined": 455,
+      "selected": 285,
+      "failed": 170,
+      "new_successes": [],
+      "lost_successes": []
+    },
+    "initial_cfg_targets": {
+      "examined": 132,
+      "selected": 111,
+      "failed": 21,
+      "remaining": [
+        {
+          "event": "function",
+          "selected": false,
+          "function": "link.Dwarf2.updateConstInner",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-width",
+          "rejection": {
+            "position": 2330,
+            "pressure": null,
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "cast",
+              "result": ".sroa.01621.0.extract.trunc",
+              "type": "i80",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": "trunc",
+              "operands": [
+                {
+                  "type": "i128",
+                  "attrs": null,
+                  "value": "%.sroa.01618.sroa.0.0.copyload8631",
+                  "location": "spill128",
+                  "origin": "binary"
+                }
+              ]
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "link.Dwarf.updateConstInner",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-width",
+          "rejection": {
+            "position": 2745,
+            "pressure": null,
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "cast",
+              "result": ".sroa.0977.0.extract.trunc",
+              "type": "i80",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": "trunc",
+              "operands": [
+                {
+                  "type": "i128",
+                  "attrs": null,
+                  "value": "%.sroa.0974.sroa.0.0.copyload6713",
+                  "location": "spill128",
+                  "origin": "binary"
+                }
+              ]
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "sort.block.block__func_12953",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-unknown-lhs",
+          "rejection": {
+            "position": 1654,
+            "pressure": null,
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-unknown-lhs",
+            "function_return_type": "void",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "binary",
+              "result": "1684",
+              "type": "i64",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": "sub",
+              "operands": [
+                {
+                  "type": "i64",
+                  "attrs": null,
+                  "value": "ptrtoint (ptr @__anon_786810 to i64)",
+                  "location": null,
+                  "origin": "constant_expr"
+                },
+                {
+                  "type": "i64",
+                  "attrs": null,
+                  "value": "%1670",
+                  "location": "spill64",
+                  "origin": "cast"
+                }
+              ]
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "sort.block.block__func_13871",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-src-stack-i32-array",
+          "rejection": null
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "link.Elf.flushInner",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "selector_detail": "load",
+          "rejection": {
+            "position": 428,
+            "pressure": null,
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "load",
+              "result": "305",
+              "type": "<2 x i64>",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": null,
+              "operands": []
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "sort.block.block__func_15047",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "composed-block-stack-frame-limit",
+          "rejection": {
+            "position": 0,
+            "pressure": {
+              "blocks": 1954,
+              "edges": 3352,
+              "max_live_in": 79,
+              "max_live_out": 81,
+              "max_pressure": 92,
+              "no_spill_limit": 6,
+              "spill_slot_count": 32,
+              "spill_envelope_limit": 38,
+              "max_pressure_block": "3833",
+              "max_pressure_boundary": "__zllvm_scalar_form_28075",
+              "max_pressure_spill_slots_needed": 86,
+              "max_pressure_spill_slots_over_envelope": 54,
+              "first_exceeding_block": "link.Elf.file.exit.i2583",
+              "first_exceeding_boundary": "__zllvm_scalar_form_51830",
+              "first_exceeding_live_values": 39,
+              "first_exceeding_spill_slots_needed": 33,
+              "first_exceeding_spill_slots_over_envelope": 1
+            },
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-stack-frame-limit",
+            "function_return_type": "void",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "sort.pdq.pdqContext__func_15099",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "composed-block-stack-frame-limit",
+          "rejection": {
+            "position": 0,
+            "pressure": {
+              "blocks": 1145,
+              "edges": 2017,
+              "max_live_in": 61,
+              "max_live_out": 63,
+              "max_pressure": 65,
+              "no_spill_limit": 6,
+              "spill_slot_count": 32,
+              "spill_envelope_limit": 38,
+              "max_pressure_block": "1698",
+              "max_pressure_boundary": "__zllvm_scalar_form_19725",
+              "max_pressure_spill_slots_needed": 59,
+              "max_pressure_spill_slots_over_envelope": 27,
+              "first_exceeding_block": "1452",
+              "first_exceeding_boundary": "1467",
+              "first_exceeding_live_values": 39,
+              "first_exceeding_spill_slots_needed": 33,
+              "first_exceeding_spill_slots_over_envelope": 1
+            },
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-stack-frame-limit",
+            "function_return_type": "void",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "link.File.loadInput",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "selector_detail": "insertvalue",
+          "rejection": null
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "link.Elf2.loadObject",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-unsupported-value",
+          "rejection": {
+            "position": 229,
+            "pressure": null,
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "insertvalue",
+              "result": "168",
+              "type": "{ ptr, i64 }",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": null,
+              "operands": []
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "zig.llvm.Builder.toBitcode",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "composed-block-stack-frame-limit",
+          "rejection": {
+            "position": 0,
+            "pressure": {
+              "blocks": 8249,
+              "edges": 14297,
+              "max_live_in": 80,
+              "max_live_out": 81,
+              "max_pressure": 83,
+              "no_spill_limit": 6,
+              "spill_slot_count": 32,
+              "spill_envelope_limit": 38,
+              "max_pressure_block": "2093",
+              "max_pressure_boundary": "2096",
+              "max_pressure_spill_slots_needed": 77,
+              "max_pressure_spill_slots_over_envelope": 45,
+              "first_exceeding_block": ".lr.ph",
+              "first_exceeding_boundary": ".sroa.1.0..sroa_idx.i.i5070",
+              "first_exceeding_live_values": 39,
+              "first_exceeding_spill_slots_needed": 33,
+              "first_exceeding_spill_slots_over_envelope": 1
+            },
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-stack-frame-limit",
+            "function_return_type": "void",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "Io.Writer.printValue__func_18583",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-unsupported-value",
+          "rejection": {
+            "position": 22458,
+            "pressure": null,
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "cast",
+              "result": "7267",
+              "type": "fp128",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": "bitcast",
+              "operands": []
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "link.File.updateExports",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-unsupported-value",
+          "rejection": {
+            "position": 5131,
+            "pressure": null,
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "freeze",
+              "result": ".fr.i1355.i",
+              "type": "{ i64, i1 }",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": null,
+              "operands": []
+            },
+            "comparison": null,
+            "freeze": {
+              "type": "{ i64, i1 }",
+              "result": null,
+              "operand": null
+            },
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "Sema.analyzeBodyInner",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-unsupported-value",
+          "rejection": {
+            "position": 53492,
+            "pressure": null,
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "call",
+              "result": "13545",
+              "type": "fp128",
+              "callee": "Value.toFloat__func_4577",
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": null,
+              "operands": []
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.llvm.FuncGen.genBody",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-llvm-intrinsic",
+          "rejection": {
+            "position": 48837,
+            "pressure": null,
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-llvm-intrinsic",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": {
+              "callee": "llvm.ctlz.i128",
+              "indirect": false,
+              "return_type": "i128",
+              "return_attrs": "range(i128 0, 129)",
+              "calling_convention": null,
+              "tail_kind": null,
+              "callee_function_type": null,
+              "inline_asm": null,
+              "attributes": null,
+              "operand_bundle": null,
+              "result": "3711",
+              "arguments": [
+                {
+                  "type": "i128",
+                  "attrs": "range(i128 1, -170141183460469231731687303715884105727)",
+                  "value": "%3708",
+                  "location": "spill128",
+                  "origin": "binary"
+                },
+                {
+                  "type": "i1",
+                  "attrs": null,
+                  "value": "1",
+                  "location": null,
+                  "origin": "int"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.c.genBodyInner",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-arg-type",
+          "rejection": {
+            "position": 19687,
+            "pressure": null,
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-arg-type",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": {
+              "callee": "Zcu.PerThread.floatValue__func_20241",
+              "indirect": false,
+              "return_type": "void",
+              "return_attrs": null,
+              "calling_convention": "fastcc",
+              "tail_kind": null,
+              "callee_function_type": null,
+              "inline_asm": null,
+              "attributes": null,
+              "operand_bundle": null,
+              "result": null,
+              "arguments": [
+                {
+                  "type": "ptr",
+                  "attrs": "dead_on_unwind noalias writeonly align 4 captures(none)",
+                  "value": "%__zllvm_padded_frame_4833",
+                  "location": "spill64",
+                  "origin": "gep"
+                },
+                {
+                  "type": "ptr",
+                  "attrs": null,
+                  "value": "%.sroa.0.0.copyload748.i",
+                  "location": "spill64",
+                  "origin": "load"
+                },
+                {
+                  "type": "i64",
+                  "attrs": null,
+                  "value": "%.sroa.5.0.copyload.i2174",
+                  "location": "spill64",
+                  "origin": "load"
+                },
+                {
+                  "type": "i32",
+                  "attrs": null,
+                  "value": "%7521",
+                  "location": "spill64",
+                  "origin": "load"
+                },
+                {
+                  "type": "fp128",
+                  "attrs": null,
+                  "value": "0xL00000000000000007FFF800000000000",
+                  "location": null,
+                  "origin": "fp"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.sparc64.CodeGen.genBody",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-call-ptr-arg",
+          "rejection": {
+            "position": 1669,
+            "pressure": null,
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-ptr-arg",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": {
+              "callee": "codegen.sparc64.CodeGen.finishAir",
+              "indirect": false,
+              "return_type": "void",
+              "return_attrs": null,
+              "calling_convention": "fastcc",
+              "tail_kind": null,
+              "callee_function_type": null,
+              "inline_asm": null,
+              "attributes": null,
+              "operand_bundle": null,
+              "result": null,
+              "arguments": [
+                {
+                  "type": "ptr",
+                  "attrs": "nonnull align 8",
+                  "value": "%0",
+                  "location": "spill64",
+                  "origin": "parameter"
+                },
+                {
+                  "type": "i32",
+                  "attrs": null,
+                  "value": "%739",
+                  "location": "spill64",
+                  "origin": "load"
+                },
+                {
+                  "type": "ptr",
+                  "attrs": "noundef nonnull readonly align 8",
+                  "value": "%__zllvm_scalar_form_5333",
+                  "location": "spill64",
+                  "origin": "gep"
+                },
+                {
+                  "type": "ptr",
+                  "attrs": "noundef nonnull readonly align 4",
+                  "value": "%14",
+                  "location": "stack_i32_array",
+                  "origin": "alloca"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.x86_64.CodeGen.genBody",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "stage2-phi-src-stack-i32-array",
+          "rejection": null
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.riscv64.CodeGen.airAsm",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "selector_detail": "composed-block-unknown-lhs",
+          "rejection": {
+            "position": 5668,
+            "pressure": null,
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-unknown-lhs",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "binary",
+              "result": "2263",
+              "type": "i64",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": "sub",
+              "operands": [
+                {
+                  "type": "i64",
+                  "attrs": null,
+                  "value": "ptrtoint (ptr @__anon_84358 to i64)",
+                  "location": null,
+                  "origin": "constant_expr"
+                },
+                {
+                  "type": "i64",
+                  "attrs": null,
+                  "value": "%2198",
+                  "location": "spill64",
+                  "origin": "cast"
+                }
+              ]
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.loongarch.Select.body",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "selector_detail": "composed-block-cast-width",
+          "rejection": {
+            "position": 3732,
+            "pressure": null,
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": {
+              "kind": "cast",
+              "result": "12367",
+              "type": "i65",
+              "callee": null,
+              "allocated_type": null,
+              "allocation_attrs": null,
+              "operation": "zext",
+              "operands": [
+                {
+                  "type": "i64",
+                  "attrs": null,
+                  "value": "%12300",
+                  "location": "spill64",
+                  "origin": "binary"
+                }
+              ]
+            },
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.loongarch.Assemble.parseInstruction",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "composed-block-stack-frame-limit",
+          "rejection": {
+            "position": 0,
+            "pressure": {
+              "blocks": 20982,
+              "edges": 39934,
+              "max_live_in": 17,
+              "max_live_out": 17,
+              "max_pressure": 20,
+              "no_spill_limit": 6,
+              "spill_slot_count": 32,
+              "spill_envelope_limit": 38,
+              "max_pressure_block": ".lr.ph.i6254.preheader",
+              "max_pressure_boundary": "__zllvm_scalar_form_107644",
+              "max_pressure_spill_slots_needed": 14,
+              "max_pressure_spill_slots_over_envelope": 0,
+              "first_exceeding_block": "-",
+              "first_exceeding_boundary": "-",
+              "first_exceeding_live_values": 0,
+              "first_exceeding_spill_slots_needed": 0,
+              "first_exceeding_spill_slots_over_envelope": 0
+            },
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-stack-frame-limit",
+            "function_return_type": "void",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        },
+        {
+          "event": "function",
+          "selected": false,
+          "function": "codegen.aarch64.Select.body",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "selector_detail": "composed-block-stack-frame-limit",
+          "rejection": {
+            "position": 0,
+            "pressure": {
+              "blocks": 10066,
+              "edges": 26958,
+              "max_live_in": 58,
+              "max_live_out": 59,
+              "max_pressure": 61,
+              "no_spill_limit": 6,
+              "spill_slot_count": 32,
+              "spill_envelope_limit": 38,
+              "max_pressure_block": "13543",
+              "max_pressure_boundary": "13545",
+              "max_pressure_spill_slots_needed": 55,
+              "max_pressure_spill_slots_over_envelope": 23,
+              "first_exceeding_block": "\"hash_map.Custom(Air.Inst.Index,codegen.aarch64.Select.Value.Index,hash_map.AutoContext(Air.Inst.Index),80).capacity.exit36.i.i.i.i20568\"",
+              "first_exceeding_boundary": "__zllvm_scalar_form_1399",
+              "first_exceeding_live_values": 39,
+              "first_exceeding_spill_slots_needed": 33,
+              "first_exceeding_spill_slots_over_envelope": 1
+            },
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "composed-block-stack-frame-limit",
+            "function_return_type": "i32",
+            "function_return_attrs": null,
+            "function_calling_convention": "fastcc",
+            "parameter": null,
+            "definition": null,
+            "comparison": null,
+            "freeze": null,
+            "global_address": null,
+            "readonly_table": null,
+            "call": null
+          }
+        }
+      ]
+    },
+    "new_outside_initial_targets": [
+      "codegen.generateFunction"
+    ],
+    "target_scope": "Original132 first-failure block-count/indirect-PHI/control-flow/owned-identity targets remain explicit. Every complete-input transition is retained, including successes outside that original group.",
+    "compiler_production": {
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 8664,
+        "failed": 264
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": [
+        "\"zig.llvm.bitcode_writer.BitcodeWriter(&.{ zig.llvm.Builder.Type, zig.llvm.Builder.FunctionAttributes }[0..2]).BlockWriter(zig.llvm.ir.ModuleBlock.MetadataBlock).init__func_17680\"",
+        "Air.Legalize.legalizeBody",
+        "Air.print.Writer.writeBody",
+        "Builtin.append",
+        "Compilation.getAllErrorsAlloc",
+        "InternPool.Key.typeOf",
+        "InternPool.PackedCallingConvention.pack",
+        "InternPool.dump",
+        "InternPool.typeOf",
+        "InternPool.zigTypeTag",
+        "Io.Threaded.fileMemoryMapWrite",
+        "Io.Threaded.linkat",
+        "Io.Threaded.posixExec",
+        "Sema.InMemoryCoercionResult.report",
+        "Sema.analyzeCall",
+        "Sema.analyzeMemoizedState",
+        "Sema.callconvCoerceAllowed",
+        "Sema.coerceInMemoryAllowedErrorSets",
+        "Sema.fieldPtr",
+        "Sema.fieldVal",
+        "Sema.ptrCastFull",
+        "Sema.resolveErrSetIsEmpty",
+        "Sema.zirErrorCast",
+        "Sema.zirTypeInfo",
+        "Target.cCallingConvention",
+        "Target.toElfMachine",
+        "Zcu.PerThread.ensureTypeLayoutUpToDate",
+        "__zig_tag_name_codegen.x86_64.Encoding.Mnemonic",
+        "codegen.aarch64.Assemble.SymbolSpec.parse__func_44353",
+        "codegen.aarch64.Assemble.nextToken__func_37608",
+        "codegen.aarch64.Assemble.nextToken__func_43328",
+        "codegen.aarch64.Select.CallAbiIterator.homogeneousAggregateBaseType",
+        "codegen.aarch64.Select.CallAbiIterator.param",
+        "codegen.aarch64.Select.Value.FieldPartIterator.next",
+        "codegen.aarch64.Select.analyze",
+        "codegen.aarch64.Select.cmp",
+        "codegen.aarch64.encoding.Instruction.add",
+        "codegen.aarch64.encoding.Instruction.adds",
+        "codegen.aarch64.encoding.Instruction.and",
+        "codegen.aarch64.encoding.Instruction.ands",
+        "codegen.aarch64.encoding.Instruction.bic",
+        "codegen.aarch64.encoding.Instruction.eor",
+        "codegen.aarch64.encoding.Instruction.ldp",
+        "codegen.aarch64.encoding.Instruction.ldr",
+        "codegen.aarch64.encoding.Instruction.ldrb",
+        "codegen.aarch64.encoding.Instruction.ldrh",
+        "codegen.aarch64.encoding.Instruction.ldrsb",
+        "codegen.aarch64.encoding.Instruction.ldrsh",
+        "codegen.aarch64.encoding.Instruction.orn",
+        "codegen.aarch64.encoding.Instruction.orr",
+        "codegen.aarch64.encoding.Instruction.prfm",
+        "codegen.aarch64.encoding.Instruction.stp",
+        "codegen.aarch64.encoding.Instruction.str",
+        "codegen.aarch64.encoding.Instruction.strb",
+        "codegen.aarch64.encoding.Instruction.strh",
+        "codegen.aarch64.encoding.Instruction.sub",
+        "codegen.aarch64.encoding.Instruction.subs",
+        "codegen.aarch64.encoding.Register.Alias.encode__func_12863",
+        "codegen.generateFunction",
+        "codegen.llvm.Object.writeZllvmStructuredAirV2",
+        "codegen.llvm.initializeLLVMTarget",
+        "codegen.loongarch.Select.CallAbiIterator.resolve",
+        "codegen.loongarch.Select.Value.Index.split",
+        "codegen.loongarch.Select.moveConstant",
+        "codegen.riscv64.CodeGen.freeValue",
+        "codegen.riscv64.CodeGen.genBody",
+        "codegen.sparc64.CodeGen.processDeath",
+        "codegen.sparc64.CodeGen.reuseOperand",
+        "codegen.wasm.Emit.lower",
+        "codegen.x86_64.CodeGen.airAsm",
+        "codegen.x86_64.CodeGen.genCall",
+        "codegen.x86_64.CodeGen.genCopy",
+        "codegen.x86_64.CodeGen.genShiftBinOpMir",
+        "codegen.x86_64.CodeGen.lowerSwitchBr",
+        "codegen.x86_64.Emit.emitMir",
+        "codegen.x86_64.bits.Condition.negate",
+        "compress.flate.Decompress.streamInner",
+        "hash.xxhash.XxHash64.final",
+        "libs.freebsd.buildSharedObjects",
+        "libs.glibc.buildSharedObjects",
+        "link.Coff.idle",
+        "link.Coff.loadObject",
+        "link.Coff.verifyParentSectionAttributes",
+        "link.Elf.writeSyntheticSections",
+        "link.Elf2.addRelocAssumeCapacity",
+        "link.Elf2.loadDso",
+        "link.Elf2.updateGlobalDynamic",
+        "link.Lld.coffLink",
+        "link.Lld.elfLink",
+        "link.MachO.Object.parse",
+        "link.Spirv.Flush.emitCapabilities",
+        "link.Wasm.Object.parse",
+        "main.ClangSearchSanitizer.addIncludePath",
+        "math.big.int.Const.toFloat__func_8846",
+        "math.big.int.Const.toFloat__func_8861",
+        "math.big.int.Const.toFloat__func_8873",
+        "meta.eql__func_11126",
+        "sort.block.block__func_12807",
+        "sort.block.block__func_13916",
+        "sort.block.block__func_14967",
+        "zig.AstGen.breakExpr",
+        "zig.AstGen.checkLabelRedefinition",
+        "zig.AstGen.continueExpr",
+        "zig.AstGen.detectLocalShadowing",
+        "zig.AstGen.localVarRef",
+        "zig.Parse.assignOpNode",
+        "zig.Parse.parseContainerMembers",
+        "zig.llvm.Builder.Function.Instruction.Tag.toCmpPredicate",
+        "zig.llvm.Builder.attr",
+        "zig.llvm.Builder.print",
+        "zig.llvm.Builder.tripleForTarget",
+        "zig.tokenizer.Tokenizer.next"
+      ],
+      "probe_selected_identities_match": true,
+      "probe_failure_tuples_match": true,
+      "profile_function_count": 8928,
+      "final_failure_groups": [
+        {
+          "diagnostic": "ValueUseUnsupportedSource",
+          "selector_tag": "-",
+          "functions": 5,
+          "example": "debug.unlockStderr"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "functions": 93,
+          "example": "heap.ArenaAllocator.remap"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "functions": 89,
+          "example": "InternPool.Key.eql"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "functions": 63,
+          "example": "hash.auto_hash.autoHash__func_432"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "functions": 8,
+          "example": "Io.Threaded.sleep"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "\"crypto.siphash.SipHash(u128,1,3).final\""
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "functions": 5,
+          "example": "sort.block.block__func_15047"
+        }
+      ]
+    },
+    "runtime_production": {
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 285,
+        "failed": 170
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": [],
+      "probe_selected_identities_match": true,
+      "probe_failure_tuples_match": true,
+      "profile_function_count": 455,
+      "final_failure_groups": [
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "functions": 19,
+          "example": "compiler_rt.__negxf2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "functions": 27,
+          "example": "compiler_rt.atomics.__atomic_fetch_umin_16"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "functions": 93,
+          "example": "compiler_rt.trunc.truncq"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "functions": 11,
+          "example": "compiler_rt.sqrt.__sqrth"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_type",
+          "functions": 1,
+          "example": "compiler_rt.trig.cosq"
+        },
+        {
+          "diagnostic": "UnsupportedLongDoubleAbi",
+          "selector_tag": "unsupported_type",
+          "functions": 11,
+          "example": "compiler_rt.round.roundq"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_instruction",
+          "functions": 1,
+          "example": "compiler_rt.addf3.__subhf3"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "functions": 3,
+          "example": "compiler_rt.float_from_int.__floattidf"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_spill_envelope",
+          "functions": 2,
+          "example": "compiler_rt.cmp.__ucmpti2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "compiler_rt.bswap.__bswapti2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "compiler_rt.bitreverse.__bitreverseti2"
+        }
+      ]
+    },
+    "compiler_events": {
+      "sequence": 3976792,
+      "elapsed_ns": 3658129539810,
+      "begins": 8928,
+      "ends": 8928,
+      "selected": 8664,
+      "failed": 264,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 8664,
+        "failed_functions": 264,
+        "normalization_runs": 66330,
+        "legalizer_attempts": 1307076,
+        "legalizer_rewrites": 64518,
+        "original_form_retries": 33324,
+        "original_form_selected": 7111,
+        "selection_iterations": 66330,
+        "max_selection_iterations": 29,
+        "emitted_instructions": 15946460,
+        "emitted_spill_instructions": 3761008
+      },
+      "unique_functions": 8928
+    },
+    "runtime_events": {
+      "sequence": 81761,
+      "elapsed_ns": 1675613395,
+      "begins": 455,
+      "ends": 455,
+      "selected": 285,
+      "failed": 170,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 285,
+        "failed_functions": 170,
+        "normalization_runs": 1403,
+        "legalizer_attempts": 25859,
+        "legalizer_rewrites": 1107,
+        "original_form_retries": 778,
+        "original_form_selected": 159,
+        "selection_iterations": 1403,
+        "max_selection_iterations": 13,
+        "emitted_instructions": 64065,
+        "emitted_spill_instructions": 12848
+      },
+      "unique_functions": 455
+    },
+    "production_attempts": {
+      "compiler": {
+        "accepted_attempt": "production-compiler-retry.json",
+        "accepted_output": "compiler-production-retry",
+        "timeout_ms": 7200000,
+        "previous_incomplete_attempt": "production-compiler.json",
+        "previous_output": "compiler-production",
+        "previous_timeout_ms": 3600000,
+        "previous_backend_outcome": "timed_out",
+        "previous_actual_backend_exit": -15,
+        "previous_attempt_has_no_terminal_selection_proof": true
+      },
+      "runtime": {
+        "accepted_attempt": "production-runtime.json",
+        "accepted_output": "runtime-production",
+        "reused_completed_command": true
+      },
+      "scope": "Exact same frozen compiler and original input. Only the incomplete compiler production command is rerun with an explicit existing deadline override; no completed gate/census/runtime replay is repeated."
+    },
+    "supervision": "Both complete censuses and the completed production replays have durable actual checked return codes. The first compiler replay timed out and has no terminal selection proof; only its same-source retry with the existing explicit two-hour deadline supplies compiler production acceptance.",
+    "scope": "Complete unchanged compiler/runtime inputs; selection proof, no complete object or execution credit"
+  },
+  "new_native_audit": {
+    "compiler_builds": [
+      {
+        "mode": "Debug",
+        "sha256": "287dd683930101041f993f1206d973ca74df9138014acb9514affbcceac38efb"
+      },
+      {
+        "mode": "ReleaseFast",
+        "sha256": "a213710228bfcc5d09c811c9eee7a88dd40376b85af42fa9e03b2e4906b19f49"
+      }
+    ],
+    "release_modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "populations": [
+      {
+        "name": "large_cfg",
+        "unique_functions": 5,
+        "observations_per_executable": 2624,
+        "local_observations_per_compiler_build": 15744,
+        "reference_observations_per_compiler_build": 7872
+      },
+      {
+        "name": "indirect_phi_slots",
+        "unique_functions": 17,
+        "observations_per_executable": 2176,
+        "local_observations_per_compiler_build": 13056,
+        "reference_observations_per_compiler_build": 6528
+      }
+    ],
+    "reports": [
+      {
+        "schema": "native-canary-v1",
+        "population": "large_cfg",
+        "compiler_sha256": "287dd683930101041f993f1206d973ca74df9138014acb9514affbcceac38efb",
+        "registry_sha256": "8eae0983fd80337eeab1121e7cd80deaa005de6f1a7e104f8dfc081de1d31885",
+        ".ll": "1a61544e8bbf2d5a6d6206f5cac878c52d85281bad3e849274e42d2a73837a39",
+        "_driver.c": "70eb52ad1a640ac7ff8975982198b512016d742eb796ae7ccd02790452ba41ca",
+        "large_cfg_reference_observations": 7872,
+        "large_cfg_local_observations": 15744,
+        "status": "passed"
+      },
+      {
+        "schema": "native-canary-v1",
+        "population": "indirect_phi_slots",
+        "compiler_sha256": "287dd683930101041f993f1206d973ca74df9138014acb9514affbcceac38efb",
+        "registry_sha256": "8eae0983fd80337eeab1121e7cd80deaa005de6f1a7e104f8dfc081de1d31885",
+        ".ll": "0577fa084fc17ff3806cb74733101ba547104d147be084a24582dd22073df675",
+        "_driver.c": "278afd026875d9d9685640776b46b76e2b278e04cc5b855e0ef86af65571ed32",
+        "indirect_phi_slots_reference_observations": 6528,
+        "indirect_phi_slots_local_observations": 13056,
+        "status": "passed"
+      },
+      {
+        "schema": "native-canary-v1",
+        "population": "large_cfg",
+        "compiler_sha256": "a213710228bfcc5d09c811c9eee7a88dd40376b85af42fa9e03b2e4906b19f49",
+        "registry_sha256": "8eae0983fd80337eeab1121e7cd80deaa005de6f1a7e104f8dfc081de1d31885",
+        ".ll": "1a61544e8bbf2d5a6d6206f5cac878c52d85281bad3e849274e42d2a73837a39",
+        "_driver.c": "70eb52ad1a640ac7ff8975982198b512016d742eb796ae7ccd02790452ba41ca",
+        "large_cfg_reference_observations": 7872,
+        "large_cfg_local_observations": 15744,
+        "status": "passed"
+      },
+      {
+        "schema": "native-canary-v1",
+        "population": "indirect_phi_slots",
+        "compiler_sha256": "a213710228bfcc5d09c811c9eee7a88dd40376b85af42fa9e03b2e4906b19f49",
+        "registry_sha256": "8eae0983fd80337eeab1121e7cd80deaa005de6f1a7e104f8dfc081de1d31885",
+        ".ll": "0577fa084fc17ff3806cb74733101ba547104d147be084a24582dd22073df675",
+        "_driver.c": "278afd026875d9d9685640776b46b76e2b278e04cc5b855e0ef86af65571ed32",
+        "indirect_phi_slots_reference_observations": 6528,
+        "indirect_phi_slots_local_observations": 13056,
+        "status": "passed"
+      }
+    ],
+    "scope": "Final fixture, registry and frozen compiler bytes. Byte-identical development-named reports reused. Failed/superseded attempts excluded; the separate original all-SSA giant execution is auxiliary and adds no registry observations."
+  },
+  "native_registry_preservation": {
+    "prior_entries": 72,
+    "current_entries": 74,
+    "all_prior_entries_preserved": true,
+    "new_populations": [
+      "large_cfg",
+      "indirect_phi_slots"
+    ]
+  },
+  "negative_controls": {
+    "wrong_chain_addend": {
+      "llvm_exit": 1,
+      "local_exit": 1
+    },
+    "wrong_long_label_result": {
+      "llvm_exit": 3,
+      "local_exit": 3
+    },
+    "broken_parallel_i128_copy": {
+      "llvm_exit": 12,
+      "local_exit": 12
+    },
+    "broken_parallel_pointer_copy": {
+      "llvm_exit": 30,
+      "local_exit": 30
+    },
+    "wrong_defined_poison_neighbor": {
+      "llvm_exit": 31,
+      "local_exit": 31
+    },
+    "negative_detections": 10,
+    "scope": "Five valid IR mutations compiled by LLVM and the local selector against unchanged independent C drivers; defined paths only and no non-byte padding observations"
+  },
+  "prior_population_comparison": {
+    "prior_native_populations": 72,
+    "current_native_populations": 74,
+    "prior_populations_preserved": true,
+    "population_differences": [],
+    "new_populations": [
+      {
+        "population": "standalone-large-cfg",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "15744",
+        "reference_observations": "7872",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      {
+        "population": "standalone-indirect-phi-slots",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "13056",
+        "reference_observations": "6528",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    ],
+    "core": {
+      "records": 36,
+      "all_selected_object_and_observation_fields_match": true,
+      "strict_records_equal": false,
+      "excluded_fields": [
+        "reference_bytes",
+        "reference_sha256",
+        "linked_bytes",
+        "linked_sha256"
+      ],
+      "scope": "Executable metadata is compared separately; selected-object bytes and all observation fields must match",
+      "executable_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153744",
+          "reference_bytes_after": "4153744",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153752",
+          "reference_bytes_after": "4153752",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151536",
+          "reference_bytes_after": "4151536",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154296",
+          "reference_bytes_after": "4154296",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148368",
+          "reference_bytes_after": "4148368",
+          "linked_bytes_before": "6287753",
+          "linked_bytes_after": "6287753",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153904",
+          "reference_bytes_after": "4153904",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152384",
+          "reference_bytes_after": "4152384",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147800",
+          "reference_bytes_after": "4147800",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148216",
+          "reference_bytes_after": "4148216",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148304",
+          "reference_bytes_after": "4148304",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148280",
+          "reference_bytes_after": "4148280",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148568",
+          "reference_bytes_after": "4148568",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039600",
+          "reference_bytes_after": "4039600",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039600",
+          "reference_bytes_after": "4039600",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035680",
+          "reference_bytes_after": "4035680",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040312",
+          "reference_bytes_after": "4040312",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034168",
+          "reference_bytes_after": "4034168",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039784",
+          "reference_bytes_after": "4039784",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038496",
+          "reference_bytes_after": "4038496",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034448",
+          "reference_bytes_after": "4034448",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034304",
+          "reference_bytes_after": "4034304",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034360",
+          "reference_bytes_after": "4034360",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034328",
+          "reference_bytes_after": "4034328",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034416",
+          "reference_bytes_after": "4034416",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        }
+      ]
+    }
+  },
+  "executable_metadata_review": {
+    "records": 36,
+    "selected_object_and_observation_fields_match": true,
+    "linked_sizes_match": true,
+    "groups": [
+      {
+        "fields": {
+          "mode": "ReleaseFast",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 12
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSafe",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 12
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSmall",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        "records": 8
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSmall",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        "records": 4
+      }
+    ]
+  },
+  "fixed_programs": {
+    "status": "passed",
+    "programs": 5,
+    "program_modes": 15,
+    "prior_source_manifest_emitter_identities_preserved": true,
+    "rows": [
+      {
+        "program": "recursive_fibonacci",
+        "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+        "manifest_sha256": "21bd150575f432aa005026f2db2ce765587f2eb9246cdc2457fec77a7d01a6ad",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "optionals",
+        "source_sha256": "8e47ea56fd5690e7b0220917f8a16eca60aa59537e2b9207ae2bf7ea485c8035",
+        "manifest_sha256": "65c424b0dc648041ec5781552aea18341353931dac668e37bd7f1356c41aed24",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "taking_pointer_of_global_tagged_union",
+        "source_sha256": "d88d9cde2f25cb0134aac0e1d894dcf1448a21e780c8ded5a91130fe7b07d7dc",
+        "manifest_sha256": "07d564db0173432a1f00b774fac6df169f36e80c56ae7853c959b6f70b20ab76",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "array_in_anon_struct",
+        "source_sha256": "9ea4e3efed991237fe3dcca39de9a8826efeb0d8de7df30c385870dc81471dce",
+        "manifest_sha256": "a1c70dc1e3162a0f7a435c7ea3faa60e0a258e5972a70800f7a19c564661764c",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "while_loops",
+        "source_sha256": "4775009971f7b7ba11a1881f55ae5ee97c69519e6ff04bc83f6d740369e41c53",
+        "manifest_sha256": "ed79b9a73c75410c2d2939d6a87519961267e466cc330fe713ecb949fb103327",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      }
+    ]
+  },
+  "zig_corpus": {
+    "status": "passed",
+    "inputs": 29,
+    "input_mode_pairs": 87,
+    "actual_executions": 174,
+    "observation_controls": 603,
+    "independent_oracle": true,
+    "prior_observations_equal": true,
+    "prior_selection_counters_equal": false,
+    "selection_comparison_scope": "Recorded separately; a capability repair may change selection while preserving all oracle observations",
+    "profile_review_against_preceding_checkpoint": {
+      "complete_review_path": "local-state/validations/compiler-selection-completion-20261108/batch-05/zig-corpus-profile-review.json",
+      "complete_review_sha256": "1701feefac2844d7c4f307433a4d1bdb6709a31d715d2b2f68df8de4f37812d2",
+      "scope": "Complete before/after identities and counters retained in sealed raw evidence; summary retains every changed machine counter",
+      "modes": [
+        {
+          "mode": "ReleaseFast",
+          "selected_identities_preserved": true,
+          "owner_counters_preserved": true,
+          "prior_selected_function_count": 1654,
+          "current_selected_function_count": 1654,
+          "aggregate_counters_before": {
+            "selected_functions": 1654,
+            "failed_functions": 0,
+            "normalization_runs": 7446,
+            "legalizer_attempts": 147951,
+            "legalizer_rewrites": 6836,
+            "original_form_retries": 2689,
+            "original_form_selected": 1044,
+            "selection_iterations": 7446,
+            "max_selection_iterations": 18,
+            "emitted_instructions": 366230,
+            "emitted_spill_instructions": 67489
+          },
+          "aggregate_counters_after": {
+            "selected_functions": 1654,
+            "failed_functions": 0,
+            "normalization_runs": 7446,
+            "legalizer_attempts": 154640,
+            "legalizer_rewrites": 6836,
+            "original_form_retries": 2689,
+            "original_form_selected": 1044,
+            "selection_iterations": 7446,
+            "max_selection_iterations": 18,
+            "emitted_instructions": 366245,
+            "emitted_spill_instructions": 67498
+          },
+          "changed_function_count": 1642,
+          "machine_counter_changes": [
+            {
+              "name": "Io.Threaded.posixExec",
+              "prior": {
+                "selected_functions": 1,
+                "failed_functions": 0,
+                "normalization_runs": 12,
+                "legalizer_attempts": 222,
+                "legalizer_rewrites": 12,
+                "original_form_retries": 6,
+                "original_form_selected": 1,
+                "selection_iterations": 12,
+                "max_selection_iterations": 12,
+                "emitted_instructions": 844,
+                "emitted_spill_instructions": 161
+              },
+              "current": {
+                "selected_functions": 1,
+                "failed_functions": 0,
+                "normalization_runs": 12,
+                "legalizer_attempts": 232,
+                "legalizer_rewrites": 12,
+                "original_form_retries": 6,
+                "original_form_selected": 1,
+                "selection_iterations": 12,
+                "max_selection_iterations": 12,
+                "emitted_instructions": 859,
+                "emitted_spill_instructions": 170
+              }
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSafe",
+          "selected_identities_preserved": true,
+          "owner_counters_preserved": true,
+          "prior_selected_function_count": 1873,
+          "current_selected_function_count": 1873,
+          "aggregate_counters_before": {
+            "selected_functions": 1873,
+            "failed_functions": 0,
+            "normalization_runs": 9116,
+            "legalizer_attempts": 172814,
+            "legalizer_rewrites": 8508,
+            "original_form_retries": 3310,
+            "original_form_selected": 1265,
+            "selection_iterations": 9116,
+            "max_selection_iterations": 20,
+            "emitted_instructions": 474812,
+            "emitted_spill_instructions": 83668
+          },
+          "aggregate_counters_after": {
+            "selected_functions": 1873,
+            "failed_functions": 0,
+            "normalization_runs": 9116,
+            "legalizer_attempts": 180480,
+            "legalizer_rewrites": 8508,
+            "original_form_retries": 3310,
+            "original_form_selected": 1265,
+            "selection_iterations": 9116,
+            "max_selection_iterations": 20,
+            "emitted_instructions": 474823,
+            "emitted_spill_instructions": 83675
+          },
+          "changed_function_count": 1852,
+          "machine_counter_changes": [
+            {
+              "name": "Io.Threaded.posixExec",
+              "prior": {
+                "selected_functions": 1,
+                "failed_functions": 0,
+                "normalization_runs": 13,
+                "legalizer_attempts": 228,
+                "legalizer_rewrites": 13,
+                "original_form_retries": 6,
+                "original_form_selected": 1,
+                "selection_iterations": 13,
+                "max_selection_iterations": 13,
+                "emitted_instructions": 1330,
+                "emitted_spill_instructions": 256
+              },
+              "current": {
+                "selected_functions": 1,
+                "failed_functions": 0,
+                "normalization_runs": 13,
+                "legalizer_attempts": 238,
+                "legalizer_rewrites": 13,
+                "original_form_retries": 6,
+                "original_form_selected": 1,
+                "selection_iterations": 13,
+                "max_selection_iterations": 13,
+                "emitted_instructions": 1341,
+                "emitted_spill_instructions": 263
+              }
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSmall",
+          "selected_identities_preserved": true,
+          "owner_counters_preserved": true,
+          "prior_selected_function_count": 866,
+          "current_selected_function_count": 866,
+          "aggregate_counters_before": {
+            "selected_functions": 866,
+            "failed_functions": 0,
+            "normalization_runs": 3790,
+            "legalizer_attempts": 74846,
+            "legalizer_rewrites": 3455,
+            "original_form_retries": 1296,
+            "original_form_selected": 531,
+            "selection_iterations": 3790,
+            "max_selection_iterations": 17,
+            "emitted_instructions": 164251,
+            "emitted_spill_instructions": 29506
+          },
+          "aggregate_counters_after": {
+            "selected_functions": 866,
+            "failed_functions": 0,
+            "normalization_runs": 3790,
+            "legalizer_attempts": 78235,
+            "legalizer_rewrites": 3455,
+            "original_form_retries": 1296,
+            "original_form_selected": 531,
+            "selection_iterations": 3790,
+            "max_selection_iterations": 17,
+            "emitted_instructions": 164266,
+            "emitted_spill_instructions": 29515
+          },
+          "changed_function_count": 860,
+          "machine_counter_changes": [
+            {
+              "name": "Io.Threaded.posixExec",
+              "prior": {
+                "selected_functions": 1,
+                "failed_functions": 0,
+                "normalization_runs": 12,
+                "legalizer_attempts": 222,
+                "legalizer_rewrites": 12,
+                "original_form_retries": 6,
+                "original_form_selected": 1,
+                "selection_iterations": 12,
+                "max_selection_iterations": 12,
+                "emitted_instructions": 842,
+                "emitted_spill_instructions": 161
+              },
+              "current": {
+                "selected_functions": 1,
+                "failed_functions": 0,
+                "normalization_runs": 12,
+                "legalizer_attempts": 232,
+                "legalizer_rewrites": 12,
+                "original_form_retries": 6,
+                "original_form_selected": 1,
+                "selection_iterations": 12,
+                "max_selection_iterations": 12,
+                "emitted_instructions": 857,
+                "emitted_spill_instructions": 170
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "counter_delta_review": {
+      "scope": "Selected IDs and owners preserved; extra optional-stage attempts are distinguished from machine instruction/spill deltas",
+      "modes": [
+        {
+          "mode": "ReleaseFast",
+          "changed_any_counters": 1642,
+          "changed_machine_counters": 1,
+          "changed_legalizer_attempts": 1642,
+          "aggregate_instruction_delta": 15,
+          "aggregate_spill_delta": 9,
+          "aggregate_legalizer_attempt_delta": 6689,
+          "machine_counter_examples": [
+            {
+              "name": "Io.Threaded.posixExec",
+              "instruction_delta": 15,
+              "spill_delta": 9
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSafe",
+          "changed_any_counters": 1852,
+          "changed_machine_counters": 1,
+          "changed_legalizer_attempts": 1852,
+          "aggregate_instruction_delta": 11,
+          "aggregate_spill_delta": 7,
+          "aggregate_legalizer_attempt_delta": 7666,
+          "machine_counter_examples": [
+            {
+              "name": "Io.Threaded.posixExec",
+              "instruction_delta": 11,
+              "spill_delta": 7
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSmall",
+          "changed_any_counters": 860,
+          "changed_machine_counters": 1,
+          "changed_legalizer_attempts": 860,
+          "aggregate_instruction_delta": 15,
+          "aggregate_spill_delta": 9,
+          "aggregate_legalizer_attempt_delta": 3389,
+          "machine_counter_examples": [
+            {
+              "name": "Io.Threaded.posixExec",
+              "instruction_delta": 15,
+              "spill_delta": 9
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "c_corpus": {
+    "status": "passed",
+    "inputs": 46,
+    "matched_inputs": 138,
+    "negative_controls": 552,
+    "source_files_equal": true,
+    "manifest_equal": true,
+    "observations_equal": true
+  },
+  "controls": {
+    "schema": "execution-breadth-controls-v2",
+    "rows": [
+      {
+        "mode": "ReleaseFast",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      }
+    ],
+    "negative_controls": 54,
+    "function_modes": 21,
+    "observations": 22788,
+    "status": "passed"
+  },
+  "full_run": {
+    "log": "local-state/validations/compiler-selection-completion-20261108/batch-05/full-cached.log",
+    "checked_capture": "local-state/validations/compiler-selection-completion-20261108/batch-05/full-cached.json",
+    "command": "local-state/validations/compiler-selection-completion-20261108/batch-05/run-full.sh",
+    "outcome": "completed",
+    "actual_command_returncode": 0,
+    "wall_ms": 4593977,
+    "sample_count": 2272,
+    "minimum_available_bytes_in_capture": 21712384000,
+    "scope": "Durable actual checked exit0, all17 gate exit0 records, final local_fail0 and terminal success verified. Samples/timings include concurrent census/replay/research activity."
+  },
+  "production_waiting_helper": {
+    "waiting_helper_pid": 1712219,
+    "signal": "TERM",
+    "reason": "Runtime production command had already completed with actual checked exit1; its old combined helper waited for the later runtime census before starting compiler production. Stop only that idle helper and start the compiler command separately so census and replay overlap.",
+    "runtime_command_completed_before_stop": true,
+    "production_command_interrupted": false,
+    "census_commands_interrupted": false,
+    "stop_was_intentional": true
+  },
+  "artifact_manifest": {
+    "path": "local-state/validations/compiler-selection-completion-20261108/batch-05/acceptance-artifacts.sha256",
+    "sha256": "c1d16c0abcaf0de509830660f71e2299b523a81c8d4e59247e898dd70021901e",
+    "files": 2759,
+    "sealed": true
+  },
+  "retention": {
+    "original_inputs_retained": true,
+    "original_scratch_files": 13,
+    "scratch_unchanged": true,
+    "prior_evidence_retained": true,
+    "air_payloads_retained": true,
+    "manual_cache_retirement": false,
+    "archives_created": false,
+    "scope": "Runners clean their own disposable state; retained evidence, original inputs and scratch are preserved"
+  },
+  "report_retention": {
+    "full_command_supervision": "setsid detached checked runner completed with actual returncode0",
+    "full_serial_passed_gates": 17,
+    "terminal_success_line_verified": true,
+    "retention_helper_exit": 0,
+    "fifo_removed": true,
+    "retained_files": 116,
+    "filenames_match_preceding_checkpoint": true,
+    "all_required_final_reports_verified": true,
+    "collector_returncode": 0,
+    "scope": "All durable gate exits, checked process exit, final serial summary and every required final report verified. No interrupted supervision or inferred return codes."
+  },
+  "auxiliary_research": {
+    "scope": "Read-only copied-source sizing and snapshot measurements add no acceptance unit, native population or selection credit",
+    "frame_sizing_path": "local-state/validations/compiler-selection-completion-20261108/batch-05/frame-research.jsonl",
+    "snapshot_benchmark_path": "local-state/validations/compiler-selection-completion-20261108/batch-05/snapshot-research-v3.log",
+    "original_all_ssa_giant": {
+      "blocks": 20976,
+      "debug_command_returncode": 0,
+      "debug_wall_ns": 506647320240,
+      "native_observations": 2624,
+      "included_in_native_registry_totals": false
+    },
+    "wide_float_inventory": "local-state/validations/compiler-selection-completion-20261108/batch-05/next-wide-float-inventory.json"
+  },
+  "excluded_development_attempts": [
+    "Initial worklist unit and copied snapshot benchmark filters matched only empty root tests; these zero-actual-test attempts are excluded",
+    "The first large all-SSA fixture exceeded the default1MiB CLI input limit; its separate explicit-input-limit Debug execution later passed, but has no registry population credit",
+    "Debug large-fixture selection and unanchored release block merging reached the120s runner deadline. Final registered fixtures preserve observable original block addresses and pass unchanged runner limits",
+    "Scalar blockaddress global initialization and unused anchor linkage hit existing parser/emission boundaries. The final fixture uses supported single-element pointer arrays and defined IR loads/stores that observe their identities",
+    "The initial half PHI fixture hit the existing arbitrary-pointer half-store boundary; the final fixture observes exact FP bits through supported integer memory",
+    "The initial indirect-PHI driver used equal low bits for i1 values. Final driver inputs make their low bits distinct and all matrices were rerun against its final hash",
+    "Superseded fixtures, registries, binaries, focused failures and earlier timing versions remain retained without final acceptance credit",
+    "Only an idle old production waiting helper was intentionally terminated after the runtime production command completed. Actual production commands and both complete censuses retain their checked return codes",
+    "The first compiler production replay reached its default one-hour deadline: timed_out, actual backend exit -15, no terminal selection proof. Its retained output is excluded from acceptance. The same frozen compiler and unchanged input were replayed with the existing explicit timeout-ms7200000 option; the completed retry supplies the compiler production proof"
+  ],
+  "next_frontier": [
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "stage2-unsupported-value"
+      },
+      "functions": 50
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      "functions": 39
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-cast-width"
+      },
+      "functions": 17
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "load"
+      },
+      "functions": 15
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "phi"
+      },
+      "functions": 14
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-unknown-lhs"
+      },
+      "functions": 12
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "unsupported-param-type"
+      },
+      "functions": 12
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "stage2-phi-src-stack-i32-array"
+      },
+      "functions": 11
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-param-width"
+      },
+      "functions": 9
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-form"
+      },
+      "functions": 7
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-memcpy-src"
+      },
+      "functions": 7
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "call-ret"
+      },
+      "functions": 5
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-binary-imm-lhs"
+      },
+      "functions": 5
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_spill_envelope",
+        "selector_detail": "composed-block-stack-frame-limit"
+      },
+      "functions": 5
+    },
+    {
+      "failure": {
+        "diagnostic": "ValueUseUnsupportedSource",
+        "selector_tag": null,
+        "selector_detail": null
+      },
+      "functions": 5
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-freeze-width"
+      },
+      "functions": 4
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-llvm-intrinsic"
+      },
+      "functions": 4
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_instruction",
+        "selector_detail": "insertvalue"
+      },
+      "functions": 4
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-call-arg-reg"
+      },
+      "functions": 3
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-arg-type"
+      },
+      "functions": 3
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-call-ptr-arg"
+      },
+      "functions": 3
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-load-width"
+      },
+      "functions": 3
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-unknown-byte-gep-ptr"
+      },
+      "functions": 3
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "cast"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-i52-cast-form"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-load-fp-ptr"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-param-reg"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "fcmp"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_instruction",
+        "selector_detail": "inline-asm-call"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "unsupported-return-type"
+      },
+      "functions": 2
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "call-arg"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-half-binary-op"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-intbytesize-signature"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-memcpy-dst"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-memset-attrs"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-pair-binary-op"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_instruction",
+        "selector_detail": "fptoui"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "freeze"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_instruction",
+        "selector_detail": "sdiv"
+      },
+      "functions": 1
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenInstruction",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-memcpy-dst"
+      },
+      "functions": 1
+    }
+  ],
+  "limitations": [
+    "The all8928-selection goal remains active; every remaining original-input rejection still requires implementation and validation",
+    "Selection does not establish complete compiler/runtime object emission, startup or self-rebuild",
+    "Private frame capacity remains1MiB; measured larger frame rejections remain open",
+    "Private PHI transport and identity storage retain explicit scalar/type/resource boundaries",
+    "Canonical graph/lookup indexes do not generalize raw SSA-definition keys or every existing PHI target-spelling comparison",
+    "Selected objects and observations are compared separately from executable wrapper metadata; corpus counter deltas are explicitly reviewed",
+    "The snapshot benchmark measures existing copied-code bookkeeping only; no spill-history optimization has been implemented"
+  ]
+}

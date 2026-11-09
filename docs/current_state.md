@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `5d71dc80300b997717563c6e2f20bfc2da42394f`; tree: `39786e6b79ac0e954ff1ab5b78ca0dc6f8c36e84`.
+Accepted revision: `bb74a371b7b84c023da8356ef4d7a13da3b7ca35`; tree: `6efce2b146f61893661aedd10963e93328d05122`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,30 +31,31 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [runtime storage checkpoint](evidence/runtime_integer_storage.md)
-is accepted at `5d71dc80`: **8,552/8,928**, adding 130 selections without
+The [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
+is accepted at `bb74a371`: **8,664/8,928**, adding 112 selections without
 losing any preceding success. Runtime retains **285/455**. Complete terminal
-census records and independent production replays match on every selection,
-owner and remaining diagnostic tuple. The
+censuses and independent production replays match every selected identity, owner
+and remaining diagnostic tuple. The
 [all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains active
-with 376 failures and authorizes continued implementation.
+with 264 failures and authorizes continued implementation.
 
-All 17 serial integration gates and 72 native populations pass, preserving all
-69 preceding populations. Debug/ReleaseSafe each pass 2,013 units and 24 structural
-checks; Debug reuses its valid cached structural result. Readiness passes all
-nine commands. The suite records 2,104,068 local observations against 1,052,034
-references. Both corpora, five fixed programs and all 54 core fault controls pass.
-All 36 selected core objects, observations and executable sizes match; hashes
-and corpus counter changes are reviewed separately. The 1,212-file seal verifies.
-Interrupted outer full/census captures remain explicit; durable gate records,
-terminal success and independent production matching establish the proofs
-without inventing their unavailable command exit statuses.
+All 17 serial integration gates and 74 native populations pass, preserving all
+72 preceding populations. Debug/ReleaseSafe each pass 2,030 units and 24 fresh
+structural checks. Readiness passes all nine commands. The suite records
+2,132,868 local observations against 1,066,434 references. Both corpora, five
+fixed programs and all 54 core fault controls pass. All 36 selected core objects,
+observations and executable sizes match; hashes and corpus counter changes are
+reviewed separately. The 2,759-file seal verifies. Full and census commands have
+durable actual return codes. The first incomplete compiler replay timed out;
+its same-source retry with the existing explicit two-hour option completed and
+supplies the independently matched production proof.
 
-Private runtime copy lengths, exact integer memory accesses and undefined select
-arms advance the storage frontier. Known pair words and conservative unused-pair
-cleanup preserve ownership and effects. Next work follows larger CFGs,
-indirect/aggregate PHIs, owned identities, pointer flow and wide/FP ABI limits.
-Selection does not establish whole-compiler objects, startup or self-rebuild.
+Canonical CFG indexes, complete successor liveness, private indirect scalar PHI
+slots and longer owned identities advance the control-flow frontier. Original
+block addresses, source ownership and the frozen bypass inventory remain intact.
+Next work follows measured large frames and spill bookkeeping, aggregate PHIs,
+pointer flow and wide/FP ABI limits. Selection does not establish whole-compiler
+objects, startup or self-rebuild.
 
 The preceding [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
 is accepted at `d06659d1`. Compiler selection reaches **8,422/8,928**, adding
