@@ -323,6 +323,16 @@ test "scalar forms bounded stack memset retains unknown extent and volatile boun
             4 => call.args.items[0].attrs = "align 8 addrspace(1)",
             else => unreachable,
         }
+        if (boundary == 3) {
+            // The byte is now a private zero refinement. Other malformed,
+            // volatile and unknown-extent cases retain their boundaries.
+            const refined_code = try executable(module);
+            defer std.posix.munmap(refined_code);
+            const refined: *const fn (u64) callconv(.c) u64 = @ptrCast(refined_code.ptr);
+            try std.testing.expectEqual(@as(u64, 0), refined(16));
+            try std.testing.expect(call.args.items[1].value == .poison);
+            continue;
+        }
         var output = machine.MachineFunction.init("fill", .{ .int = 64 });
         defer output.deinit(std.testing.allocator);
         try std.testing.expect((try selector.tryLower(std.testing.allocator, &output, module.functions.items[0])) == .unsupported);

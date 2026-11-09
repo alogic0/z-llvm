@@ -711,6 +711,7 @@ pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
     ir.verifyParameterAttrs(.ptr, attrs) catch return false;
     var rest = std.mem.trim(u8, attrs, " \t");
     var saw_attr = false;
+    var saw_initializes = false;
     while (rest.len != 0) {
         const end = syntax.findTopLevelTokenEnd(rest) orelse return false;
         if (end == 0) return false;
@@ -721,10 +722,18 @@ pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
         if (std.mem.eql(u8, token, "nonnull")) continue;
         if (std.mem.eql(u8, token, "readonly")) continue;
         if (std.mem.eql(u8, token, "writeonly")) continue;
+        if (std.mem.eql(u8, token, "readnone")) continue;
         if (std.mem.eql(u8, token, "noalias")) continue;
         if (std.mem.eql(u8, token, "allocptr")) continue;
         if (std.mem.eql(u8, token, "dead_on_unwind")) continue;
         if (std.mem.eql(u8, token, "captures(none)")) continue;
+        if (std.mem.eql(u8, token, "captures(address)")) continue;
+        if (std.mem.eql(u8, token, "captures(address_is_null)")) continue;
+        if (initializesAttrSupported(token)) {
+            if (saw_initializes) return false;
+            saw_initializes = true;
+            continue;
+        }
         if (std.mem.startsWith(u8, token, "dereferenceable(")) continue;
         if (!std.mem.eql(u8, token, "align")) return false;
         const alignment_end = syntax.findTopLevelTokenEnd(rest) orelse return false;
@@ -734,22 +743,84 @@ pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
     return saw_attr;
 }
 
+// LLVM's ConstantRangeList requires signed, increasing, separated ranges.
+// Parameter verification recognizes the attribute envelope; validate its full
+// payload before treating it as a promise with no machine ABI effect.
+fn initializesAttrSupported(token: []const u8) bool {
+    const prefix = "initializes(";
+    if (!std.mem.startsWith(u8, token, prefix) or !std.mem.endsWith(u8, token, ")")) return false;
+    var rest = std.mem.trim(u8, token[prefix.len .. token.len - 1], " \t");
+    var previous_high: ?i64 = null;
+    while (rest.len != 0) {
+        if (rest[0] != '(') return false;
+        const close = std.mem.indexOfScalar(u8, rest, ')') orelse return false;
+        const pair = rest[1..close];
+        const comma = std.mem.indexOfScalar(u8, pair, ',') orelse return false;
+        const low = initializesEndpoint(pair[0..comma]) orelse return false;
+        const high = initializesEndpoint(pair[comma + 1 ..]) orelse return false;
+        if (low >= high) return false;
+        if (previous_high) |prior| if (low <= prior) return false;
+        previous_high = high;
+        rest = std.mem.trim(u8, rest[close + 1 ..], " \t");
+        if (rest.len == 0) return true;
+        if (rest[0] != ',') return false;
+        rest = std.mem.trim(u8, rest[1..], " \t");
+        if (rest.len == 0) return false;
+    }
+    return false;
+}
+
+fn initializesEndpoint(text: []const u8) ?i64 {
+    const value_text = std.mem.trim(u8, text, " \t");
+    if (value_text.len == 0) return null;
+    const digits = if (value_text[0] == '-') value_text[1..] else value_text;
+    if (digits.len == 0) return null;
+    for (digits) |byte| if (!std.ascii.isDigit(byte)) return null;
+    const value = std.fmt.parseInt(i128, value_text, 10) catch return null;
+    if (std.math.cast(i64, value)) |signed| return signed;
+    // LLVM also permits the unsigned spelling of a signed i64 bit pattern.
+    return @bitCast(std.math.cast(u64, value) orelse return null);
+}
+
 test "pointer advisory attributes validate allocation and memory promises without admitting ABI changes" {
     for ([_][]const u8{
         "allocptr noundef align 1 captures(none)",
         "noundef nonnull align 16 dereferenceable(16)",
         "writeonly captures(none) align 1",
         "dead_on_unwind noalias writeonly align 4 captures(none)",
+        "nonnull readonly align 8 captures(address_is_null)",
+        "nonnull align 1 captures(address)",
+        "readnone align 1 captures(none)",
+        "dead_on_unwind noalias nonnull writeonly align 4 captures(none) initializes((4, 6))",
     }) |attrs| {
         try std.testing.expect(pointerCallAttrsAreAdvisory(attrs));
         try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .value = .{ .named = "p" }, .attrs = attrs });
     }
     for ([_][]const u8{
-        "allocptr allocptr", "align 3",           "align",      "dereferenceable(no)",
-        "captures(unknown)", "allocptr, noundef", "byval(i32)", "sret(i32)",
-        "addrspace(1)",
+        "allocptr allocptr", "align 3",           "align",                                     "dereferenceable(no)",
+        "captures(unknown)", "allocptr, noundef", "byval(i32)",                                "sret(i32)",
+        "addrspace(1)",      "initializes(bad)",  "initializes((0, 8)) initializes((16, 24))",
     }) |attrs| try std.testing.expect(!pointerCallAttrsAreAdvisory(attrs));
     try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = .{ .int = 64 }, .value = .{ .int = 0 }, .attrs = "allocptr" }));
+}
+
+test "pointer initialization promises validate complete signed nonoverlapping ranges" {
+    for ([_][]const u8{
+        "initializes((0, 8))",                                      "initializes((-8, -2), (0, 16))",
+        "initializes((-9223372036854775808, 9223372036854775807))", "initializes((18446744073709551615, 1))",
+    }) |attrs| {
+        try std.testing.expect(pointerCallAttrsAreAdvisory(attrs));
+        try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .value = .{ .named = "p" }, .attrs = attrs });
+        try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallArgAttrs(.{ .ty = .{ .int = 64 }, .value = .{ .int = 0 }, .attrs = attrs }));
+        try std.testing.expectError(error.UnsupportedCallAttributeAbi, rejectUnsupportedCallEnvelope(.{ .callee = "f", .ret_ty = .ptr, .ret_attrs = attrs, .args = .empty }));
+    }
+    for ([_][]const u8{
+        "initializes()",             "initializes(())",           "initializes((0))",                      "initializes((0,))",
+        "initializes((,8))",         "initializes((0,8,16))",     "initializes((0,0))",                    "initializes((8,0))",
+        "initializes((0,8),(7,16))", "initializes((0,8),(8,16))", "initializes((16,24),(0,8))",            "initializes((0,8),)",
+        "initializes((0,8))junk",    "initializes(((0,8)))",      "initializes((0,18446744073709551616))", "initializes((-9223372036854775809,0))",
+        "initializes((+0,8))",       "initializes((0,1_6))",
+    }) |attrs| try std.testing.expect(!pointerCallAttrsAreAdvisory(attrs));
 }
 
 test "call value facts validate typed wrapped ranges without extending the ABI" {

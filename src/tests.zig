@@ -1,6 +1,9 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/sysv_abi.zig");
+    _ = @import("codegen/x86_64/generic_cfg/composed_selector_calls_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/source_guard/split_policy_tests.zig");
     _ = @import("selection_census.zig");
     _ = @import("codegen/x86_64/generic_cfg/narrow_freeze_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/pointer_freeze_tests.zig");
@@ -23,6 +26,7 @@ comptime {
     _ = @import("tests/compilation.zig");
     _ = @import("codegen/x86_64/generic_cfg/wide_integer_forms_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/semantic_normalization_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/call_values_tests.zig");
     _ = @import("codegen/x86_64/inline_asm_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/pair_arithmetic_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/constant_pair_tests.zig");

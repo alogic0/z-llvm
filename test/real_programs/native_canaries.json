@@ -2,6 +2,14 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "call_values",
+      "prefix": "call-values",
+      "fixture": "call_values",
+      "functions": ["call_values_ignore_i32", "call_values_ignore_i64", "call_values_ignore_ptr", "call_values_undef_i32", "call_values_poison_i64", "call_values_undef_i64", "call_values_poison_ptr", "call_values_undef_ptr", "call_values_init_body", "call_values_init", "call_values_capture", "call_values_is_null"],
+      "observations": 4096,
+      "stdout": "call-values observations=4096 defined-results=live-values=promises=guards=preserved\n"
+    },
+    {
       "population": "samesign_comparisons",
       "prefix": "samesign-comparisons",
       "fixture": "samesign_comparisons",

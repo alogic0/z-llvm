@@ -9,6 +9,7 @@ const integers = @import("integer_forms.zig");
 const comparisons = @import("comparison_forms.zig");
 const legacy = @import("legacy_forms.zig");
 const phi_values = @import("phi_values.zig");
+const call_values = @import("call_values.zig");
 const profiling = @import("../../../compilation_profile.zig");
 
 pub const Function = struct {
@@ -17,12 +18,13 @@ pub const Function = struct {
 };
 
 pub fn check(function: ir.Function) !void {
-    if (phi_values.requiresNormalization(function) or integers.requiresNormalization(function) or comparisons.requiresNarrowNormalization(function))
+    if (phi_values.requiresNormalization(function) or call_values.requiresNormalization(function) or
+        integers.requiresNormalization(function) or comparisons.requiresNarrowNormalization(function))
         return error.UnsupportedSemanticNormalization;
 }
 
 /// The caller owns an arena for private instructions. Source definitions and
-/// the function's ABI remain borrowed and unchanged. Three bounded stages avoid a
+/// the function's ABI remain borrowed and unchanged. Bounded stages avoid a
 /// recursive fixed-point search and make failure to normalize explicit.
 pub fn normalize(allocator: std.mem.Allocator, source: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !Function {
     return normalizeProfiled(allocator, source, context, null);
@@ -34,6 +36,11 @@ pub fn normalizeProfiled(allocator: std.mem.Allocator, source: ir.Function, cont
         const activity = profiling.activity(profile, "normalize-phi-values");
         defer activity.end();
         if (phi_values.requiresNormalization(function)) function = try phi_values.normalize(allocator, function);
+    }
+    {
+        const activity = profiling.activity(profile, "normalize-call-values");
+        defer activity.end();
+        if (call_values.requiresNormalization(function)) function = try call_values.normalize(allocator, function);
     }
     {
         const activity = profiling.activity(profile, "recognize-legacy-envelope");
