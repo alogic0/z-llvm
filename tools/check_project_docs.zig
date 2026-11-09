@@ -31,6 +31,7 @@ const docs = [_][]const u8{
     "docs/current_state.md",
     "docs/next_steps.md",
     "docs/roadmap/project_improvement_plan.md",
+    "docs/plans/2026-11-09-validation-performance-improvement.md",
     "docs/validation_tiers.md",
     "docs/retention_headroom_policy.md",
     "docs/zllvm_artifact_retention_contract.md",
