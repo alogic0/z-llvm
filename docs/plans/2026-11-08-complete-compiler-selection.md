@@ -41,11 +41,21 @@ Evidence root: `local-state/validations/compiler-selection-completion-20261108/`
 The previous accepted checkpoint remains authoritative until a new cumulative
 acceptance is recorded. Progress counts before that are provisional.
 
-The first checkpoint implements pointer freeze aliases, private normalization
+The first checkpoint is accepted at `9ba5e61c`: pointer freeze aliases, private normalization
 of scalar `samesign` comparisons and signed interpretation of unsigned-spelled
 i32 immediates. It fixes a confirmed dirty-upper-bit i8 comparison miscompile.
 Debug and ReleaseSafe pass 1,995 units and 23 structural checks each. Two new
 native populations pass all modes/routes with Debug and ReleaseFast compilers.
-The targeted replay selects 144 of 164 functions, with twenty later limits;
-runtime selects 285/455 with its prior successes preserved. Complete compiler
-census, production audits, readiness and immediate Tier 3 remain pending.
+The complete compiler census and production replay select 7,943/8,928, adding
+144 with every preceding success preserved. All 164 targeted first boundaries
+advance; twenty reach later limits. Runtime reaches 285/455. Event audits,
+readiness and all 17 integration gates pass. The 66 native populations record
+2,043,396 local observations and preserve all 64 preceding populations. See the
+[accepted evidence](../evidence/scalar_comparisons_pointer_freeze.md).
+
+The objective remains active with 985 failures. Continue with private call-value
+refinements, validated advisory pointer attributes, and vector/scalar bitcasts,
+then the later observed limits. The retained read-only inventory identifies
+60 rejected original CFGs exceeding 1,024 blocks, internal vector expansions,
+FP storage/ABI limits, and long labels. These are work groups under the existing
+authorization, not new permission boundaries.

@@ -1,0 +1,3803 @@
+{
+  "gates": [
+    {
+      "id": "selected-object-suite",
+      "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+      "exit_status": "0",
+      "duration_ms": "63453",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "2198",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "3639",
+      "cache_status": "none"
+    },
+    {
+      "id": "selected-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "3796",
+      "cache_status": "none"
+    },
+    {
+      "id": "zig-source-native-link",
+      "tool": "tools/run_distribution_zig_source_native_link.zig",
+      "exit_status": "0",
+      "duration_ms": "19051",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-postopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "73381",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-preopt",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "--pipeline": "preopt",
+      "exit_status": "0",
+      "duration_ms": "41981",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-ir-writer",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "15949",
+      "cache_status": "none"
+    },
+    {
+      "id": "integrated-object-release",
+      "tool": "tools/run_distribution_zig_integrated_object.zig",
+      "exit_status": "0",
+      "duration_ms": "10829",
+      "cache_status": "none"
+    },
+    {
+      "id": "real-rows-release-fast",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseFast",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "717212",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-safe",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSafe",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "740095",
+      "cache_status": "hit"
+    },
+    {
+      "id": "real-rows-release-small",
+      "tool": "src/distribution_real_rows_gate.zig",
+      "--mode": "ReleaseSmall",
+      "--limit": "100",
+      "exit_status": "0",
+      "duration_ms": "413111",
+      "cache_status": "hit"
+    },
+    {
+      "id": "integrated-executable",
+      "tool": "tools/run_distribution_zig_integrated_exe.zig",
+      "exit_status": "0",
+      "duration_ms": "2528990",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-object-inspection",
+      "tool": "tools/run_native_link_object_inspection.zig",
+      "exit_status": "0",
+      "duration_ms": "502",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-link",
+      "tool": "tools/run_distribution_native_link_m5.zig",
+      "exit_status": "0",
+      "duration_ms": "1120",
+      "cache_status": "none"
+    },
+    {
+      "id": "release-native-probe",
+      "tool": "tools/probe_native_linker_compatibility.zig",
+      "exit_status": "0",
+      "duration_ms": "1044",
+      "cache_status": "none"
+    },
+    {
+      "id": "boundary-gates",
+      "tool": "tools/run_distribution_boundary_gates.zig",
+      "exit_status": "0",
+      "duration_ms": "8573",
+      "cache_status": "none"
+    }
+  ],
+  "compiler_core": [
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseFast",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSafe",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    },
+    {
+      "counter_schema": "distribution-real-rows-v3",
+      "mode": "ReleaseSmall",
+      "selector_version": "real-candidate-selector-v3",
+      "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+      "limit": "100",
+      "candidate_rows": "100",
+      "real_functions_lowered": "100",
+      "real_objects_emitted": "100",
+      "real_native_linked": "100",
+      "real_executed": "12",
+      "real_programs_ok": "12",
+      "first_failing_real_row": "-",
+      "first_failing_stage": "-",
+      "local_fail": "0"
+    }
+  ],
+  "execution_cohort": [
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "771c812fe0df706e15fecc90163c3918a16f4b8b1bf3efcc001f3dfdda9e63cb",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4148216",
+      "reference_sha256": "9f2dfe131b32ddfc8a5a0736604be1c16f65246161bfecee807ed75b5c6a868f",
+      "linked_bytes": "6291806",
+      "linked_sha256": "3740d92e75c6e2304badcae43c8305048acd57f540c5d2592d3758484a1865d4",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "b438f39a0529f7137c83a4282b7cb8f1d830a73fff9ac11233852dfc98b9a890",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4148304",
+      "reference_sha256": "39872681064064efa71ad018cfec1e61e19c9b279b20c287d0a8c638431d6fb7",
+      "linked_bytes": "6291806",
+      "linked_sha256": "d05c6345dbf1da3329535295f4aa373370db1a0976cb6fc7737e6739e32734a9",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "e7226becbcf2d8c362726684777a76e4cef8e09ef39b8e19044097f7dc60433d",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4148280",
+      "reference_sha256": "698da59d14f2fbc05f3b92e9dbfee8597c7059368ba81a4f4e03d682bee3c49a",
+      "linked_bytes": "6291806",
+      "linked_sha256": "2e34f77fd9862c0f4e6659ebd8fc83f4532e9239e3e6537578832c31f949dec4",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0757ed24dd920f69a1dd0f4a4f8bf8b40f97ef21f9dd52b4dbe6d46b7c71cbe0",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4148568",
+      "reference_sha256": "f96dc4394e47cbf3d39d8a33a4b6352e757673de22b022adfe3cc99f9a7e8bfb",
+      "linked_bytes": "6291806",
+      "linked_sha256": "d6dd9b3cb7916473a2222e8f121eb9121f28d186930558a4261473a17430fa96",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "096d9472ae183cfa3719c65a5594248c8d527463f93342de612faf74b3eb8de7",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4151536",
+      "reference_sha256": "a07fc627eb0afa1d104bd989119b5ea4355aa9cea8553e2e3d0b83df90192403",
+      "linked_bytes": "6288265",
+      "linked_sha256": "db27a16f73d9910704f461eff8afddb60031ad4e8cf0c93b0e4f8d1223d4033c",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "d37472effb4bd393891542a999edbe11f89eea30771f288c51a3091d50585e09",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4153744",
+      "reference_sha256": "cd71da786f6b0e9615039a8d29e00cbca21697617411bb019bd51229c09a80cf",
+      "linked_bytes": "6287668",
+      "linked_sha256": "35964c89752c1dbf5f12904f6727e1583e7cc7799a0713b0016cbc185bbb6837",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "61a61fe05c25f9f28cd23c0826ad17410738360b00a6686c55e36b5ef112eb10",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4153752",
+      "reference_sha256": "300cb4b049f332f03dfe513480e1fe8ed020ab1482109559741854119593acbf",
+      "linked_bytes": "6287668",
+      "linked_sha256": "45be6265a140a175189fc5ba14c115054bb6943f90fac431d43d643283d146bd",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4154296",
+      "reference_sha256": "c2ffafcd9515281917e7880138757d6c9f7375b70b60a71c290c94f93904b1b9",
+      "linked_bytes": "6292446",
+      "linked_sha256": "2f9fefc967033a5ed838d7cf7a2c5b1ea02ce34563f9f6d7b6e3d22985988e18",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "67dfabcf131de792bd4b8c9c8b4276e8c16bbe5a23cb534fdda95782e84527d0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4153904",
+      "reference_sha256": "6ccca2cbba92ebcd0496e6b1ed0a5d15fb4deb4c4164eaccd9524517a89c5053",
+      "linked_bytes": "6287625",
+      "linked_sha256": "70a4d24ffded484c76afb52f17a4372d2ec7aa50fe2042995611cdbc042777d2",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "4dbb2cb74487df4ec7164dd64a99cef5e4cdb798149003035e81f4c23446970f",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4148368",
+      "reference_sha256": "bfbc0761a72c113421fd519f049580cb02ac593cbc0f0503dde55fbcb5c37339",
+      "linked_bytes": "6287753",
+      "linked_sha256": "be15b0b98028128815014a13fb62e1354ae716b08b39a8f3cfc092e4077cceaa",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "cec703a7cc929cf1399c85bb23682a3932ff2937c4aa17f4575f1e6a127da857",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4152384",
+      "reference_sha256": "724a0d444615c3825b73dfcb82e9640248c9b847c544d1973ddb41cac5377ba3",
+      "linked_bytes": "6291977",
+      "linked_sha256": "25633831999fadabaef1972fa374418339d84c3a5b4092f1ff52979a184d77f8",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseFast",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "05b7decf31bfa3f305b59b80c43f6f1203a14bcdba17aa78b789363ca6f4b334",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4147800",
+      "reference_sha256": "ca339ed08a5fdf36dbdc38db2ffb06cd448062a4ea145c1a1a5e7e927aa8b2b0",
+      "linked_bytes": "6291977",
+      "linked_sha256": "99663b467f2843b8d5d4d8260bacda0c3a19d19696e377f9561a5d8c9de20590",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "ec4c7a087cc6fb0bfc4302bbeb9e2f729322ff2152f4f1b2a4f8eb266303a24d",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "4034304",
+      "reference_sha256": "72ade6b9f45e3a03b4a478a22a81637467f5a0f14bf93f8875433b106fa2c4b8",
+      "linked_bytes": "6147062",
+      "linked_sha256": "b2c3c14bd8d7a5ed0c96735f8e3cab9f0a3a53bde6f491e9dbe1777510c057e7",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "673975f12bc2f12983539c9fceb7987e957a9af1b480e35c2af400d2070a5109",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "4034360",
+      "reference_sha256": "a6bb9730b818ad758dcdeadd4e49dd6b6b27ea36a2f432d4e1abf307cfc06874",
+      "linked_bytes": "6147062",
+      "linked_sha256": "a0f7a70d774ec8e26a838b8b678270d134fb66e45bca573be1e484835c69fc67",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "f4d9f0cce93a6a792ec4a31124708e49b79e3c72bdda6bc6eba7df4336819ab2",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "4034328",
+      "reference_sha256": "85e5f05919e73e76a5bc30664365f818b9337a97324bec2acc069f5bf277d927",
+      "linked_bytes": "6147062",
+      "linked_sha256": "28a1a05bec6891e0be1ed48b3cf2c816b77b532ca0c494b49292512b44d253a5",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "0f0e86316bfb932fd92a27b50d213d251439538c0700ac70e5eda5654dee373f",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "4034416",
+      "reference_sha256": "f23fb1932a4adff12fe2d479bb936db70fe53699e1fa63e113ac61afeba2238b",
+      "linked_bytes": "6147062",
+      "linked_sha256": "373ee3b83f7999d41d14a3c2c6be33b2f83e86a8de779afa32aab9e95fbf1b3a",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "f6d0b8ccfd56bf25d342984dd53c64dfa3ed7e733c79c8382ea8106d859139d4",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "4035680",
+      "reference_sha256": "ff881e4aae5d8516eba4b86ff42fdba8c52eec81e9b725ed96c71222e8daadac",
+      "linked_bytes": "6142732",
+      "linked_sha256": "41f0cdb6a9b17369575f197e54cdd6718d0dbefd4c5beca3d70a668877b96a9a",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "4d1fe939c4cf95156e3f1b8b53e0c2a224a2221a1ddc3cf09acab00785b7deb0",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "4039600",
+      "reference_sha256": "2093732a6f1c64a7776b4f91ee5baae36d3b26cdc4b2af6ee0f4425b4cbbd379",
+      "linked_bytes": "6142796",
+      "linked_sha256": "149d088237fe9729d81019df0f3d3215944b209370d914f3132e6fe8abab2f4a",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "0c4f15638e021ab253fb2fe0fd0c343a09ff9e06890910b76d2f4c085edd5743",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "4039600",
+      "reference_sha256": "58b2260a27b413edccbaef1d12c08daf0f5429897c60e58b727a5f529e5add62",
+      "linked_bytes": "6142796",
+      "linked_sha256": "f9fb79edc8611de03c2675ece869707028ef69c894c54e7f71ca72c85d27b607",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "58b09a93c34231d2d337ab09e6bf106be69329979a2ecf2ed10eeb4332edc6ff",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "4040312",
+      "reference_sha256": "90fb9b3d5b2fca6cc4d0594849a0aa96cc3efcaedb3696b5ffc87198536b7272",
+      "linked_bytes": "6147638",
+      "linked_sha256": "c87608534c8734f2f55028ff5697f1e724da387d012e69943b5051873fa31453",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "779b502b10695d9d1e81bf7122b0d50882ab5e6c75e8fa011fd87e7167b64ec6",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "4039784",
+      "reference_sha256": "3e917ee2e9302081c034ec6c514bebe8e838357a066b2dee01e57e3c42fd536e",
+      "linked_bytes": "6142732",
+      "linked_sha256": "a0a27902a8614c6fc61ccee61ef84e74751ef70dafbafdef33c8d8c2eb6ee7e8",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "81641a4e0b55b09f7e522a15636d7cfe97c5e046222b430c1e49402929d00c52",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "4034168",
+      "reference_sha256": "5b60aa8106d114a677343c8c09f7d82099a3600ef725cca56893b8d5a4e0e060",
+      "linked_bytes": "6142646",
+      "linked_sha256": "73023db7b6542c71c40b5e3ab2d6f0721ed089169e4b40f6506bf235b339ec37",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "58b67ba6931f90a1854142a7989f32094edeff8fa416a841ffac653b7c3cd233",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "4038496",
+      "reference_sha256": "a33a316440b9be3664993050f3e0d56c07bf7fe7ef629fa597f8db9abdb86f8d",
+      "linked_bytes": "6147318",
+      "linked_sha256": "9270dab6b89b451df69894a7a34031bcedf371a7d0664748db3ecb987fae209a",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSafe",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "f3ed1a8136b5d2fc6ff566354d364e99078dac14fc918df8dc8d39d0ec04e57e",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "4034448",
+      "reference_sha256": "96ac03ed585c7596885f95c7e7aeecbe3a7a8ae6ef790154174d269dba605949",
+      "linked_bytes": "6147318",
+      "linked_sha256": "0317b0aeb3409aecdb8d205111379da17c3f061fa5d77a296fc8655d9502e7c0",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.size",
+      "descriptor_sha256": "a2a97ff3e5bd48a80f721303693b269112227fd7ef5fc96a4526d72f06c9343e",
+      "object_bytes": "744",
+      "object_sha256": "187000fece398cef69907c6caa5c4c6cbcfd2e509819b6f5df274ddb59645a3f",
+      "reference_bytes": "149664",
+      "reference_sha256": "517296ad1fd60856ab22e843f46132e985d92247d21b2c6e23e2eb55c6fa5625",
+      "linked_bytes": "355886",
+      "linked_sha256": "27b3ece3f14bc7da0eb06d6f73a689c9f43e0e614f12abd9b891d427bd4ac846",
+      "result": "12",
+      "witness": "43",
+      "observations": "1",
+      "result_sha256": "9f6ca99cc336ff3c19ca1202c2ee22912c9e61708bb125b07b54cc3e3217d41e",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Requirements.slotType",
+      "descriptor_sha256": "5969dece1d04131c7fc77db02d5b7ba7e35d53c72cb73053f3218a403a53638e",
+      "object_bytes": "752",
+      "object_sha256": "c1806338181e632b202a940e88fc427d15f4e05ccbd569b4380d00effd45322b",
+      "reference_bytes": "149664",
+      "reference_sha256": "e50a6c386ae71b6da538d1cd15a27be2f4d70dbbd450bade592d09a1b978c774",
+      "linked_bytes": "355886",
+      "linked_sha256": "583ed22be135874beccf58a41421cc957572a0026d75c6099f6f13c46986b509",
+      "result": "2",
+      "witness": "13",
+      "observations": "1",
+      "result_sha256": "70a802218061f063753ddda0e02f705c13e952891289cc39acb3f54025a902d9",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.size",
+      "descriptor_sha256": "afc10d2b53f59145c9585fa576994f831169b48344efc8b71b50c449388eb439",
+      "object_bytes": "744",
+      "object_sha256": "0b539e61bdfa3b7ffee194cc674f3f18a2434d7140881087f636ef51a0d39ebb",
+      "reference_bytes": "149664",
+      "reference_sha256": "981c89cda9bb178597bf907fdc9ca4a4d96225b0b8ded4bcbf9564e626526a8a",
+      "linked_bytes": "355886",
+      "linked_sha256": "7f7ef30437410f478f3dc9ff5493e03cac0cb4ed6e576e049bbc5b64b0dd352e",
+      "result": "8",
+      "witness": "31",
+      "observations": "1",
+      "result_sha256": "86561d1a97ee661c6d45d48d3a272cc0fa414ef2d2b17b955c5358091d9560b7",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "link.MachO.CodeSignature.Signature.slotType",
+      "descriptor_sha256": "429bfd019f347369b5fa197515435b0ddde1d3304a342b7131ed32e1175a11ff",
+      "object_bytes": "744",
+      "object_sha256": "b79050442e05e545c16fe9cef6e6d361d8b179cae508015ea8e3e46598ece5d0",
+      "reference_bytes": "149696",
+      "reference_sha256": "b8e2be571cafd55f9d19259e137c27866fee71be1d45040d038ac8abe9b78402",
+      "linked_bytes": "355886",
+      "linked_sha256": "b83965a3a36dfe5abea79336f9c9c73b85d06d2eec9eb22d1657b435337d4f83",
+      "result": "65536",
+      "witness": "196615",
+      "observations": "1",
+      "result_sha256": "91bf01cacafeee7d65a36b0b1d5e958f9d62e957199426dc58461aa0776e0da3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "Io.Event.reset",
+      "descriptor_sha256": "9bde311d7a2276fd1d855635eb3f9a3aecd44609a1199362e45e405154d413b2",
+      "object_bytes": "720",
+      "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+      "reference_bytes": "149992",
+      "reference_sha256": "e4ca544afaf896553f640ae6d9c8ba888c723ed004a600696e3cd0cb90537666",
+      "linked_bytes": "356217",
+      "linked_sha256": "35e2d7ab6639afeee93212e2020f42f882d0cc1122f569698db67d1d0e67554d",
+      "result": "512",
+      "witness": "98688",
+      "observations": "512",
+      "result_sha256": "ba7da1945eeba04a23c18b9b8e7ae340168e291df8dce07cf16a9f287067d368",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.get",
+      "descriptor_sha256": "b90f3029c1a86c3e284c3f6b64e2f95191644d7c832395f9eed036bddb542e70",
+      "object_bytes": "728",
+      "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "82e7fee902b89f4759d163f29a7f9d26862ced09cc2b8cad32c4675411cfa0ff",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "InternPool.PackedU64.init",
+      "descriptor_sha256": "d612a4a4d3090ef336ed6df433b50de3dd5c1a51cb0d677dcbff307a972faa3f",
+      "object_bytes": "728",
+      "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+      "reference_bytes": "149944",
+      "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+      "linked_bytes": "356030",
+      "linked_sha256": "fbe43fa70a3e53f59508cc1c03b16245672101fb9650059c653fb29c82d1c18e",
+      "result": "1040",
+      "witness": "3734979248165958152",
+      "observations": "1040",
+      "result_sha256": "ae4e3829e54ba315c2b5aeeb30a80adcf9b58ad28164a21da56165df7999bcc5",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "ascii.isAscii",
+      "descriptor_sha256": "1c22a444d2b93abb2525f540ff3d6fe1ab47e42312fdd69f1f899c56175f616d",
+      "object_bytes": "760",
+      "object_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+      "reference_bytes": "149824",
+      "reference_sha256": "6b1655d0d79e11664f9c9a64be02b4e583ec414287e5f4540dbaa69f9bfc5ec0",
+      "linked_bytes": "356198",
+      "linked_sha256": "14ab19f82c68b1c12e58cba1892f3e4a26b4b61ce501d85b9a67f58c80fd025f",
+      "result": "128",
+      "witness": "8256",
+      "observations": "256",
+      "result_sha256": "f07d67400bfa220cf5ea02646f1a5416bdd50424a9c738ffa0e85877c0003017",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "bit_set.Dynamic.maskIndex",
+      "descriptor_sha256": "7e7f85ea61fd2f396425cee8a64b7f32fe4e0bf193dffc27c9e8697e10f530e0",
+      "object_bytes": "728",
+      "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+      "reference_bytes": "149872",
+      "reference_sha256": "2fd34967a38babe25d3ab728000c7f7a44b7b38b32caa9670d684f4fa63bc609",
+      "linked_bytes": "356005",
+      "linked_sha256": "02d52a039405a263b7a14b4ac40b873590181d6461f30b280eea76bef93f8a76",
+      "result": "4108",
+      "witness": "8791026472635726404",
+      "observations": "4108",
+      "result_sha256": "83225e28652e69a10987667137167865d17a80b680ee2b4058fbfb738b45d477",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "atomic.Mutex.tryLock",
+      "descriptor_sha256": "28a053d41f368edda8b4a4385fb48b10e3f2152bbb7851060dff9529d58a0093",
+      "object_bytes": "800",
+      "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+      "reference_bytes": "149712",
+      "reference_sha256": "83240aba201a066d7992f6a2e17a80c1317747c5e608d9793c01093ca08172d8",
+      "linked_bytes": "356205",
+      "linked_sha256": "b1aa8842e63a1b04c815bdcf344be5372bd6fa8b2e64bf56029ac34852bff4eb",
+      "result": "256",
+      "witness": "512",
+      "observations": "384",
+      "result_sha256": "cf88731e6e0b3965ad4c5f1a2dae7449512c95dcfcbc618f93e90eada0bee3e3",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+      "descriptor_sha256": "985f961062e1be2560deabefbca27b243be360298f89db15da08eeec80648843",
+      "object_bytes": "840",
+      "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+      "reference_bytes": "149768",
+      "reference_sha256": "ac759d10d2000fdc39a6ed57414035e275261adbaef8cdb366c30e54dd87baa1",
+      "linked_bytes": "356041",
+      "linked_sha256": "5dd3a49b0f87a418394f70e1994efb3bb54fcc6a90420ef2b41b1bed4bd125db",
+      "result": "1",
+      "witness": "1",
+      "observations": "256",
+      "result_sha256": "af078abaeef7a07e55ccc070faee05d11438aba74839b877c400209fa6590387",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    },
+    {
+      "schema": "distribution-execution-cohort-v5",
+      "mode": "ReleaseSmall",
+      "source": "../ziglang/src/main.zig",
+      "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+      "descriptor_sha256": "9fd2c46b5b3bb636bf1a0ca90695e93d075ad39332c90f96ba4ce2ee40abe025",
+      "object_bytes": "848",
+      "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+      "reference_bytes": "149768",
+      "reference_sha256": "71de76cacc973a3644ee5257ed0d184bb036d0e2c3df77826a8b534fec5f0b46",
+      "linked_bytes": "356042",
+      "linked_sha256": "4e22cdf41f556d547542dbe667974016c8bb261cb83522c609da60c4894cd746",
+      "result": "1",
+      "witness": "2",
+      "observations": "256",
+      "result_sha256": "300595d789c75f47fd3491c720915d2701a0096aacab0e6375cd4f76c3a53dfb",
+      "reference_status": "0",
+      "linked_status": "0",
+      "real_executed": "1",
+      "real_programs_ok": "1"
+    }
+  ],
+  "native_populations": [
+    {
+      "population": "standalone-two-word-stack-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "384",
+      "reference_observations": "192",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-pointer-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "486",
+      "reference_observations": "243",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-pointer-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-signed-nonnegative",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-type-allocation-padding",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-samesign-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-freeze",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "10752",
+      "reference_observations": "5376",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-freeze",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-multiply",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "12288",
+      "reference_observations": "6144",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-quoted-symbols",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6144",
+      "reference_observations": "3072",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-symbolic-call",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-comparison-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "21504",
+      "reference_observations": "10752",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-syscall-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-register-pressure",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-bit-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46080",
+      "reference_observations": "23040",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-relative-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-tls-address",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-tls-address-shared",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-attributes",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14790",
+      "reference_observations": "7395",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-runtime-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "8466",
+      "reference_observations": "4233",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-fp-casts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "7680",
+      "reference_observations": "3840",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-packed-globals",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-parallel-transfer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-scalar",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "110592",
+      "reference_observations": "55296",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-vector-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "15360",
+      "reference_observations": "7680",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-branches",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "18432",
+      "reference_observations": "9216",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aligned-stack",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "36864",
+      "reference_observations": "18432",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-vectors",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "795648",
+      "reference_observations": "397824",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "49152",
+      "reference_observations": "24576",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "32256",
+      "reference_observations": "16128",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-integer",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "73728",
+      "reference_observations": "36864",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-system-assembly",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "6912",
+      "reference_observations": "3456",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pair-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "70656",
+      "reference_observations": "35328",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pair",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "78336",
+      "reference_observations": "39168",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-accumulator-store",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-call-contracts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-address-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "14208",
+      "reference_observations": "7104",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-pointer-flow",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-atomics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "112908",
+      "reference_observations": "56454",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-integer-intrinsics",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "87552",
+      "reference_observations": "43776",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-switch-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "26112",
+      "reference_observations": "13056",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-word-arithmetic",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "29568",
+      "reference_observations": "14784",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-checked-integers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "46464",
+      "reference_observations": "23232",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-stack-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3456",
+      "reference_observations": "1728",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "5760",
+      "reference_observations": "2880",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "guard_checks": "18"
+    },
+    {
+      "population": "standalone-safe-comparisons",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "17664",
+      "reference_observations": "8832",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-safe-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-indirect-stack-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9984",
+      "reference_observations": "4992",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-scalar-forms",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3840",
+      "reference_observations": "1920",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-aggregate-storage",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4608",
+      "reference_observations": "2304",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-narrow-abi",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "4992",
+      "reference_observations": "2496",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-remainder",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "3072",
+      "reference_observations": "1536",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-rax-pointer-load",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "2688",
+      "reference_observations": "1344",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-general-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1920",
+      "reference_observations": "960",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-bounded-frame",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "768",
+      "reference_observations": "384",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-module-dependencies",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "330",
+      "reference_observations": "165",
+      "reference_reused_per_route": "true",
+      "local_fail": "0",
+      "negative_controls": "30",
+      "environment_checks": "3"
+    },
+    {
+      "population": "standalone-array-stride",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-boolean-calls",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "1536",
+      "reference_observations": "768",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-addresses",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "192",
+      "reference_observations": "96",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-wide-abi-carriers",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-intrinsic-facts",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "9216",
+      "reference_observations": "4608",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-constant-pointer-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "576",
+      "reference_observations": "288",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    },
+    {
+      "population": "standalone-global-memory",
+      "routes": "direct,release",
+      "modes": "3",
+      "local_observations": "240",
+      "reference_observations": "120",
+      "reference_reused_per_route": "true",
+      "local_fail": "0"
+    }
+  ],
+  "disk": {
+    "schema_version": "1",
+    "run_id": "5c01c6528323f87b5cda2dc94b7e0741",
+    "scratch_path": "tmp/selection-scalar-20261109-full",
+    "bundle_path": "tmp/selection-scalar-20261109-full/release_source_object_bundle",
+    "target": "x86_64-unknown-linux-gnu",
+    "mode": "serial",
+    "real_rows_concurrency": "3",
+    "subgates": "17",
+    "wall_ms": "3732494",
+    "starting_free_bytes": "40521461760",
+    "minimum_observed_free_bytes": "36101746688",
+    "final_free_bytes": "36101746688",
+    "observed_peak_bytes": "4419715072",
+    "reserve_bytes": "11410065408",
+    "required_start_bytes": "20000000000",
+    "local_fail": "0"
+  },
+  "cache": [
+    {
+      "mode": "ReleaseFast",
+      "status": "hit",
+      "duration_ms": "14890",
+      "cache_key": "71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6",
+      "descriptor_bytes": "1343891552"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "status": "hit",
+      "duration_ms": "16308",
+      "cache_key": "c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de",
+      "descriptor_bytes": "1473501276"
+    },
+    {
+      "mode": "ReleaseSmall",
+      "status": "hit",
+      "duration_ms": "12386",
+      "cache_key": "db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7",
+      "descriptor_bytes": "1106432911"
+    }
+  ],
+  "native_population_count": 66,
+  "native_local_observations": 2043396,
+  "native_reference_observations": 1021698,
+  "schema": "scalar-comparisons-pointer-freeze-acceptance-v1",
+  "status": "passed",
+  "returncode": 0,
+  "recorded_utc": "2026-11-09T07:39:17Z",
+  "accepted_revision": "9ba5e61c20c3ed5632514eeb56ca933fa1e57469",
+  "accepted_tree": "85de42914a3089185193d7e0b7ca2127bd31101f",
+  "baseline_accepted_revision": "7080d4544ee966079b76270081c6cf10e1d3bd32",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+  "selector_version": "real-candidate-selector-v3",
+  "target": "x86_64-unknown-linux-gnu",
+  "source_binding": {
+    "source_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-01/sources.sha256",
+    "source_files": 1779,
+    "full_snapshot": "local-state/validations/compiler-selection-completion-20261108/batch-01/source-snapshot.json",
+    "source_snapshot_files": 3098,
+    "source_snapshot_verified": true,
+    "compiler_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-01/compilers.sha256",
+    "input_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-01/inputs.sha256",
+    "frontend_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-01/frontend.sha256",
+    "upstream_semantics_hash_manifest": "local-state/validations/compiler-selection-completion-20261108/batch-01/upstream-semantics.sha256",
+    "hashes_verified": true,
+    "scope": "Implementation, compiler/tool/test inputs and source membership frozen at the stated revision; acceptance documentation finalized afterward"
+  },
+  "implementation": {
+    "pointer_freeze_aliases": true,
+    "pointer_carriers": [
+      "arg64",
+      "scratch64",
+      "rax",
+      "spill64",
+      "stack_scalar",
+      "stack128",
+      "stack_i32_array",
+      "stack_i32_ptr",
+      "stack_f32_pair_ptr",
+      "readonly_table_ptr"
+    ],
+    "freeze_emits_no_instruction_or_mask": true,
+    "wide_aliases_and_eflags_preserved": true,
+    "samesign_scalar_comparisons_normalized_privately": true,
+    "dirty_narrow_upper_bits_normalized": true,
+    "unsigned_spelled_i32_immediates_interpreted_as_bit_patterns": true,
+    "source_comparison_types_and_flags_preserved": true,
+    "sign_mismatches_remain_source_poison": true,
+    "frozen_bypass_inventory_unchanged": true,
+    "late_selection_rollback_checked": true,
+    "frontend_unchanged": true,
+    "candidate_prefix_unchanged": true,
+    "execution_cohort_unchanged": true
+  },
+  "validation": {
+    "unit_tests_per_build_mode": 1995,
+    "unit_build_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "structural_checks_per_mode": 23,
+    "readiness_commands": 9,
+    "readiness_passed": true,
+    "full_gates": 17,
+    "full_runs": 1,
+    "full_run_kind": "serial with authenticated AIR cache hits",
+    "new_native_populations": 2,
+    "new_native_unique_functions": 15,
+    "new_native_compiler_builds": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "new_native_local_observations_per_compiler_build": 59904,
+    "new_native_reference_observations_per_compiler_build": 29952,
+    "confirmed_baseline_dirty_byte_wrong_code_repaired": true,
+    "wrong_comparison_oracle_control_rejected": true,
+    "compiler_rt_bypass_ratchet": 130,
+    "cache": {
+      "cache_hits": 3,
+      "prior_keys_and_descriptor_sizes_preserved": true
+    }
+  },
+  "diagnostic": {
+    "schema": "compiler-selection-completion-diagnostic-v1",
+    "batch": 1,
+    "compiler_before": {
+      "selected": 7799,
+      "examined": 8928
+    },
+    "runtime_before": {
+      "selected": 284,
+      "examined": 455
+    },
+    "compiler": {
+      "examined": 8928,
+      "selected": 7943,
+      "failed": 985,
+      "new_successes": [
+        "\"array_hash_map.Custom(SemanticVersion,void,array_hash_map.AutoContext(SemanticVersion),true).getOrPutAssumeCapacity\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).allocRegs__func_11296\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).getReg\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).getRegIndex\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).indexOfRegIntoTracked\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockReg\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockRegAssumeUnused\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockRegsAssumeUnused__func_11003\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockRegsAssumeUnused__func_29239\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).tryAllocRegs__func_11169\"",
+        "Air.Liveness.analyzeInstBlock__func_49732",
+        "Air.Liveness.analyzeInstSwitchBr__func_49747",
+        "Compilation.Path.fromUnresolved",
+        "Compilation.classifyFileExt",
+        "InternPool.Alignment.compare",
+        "Io.Threaded.childWait",
+        "Io.Threaded.dup2",
+        "Io.Threaded.fchdir",
+        "Io.Threaded.fchmodatFallback",
+        "Io.Threaded.fileDowngradeLock",
+        "Io.Threaded.fileLength",
+        "Io.Threaded.fileLock",
+        "Io.Threaded.fileReadPositional",
+        "Io.Threaded.fileSeekBy",
+        "Io.Threaded.fileSetLength",
+        "Io.Threaded.fileSyncPosix",
+        "Io.Threaded.fileTryLock",
+        "Io.Threaded.fileWriteFileStreaming",
+        "Io.Threaded.fileWriteStreaming",
+        "Io.Threaded.inheritParentHandle",
+        "Io.Threaded.isTty",
+        "Io.Threaded.mmSyncRead",
+        "Io.Threaded.netAcceptPosix",
+        "Io.Threaded.netConnectIpPosix",
+        "Io.Threaded.netConnectUnixPosix",
+        "Io.Threaded.netInterfaceNameResolve",
+        "Io.Threaded.netListenIpPosix",
+        "Io.Threaded.netListenUnixPosix",
+        "Io.Threaded.netReceivePosix",
+        "Io.Threaded.netSendPosix",
+        "Io.Threaded.netShutdownPosix",
+        "Io.Threaded.netSocketCreatePair",
+        "Io.Threaded.openSocketPosix",
+        "Io.Threaded.operate",
+        "Io.Threaded.posixBind",
+        "Io.Threaded.posixFchown",
+        "Io.Threaded.posixGetSockName",
+        "Io.Threaded.posixSeekTo",
+        "Io.Threaded.randomSecure",
+        "Io.Threaded.realPathPosix",
+        "Io.Threaded.setPermissionsPosix",
+        "Io.Threaded.setSocketOptionPosix",
+        "Io.Writer.printValue__func_18192",
+        "Io.Writer.printValue__func_337",
+        "Type.getUnionLayout",
+        "Type.structFieldOffset",
+        "Zcu.PerThread.doImport",
+        "codegen.aarch64.Select.movImmediate",
+        "codegen.aarch64.abi.getFloatArrayType",
+        "codegen.c.isReservedIdent",
+        "codegen.generateLazySymbol",
+        "codegen.llvm.FuncGen.fieldPtr",
+        "codegen.loongarch.Select.fillUnusedBits",
+        "codegen.loongarch.Select.writeConstantKeyToMemory",
+        "codegen.lowerPtr",
+        "codegen.spirv.CodeGen.layoutType",
+        "codegen.spirv.CodeGen.unionLayout",
+        "codegen.wasm.CodeGen.airGetUnionTag",
+        "codegen.wasm.CodeGen.airSetUnionTag",
+        "codegen.wasm.CodeGen.airUnionFromEnum",
+        "codegen.wasm.CodeGen.airUnionInit",
+        "codegen.wasm.CodeGen.emitWValue",
+        "codegen.x86_64.CodeGen.InstTracking.liveOut",
+        "codegen.x86_64.CodeGen.InstTracking.trackSpill",
+        "codegen.x86_64.CodeGen.MoveStrategy.write",
+        "codegen.x86_64.CodeGen.Select.TempSpec.Kind.lock",
+        "codegen.x86_64.CodeGen.Temp.getLimb",
+        "codegen.x86_64.CodeGen.Temp.loadReg",
+        "codegen.x86_64.CodeGen.Temp.readReg",
+        "codegen.x86_64.CodeGen.Temp.storeRegs",
+        "codegen.x86_64.CodeGen.Temp.toLimb",
+        "codegen.x86_64.CodeGen.Temp.toPair",
+        "codegen.x86_64.CodeGen.Temp.toReg",
+        "codegen.x86_64.CodeGen.Temp.toRegClass",
+        "codegen.x86_64.CodeGen.Temp.toRegPair",
+        "codegen.x86_64.CodeGen.Temp.writeReg",
+        "codegen.x86_64.CodeGen.asmSetccMemory",
+        "codegen.x86_64.CodeGen.asmSetccRegister",
+        "codegen.x86_64.CodeGen.convertFloatVarArg",
+        "codegen.x86_64.CodeGen.freeReg__func_11117",
+        "codegen.x86_64.CodeGen.freeValue__func_29194",
+        "codegen.x86_64.CodeGen.genBinOpMir",
+        "codegen.x86_64.CodeGen.genCondBrMir",
+        "codegen.x86_64.CodeGen.genSetMem",
+        "codegen.x86_64.CodeGen.genUnOpMir",
+        "codegen.x86_64.CodeGen.generate",
+        "codegen.x86_64.CodeGen.getValue",
+        "codegen.x86_64.CodeGen.getValueIfFree",
+        "codegen.x86_64.CodeGen.load",
+        "codegen.x86_64.CodeGen.registerAlias",
+        "codegen.x86_64.CodeGen.resolveCallingConventionValues",
+        "codegen.x86_64.CodeGen.restoreState__func_29199",
+        "codegen.x86_64.CodeGen.restoreState__func_29289",
+        "codegen.x86_64.CodeGen.reuseOperandAdvanced",
+        "codegen.x86_64.CodeGen.reuseTemp",
+        "codegen.x86_64.CodeGen.store",
+        "codegen.x86_64.Encoding.Op.fromOperand",
+        "codegen.x86_64.bits.Register.class",
+        "codegen.x86_64.bits.Register.dwarfNum",
+        "codegen.x86_64.bits.Register.id",
+        "codegen.x86_64.bits.Register.to16",
+        "codegen.x86_64.bits.Register.to32",
+        "codegen.x86_64.bits.Register.to64",
+        "codegen.x86_64.bits.Register.to8",
+        "codegen.x86_64.bits.Register.toBitSize",
+        "codegen.x86_64.bits.Register.toSize",
+        "compress.zstd.Decompress.BitReader.readBitsNoEof__func_55467",
+        "compress.zstd.Decompress.Frame.Zstandard.Decode.decodeLiterals",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsNoEof__func_55442",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsNoEof__func_55444",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsNoEof__func_55451",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsTuple__func_55459",
+        "compress.zstd.Decompress.Table.decode",
+        "fmt.float.binaryToDecimal__func_18636",
+        "fmt.float.binaryToDecimal__func_748",
+        "fmt.fmtPathDir",
+        "fmt.parseInt__func_53281",
+        "fmt.parseInt__func_53282",
+        "math.big.int.Const.toString",
+        "math.big.int.Mutable.setFloat__func_20247",
+        "mem.sortUnstable__func_50466",
+        "sort.block.binaryFirst__func_14074",
+        "sort.block.binaryFirst__func_14977",
+        "sort.block.binaryLast__func_14983",
+        "sort.block.mergeExternal__func_14070",
+        "sort.block.mergeExternal__func_14973",
+        "sort.block.mergeInto__func_14971",
+        "sort.block.swap__func_14067",
+        "sort.block.swap__func_14970",
+        "sort.pdq.partialInsertionSort__func_50487",
+        "unicode.utf8Decode",
+        "unicode.utf8Decode3",
+        "unicode.utf8Decode4",
+        "zig.number_literal.parseNumberLiteral"
+      ],
+      "lost_successes": [],
+      "failure_groups": [
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-unsupported-value"
+          },
+          "functions": 133
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "alloca"
+          },
+          "functions": 123
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-call-unknown-arg"
+          },
+          "functions": 116
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "icmp"
+          },
+          "functions": 102
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCallAttributeAbi",
+            "selector_tag": null,
+            "selector_detail": null
+          },
+          "functions": 90
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "load"
+          },
+          "functions": 72
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "stage2-indirect-phi"
+          },
+          "functions": 45
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_spill_envelope",
+            "selector_detail": "stage2-block-count"
+          },
+          "functions": 40
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-load-width"
+          },
+          "functions": 39
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": null,
+            "selector_detail": null
+          },
+          "functions": 24
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-cast-value"
+          },
+          "functions": 18
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "insertelement"
+          },
+          "functions": 15
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "phi"
+          },
+          "functions": 14
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-select-true-value"
+          },
+          "functions": 12
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-param-type"
+          },
+          "functions": 12
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-select-false-value"
+          },
+          "functions": 11
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-store-width"
+          },
+          "functions": 11
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-cast-width"
+          },
+          "functions": 9
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-phi-src-stack-i32-array"
+          },
+          "functions": 9
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-param-width"
+          },
+          "functions": 7
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-form"
+          },
+          "functions": 6
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-call-unknown-ptr-arg"
+          },
+          "functions": 6
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "stage2-phi-dst"
+          },
+          "functions": 6
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "call-ret"
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-binary-imm-lhs"
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedVarargsAbi",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "alloca"
+          },
+          "functions": 5
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "store"
+          },
+          "functions": 4
+        },
+        {
+          "failure": {
+            "diagnostic": "ValueUseUnsupportedSource",
+            "selector_tag": null,
+            "selector_detail": null
+          },
+          "functions": 4
+        },
+        {
+          "failure": {
+            "diagnostic": "ValueUseIdentityTooLong",
+            "selector_tag": null,
+            "selector_detail": null
+          },
+          "functions": 3
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-arg-type"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-call-ptr-arg"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-i52-cast-form"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-llvm-intrinsic"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-load-fp-ptr"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-param-reg"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-unknown-lhs"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "fcmp"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "inline-asm-call"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "unsupported-return-type"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-call-unknown-ptr-arg"
+          },
+          "functions": 2
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "call-arg"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "cast"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-call-arg-reg"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-half-binary-op"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-intbytesize-signature"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-memcpy-dst"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-memcpy-src"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-memset-attrs"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "composed-block-pair-binary-op"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-unknown-byte-gep-ptr"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "fptoui"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "freeze"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "insertvalue"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "unsupported_instruction",
+            "selector_detail": "sdiv"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenControlFlow",
+            "selector_tag": "no_emitter",
+            "selector_detail": "stage2-switch-width"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedCodegenInstruction",
+            "selector_tag": "unsupported_type",
+            "selector_detail": "insertelement"
+          },
+          "functions": 1
+        },
+        {
+          "failure": {
+            "diagnostic": "UnsupportedVarargsAbi",
+            "selector_tag": "unsupported_value",
+            "selector_detail": "composed-block-call-unknown-arg"
+          },
+          "functions": 1
+        }
+      ]
+    },
+    "runtime": {
+      "examined": 455,
+      "selected": 285,
+      "failed": 170,
+      "new_successes": [
+        "compiler_rt.addf3.add_f16"
+      ],
+      "lost_successes": []
+    },
+    "target_transitions": {
+      "complete": {
+        "event": "complete",
+        "examined": 164,
+        "selected": 144,
+        "failed": 20
+      },
+      "remaining": [
+        {
+          "function": "Io.Threaded.spawnPosix",
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_detail": "composed-block-call-unknown-arg"
+        },
+        {
+          "function": "Io.Threaded.fileStatLinux",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-dst"
+        },
+        {
+          "function": "zig.AstGen.expr",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-cast-value"
+        },
+        {
+          "function": "codegen.llvm.Object.lowerDebugType",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-call-unknown-arg"
+        },
+        {
+          "function": "codegen.llvm.Object.lowerType",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-intbytesize-signature"
+        },
+        {
+          "function": "codegen.x86_64.encoder.Instruction.encode__func_10648",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-load-width"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.genSetReg",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-call-arg-type"
+        },
+        {
+          "function": "link.MachO.checkDuplicates",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        {
+          "function": "sort.block.block__func_13181",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        {
+          "function": "sort.block.block__func_14023",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        {
+          "function": "sort.block.block__func_15116",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        {
+          "function": "math.big.int.Mutable.setFloat__func_20249",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-i52-cast-form"
+        },
+        {
+          "function": "Zcu.PerThread.errorSetFromUnsortedNames",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        {
+          "function": "sort.block.block__func_29110",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "stage2-phi-src-stack-i32-array"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.airArg",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-load-width"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.airRet",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-store-width"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.airMemset",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-store-width"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.genTry",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-load-width"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.atomicOp",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-load-width"
+        },
+        {
+          "function": "codegen.x86_64.CodeGen.Temp.toOffset",
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_detail": "composed-block-load-width"
+        }
+      ]
+    },
+    "compiler_production": {
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 7943,
+        "failed": 985
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": [
+        "\"array_hash_map.Custom(SemanticVersion,void,array_hash_map.AutoContext(SemanticVersion),true).getOrPutAssumeCapacity\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).allocRegs__func_11296\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).getReg\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).getRegIndex\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).indexOfRegIntoTracked\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockReg\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockRegAssumeUnused\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockRegsAssumeUnused__func_11003\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).lockRegsAssumeUnused__func_29239\"",
+        "\"register_manager.RegisterManager(codegen.x86_64.CodeGen,codegen.x86_64.bits.Register,&.{ .rax, .rdx, .rbx, .rcx, .rsi, .rdi, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15, .st0, .st1, .st2, .st3, .st4, .st5, .st6, .ymm0, .ymm1, .ymm2, .ymm3, .ymm4, .ymm5, .ymm6, .ymm7, .ymm8, .ymm9, .ymm10, .ymm11, .ymm12, .ymm13, .ymm14, .ymm15 }[0..37]).tryAllocRegs__func_11169\"",
+        "Air.Liveness.analyzeInstBlock__func_49732",
+        "Air.Liveness.analyzeInstSwitchBr__func_49747",
+        "Compilation.Path.fromUnresolved",
+        "Compilation.classifyFileExt",
+        "InternPool.Alignment.compare",
+        "Io.Threaded.childWait",
+        "Io.Threaded.dup2",
+        "Io.Threaded.fchdir",
+        "Io.Threaded.fchmodatFallback",
+        "Io.Threaded.fileDowngradeLock",
+        "Io.Threaded.fileLength",
+        "Io.Threaded.fileLock",
+        "Io.Threaded.fileReadPositional",
+        "Io.Threaded.fileSeekBy",
+        "Io.Threaded.fileSetLength",
+        "Io.Threaded.fileSyncPosix",
+        "Io.Threaded.fileTryLock",
+        "Io.Threaded.fileWriteFileStreaming",
+        "Io.Threaded.fileWriteStreaming",
+        "Io.Threaded.inheritParentHandle",
+        "Io.Threaded.isTty",
+        "Io.Threaded.mmSyncRead",
+        "Io.Threaded.netAcceptPosix",
+        "Io.Threaded.netConnectIpPosix",
+        "Io.Threaded.netConnectUnixPosix",
+        "Io.Threaded.netInterfaceNameResolve",
+        "Io.Threaded.netListenIpPosix",
+        "Io.Threaded.netListenUnixPosix",
+        "Io.Threaded.netReceivePosix",
+        "Io.Threaded.netSendPosix",
+        "Io.Threaded.netShutdownPosix",
+        "Io.Threaded.netSocketCreatePair",
+        "Io.Threaded.openSocketPosix",
+        "Io.Threaded.operate",
+        "Io.Threaded.posixBind",
+        "Io.Threaded.posixFchown",
+        "Io.Threaded.posixGetSockName",
+        "Io.Threaded.posixSeekTo",
+        "Io.Threaded.randomSecure",
+        "Io.Threaded.realPathPosix",
+        "Io.Threaded.setPermissionsPosix",
+        "Io.Threaded.setSocketOptionPosix",
+        "Io.Writer.printValue__func_18192",
+        "Io.Writer.printValue__func_337",
+        "Type.getUnionLayout",
+        "Type.structFieldOffset",
+        "Zcu.PerThread.doImport",
+        "codegen.aarch64.Select.movImmediate",
+        "codegen.aarch64.abi.getFloatArrayType",
+        "codegen.c.isReservedIdent",
+        "codegen.generateLazySymbol",
+        "codegen.llvm.FuncGen.fieldPtr",
+        "codegen.loongarch.Select.fillUnusedBits",
+        "codegen.loongarch.Select.writeConstantKeyToMemory",
+        "codegen.lowerPtr",
+        "codegen.spirv.CodeGen.layoutType",
+        "codegen.spirv.CodeGen.unionLayout",
+        "codegen.wasm.CodeGen.airGetUnionTag",
+        "codegen.wasm.CodeGen.airSetUnionTag",
+        "codegen.wasm.CodeGen.airUnionFromEnum",
+        "codegen.wasm.CodeGen.airUnionInit",
+        "codegen.wasm.CodeGen.emitWValue",
+        "codegen.x86_64.CodeGen.InstTracking.liveOut",
+        "codegen.x86_64.CodeGen.InstTracking.trackSpill",
+        "codegen.x86_64.CodeGen.MoveStrategy.write",
+        "codegen.x86_64.CodeGen.Select.TempSpec.Kind.lock",
+        "codegen.x86_64.CodeGen.Temp.getLimb",
+        "codegen.x86_64.CodeGen.Temp.loadReg",
+        "codegen.x86_64.CodeGen.Temp.readReg",
+        "codegen.x86_64.CodeGen.Temp.storeRegs",
+        "codegen.x86_64.CodeGen.Temp.toLimb",
+        "codegen.x86_64.CodeGen.Temp.toPair",
+        "codegen.x86_64.CodeGen.Temp.toReg",
+        "codegen.x86_64.CodeGen.Temp.toRegClass",
+        "codegen.x86_64.CodeGen.Temp.toRegPair",
+        "codegen.x86_64.CodeGen.Temp.writeReg",
+        "codegen.x86_64.CodeGen.asmSetccMemory",
+        "codegen.x86_64.CodeGen.asmSetccRegister",
+        "codegen.x86_64.CodeGen.convertFloatVarArg",
+        "codegen.x86_64.CodeGen.freeReg__func_11117",
+        "codegen.x86_64.CodeGen.freeValue__func_29194",
+        "codegen.x86_64.CodeGen.genBinOpMir",
+        "codegen.x86_64.CodeGen.genCondBrMir",
+        "codegen.x86_64.CodeGen.genSetMem",
+        "codegen.x86_64.CodeGen.genUnOpMir",
+        "codegen.x86_64.CodeGen.generate",
+        "codegen.x86_64.CodeGen.getValue",
+        "codegen.x86_64.CodeGen.getValueIfFree",
+        "codegen.x86_64.CodeGen.load",
+        "codegen.x86_64.CodeGen.registerAlias",
+        "codegen.x86_64.CodeGen.resolveCallingConventionValues",
+        "codegen.x86_64.CodeGen.restoreState__func_29199",
+        "codegen.x86_64.CodeGen.restoreState__func_29289",
+        "codegen.x86_64.CodeGen.reuseOperandAdvanced",
+        "codegen.x86_64.CodeGen.reuseTemp",
+        "codegen.x86_64.CodeGen.store",
+        "codegen.x86_64.Encoding.Op.fromOperand",
+        "codegen.x86_64.bits.Register.class",
+        "codegen.x86_64.bits.Register.dwarfNum",
+        "codegen.x86_64.bits.Register.id",
+        "codegen.x86_64.bits.Register.to16",
+        "codegen.x86_64.bits.Register.to32",
+        "codegen.x86_64.bits.Register.to64",
+        "codegen.x86_64.bits.Register.to8",
+        "codegen.x86_64.bits.Register.toBitSize",
+        "codegen.x86_64.bits.Register.toSize",
+        "compress.zstd.Decompress.BitReader.readBitsNoEof__func_55467",
+        "compress.zstd.Decompress.Frame.Zstandard.Decode.decodeLiterals",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsNoEof__func_55442",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsNoEof__func_55444",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsNoEof__func_55451",
+        "compress.zstd.Decompress.ReverseBitReader.readBitsTuple__func_55459",
+        "compress.zstd.Decompress.Table.decode",
+        "fmt.float.binaryToDecimal__func_18636",
+        "fmt.float.binaryToDecimal__func_748",
+        "fmt.fmtPathDir",
+        "fmt.parseInt__func_53281",
+        "fmt.parseInt__func_53282",
+        "math.big.int.Const.toString",
+        "math.big.int.Mutable.setFloat__func_20247",
+        "mem.sortUnstable__func_50466",
+        "sort.block.binaryFirst__func_14074",
+        "sort.block.binaryFirst__func_14977",
+        "sort.block.binaryLast__func_14983",
+        "sort.block.mergeExternal__func_14070",
+        "sort.block.mergeExternal__func_14973",
+        "sort.block.mergeInto__func_14971",
+        "sort.block.swap__func_14067",
+        "sort.block.swap__func_14970",
+        "sort.pdq.partialInsertionSort__func_50487",
+        "unicode.utf8Decode",
+        "unicode.utf8Decode3",
+        "unicode.utf8Decode4",
+        "zig.number_literal.parseNumberLiteral"
+      ],
+      "probe_selected_identities_match": true,
+      "probe_failure_tuples_match": true,
+      "profile_function_count": 8928,
+      "final_failure_groups": [
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "functions": 319,
+          "example": "start.main"
+        },
+        {
+          "diagnostic": "ValueUseUnsupportedSource",
+          "selector_tag": "-",
+          "functions": 4,
+          "example": "debug.unlockStderr"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "functions": 354,
+          "example": "Io.Threaded.netLookup"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "-",
+          "functions": 24,
+          "example": "Target.cCallingConvention"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "functions": 137,
+          "example": "meta.eql__func_256"
+        },
+        {
+          "diagnostic": "UnsupportedCallAttributeAbi",
+          "selector_tag": "-",
+          "functions": 90,
+          "example": "InternPool.getOrPutString__func_368"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "functions": 5,
+          "example": "Io.Threaded.sleep"
+        },
+        {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "Io.Threaded.spawnPosix"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "functions": 2,
+          "example": "Io.Threaded.processExecutableOpen"
+        },
+        {
+          "diagnostic": "UnsupportedVarargsAbi",
+          "selector_tag": "unsupported_type",
+          "functions": 5,
+          "example": "Io.Threaded.dirRealPathFilePosix"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_spill_envelope",
+          "functions": 40,
+          "example": "main.ClangSearchSanitizer.addIncludePath"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "functions": 1,
+          "example": "\"crypto.siphash.SipHash(u128,1,3).final\""
+        },
+        {
+          "diagnostic": "ValueUseIdentityTooLong",
+          "selector_tag": "-",
+          "functions": 3,
+          "example": "codegen.riscv64.CodeGen.freeValue"
+        }
+      ]
+    },
+    "runtime_production": {
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 285,
+        "failed": 170
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": [
+        "compiler_rt.addf3.add_f16"
+      ],
+      "probe_selected_identities_match": true,
+      "probe_failure_tuples_match": true,
+      "profile_function_count": 455,
+      "final_failure_groups": [
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "functions": 19,
+          "example": "compiler_rt.__negxf2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "functions": 24,
+          "example": "compiler_rt.atomics.__atomic_fetch_umin_16"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "functions": 93,
+          "example": "compiler_rt.trunc.truncq"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "functions": 11,
+          "example": "compiler_rt.sqrt.__sqrth"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_type",
+          "functions": 1,
+          "example": "compiler_rt.trig.cosq"
+        },
+        {
+          "diagnostic": "UnsupportedLongDoubleAbi",
+          "selector_tag": "unsupported_type",
+          "functions": 11,
+          "example": "compiler_rt.round.roundq"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_instruction",
+          "functions": 1,
+          "example": "compiler_rt.addf3.__subhf3"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "functions": 6,
+          "example": "compiler_rt.float_from_int.__floattidf"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_spill_envelope",
+          "functions": 2,
+          "example": "compiler_rt.cmp.__ucmpti2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "compiler_rt.bswap.__bswapti2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "compiler_rt.bitreverse.__bitreverseti2"
+        }
+      ]
+    },
+    "compiler_events": {
+      "sequence": 3464216,
+      "elapsed_ns": 967086644519,
+      "begins": 8928,
+      "ends": 8928,
+      "selected": 7943,
+      "failed": 985,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 7943,
+        "failed_functions": 985,
+        "normalization_runs": 65740,
+        "legalizer_attempts": 1188237,
+        "legalizer_rewrites": 63491,
+        "original_form_retries": 32960,
+        "original_form_selected": 6560,
+        "selection_iterations": 65740,
+        "max_selection_iterations": 26,
+        "emitted_instructions": 9548752,
+        "emitted_spill_instructions": 2199190
+      },
+      "unique_functions": 8928
+    },
+    "runtime_events": {
+      "sequence": 70548,
+      "elapsed_ns": 1909345701,
+      "begins": 455,
+      "ends": 455,
+      "selected": 285,
+      "failed": 170,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 285,
+        "failed_functions": 170,
+        "normalization_runs": 1362,
+        "legalizer_attempts": 23384,
+        "legalizer_rewrites": 1066,
+        "original_form_retries": 760,
+        "original_form_selected": 159,
+        "selection_iterations": 1362,
+        "max_selection_iterations": 12,
+        "emitted_instructions": 65956,
+        "emitted_spill_instructions": 13398
+      },
+      "unique_functions": 455
+    },
+    "scope": "Complete unchanged compiler/runtime inputs; function-selection proof, no complete object or execution credit"
+  },
+  "new_native_audit": {
+    "compiler_builds": [
+      {
+        "mode": "Debug",
+        "sha256": "53a5282103a984b748a5dbc909df37effba4b26dbac39a63c61f115f82b20cd4"
+      },
+      {
+        "mode": "ReleaseFast",
+        "sha256": "08c73c739ac47610eeba3d195f8ae26fb3689e6dccef8a535b94c7d046470da1"
+      }
+    ],
+    "release_modes": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "routes": [
+      "direct",
+      "release"
+    ],
+    "populations": [
+      {
+        "name": "pointer_freeze",
+        "unique_functions": 7,
+        "observations_per_executable": 1792,
+        "local_observations_per_compiler_build": 10752,
+        "reference_observations_per_compiler_build": 5376
+      },
+      {
+        "name": "samesign_comparisons",
+        "unique_functions": 8,
+        "observations_per_executable": 8192,
+        "local_observations_per_compiler_build": 49152,
+        "reference_observations_per_compiler_build": 24576
+      }
+    ],
+    "total_local_observations_per_compiler_build": 59904,
+    "total_reference_observations_per_compiler_build": 29952,
+    "reports": [
+      {
+        "schema": "native-canary-v1",
+        "population": "pointer_freeze",
+        "compiler_sha256": "53a5282103a984b748a5dbc909df37effba4b26dbac39a63c61f115f82b20cd4",
+        "registry_sha256": "ed9e179ab6f35f2be7abb1273786f90744bf8515ebbc092348751d669346692a",
+        ".ll": "dd517a3d31184e68107cac7406f1744f8d350a15da0a8c8cfde8c7d23248118b",
+        "_driver.c": "9e9480df13e13ccb65586ff6e5a7900e5fc9e426f0137b955b3c8808da404143",
+        "pointer_freeze_reference_observations": 5376,
+        "pointer_freeze_local_observations": 10752,
+        "status": "passed"
+      },
+      {
+        "schema": "native-canary-v1",
+        "population": "samesign_comparisons",
+        "compiler_sha256": "53a5282103a984b748a5dbc909df37effba4b26dbac39a63c61f115f82b20cd4",
+        "registry_sha256": "ed9e179ab6f35f2be7abb1273786f90744bf8515ebbc092348751d669346692a",
+        ".ll": "2af4dbc4255b83e963fa931fd52149781e72e6d22f655631129364b67b26801b",
+        "_driver.c": "dcbb04e992b149e500420e2d6c49c2b6a89682a90502390a53ce01600cec69ad",
+        "samesign_comparisons_reference_observations": 24576,
+        "samesign_comparisons_local_observations": 49152,
+        "status": "passed"
+      },
+      {
+        "schema": "native-canary-v1",
+        "population": "pointer_freeze",
+        "compiler_sha256": "08c73c739ac47610eeba3d195f8ae26fb3689e6dccef8a535b94c7d046470da1",
+        "registry_sha256": "ed9e179ab6f35f2be7abb1273786f90744bf8515ebbc092348751d669346692a",
+        ".ll": "dd517a3d31184e68107cac7406f1744f8d350a15da0a8c8cfde8c7d23248118b",
+        "_driver.c": "9e9480df13e13ccb65586ff6e5a7900e5fc9e426f0137b955b3c8808da404143",
+        "pointer_freeze_reference_observations": 5376,
+        "pointer_freeze_local_observations": 10752,
+        "status": "passed"
+      },
+      {
+        "schema": "native-canary-v1",
+        "population": "samesign_comparisons",
+        "compiler_sha256": "08c73c739ac47610eeba3d195f8ae26fb3689e6dccef8a535b94c7d046470da1",
+        "registry_sha256": "ed9e179ab6f35f2be7abb1273786f90744bf8515ebbc092348751d669346692a",
+        ".ll": "2af4dbc4255b83e963fa931fd52149781e72e6d22f655631129364b67b26801b",
+        "_driver.c": "dcbb04e992b149e500420e2d6c49c2b6a89682a90502390a53ce01600cec69ad",
+        "samesign_comparisons_reference_observations": 24576,
+        "samesign_comparisons_local_observations": 49152,
+        "status": "passed"
+      }
+    ],
+    "scope": "Final frozen compilers; development fixture attempts and earlier binaries excluded"
+  },
+  "negative_controls": {
+    "defined_dirty_byte_comparison": {
+      "baseline_exit": 1,
+      "llvm_reference_exit": 0,
+      "fixed_exit": 0,
+      "confirmed_wrong_code_repaired": true
+    },
+    "wrong_comparison_oracle_control": {
+      "exit": 7,
+      "rejected": true
+    }
+  },
+  "prior_population_comparison": {
+    "prior_native_populations": 64,
+    "current_native_populations": 66,
+    "prior_populations_preserved": true,
+    "population_differences": [],
+    "new_populations": [
+      {
+        "population": "standalone-samesign-comparisons",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "49152",
+        "reference_observations": "24576",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      },
+      {
+        "population": "standalone-pointer-freeze",
+        "routes": "direct,release",
+        "modes": "3",
+        "local_observations": "10752",
+        "reference_observations": "5376",
+        "reference_reused_per_route": "true",
+        "local_fail": "0"
+      }
+    ],
+    "core": {
+      "records": 36,
+      "all_selected_object_and_observation_fields_match": true,
+      "strict_records_equal": false,
+      "excluded_fields": [
+        "reference_bytes",
+        "reference_sha256",
+        "linked_bytes",
+        "linked_sha256"
+      ],
+      "scope": "Executable metadata is compared separately; selected-object bytes and all observation fields must match",
+      "executable_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153648",
+          "reference_bytes_after": "4153744",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153648",
+          "reference_bytes_after": "4153752",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151432",
+          "reference_bytes_after": "4151536",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154200",
+          "reference_bytes_after": "4154296",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148264",
+          "reference_bytes_after": "4148368",
+          "linked_bytes_before": "6283657",
+          "linked_bytes_after": "6287753",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153800",
+          "reference_bytes_after": "4153904",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152288",
+          "reference_bytes_after": "4152384",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147696",
+          "reference_bytes_after": "4147800",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148120",
+          "reference_bytes_after": "4148216",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148208",
+          "reference_bytes_after": "4148304",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148176",
+          "reference_bytes_after": "4148280",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148472",
+          "reference_bytes_after": "4148568",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039496",
+          "reference_bytes_after": "4039600",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039504",
+          "reference_bytes_after": "4039600",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035576",
+          "reference_bytes_after": "4035680",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040216",
+          "reference_bytes_after": "4040312",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034072",
+          "reference_bytes_after": "4034168",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039688",
+          "reference_bytes_after": "4039784",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038392",
+          "reference_bytes_after": "4038496",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034344",
+          "reference_bytes_after": "4034448",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034208",
+          "reference_bytes_after": "4034304",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034256",
+          "reference_bytes_after": "4034360",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034232",
+          "reference_bytes_after": "4034328",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034312",
+          "reference_bytes_after": "4034416",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        }
+      ]
+    }
+  },
+  "executable_metadata_review": {
+    "records": 36,
+    "selected_object_and_observation_fields_match": true,
+    "linked_sizes_match": false,
+    "groups": [
+      {
+        "fields": {
+          "mode": "ReleaseFast",
+          "reference_delta": 96,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseFast",
+          "reference_delta": 104,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 5
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSafe",
+          "reference_delta": 96,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSafe",
+          "reference_delta": 104,
+          "linked_delta": 0,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 6
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSmall",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        "records": 7
+      },
+      {
+        "fields": {
+          "mode": "ReleaseSmall",
+          "reference_delta": 0,
+          "linked_delta": 0,
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        "records": 5
+      },
+      {
+        "fields": {
+          "mode": "ReleaseFast",
+          "reference_delta": 104,
+          "linked_delta": 4096,
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        "records": 1
+      }
+    ]
+  },
+  "linked_wrapper_metadata_exception": {
+    "mode": "ReleaseFast",
+    "function": "atomic.Mutex.tryLock",
+    "before_bytes": 6283657,
+    "after_bytes": 6287753,
+    "delta_bytes": 4096,
+    "selected_object_unchanged": true,
+    "all_behavior_fields_unchanged": true,
+    "exact_elf_section_cause_not_claimed": true,
+    "initial_strict_comparison_exit": 5,
+    "reviewed_comparison_exit": 0
+  },
+  "fixed_programs": {
+    "status": "passed",
+    "programs": 5,
+    "program_modes": 15,
+    "prior_source_manifest_emitter_identities_preserved": true,
+    "rows": [
+      {
+        "program": "recursive_fibonacci",
+        "source_sha256": "bd530890b4e111b0a9b8e260d766253a243c1a4d8523a01dde073ee2fd44e05b",
+        "manifest_sha256": "21bd150575f432aa005026f2db2ce765587f2eb9246cdc2457fec77a7d01a6ad",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "optionals",
+        "source_sha256": "8e47ea56fd5690e7b0220917f8a16eca60aa59537e2b9207ae2bf7ea485c8035",
+        "manifest_sha256": "65c424b0dc648041ec5781552aea18341353931dac668e37bd7f1356c41aed24",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "taking_pointer_of_global_tagged_union",
+        "source_sha256": "d88d9cde2f25cb0134aac0e1d894dcf1448a21e780c8ded5a91130fe7b07d7dc",
+        "manifest_sha256": "07d564db0173432a1f00b774fac6df169f36e80c56ae7853c959b6f70b20ab76",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "array_in_anon_struct",
+        "source_sha256": "9ea4e3efed991237fe3dcca39de9a8826efeb0d8de7df30c385870dc81471dce",
+        "manifest_sha256": "a1c70dc1e3162a0f7a435c7ea3faa60e0a258e5972a70800f7a19c564661764c",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      },
+      {
+        "program": "while_loops",
+        "source_sha256": "4775009971f7b7ba11a1881f55ae5ee97c69519e6ff04bc83f6d740369e41c53",
+        "manifest_sha256": "ed79b9a73c75410c2d2939d6a87519961267e466cc330fe713ecb949fb103327",
+        "zig_emitter_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+        "zig_revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+        "matched_program_modes": 3,
+        "local_executions": 3,
+        "reference_executions": 3
+      }
+    ]
+  },
+  "zig_corpus": {
+    "status": "passed",
+    "inputs": 29,
+    "input_mode_pairs": 87,
+    "actual_executions": 174,
+    "observation_controls": 603,
+    "independent_oracle": true,
+    "prior_observations_equal": true,
+    "prior_selection_counters_equal": false,
+    "selection_comparison_scope": "Recorded separately; a capability repair may change selection while preserving all oracle observations",
+    "profile_review": [
+      {
+        "mode": "ReleaseSafe",
+        "changed_functions": [
+          {
+            "name": "heap.SafeAllocator.AllocFooter.lenLarge",
+            "prior": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 3,
+              "legalizer_attempts": 35,
+              "legalizer_rewrites": 3,
+              "original_form_retries": 2,
+              "original_form_selected": 1,
+              "selection_iterations": 3,
+              "max_selection_iterations": 3,
+              "emitted_instructions": 55,
+              "emitted_spill_instructions": 7
+            },
+            "current": {
+              "selected_functions": 1,
+              "failed_functions": 0,
+              "normalization_runs": 2,
+              "legalizer_attempts": 12,
+              "legalizer_rewrites": 2,
+              "original_form_retries": 1,
+              "original_form_selected": 1,
+              "selection_iterations": 2,
+              "max_selection_iterations": 2,
+              "emitted_instructions": 53,
+              "emitted_spill_instructions": 6
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "c_corpus": {
+    "status": "passed",
+    "inputs": 46,
+    "matched_inputs": 138,
+    "negative_controls": 552,
+    "source_files_equal": true,
+    "manifest_equal": true,
+    "observations_equal": true
+  },
+  "controls": {
+    "schema": "execution-breadth-controls-v2",
+    "rows": [
+      {
+        "mode": "ReleaseFast",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseFast",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSafe",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "bit_set.Dynamic.maskIndex",
+        "observations": 4108,
+        "object_sha256": "08065365acb3bec22263f3481fc15cf6f2a12cffecbd3c5512dc475bc25bb254",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "atomic.Mutex.tryLock",
+        "observations": 384,
+        "object_sha256": "c90c72b8aa8a7690997bc764323877474a1560db242d62f9acc426597941d327",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+        "observations": 256,
+        "object_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+        "observations": 256,
+        "object_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "Io.Event.reset",
+        "observations": 512,
+        "object_sha256": "58179b466b2032fd795f829b4b0198b89b7d6e7ba2944b0727928b5e69dab217",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.get",
+        "observations": 1040,
+        "object_sha256": "9170548d889e8e2069b27d2bd1332be82b1d604e69bd896f2813cb7f6734fd7e",
+        "status": "passed"
+      },
+      {
+        "mode": "ReleaseSmall",
+        "function": "InternPool.PackedU64.init",
+        "observations": 1040,
+        "object_sha256": "4d03c08d9b1de97b4c1c10d6f9724723e74aa905ee02b819e60ed12217ada003",
+        "status": "passed"
+      }
+    ],
+    "negative_controls": 54,
+    "function_modes": 21,
+    "observations": 22788,
+    "status": "passed"
+  },
+  "native_registry_preservation": {
+    "prior_entries": 64,
+    "current_entries": 66,
+    "all_prior_entries_preserved": true,
+    "new_populations": [
+      "pointer_freeze",
+      "samesign_comparisons"
+    ]
+  },
+  "compiler_builds": {
+    "Debug": "53a5282103a984b748a5dbc909df37effba4b26dbac39a63c61f115f82b20cd4",
+    "ReleaseSafe": "87b78cead7ebd1dfae26b3ce027de81eb19e429295e6b94064e620808583210c",
+    "ReleaseFast": "08c73c739ac47610eeba3d195f8ae26fb3689e6dccef8a535b94c7d046470da1",
+    "suite_debug_matches_frozen_debug": true
+  },
+  "toolchain": {
+    "project_zig": "0.17.0",
+    "fixture_emitter": "0.17.0-dev.11+1c08b09d1",
+    "clang": "Ubuntu clang version 22.1.8 (++20260714014902+ca7933e47d3a-1~exp1~20260714135019.80)",
+    "llvm_reference_revision": "c0262e742787e5997a6df2b4b56830df00a6ff11"
+  },
+  "full_run": {
+    "log": "local-state/validations/compiler-selection-completion-20261108/batch-01/full-cached.log",
+    "capture": "local-state/validations/compiler-selection-completion-20261108/batch-01/full-cached.json",
+    "command": "local-state/validations/compiler-selection-completion-20261108/batch-01/tier3-command.txt",
+    "outcome": "completed",
+    "returncode": 0,
+    "wall_ns": 3732751817841,
+    "sample_count": 1848,
+    "minimum_sampled_available_bytes": 34547077120
+  },
+  "next_frontier": [
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "stage2-unsupported-value"
+      },
+      "functions": 133
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "alloca"
+      },
+      "functions": 123
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "composed-block-call-unknown-arg"
+      },
+      "functions": 116
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "icmp"
+      },
+      "functions": 102
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCallAttributeAbi",
+        "selector_tag": null,
+        "selector_detail": null
+      },
+      "functions": 90
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "load"
+      },
+      "functions": 72
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "stage2-indirect-phi"
+      },
+      "functions": 45
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_spill_envelope",
+        "selector_detail": "stage2-block-count"
+      },
+      "functions": 40
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "no_emitter",
+        "selector_detail": "composed-block-load-width"
+      },
+      "functions": 39
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": null,
+        "selector_detail": null
+      },
+      "functions": 24
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_value",
+        "selector_detail": "stage2-cast-value"
+      },
+      "functions": 18
+    },
+    {
+      "failure": {
+        "diagnostic": "UnsupportedCodegenControlFlow",
+        "selector_tag": "unsupported_type",
+        "selector_detail": "insertelement"
+      },
+      "functions": 15
+    }
+  ],
+  "active_objective": {
+    "selected": 7943,
+    "required": 8928,
+    "remaining": 985,
+    "status": "active",
+    "continue_after_checkpoint": true
+  },
+  "retention": {
+    "original_inputs_retained": true,
+    "original_scratch_files": 13,
+    "scratch_unchanged": true,
+    "prior_evidence_retained": true,
+    "air_payloads_retained": true,
+    "manual_cache_retirement": false,
+    "archives_created": false,
+    "scope": "Runners clean their own disposable state; retained evidence, original inputs and scratch are preserved"
+  },
+  "excluded_development_attempts": [
+    "Early pointer fixtures used an unadmitted readonly-table shape; final fixtures use the existing 128xi16 contract",
+    "Early passing pointer matrices predate the final comparison changes and are excluded from acceptance; final Debug and Fast matrices bind the frozen binaries",
+    "Focused comparison development exposed the final width guard and signed i32 spelling checks; all final unit and native checks pass",
+    "The initial core metadata comparison required identical linked sizes; its one 4096-byte wrapper change is retained and reviewed separately from identical selected objects and behavior",
+    "The baseline dirty-byte wrong-code executable and deliberately wrong comparison are expected failing controls"
+  ],
+  "limitations": [
+    "The all-8928 goal remains active with 985 rejected definitions; this is an intermediate accepted checkpoint",
+    "Selection counts do not establish complete compiler/runtime object emission, startup or self-rebuild",
+    "Twenty targeted functions advance to later existing selector limitations; actual transitions are retained",
+    "Selected core objects and observations match; wrapper metadata is reviewed separately without a whole-executable identity claim",
+    "Timings and global filesystem samples include concurrent activity and are not throughput or exclusive disk-usage measurements"
+  ],
+  "artifact_manifest": {
+    "path": "local-state/validations/compiler-selection-completion-20261108/batch-01/acceptance-artifacts.sha256",
+    "sha256": "971c4bbaa9bddf0d1a6dea79b05ae7d2e1d3ba972566e5345a9295ec2cb725f1",
+    "files": 920
+  }
+}

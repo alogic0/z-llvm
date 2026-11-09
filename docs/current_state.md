@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `7080d4544ee966079b76270081c6cf10e1d3bd32`; tree: `3d78027ce8914fa6c6ec0601aef593774316a4ec`.
+Accepted revision: `9ba5e61c20c3ed5632514eeb56ca933fa1e57469`; tree: `85de42914a3089185193d7e0b7ca2127bd31101f`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,7 +31,28 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [narrow freeze slice](evidence/narrow_freeze.md) is accepted at `7080d454`.
+The [comparison and pointer-freeze checkpoint](evidence/scalar_comparisons_pointer_freeze.md)
+is accepted at `9ba5e61c`. Compiler selection reaches **7,943/8,928**, adding
+144 without losing any preceding success; runtime reaches **285/455**. Both
+complete production replays match their censuses and pass event audits.
+The [all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains
+active with 985 failures and authorizes continued implementation.
+
+All 17 integration gates and 66 native populations pass, preserving all 64
+preceding populations. Debug/ReleaseSafe each pass 1,995 units and 23 structural
+checks; all nine readiness commands pass. The suite records 2,043,396 local
+observations against 1,021,698 references. Five fixed programs, both input
+corpora, and all 54 fault controls pass. All 36 core selected objects and
+behavioral records match; executable metadata is reviewed separately, including
+one 4,096-byte wrapper increase. The 100-row prefix, twelve-function cohort,
+and ratchet 130 remain unchanged. The raw seal retains 920 artifacts.
+
+Private normalization fixes a defined dirty-carrier `samesign` comparison and
+admits signed interpretation of unsigned-spelled i32 immediates. Named pointer
+freezes retain existing physical addresses without an instruction or flag write.
+No complete compiler/runtime object, startup, or self-rebuild is claimed.
+
+The preceding [narrow freeze slice](evidence/narrow_freeze.md) is accepted at `7080d454`.
 All 17 serial integration gates and 64 native populations pass, preserving
 all 63 prior populations. Debug and ReleaseSafe each pass 1,989 units and
 23 structural checks; readiness, both input corpora, all five fixed programs

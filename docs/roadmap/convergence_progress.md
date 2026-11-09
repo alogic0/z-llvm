@@ -4663,6 +4663,23 @@ One line per completed cycle, append-only, newest last. This is the
   programs and all 54 fault controls pass. Evidence:
   `docs/evidence/narrow_freeze_acceptance_20261108.json`.
 
+- 2026-11-09 (scalar comparisons and pointer freeze, `9ba5e61c`)
+  Private `samesign` width normalization fixes a defined dirty-carrier i8
+  comparison; signed predicates accept unsigned-spelled i32 bit patterns.
+  Pointer freezes alias compatible existing locations without instructions or
+  flag writes. Compiler selection reaches 7,943/8,928 (+144), runtime 285/455
+  (+1), with no lost successes. All 164 targeted first boundaries advance;
+  twenty reach later limits. Both production replays and event audits match
+  their complete censuses. All 17 gates and 66 native populations pass,
+  preserving all 64 prior populations and 36 selected-object/behavior records.
+  Debug/ReleaseSafe each pass 1,995 units plus 23 structural checks. Readiness,
+  fixed programs, both corpora, and all 54 fault controls pass. The suite records
+  2,043,396 local observations; 920 raw artifacts are sealed. Executable metadata
+  includes one linked wrapper growing 4,096 bytes; selected objects and behavior
+  are unchanged. The twelve-function cohort, prefix 100, and ratchet 130 remain.
+  The all-8,928 objective stays active with 985 failures. Evidence:
+  `docs/evidence/scalar_comparisons_pointer_freeze_acceptance_20261109.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4670,7 +4687,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `7080d4544ee966079b76270081c6cf10e1d3bd32`; tree: `3d78027ce8914fa6c6ec0601aef593774316a4ec`.
+Accepted revision: `9ba5e61c20c3ed5632514eeb56ca933fa1e57469`; tree: `85de42914a3089185193d7e0b7ca2127bd31101f`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
