@@ -2,6 +2,22 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "samesign_comparisons",
+      "prefix": "samesign-comparisons",
+      "fixture": "samesign_comparisons",
+      "functions": ["samesign_byte_named", "samesign_byte_negative", "samesign_half_named", "samesign_i21_literal", "samesign_i37_literal", "samesign_signed_word", "samesign_dirty_byte", "samesign_signed_named"],
+      "observations": 8192,
+      "stdout": "samesign-comparisons observations=8192 widths=immediates=defined-domain=aliases=guards=preserved\n"
+    },
+    {
+      "population": "pointer_freeze",
+      "prefix": "pointer-freeze",
+      "fixture": "pointer_freeze",
+      "functions": ["pointer_freeze_arg", "pointer_freeze_gep", "pointer_freeze_phi", "pointer_freeze_calls", "pointer_freeze_stack", "pointer_freeze_array", "pointer_freeze_readonly"],
+      "observations": 1792,
+      "stdout": "pointer-freeze observations=1792 pointers=aliases=phis=calls=stack=readonly=guards=preserved\n"
+    },
+    {
       "population": "narrow_freeze",
       "prefix": "narrow-freeze",
       "fixture": "narrow_freeze",

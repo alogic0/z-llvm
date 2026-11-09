@@ -3,6 +3,8 @@ const std = @import("std");
 comptime {
     _ = @import("selection_census.zig");
     _ = @import("codegen/x86_64/generic_cfg/narrow_freeze_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/pointer_freeze_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/samesign_comparison_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/checked_multiply_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/vector_fp_cast_tests.zig");
     _ = @import("tests/ir_compiler_boundaries.zig");

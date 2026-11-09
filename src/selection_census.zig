@@ -218,10 +218,10 @@ pub fn main(init: std.process.Init) !void {
 
 test "selection census retains rejected freeze type location and value after rollback" {
     const text =
-        \\define ptr @observed(ptr %input) {
+        \\define float @observed(float %input) {
         \\entry:
-        \\ %frozen = freeze ptr %input
-        \\ ret ptr %frozen
+        \\ %frozen = freeze float %input
+        \\ ret float %frozen
         \\}
     ;
     var module = try ir.Module.parse(std.testing.allocator, text);
@@ -230,7 +230,7 @@ test "selection census retains rejected freeze type location and value after rol
     var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
     defer capture.arena.deinit();
     var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
-    var output = x86.MachineFunction.init("observed", .ptr);
+    var output = x86.MachineFunction.init("observed", .float);
     defer output.deinit(std.testing.allocator);
     var dependencies: @import("codegen/x86_64/generic_cfg/composed_selector_address_dependencies.zig").AddressDependencyDomain = .{};
     const result = try @import("codegen/x86_64/generic_cfg/composed_selector.zig").tryLowerComposedCfgObserved(std.testing.allocator, &output, module.functions.items[0], null, &dependencies, &observer);
@@ -240,11 +240,11 @@ test "selection census retains rejected freeze type location and value after rol
     const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
     defer payload.deinit();
     const freeze = payload.value.object.get("freeze").?.object;
-    try std.testing.expectEqualStrings("ptr", freeze.get("type").?.string);
+    try std.testing.expectEqualStrings("float", freeze.get("type").?.string);
     try std.testing.expectEqualStrings("frozen", freeze.get("result").?.string);
     const operand = freeze.get("operand").?.object;
     try std.testing.expectEqualStrings("%input", operand.get("value").?.string);
-    try std.testing.expectEqualStrings("arg64", operand.get("location").?.string);
+    try std.testing.expectEqualStrings("xmm", operand.get("location").?.string);
     try std.testing.expectEqualStrings("parameter", operand.get("origin").?.string);
     try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
     observations.Observer.reset(&observer);

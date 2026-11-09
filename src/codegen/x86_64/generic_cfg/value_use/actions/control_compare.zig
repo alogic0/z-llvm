@@ -870,17 +870,9 @@ pub fn executeSetccEaxCompare(
     const definition: x86_64_machine.Instruction = switch (plan.definition) {
         .instruction => |instruction| instruction,
         .compare_immediate => |immediate| .{
-            .cmp_eax_imm32 = if (std.math.cast(i32, immediate)) |imm|
-                imm
-            else if (if (plan.setcc) |setcc| switch (setcc) {
-                .sete_eax, .setne_eax, .setb_eax, .setbe_eax, .seta_eax => true,
-                else => false,
-            } else false)
-                if (std.math.cast(u32, immediate)) |imm|
-                    @bitCast(imm)
-                else
-                    return error.ValueUseSetccEaxCompareImmediateOutOfRange
-            else
+            // LLVM's signed and unsigned spellings denote the same i32 bits;
+            // signed predicates interpret those bits through their setcc.
+            .cmp_eax_imm32 = composed_helpers.i32BitPattern(immediate) catch
                 return error.ValueUseSetccEaxCompareImmediateOutOfRange,
         },
     };

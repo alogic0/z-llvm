@@ -1,7 +1,15 @@
 # Active direction
 
+The user explicitly authorized continuing until **all 8,928 definitions** in
+the unchanged original compiler input select. The [complete-selection plan](plans/2026-11-08-complete-compiler-selection.md)
+is active and authorizes successive necessary capability groups. Begin with
+the retained 1,129 failures, preserve all 7,799 successes and continue through
+newly exposed limits. No further per-slice permission is required. Keep the
+accepted checkpoint below authoritative until cumulative validation accepts
+new progress; selection does not imply compiler startup or self-rebuild.
+
 The authorized [narrow freeze slice](plans/2026-11-08-narrow-freeze.md) is
-complete and accepted at `7080d454`. No successor slice is active. Compiler
+complete and accepted at `7080d454`. Compiler
 selection is **7,799/8,928**: 86 additions, preserving all 7,713 preceding
 successes. Runtime remains **284/455**. Both production replays match their
 complete censuses and pass event audits. All 17 integration gates and 64 native

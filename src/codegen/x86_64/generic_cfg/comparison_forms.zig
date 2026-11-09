@@ -104,7 +104,7 @@ fn wordValue(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Bas
 // byte/halfword instructions, halfword normalization, and masked sign tests.
 // Other narrow paths may observe dirty upper bits left by a truncation alias.
 fn needsNarrowNormalization(function: ir.Function, cmp: ir.IcmpInst) bool {
-    if (cmp.samesign or cmp.operand_ty != .int or cmp.operand_ty.int == 0 or cmp.operand_ty.int > 64 or
+    if (cmp.operand_ty != .int or cmp.operand_ty.int == 0 or cmp.operand_ty.int > 64 or
         cmp.operand_ty.int == 32 or cmp.operand_ty.int == 64)
         return false;
     const bits = cmp.operand_ty.int;
@@ -162,12 +162,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 // Existing full-width named comparisons are already canonical.
                 // Preserve established null and nonnegative compare fast paths.
                 const needs_rewrite = pointer_needs_rewrite or (!pointer and (needsNarrowNormalization(function, cmp) or
+                    (cmp.samesign and (signed or cmp.predicate == .ne)) or
                     cmp.lhs == .int or
                     (cmp.rhs == .int and (cmp.rhs.int != 0 or cmp.predicate == .uge or (bits == 32 and cmp.predicate == .ule))) or
                     (cmp.predicate == .sge and !(bits == 32 and cmp.rhs.eql(.{ .int = 0 }))) or
                     cmp.predicate == .sle));
-                if (!cmp.samesign and (integer_form or pointer_form) and needs_rewrite and
-                    (pointer or bits >= 32 or needsNarrowNormalization(function, cmp)) and
+                if ((!cmp.samesign or integer_form) and (integer_form or pointer_form) and needs_rewrite and
+                    (pointer or bits >= 32 or cmp.samesign or needsNarrowNormalization(function, cmp)) and
                     (cmp.lhs == .named or cmp.rhs == .named))
                 {
                     try candidate.begin(&block, block_index, instruction_index);
@@ -182,6 +183,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     cmp.lhs = lhs;
                     cmp.rhs = rhs;
                     cmp.operand_ty = .{ .int = if (bits <= 32) 32 else 64 };
+                    // samesign constrains defined source inputs. Widening and
+                    // sign-bit bias preserve their ordering; the old-width
+                    // promise is unnecessary on this private comparison.
+                    cmp.samesign = false;
                     if (signed and bits != 32 and bits != 64) cmp.predicate = unsignedPredicate(cmp.predicate);
                     const invert = cmp.predicate == .sge or cmp.predicate == .sle;
                     if (invert) cmp.predicate = if (cmp.predicate == .sge) .slt else .sgt;

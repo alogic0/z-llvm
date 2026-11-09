@@ -485,7 +485,7 @@ test "value-use setcc EAX compare preserves post-materialization immediate failu
         .{ .int = 32 },
         .sgt,
         false,
-        @as(i128, std.math.maxInt(i32)) + 1,
+        @as(i128, std.math.maxInt(u32)) + 1,
         .ordinary,
     );
     try transaction.seal();
