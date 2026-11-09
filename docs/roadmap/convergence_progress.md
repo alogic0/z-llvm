@@ -4715,6 +4715,24 @@ One line per completed cycle, append-only, newest last. This is the
   506 remaining failures. Evidence:
   `docs/evidence/integer_vector_graphs_acceptance_20261109.json`.
 
+- **2026-11-09 — Runtime storage checkpoint accepted** (`5d71dc80`):
+  complete compiler census and independent production replay select 8,552/8,928,
+  adding 130 with no lost successes. Runtime retains 285/455. Private runtime
+  copies, exact integer memory, undefined select arms and conservative pair-word
+  cleanup preserve source facts, ownership and effects. All 17 serial gates
+  and 72 native populations pass, preserving the prior 69; 2,104,068 local
+  observations and 1,052,034 references are recorded. Debug/ReleaseSafe pass
+  2,013 units and 24 structural checks, with a valid cached Debug structural
+  result. Readiness, both corpora, fifteen fixed program/mode pairs and all 54
+  fault controls pass. Core objects, observations and executable sizes match;
+  hashes and profile counter changes are reviewed separately. Interrupted outer
+  full/census captures retain their unavailable exit statuses; durable final
+  gate records and independent production matching verify the proofs. The
+  100-row prefix, twelve-function cohort and ratchet 130 remain unchanged.
+  A 1,212-artifact seal retains the evidence. Continue the all-8,928 goal with
+  376 remaining failures. Evidence:
+  `docs/evidence/runtime_integer_storage_acceptance_20261109.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4722,7 +4740,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `d06659d1d1e256edc4148f4b3c44770136daa6a0`; tree: `33aa089ed5ee52b201db58579e6785bfe88460c6`.
+Accepted revision: `5d71dc80300b997717563c6e2f20bfc2da42394f`; tree: `39786e6b79ac0e954ff1ab5b78ca0dc6f8c36e84`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

@@ -4,34 +4,34 @@ Continue until **all 8,928 definitions** in the unchanged original compiler
 input select. The user's [complete-selection plan](plans/2026-11-08-complete-compiler-selection.md)
 authorizes the successive necessary groups without further per-slice permission.
 
-The [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
-is accepted at `d06659d1`: **8,422/8,928**, adding 252 selections with no lost
-successes. Runtime retains **285/455**. Both complete production replays match
-their censuses and pass event audits.
-[Acceptance record](evidence/integer_vector_graphs_acceptance_20261109.json).
+The [runtime storage checkpoint](evidence/runtime_integer_storage.md)
+is accepted at `5d71dc80`: **8,552/8,928**, adding 130 selections with no lost
+successes. Runtime retains **285/455**. Complete terminal censuses and independent
+production replays match all selections, owners and remaining diagnostic tuples.
+[Acceptance record](evidence/runtime_integer_storage_acceptance_20261109.json).
 
-All 17 serial integration gates and 69 native populations pass, preserving
-all 67 preceding populations. Debug and ReleaseSafe each pass 2,004 units
-and 24 structural checks; all nine readiness commands pass. The suite records
-2,087,940 local observations against 1,043,970 references. Five fixed programs,
-both input corpora, and all 54 core fault controls pass. All 36 core selected
-objects, behavioral records and linked/reference sizes match. Executable hashes
-are reviewed separately. The 1,593-artifact seal is retained. Zig selected
-identities and owners match; instruction/spill counter changes are recorded.
+All 17 serial gates and 72 native populations pass, preserving the preceding 69.
+Debug/ReleaseSafe each pass 2,013 units and 24 structural checks; Debug reuses
+its valid cached structural result. Readiness, both corpora, five fixed programs
+and all 54 core fault controls pass. The suite records 2,104,068 local observations
+against 1,052,034 references. All 36 selected core objects, observations and
+executable sizes match. Wrapper hashes and corpus counter changes are reviewed
+separately. The 1,212-file seal verifies. Interrupted full/census outer captures
+and unavailable command exit statuses are explicit in the accepted evidence;
+durable final gate records and independent production matching verify the work.
 
-The remaining **506 failures** are still authorized work. Next:
+The remaining **376 failures** are still authorized work. Next:
 
-1. Repair exact-byte non-native integer memory accesses, general storage views
-   with runtime copies, and undefined select arms. Keep guards, source ownership
-   and unsupported barrier/address-space boundaries explicit.
-   Of 128 allocation-first failures (including five variadic diagnostics),
-   91 use named copy lengths outside the currently resolved literal forms.
-2. Continue through wider ABI carriers, aggregate/indirect PHIs, large CFGs,
-   long owned identities and FP limits as observed.
-   Original rejected functions include 60 CFGs over 1,024 blocks, with a
-   maximum of 20,976; quoted block labels reach 406 bytes. Read-only inspection
-   also connects unannotated large-switch failures to a sixteen-successor
-   planning limit; verify that hypothesis in the CFG cycle.
+1. Replace linear CFG lookups and the sixteen-successor planning container with
+   canonical indexed graphs and correct indirect-edge liveness. Remove fixed
+   stack arrays before expanding the explicit block resource limit. There are
+   55 block-count and 49 indirect-PHI first failures. Original rejected CFGs
+   reach 20,976 blocks; conservative switch/dispatcher sizing reaches 33,722.
+   Preserve original block addresses, simultaneous PHI copies and rollback.
+2. Continue through aggregate PHIs/freezes, long owned identities, pointer flows,
+   atomic stack views and wide/FP ABI limits. Three current identity failures
+   involve block labels over 192 bytes. Four scalar freeze failures involve i40;
+   a private native-width bridge should preserve source widths and aliases.
 
 Replay affected original functions after each cohesive change, preserve all
 accepted selected identities, and reclassify later limits. Use the validation
@@ -39,7 +39,7 @@ tiers, including immediate Tier 3 for correctness or shared ABI/frame changes.
 Keep this checkpoint authoritative until the next cumulative acceptance.
 
 Raw batch evidence is sealed under
-`local-state/validations/compiler-selection-completion-20261108/batch-03/`;
+`local-state/validations/compiler-selection-completion-20261108/batch-04/`;
 ongoing notes and read-only classifications are in its parent. Preserve the
 100-row prefix, twelve-function core cohort, ratchet 130, every execution
 population, original inputs, prior evidence, AIR payloads, and thirteen scratch
@@ -51,6 +51,11 @@ when producer identities match. Create no archives. See the
 [headroom policy](retention_headroom_policy.md#headroom).
 
 ## Preceding checkpoints
+
+The [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
+at `d06659d1` selected 8,422 compiler and 285 runtime definitions, with all 17
+gates and 69 native populations passing. Its runtime storage, integer memory
+and undefined-select recommendations are advanced by the current checkpoint.
 
 The [call values and pointer-promises checkpoint](evidence/call_values_pointer_promises.md)
 at `636816de` selected 8,170 compiler and 285 runtime definitions, with all 17

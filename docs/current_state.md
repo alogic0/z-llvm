@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `d06659d1d1e256edc4148f4b3c44770136daa6a0`; tree: `33aa089ed5ee52b201db58579e6785bfe88460c6`.
+Accepted revision: `5d71dc80300b997717563c6e2f20bfc2da42394f`; tree: `39786e6b79ac0e954ff1ab5b78ca0dc6f8c36e84`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,7 +31,32 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
+The [runtime storage checkpoint](evidence/runtime_integer_storage.md)
+is accepted at `5d71dc80`: **8,552/8,928**, adding 130 selections without
+losing any preceding success. Runtime retains **285/455**. Complete terminal
+census records and independent production replays match on every selection,
+owner and remaining diagnostic tuple. The
+[all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains active
+with 376 failures and authorizes continued implementation.
+
+All 17 serial integration gates and 72 native populations pass, preserving all
+69 preceding populations. Debug/ReleaseSafe each pass 2,013 units and 24 structural
+checks; Debug reuses its valid cached structural result. Readiness passes all
+nine commands. The suite records 2,104,068 local observations against 1,052,034
+references. Both corpora, five fixed programs and all 54 core fault controls pass.
+All 36 selected core objects, observations and executable sizes match; hashes
+and corpus counter changes are reviewed separately. The 1,212-file seal verifies.
+Interrupted outer full/census captures remain explicit; durable gate records,
+terminal success and independent production matching establish the proofs
+without inventing their unavailable command exit statuses.
+
+Private runtime copy lengths, exact integer memory accesses and undefined select
+arms advance the storage frontier. Known pair words and conservative unused-pair
+cleanup preserve ownership and effects. Next work follows larger CFGs,
+indirect/aggregate PHIs, owned identities, pointer flow and wide/FP ABI limits.
+Selection does not establish whole-compiler objects, startup or self-rebuild.
+
+The preceding [integer vector graph checkpoint](evidence/integer_vector_graphs.md)
 is accepted at `d06659d1`. Compiler selection reaches **8,422/8,928**, adding
 252 without losing any preceding selection. Runtime retains **285/455**.
 Both complete production replays match their censuses and pass event audits.

@@ -73,9 +73,19 @@ pass. All 69 native populations pass and preserve the preceding 67. Both new
 populations pass both routes and all modes with frozen Debug/Fast builds.
 See the [accepted evidence](../evidence/integer_vector_graphs.md).
 
-The objective remains active with 506 failures. Continue with runtime storage
-copies, exact-byte integer memory and undefined select arms, then the later
-observed limits. The retained read-only inventory identifies
-60 rejected original CFGs exceeding 1,024 blocks, internal vector expansions,
-FP storage/ABI limits, and long labels. These are work groups under the existing
-authorization, not new permission boundaries.
+The fourth checkpoint is accepted at `5d71dc80`: general runtime copy views,
+exact integer memory, private undefined select arms and conservative pair-word
+reuse/cleanup. Complete census and production selection reach 8,552/8,928,
+adding 130 with no lost successes; runtime retains 285/455. Debug/ReleaseSafe
+pass 2,013 units and 24 structural checks, with a valid cached Debug structural
+result. Readiness and all 17 serial gates pass; 72 native populations preserve
+the prior 69. The interrupted outer full/census captures remain explicit;
+durable final gate records and independent production matching verify the work
+without inferring unavailable wrapper exit statuses. See the
+[accepted evidence](../evidence/runtime_integer_storage.md).
+
+The objective remains active with 376 failures. Continue with indexed large
+CFGs, correct successor liveness, indirect/aggregate PHIs and owned identities,
+then pointer/storage and wide/FP ABI limits. The read-only inventory identifies
+60 rejected original CFGs exceeding 1,024 blocks, maximum 20,976; conservative
+switch/dispatcher sizing reaches 33,722. These remain authorized work groups.
