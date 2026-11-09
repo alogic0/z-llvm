@@ -457,7 +457,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
 
     .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "44a3371c3c0125f6fc7b76d70cbe1a138c109d94d2b51df69410d7358f970249" },
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "110d9c541f057cdb2a9a350cb9c16a1f9eac811c9739ed6cda8826d614b70b84" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "bea3f58e763f631846380cc7adc9798ce5c7b93e89732ae0460c0276edf69ad8" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "8536b14d20e330bce4f1717f6dda9d3f6b663664507cf302d1e4d6a68fccf211" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "00006893705d1a9313e51fff70572cac4aafed354d56edacf66ada2e8203aad1" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "eb1fd1587c460328e15d5fc0a5805364a08b26538f233134211def686696c204" },

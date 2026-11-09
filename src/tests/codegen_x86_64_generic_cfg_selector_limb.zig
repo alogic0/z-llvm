@@ -57,6 +57,56 @@ fn expectComposedNearMissArithmetic(output: codegen.x86_64.MachineFunction, mult
     };
 }
 
+fn expectComposedNarrowNearMiss(output: codegen.x86_64.MachineFunction, operation: enum { copy, shr, shl }) !void {
+    try std.testing.expectEqual(.composed_block, output.selection_owner);
+    for (output.instructions.items) |instruction| switch (instruction) {
+        .byteswap_limb64_rdi_rsi_dl_cx,
+        .shr_limb64_rdi_rsi_dx_cl_r8w,
+        .shlo_limb64_rdi_rsi_dx_cl_r8w_al,
+        .bitreverse_limb64_rdi_rsi_dl_cx,
+        => return error.TestUnexpectedResult,
+        else => {},
+    };
+    try codegen.x86_64.verifyFunction(output);
+    const bytes = try mc.encoding.encodeFunction(std.testing.allocator, output);
+    defer std.testing.allocator.free(bytes);
+    const helper = [_]u8{ 0x89, 0xf8, 0x83, 0xc0, 0x07, 0xc1, 0xe8, 0x03, 0xc3 };
+    const memory = try std.posix.mmap(null, bytes.len + helper.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..bytes.len], bytes);
+    @memcpy(memory[bytes.len..], &helper);
+    var offset: usize = 0;
+    var calls: usize = 0;
+    for (output.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            try std.testing.expectEqualStrings("zig.target.intByteSize", instruction.direct_call.symbol);
+            std.mem.writeInt(i32, memory[offset + 1 ..][0..4], @intCast(bytes.len - offset - 5), .little);
+            calls += 1;
+        }
+        offset += mc.encoding.instructionSize(instruction);
+    }
+    try std.testing.expectEqual(@as(usize, 1), calls);
+    const copy: *const fn (*u64, *const u64, u64, u64) callconv(.c) void = @ptrCast(memory.ptr);
+    const shift: *const fn (*u64, *const u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+    for ([_]u64{ 0, 1, 0x8000000000000000, 0xfedcba9876543210, std.math.maxInt(u64) }) |input| {
+        for ([_]u6{ 0, 1, 7, 31, 63 }) |amount| {
+            var guarded = [_]u64{ 0xa5a5a5a5a5a5a5a5, 0, 0x5a5a5a5a5a5a5a5a };
+            if (operation == .copy) copy(&guarded[1], &input, 0, 128) else {
+                const result = shift(&guarded[1], &input, amount, 0, 128);
+                if (operation == .shl) try std.testing.expectEqual(@as(u64, 0), result & 1);
+            }
+            const expected = switch (operation) {
+                .copy => input,
+                .shr => input >> 1,
+                .shl => input << amount,
+            };
+            try std.testing.expectEqual(expected, guarded[1]);
+            try std.testing.expectEqual(@as(u64, 0xa5a5a5a5a5a5a5a5), guarded[0]);
+            try std.testing.expectEqual(@as(u64, 0x5a5a5a5a5a5a5a5a), guarded[2]);
+        }
+    }
+}
+
 fn expectInstruction(instructions: []const codegen.x86_64.Instruction, expected: codegen.x86_64.Instruction) !void {
     for (instructions) |instruction| {
         if (std.meta.eql(instruction, expected)) return;
@@ -246,7 +296,7 @@ test "generic cfg selector emits limb64 byteswap envelope through opt-in selecto
     try std.testing.expectEqual(.byteswap_limb64_rdi_rsi_dl_cx, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 byteswap near miss fail-closed" {
+test "generic cfg selector composes limb64 byteswap near miss after narrow freeze" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -272,11 +322,8 @@ test "generic cfg selector keeps limb64 byteswap near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectComposedNarrowNearMiss(machine, .copy);
 }
 
 test "generic cfg selector emits limb64 shift-right envelope through opt-in selector" {
@@ -337,7 +384,7 @@ test "generic cfg selector emits limb64 shift-right envelope through opt-in sele
     try std.testing.expectEqual(.shr_limb64_rdi_rsi_dx_cl_r8w, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 shift-right near miss fail-closed" {
+test "generic cfg selector composes limb64 shift-right near miss after narrow freeze" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -366,11 +413,8 @@ test "generic cfg selector keeps limb64 shift-right near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectComposedNarrowNearMiss(machine, .shr);
 }
 
 test "generic cfg selector emits limb64 shift-left-overflow envelope through opt-in selector" {
@@ -450,7 +494,7 @@ test "generic cfg selector emits limb64 shift-left-overflow envelope through opt
     try std.testing.expectEqual(.shlo_limb64_rdi_rsi_dx_cl_r8w_al, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 shift-left-overflow near miss fail-closed" {
+test "generic cfg selector composes limb64 shift-left-overflow near miss after narrow freeze" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -478,11 +522,8 @@ test "generic cfg selector keeps limb64 shift-left-overflow near miss fail-close
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectComposedNarrowNearMiss(machine, .shl);
 }
 
 test "generic cfg selector emits limb64 bitreverse envelope through opt-in selector" {
@@ -547,7 +588,7 @@ test "generic cfg selector emits limb64 bitreverse envelope through opt-in selec
     try std.testing.expectEqual(.bitreverse_limb64_rdi_rsi_dl_cx, machine.instructions.items[0]);
 }
 
-test "generic cfg selector keeps limb64 bitreverse near miss fail-closed" {
+test "generic cfg selector composes limb64 bitreverse near miss after narrow freeze" {
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -573,11 +614,8 @@ test "generic cfg selector keeps limb64 bitreverse near miss fail-closed" {
     defer machine.deinit(std.testing.allocator);
 
     const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
-    const diagnostic = switch (result) {
-        .selected => return error.TestExpectedUnsupported,
-        .unsupported => |diagnostic| diagnostic,
-    };
-    try std.testing.expectEqualStrings("no_emitter", diagnostic.tagName());
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try expectComposedNarrowNearMiss(machine, .copy);
 }
 
 test "generic cfg selector emits limb64 popcount envelope through opt-in selector" {

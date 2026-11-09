@@ -2,6 +2,17 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "narrow_freeze",
+      "prefix": "narrow-freeze",
+      "fixture": "narrow_freeze",
+      "functions": [
+        "freeze_alias3", "freeze_alias8", "freeze_alias10", "freeze_alias16", "freeze_alias31",
+        "freeze_load8", "freeze_calls16", "freeze_phi8", "freeze_branch1", "freeze_parameter8"
+      ],
+      "observations": 2560,
+      "stdout": "narrow-freeze observations=2560 bits=aliases=branches=phis=calls=guards=preserved\n"
+    },
+    {
       "population": "checked_multiply",
       "prefix": "checked-multiply",
       "fixture": "checked_multiply",

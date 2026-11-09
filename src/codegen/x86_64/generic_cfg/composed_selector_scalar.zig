@@ -1377,15 +1377,18 @@ pub fn isExactEiNarrowBits(selector: *const ComposedBlockSelector, bits: u16) bo
 pub fn lowerFreeze(selector: *ComposedBlockSelector, result: ?[]const u8, freeze: ir.FreezeInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     const bits = intBits(freeze.ty) orelse return .{ .no_emitter = "composed-block-freeze-type" };
-    if (bits != 32 and bits != 64 and bits != 128) return .{ .no_emitter = "composed-block-freeze-width" };
+    if (bits == 0 or (bits > 32 and bits != 64 and bits != 128)) return .{ .no_emitter = "composed-block-freeze-width" };
     const loc = selector_state.resolveValue(selector, freeze.value) orelse return .{ .unsupported_value = "composed-block-unknown-freeze" };
     switch (loc) {
-        .arg32, .scratch32, .eax => if (bits != 32) return .{ .no_emitter = "composed-block-freeze-width" },
+        .arg32, .scratch32, .eax => if (bits > 32) return .{ .no_emitter = "composed-block-freeze-width" },
         .arg64, .scratch64, .rax => if (bits != 64) return .{ .no_emitter = "composed-block-freeze-width" },
         .spill64 => if (bits != 64 and bits > 32) return .{ .no_emitter = "composed-block-freeze-width" },
         .arg128, .scratch128, .stack128_value, .spill128 => if (bits != 128) return .{ .no_emitter = "composed-block-freeze-width" },
         .xmm, .stack_scalar, .stack128, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-freeze-loc" },
     }
+    // A defined integer keeps its existing carrier. Narrow consumers interpret
+    // its low bits; masking here would corrupt any wider alias of that carrier.
+    // Non-named values (including undef/poison) remain unresolved above.
     try selector_state.bindValueLoc(selector, result_name, loc);
     switch (loc) {
         .arg32, .arg64, .arg128, .eax, .rax, .scratch32, .scratch64, .scratch128, .stack128_value, .spill64, .spill128 => {},

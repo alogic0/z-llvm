@@ -470,7 +470,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
             selector_scalar.lowerIntToPtr(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-int-pointer-cast-value")
         else
             selector_scalar.lowerCast(selector, instruction.result, cast) catch |err| return instructionValueError(selector, err, "stage2-cast-value"),
-        .freeze => |freeze| selector_scalar.lowerFreeze(selector, instruction.result, freeze) catch |err| return instructionValueError(selector, err, "stage2-freeze-value"),
+        .freeze => |freeze| lowerObservedFreeze(selector, instruction.result, freeze),
         .icmp => |icmp| lowerObservedIcmp(selector, instruction.result, icmp),
         .fcmp => |fcmp| if (fcmp.operand_ty == .vector)
             selector_vector.lowerFcmp(selector, instruction.result, fcmp) catch |err| return instructionValueError(selector, err, "stage2-vector-fcmp-value")
@@ -498,6 +498,12 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
 fn lowerObservedCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const diagnostic = try selector_calls.lowerCall(selector, result, call);
     if (diagnostic) |failure| try selector_state.observeRejectedCall(selector, result, call, failure);
+    return diagnostic;
+}
+
+fn lowerObservedFreeze(selector: *ComposedBlockSelector, result: ?[]const u8, freeze: ir.FreezeInst) !?Diagnostic {
+    const diagnostic = selector_scalar.lowerFreeze(selector, result, freeze) catch |err| try instructionValueError(selector, err, "stage2-freeze-value");
+    if (diagnostic) |failure| try selector_state.observeRejectedFreeze(selector, result, freeze, failure);
     return diagnostic;
 }
 

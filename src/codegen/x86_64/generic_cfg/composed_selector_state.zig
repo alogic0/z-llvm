@@ -100,6 +100,23 @@ pub fn observeRejectedCall(selector: *const ComposedBlockSelector, result: ?[]co
     });
 }
 
+pub fn observeRejectedFreeze(selector: *const ComposedBlockSelector, result: ?[]const u8, freeze: ir.FreezeInst, failure: Diagnostic) !void {
+    const observer = selector.rejection_observer orelse return;
+    const operand: @import("rejection_observer.zig").Operand = .{
+        .argument = .{ .ty = freeze.ty, .value = freeze.value },
+        .location = if (resolveValue(selector, freeze.value)) |loc| @tagName(loc) else null,
+    };
+    try observer.reject(.{
+        .function = selector.function.?.*,
+        .position = selector.current_position,
+        .tag = failure.tagName(),
+        .detail = failure.detail(),
+        .definition = .{ .result = result, .kind = .{ .freeze = freeze } },
+        .result = result,
+        .operands = &.{operand},
+    });
+}
+
 pub fn observeRejectedIcmp(selector: *const ComposedBlockSelector, result: ?[]const u8, comparison: ir.IcmpInst, failure: Diagnostic) !void {
     const observer = selector.rejection_observer orelse return;
     var operands: [2]@import("rejection_observer.zig").Operand = undefined;

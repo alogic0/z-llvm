@@ -1,5 +1,11 @@
 # Active direction
 
+The user authorized the [narrow freeze slice](plans/2026-11-08-narrow-freeze.md).
+Implementation and validation are in progress; the accepted checkpoint below
+remains authoritative until its complete validation passes. The 94 classified
+first failures use i1/i3/i8/i10/i16 in EAX, 32-bit scratch registers and scalar
+spill slots. Preserve their existing carriers and validate aliases and consumers.
+
 The [checked-multiply operand slice](plans/2026-11-08-checked-multiply-operands.md)
 is complete and accepted at `29e034a7`. Compiler selection is **7,713/8,928**:
 56 additions, preserving all 7,657 preceding successes. Runtime stays

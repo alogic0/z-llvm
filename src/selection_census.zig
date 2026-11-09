@@ -1,5 +1,5 @@
 //! Diagnostic-only complete selection census with final composed rejection context.
-//! Usage: zig run -O ReleaseFast src/selection_census.zig -- INPUT OUTPUT [FUNCTION]
+//! Usage: zig run -O ReleaseFast src/selection_census.zig -- INPUT OUTPUT [FUNCTION|@JSON_NAMES]
 const std = @import("std");
 const ir = @import("ir.zig");
 const compilation = @import("compilation.zig");
@@ -67,6 +67,11 @@ const Capture = struct {
                 .result = rejection.result,
                 .operands = operands,
             } else null,
+            .freeze = if (rejection.definition != null and rejection.definition.?.kind == .freeze) .{
+                .type = try std.fmt.allocPrint(a, "{f}", .{rejection.definition.?.kind.freeze.ty}),
+                .result = rejection.result,
+                .operand = if (operands.len == 1) operands[0] else null,
+            } else null,
             .global_address = if (rejection.global_address) |address| .{
                 .symbol = address.symbol,
                 .addend = address.addend,
@@ -124,6 +129,17 @@ pub fn main(init: std.process.Init) !void {
     const a = init.gpa;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     if (args.len < 3 or args.len > 4) return error.ExpectedInputOutputAndOptionalFunction;
+    const names: ?[]const []const u8 = if (args.len == 4 and std.mem.startsWith(u8, args[3], "@")) blk: {
+        const arena = init.arena.allocator();
+        const bytes = try std.Io.Dir.cwd().readFileAlloc(init.io, args[3][1..], arena, .limited(16 * 1024 * 1024));
+        const parsed = try std.json.parseFromSliceLeaky([]const []const u8, arena, bytes, .{});
+        if (parsed.len == 0) return error.EmptySelectionFilter;
+        for (parsed, 0..) |name, index| {
+            if (!ir.identifiers.isValid(name)) return error.InvalidSelectionFilter;
+            for (parsed[0..index]) |previous| if (ir.identifiers.eql(name, previous)) return error.DuplicateSelectionFilter;
+        }
+        break :blk parsed;
+    } else null;
     const input = try std.Io.Dir.cwd().readFileAlloc(init.io, args[1], a, .limited(2 * 1024 * 1024 * 1024));
     defer a.free(input);
     var digest: [32]u8 = undefined;
@@ -136,7 +152,7 @@ pub fn main(init: std.process.Init) !void {
     var buffer: [65536]u8 = undefined;
     var output = file.writerStreaming(init.io, &buffer);
     const writer = &output.interface;
-    try std.json.Stringify.value(.{ .event = "begin", .schema = "selection-rejection-census-v1", .input_sha256 = std.fmt.bytesToHex(digest, .lower), .definitions = module.functions.items.len, .filter = if (args.len == 4) args[3] else null, .scope = "function selection and final composed rejection context; no complete object or execution credit" }, .{}, writer);
+    try std.json.Stringify.value(.{ .event = "begin", .schema = "selection-rejection-census-v1", .input_sha256 = std.fmt.bytesToHex(digest, .lower), .definitions = module.functions.items.len, .filter = if (args.len == 4) args[3] else null, .filter_functions = names, .scope = "function selection and final composed rejection context; no complete object or execution credit" }, .{}, writer);
     try writer.writeByte('\n');
     try writer.flush();
     const context: x86.ReadOnlyModuleContext = .{
@@ -155,7 +171,12 @@ pub fn main(init: std.process.Init) !void {
     var selected: usize = 0;
     var failed: usize = 0;
     for (module.functions.items) |function| {
-        if (args.len == 4 and !ir.identifiers.eql(function.name, args[3])) continue;
+        if (names) |filters| {
+            const matches = for (filters) |name| {
+                if (ir.identifiers.eql(function.name, name)) break true;
+            } else false;
+            if (!matches) continue;
+        } else if (args.len == 4 and !ir.identifiers.eql(function.name, args[3])) continue;
         Capture.reset(&capture);
         var tag: ?[]const u8 = null;
         var detail: ?[]const u8 = null;
@@ -189,9 +210,45 @@ pub fn main(init: std.process.Init) !void {
         try writer.flush();
     }
     if (selected + failed == 0) return error.EmptySelection;
+    if (names) |filters| if (selected + failed != filters.len) return error.SelectionFilterNotFound;
     try std.json.Stringify.value(.{ .event = "complete", .examined = selected + failed, .selected = selected, .failed = failed }, .{}, writer);
     try writer.writeByte('\n');
     try writer.flush();
+}
+
+test "selection census retains rejected freeze type location and value after rollback" {
+    const text =
+        \\define ptr @observed(ptr %input) {
+        \\entry:
+        \\ %frozen = freeze ptr %input
+        \\ ret ptr %frozen
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var capture: Capture = .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
+    defer capture.arena.deinit();
+    var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
+    var output = x86.MachineFunction.init("observed", .ptr);
+    defer output.deinit(std.testing.allocator);
+    var dependencies: @import("codegen/x86_64/generic_cfg/composed_selector_address_dependencies.zig").AddressDependencyDomain = .{};
+    const result = try @import("codegen/x86_64/generic_cfg/composed_selector.zig").tryLowerComposedCfgObserved(std.testing.allocator, &output, module.functions.items[0], null, &dependencies, &observer);
+    try std.testing.expect(result == .unsupported);
+    try std.testing.expectEqualStrings("composed-block-freeze-type", result.unsupported.detail());
+    try std.testing.expect(capture.matches(result.unsupported.tagName(), result.unsupported.detail()));
+    const payload = try std.json.parseFromSlice(std.json.Value, std.testing.allocator, capture.payload.?, .{});
+    defer payload.deinit();
+    const freeze = payload.value.object.get("freeze").?.object;
+    try std.testing.expectEqualStrings("ptr", freeze.get("type").?.string);
+    try std.testing.expectEqualStrings("frozen", freeze.get("result").?.string);
+    const operand = freeze.get("operand").?.object;
+    try std.testing.expectEqualStrings("%input", operand.get("value").?.string);
+    try std.testing.expectEqualStrings("arg64", operand.get("location").?.string);
+    try std.testing.expectEqualStrings("parameter", operand.get("origin").?.string);
+    try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
+    observations.Observer.reset(&observer);
+    try std.testing.expect(capture.payload == null);
 }
 
 test "selection census retains final private call context and clears stale attempts" {
