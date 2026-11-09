@@ -34,8 +34,9 @@ their original thresholds. See the [current policy](retention_headroom_policy.md
 The [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
 is accepted at `bb74a371`: **8,664/8,928**, adding 112 selections without
 losing any preceding success. Runtime retains **285/455**. Complete terminal
-censuses and independent production replays match every selected identity, owner
-and remaining diagnostic tuple. The
+censuses and independent production replays match every selected identity and
+remaining diagnostic tuple. Owner preservation is checked between censuses;
+blocked production profiles have no per-function owner fields. The
 [all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) remains active
 with 264 failures and authorizes continued implementation.
 

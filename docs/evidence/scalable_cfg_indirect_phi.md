@@ -37,8 +37,10 @@ The separate 192-byte address-dependency identity bound remains unchanged.
 
 Of 132 original CFG/indirect-PHI/identity targets, 111 select and 21 reach later
 limits. `codegen.generateFunction` also selects outside that initial set.
-Independent production replays match every selected identity, owner and remaining
-rejection tuple. Balanced audits cover 3,976,792 compiler events and 81,761 runtime
+Independent production replays match every selected identity and remaining
+rejection tuple. Owner preservation is checked between the retained censuses;
+blocked production profiles have no per-function owner fields. Balanced audits
+cover 3,976,792 compiler events and 81,761 runtime
 events, with exactly 8,928/455 unique definitions and matching begin/end counts.
 Selection does not establish complete compiler objects, startup or self-rebuild.
 

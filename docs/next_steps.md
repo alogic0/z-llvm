@@ -7,7 +7,9 @@ authorizes the successive necessary groups without further per-slice permission.
 The [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
 is accepted at `bb74a371`: **8,664/8,928**, adding 112 selections with no lost
 successes. Runtime retains **285/455**. Complete terminal censuses and independent
-production replays match all selections, owners and remaining diagnostic tuples.
+production replays match all selections and remaining diagnostic tuples. Census
+owner preservation is checked separately; blocked production profiles have no
+per-function owner fields.
 [Acceptance record](evidence/scalable_cfg_indirect_phi_acceptance_20261109.json).
 
 All 17 serial gates and 74 native populations pass, preserving the preceding 72.
@@ -22,16 +24,24 @@ same-source retry with the existing two-hour override supplies production proof.
 
 The remaining **264 failures** are still authorized work. Next:
 
-1. Complete the measured large-frame and spill-bookkeeping family. Five current
-   frame rejections need at least 1.18–7.02 MB of reservation before object layout
-   and extra PHI homes. Preserve checked displacements, page touches, stack/call
-   alignment, exact rollback and owned names. The isolated successor's native
-   and unit proofs remain provisional until a fresh Tier 3, complete census and
-   production matching accept the final source.
+1. Finish the current private integer-intrinsic slice: signed saturation,
+   i128 leading-zero count, signed three-way comparison, poison-enabled scalar
+   absolute value, and the observed fixed-product and saturating-shift forms.
+   The preceding source at `726a7c55` passed all 17 integration gates and 75
+   native populations with bounded 8 MiB page-probed frames and owned spill
+   checkpoints. Its incomplete whole-input probes were explicitly superseded;
+   the accepted count remains 8,664. Preserve checked layout, page touches,
+   stack/call alignment, exact rollback and owned names. Current intrinsic
+   work needs its own Tier 3 before moving to another capability family.
 2. Continue through aggregate PHIs/freezes, frame-pointer flows, scalar
    intrinsics, atomic stack views and wide/FP ABI limits. Reclassify later
    boundaries, including `llvm.abs` poison mode, from actual original-input
    retries. Private normalization must preserve defined behavior and public ABI.
+
+The complete original-input census and production replay are final cumulative
+acceptance checks. Targeted original-function retries guide intermediate work;
+provisional gains do not advance the accepted count. Both final runs must select
+all 8,928 definitions with complete event and preservation audits.
 
 Replay affected original functions after each cohesive change, preserve all
 accepted selected identities, and reclassify later limits. Use the validation
