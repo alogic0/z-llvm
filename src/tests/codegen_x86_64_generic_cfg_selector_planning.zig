@@ -306,8 +306,8 @@ test "generic cfg selector reports composed diagnostic over skeleton fallback" {
 }
 
 test "generic cfg selector transaction restores seeded state after unsupported mutation" {
-    // Defined i128 selects are legalizable. An undef arm keeps this rejection
-    // after the same frame/condition writes, so rollback is still exercised.
+    // Select arms now admit explicit undefined values. A scalar freeze of
+    // poison remains unsupported after the same frame/condition writes.
     const text =
         \\target triple = "x86_64-unknown-linux-gnu"
         \\
@@ -317,7 +317,8 @@ test "generic cfg selector transaction restores seeded state after unsupported m
         \\  br label %next
         \\next:
         \\  %condition = icmp ne i32 %flag, 0
-        \\  %selected = select i1 %condition, i128 undef, i128 2
+        \\  %unknown = freeze i128 poison
+        \\  %selected = select i1 %condition, i128 %unknown, i128 2
         \\  ret i128 %selected
         \\}
         \\
@@ -334,7 +335,7 @@ test "generic cfg selector transaction restores seeded state after unsupported m
         .selected => return error.TestExpectedUnsupported,
         .unsupported => |diagnostic| diagnostic,
     };
-    try std.testing.expectEqualStrings("composed-block-select-width", diagnostic.detail());
+    try std.testing.expectEqualStrings("composed-block-unknown-freeze", diagnostic.detail());
     try expectSeededMachineState(machine, expected);
 }
 

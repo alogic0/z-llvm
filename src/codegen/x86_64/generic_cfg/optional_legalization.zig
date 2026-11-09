@@ -8,6 +8,7 @@ const profiling = @import("../../../compilation_profile.zig");
 pub const Stage = enum {
     @"aligned_stack.zig.legalize",
     @"integer_vectors.zig.legalize",
+    @"integer_memory.zig.legalize",
     @"pair_memory.zig.legalize",
     @"wide_integer_forms.zig.legalize",
     @"overflow_values.zig.legalize",
@@ -66,6 +67,7 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
     const candidate = try switch (stage) {
         .@"aligned_stack.zig.legalize" => @import("aligned_stack.zig").legalize(measured, function, context),
         .@"integer_vectors.zig.legalize" => @import("integer_vectors.zig").legalize(measured, function, context),
+        .@"integer_memory.zig.legalize" => @import("integer_memory.zig").legalize(measured, function, context),
         .@"pair_memory.zig.legalize" => @import("pair_memory.zig").legalize(measured, function, context),
         .@"wide_integer_forms.zig.legalize" => @import("wide_integer_forms.zig").legalize(measured, function),
         .@"overflow_values.zig.legalize" => @import("overflow_values.zig").legalize(measured, function),

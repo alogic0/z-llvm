@@ -1,6 +1,88 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const forms = @import("pair_arithmetic.zig");
+const cleanup = @import("pair_dead_values.zig");
+
+test "pair arithmetic cleanup owns removals and preserves memory and calls" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare void @sink(i128)
+        \\define void @keep(i64 %a, i128 %b, ptr %p) {
+        \\entry:
+        \\ %root = zext i64 %a to i128
+        \\ %unused = shl i128 %root, 64
+        \\ %live = add i128 %root, %b
+        \\ store i128 %live, ptr %p
+        \\ %loaded = load i128, ptr %p
+        \\ call void @sink(i128 %live)
+        \\ %dead_a = zext i64 %a to i128
+        \\ %dead_b = or i128 %dead_a, 7
+        \\ ret void
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    const original = module.functions.items[0];
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var view = original;
+    view.blocks = try original.blocks.clone(arena.allocator());
+    for (view.blocks.items) |*block| block.instructions = try block.instructions.clone(arena.allocator());
+    try std.testing.expectEqual(@as(usize, 3), try cleanup.removeUnused(arena.allocator(), &view));
+    for (original.blocks.items[0].instructions.items) |inst| try std.testing.expect(!inst.removed);
+    for ([_]usize{ 0, 2, 3, 4, 5 }) |index| try std.testing.expect(!view.blocks.items[0].instructions.items[index].removed);
+    try std.testing.expectEqual(@as(usize, 0), try cleanup.removeUnused(arena.allocator(), &view));
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    private.functions.items[0] = view;
+    try private.verify();
+    try module.verify();
+}
+
+test "pair arithmetic cleanup rejects opaque reference proofs before removing definitions" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare void @sink()
+        \\define void @opaque(i64 %a) {
+        \\entry:
+        \\ %value = zext i64 %a to i128
+        \\ call void @sink()
+        \\ ret void
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var view = module.functions.items[0];
+    view.blocks = try view.blocks.clone(arena.allocator());
+    for (view.blocks.items) |*block| block.instructions = try block.instructions.clone(arena.allocator());
+    // Exercise a valid LLVM bundle that this parser deliberately leaves
+    // outside its nonempty-bundle envelope. Cleanup cannot prove its uses.
+    view.blocks.items[0].instructions.items[1].kind.call.operand_bundle = "[ \"deopt\"(i128 %value) ]";
+    try std.testing.expectEqual(@as(usize, 0), try cleanup.removeUnused(arena.allocator(), &view));
+    try std.testing.expect(!view.blocks.items[0].instructions.items[0].removed);
+    try module.verify();
+}
+
+test "pair arithmetic cleanup use counts retain quoted identifier aliases" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i128 @alias(i64 %a) {
+        \\entry:
+        \\ %"pair" = zext i64 %a to i128
+        \\ ret i128 %"pair"
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var view = module.functions.items[0];
+    view.blocks = try view.blocks.clone(arena.allocator());
+    for (view.blocks.items) |*block| block.instructions = try block.instructions.clone(arena.allocator());
+    view.blocks.items[0].terminator.?.ret.value = .{ .named = "pair" };
+    try std.testing.expectEqual(@as(usize, 0), try cleanup.removeUnused(arena.allocator(), &view));
+    try std.testing.expect(!view.blocks.items[0].instructions.items[0].removed);
+    try module.verify();
+}
 
 test "pair arithmetic private scalar expansion retains inputs and reaches a fixed point" {
     var module = try ir.Module.parse(std.testing.allocator,

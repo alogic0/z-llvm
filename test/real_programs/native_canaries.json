@@ -2037,6 +2037,30 @@
       ],
       "observations": 128,
       "stdout": "pointer-stack-memory observations=128 pointers=preserved live=preserved guards=preserved\n"
+    },
+    {
+      "population": "runtime_storage",
+      "prefix": "runtime-storage",
+      "fixture": "runtime_storage",
+      "functions": ["runtime_storage_33", "runtime_storage_4096", "runtime_storage_nested", "runtime_storage_pair_array"],
+      "observations": 512,
+      "stdout": "runtime-storage observations=512 lengths=padding=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "integer_memory",
+      "prefix": "integer-memory",
+      "fixture": "integer_memory",
+      "functions": ["integer_memory_24", "integer_memory_40", "integer_memory_56", "integer_memory_65", "integer_memory_96"],
+      "observations": 1280,
+      "stdout": "integer-memory observations=1280 exact=padding=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "undefined_selects",
+      "prefix": "undefined-selects",
+      "fixture": "undefined_selects",
+      "functions": ["undefined_select_1", "undefined_select_8", "undefined_select_16", "undefined_select_32", "undefined_select_64", "undefined_select_128", "undefined_select_pointer"],
+      "observations": 896,
+      "stdout": "undefined-selects observations=896 defined=conditions=clobbers=guards=preserved\n"
     }
   ]
 }

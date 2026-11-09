@@ -124,6 +124,81 @@ test "bounded storage copy extents exclude carrier padding and zero sized object
     }
 }
 
+test "bounded storage runtime copies preserve exact bytes and source call ownership" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+        \\declare void @llvm.memset.p0.i64(ptr, i8, i64, i1)
+        \\define i64 @runtime_copy(ptr %input, ptr %output, i64 %length, i64 %live) {
+        \\entry:
+        \\ %slot = alloca [33 x i8], align 8
+        \\ call void @llvm.memset.p0.i64(ptr %slot, i8 -91, i64 33, i1 false)
+        \\ call void @llvm.memcpy.p0.p0.i64(ptr %slot, ptr %input, i64 %length, i1 false)
+        \\ call void @llvm.memcpy.p0.p0.i64(ptr %output, ptr %slot, i64 33, i1 false)
+        \\ ret i64 %live
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    const original = module.functions.items[0];
+    const source_copy = original.blocks.items[0].instructions.items[2].kind.call;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const view = (try frame.legalizeStorage(arena.allocator(), original, null)).?;
+    try std.testing.expectEqual(original.params.items.ptr, view.params.items.ptr);
+    try std.testing.expect(original.ret_ty.eql(view.ret_ty));
+    var found_runtime_copy = false;
+    for (view.blocks.items[0].instructions.items) |inst| {
+        if (inst.kind != .call or inst.kind.call.args.items.len != 4 or
+            !inst.kind.call.args.items[2].value.eql(.{ .named = "length" })) continue;
+        found_runtime_copy = true;
+        try std.testing.expect(inst.kind.call.args.items.ptr != source_copy.args.items.ptr);
+        try std.testing.expect(!inst.kind.call.args.items[0].value.eql(source_copy.args.items[0].value));
+        try std.testing.expectEqualDeep(source_copy.args.items[1..], inst.kind.call.args.items[1..]);
+    }
+    try std.testing.expect(found_runtime_copy);
+    try std.testing.expectEqualStrings("slot", source_copy.args.items[0].value.named);
+    try std.testing.expect(try frame.legalizeStorage(arena.allocator(), view, null) == null);
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    private.functions.items[0] = view;
+    try private.verify();
+    try module.verify();
+
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn ([*]const u8, [*]u8, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    var input: [33]u8 = undefined;
+    for (&input, 0..) |*byte, i| byte.* = @truncate(i * 17 + 3);
+    for (0..34) |length| {
+        var actual: [49]u8 = @splat(0x5a);
+        var expected = actual;
+        @memset(expected[8..41], 0xa5);
+        @memcpy(expected[8..][0..length], input[0..length]);
+        const live = @as(u64, 0xf0e1d2c3b4a59687) +% length;
+        try std.testing.expectEqual(live, run(&input, actual[8..].ptr, length, live));
+        try std.testing.expectEqualSlices(u8, &expected, &actual);
+    }
+}
+
+test "bounded storage runtime copy admission retains specialized and inline limits" {
+    for ([_][]const u8{ "llvm.memcpy.p0.p0.i64", "llvm.memcpy.inline.p0.p0.i64" }) |callee| {
+        const source = try std.fmt.allocPrint(
+            std.testing.allocator,
+            "declare void @{s}(ptr, ptr, i64, i1)\ndefine void @copy(ptr %output, i64 %length) {{\nentry:\n %slot = alloca {{ i64, i16, [6 x i8] }}, align 8\n call void @{s}(ptr %output, ptr %slot, i64 %length, i1 false)\n ret void\n}}\n",
+            .{ callee, callee },
+        );
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const function = module.functions.items[0];
+        try std.testing.expect(try frame.legalize(arena.allocator(), function, null) == null);
+        const view = try frame.legalizeStorage(arena.allocator(), function, null);
+        try std.testing.expectEqual(!std.mem.eql(u8, callee, "llvm.memcpy.inline.p0.p0.i64"), view != null);
+    }
+}
+
 test "bounded storage rejects huge frame arithmetic and unsupported stack alignment" {
     const helpers = @import("composed_helpers.zig");
     try std.testing.expect(helpers.alignedCallFrameBytes(std.math.maxInt(u32)) == null);
@@ -242,7 +317,7 @@ test "aggregate storage rejects unsafe allocation and copy forms without mutatin
         \\  ret void
         \\}
     ;
-    for (0..10) |boundary| {
+    for (0..9) |boundary| {
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
         const function = &module.functions.items[0];
@@ -257,7 +332,6 @@ test "aggregate storage rejects unsafe allocation and copy forms without mutatin
             6 => insts[1].kind.store.ptr_addrspace = "1",
             7 => insts[2].kind.call.args.items[2].value = .{ .int = 49 },
             8 => insts[2].kind.call.args.items[2].value = .{ .int = -1 },
-            9 => insts[2].kind.call.args.items[2].value = .{ .named = "size" },
             else => unreachable,
         }
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);

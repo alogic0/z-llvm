@@ -10,6 +10,7 @@ const comparisons = @import("comparison_forms.zig");
 const legacy = @import("legacy_forms.zig");
 const phi_values = @import("phi_values.zig");
 const call_values = @import("call_values.zig");
+const select_values = @import("select_values.zig");
 const profiling = @import("../../../compilation_profile.zig");
 
 pub const Function = struct {
@@ -18,7 +19,7 @@ pub const Function = struct {
 };
 
 pub fn check(function: ir.Function) !void {
-    if (phi_values.requiresNormalization(function) or call_values.requiresNormalization(function) or
+    if (phi_values.requiresNormalization(function) or call_values.requiresNormalization(function) or select_values.requiresNormalization(function) or
         integers.requiresNormalization(function) or comparisons.requiresNarrowNormalization(function))
         return error.UnsupportedSemanticNormalization;
 }
@@ -41,6 +42,11 @@ pub fn normalizeProfiled(allocator: std.mem.Allocator, source: ir.Function, cont
         const activity = profiling.activity(profile, "normalize-call-values");
         defer activity.end();
         if (call_values.requiresNormalization(function)) function = try call_values.normalize(allocator, function);
+    }
+    {
+        const activity = profiling.activity(profile, "normalize-select-values");
+        defer activity.end();
+        if (select_values.requiresNormalization(function)) function = try select_values.normalize(allocator, function);
     }
     {
         const activity = profiling.activity(profile, "recognize-legacy-envelope");

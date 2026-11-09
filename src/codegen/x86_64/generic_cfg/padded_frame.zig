@@ -148,8 +148,14 @@ fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         if (arg.ty != .ptr) return null;
                         if (memcpy and index < 2) {
                             if (call.args.items.len != 4) return null;
-                            const length = copyLength(function, call.args.items[2].value) orelse return null;
-                            if (length < 0 or length > bytes) return null;
+                            if (copyLength(function, call.args.items[2].value)) |length| {
+                                if (length < 0 or length > bytes) return null;
+                            } else if (!general or std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64")) {
+                                return null;
+                            }
+                            // A general byte view retains the runtime length.
+                            // Defined source executions stay within the original
+                            // extent; private carrier padding grants no extra bytes.
                         }
                         if (!copied) {
                             copy.kind.call.args = try call.args.clone(allocator);

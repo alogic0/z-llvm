@@ -162,6 +162,20 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .known_parts = &known_parts };
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .cast) {
+                const cast = inst.kind.cast;
+                if (cast.op == .trunc and cast.from_ty.eql(pair) and cast.to_ty == .int and
+                    cast.to_ty.int > 0 and cast.to_ty.int <= 64 and cast.value == .named)
+                {
+                    if (known_parts.get(cast.value.named)) |parts| {
+                        try candidate.begin(&block, block_index, instruction_index);
+                        var copy = inst;
+                        copy.kind = .{ .cast = .{ .op = if (cast.to_ty.eql(word)) .bitcast else .trunc, .from_ty = word, .value = try builder.literal(parts.lo), .to_ty = cast.to_ty } };
+                        try block.instructions.append(allocator, copy);
+                        continue;
+                    }
+                }
+            }
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (value.ty.eql(pair) and operand(value.lhs) and operand(value.rhs)) {
                     const expanded = switch (value.op) {
@@ -290,5 +304,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         }
         try candidate.finishBlock(block);
     }
-    return candidate.finish();
+    var result = candidate.finish() orelse return null;
+    _ = try @import("pair_dead_values.zig").removeUnused(allocator, &result);
+    return result;
 }
