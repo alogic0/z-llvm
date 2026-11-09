@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "scope": "Retire superseded project AIR payloads and complete inactive compiler-cache roots after the quoted-symbol acceptance pair",
+  "recorded_utc": "2026-11-09T01:37:53Z",
+  "completed_utc": "2026-11-09T01:42:54Z",
+  "base_revision": "5e9a0c2f5eb6fca30c2f4920fee35374c481d10a",
+  "local_audit_root": "local-state/validations/quoted-symbols-cleanup-20261108",
+  "allocated_bytes_removed": 5275144192,
+  "retired_air": {
+    "root": "local-state/caches/core-execution-20261107",
+    "payload_count": 3,
+    "allocated_bytes_removed": 3923910656,
+    "payloads": [
+      {
+        "sha256": "e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995",
+        "path": "local-state/caches/core-execution-20261107/ReleaseFast/export/71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6.e4cc24d5efee4cc82691b4a54a532b19227ef2790948bf39933503e458132995.air"
+      },
+      {
+        "sha256": "6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429",
+        "path": "local-state/caches/core-execution-20261107/ReleaseSafe/export/c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de.6376f9d27843363d03907119b9ab31b484c4faf04989f500067125281fdae429.air"
+      },
+      {
+        "sha256": "0092b4db7596a504b2a7e3f43f3adfa7e046fd6c0cf289d8a5960c5053ff5958",
+        "path": "local-state/caches/core-execution-20261107/ReleaseSmall/export/db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7.0092b4db7596a504b2a7e3f43f3adfa7e046fd6c0cf289d8a5960c5053ff5958.air"
+      }
+    ],
+    "hashes_verified_before": true,
+    "retained_metadata_and_lock_files": 6,
+    "retained_metadata_verified_after": true,
+    "retirement_record": "local-state/caches/core-execution-20261107/retirement.json",
+    "replacement": {
+      "root": "local-state/caches/quoted-symbols-20261108",
+      "accepted_revision": "a9e9c0f1404b3b4e98ff0f66e25760b91990b286",
+      "proof": "docs/evidence/quoted_symbol_addresses_acceptance_20261108.json",
+      "proof_sha256": "89b9d1467aaeb8ade7ed60905ac52951e489a0ff6bd5e171e38c90ce38439879",
+      "fresh_cached_pair": {
+        "status": "passed",
+        "comparator": {
+          "schema_version": "4",
+          "expected": "local-state/validations/quoted-symbols-20261108/fresh/full-acceptance.log",
+          "actual": "local-state/validations/quoted-symbols-20261108/cache/full-acceptance.log",
+          "gates": "17",
+          "canonical_records": "1501",
+          "semantic_match": "true",
+          "local_fail": "0"
+        },
+        "fresh_log": "local-state/validations/quoted-symbols-20261108/fresh/full-acceptance.log",
+        "cached_log": "local-state/validations/quoted-symbols-20261108/cache/full-acceptance.log",
+        "gates_per_run": 17,
+        "core_records_per_run": 36,
+        "native_populations_per_run": 62,
+        "fresh_export_modes": 3,
+        "cached_hit_modes": 3,
+        "cache_keys_and_descriptor_sizes_match": true,
+        "all_native_population_records_match": true,
+        "policy": {
+          "schema": 3,
+          "admission_bytes": 20000000000,
+          "reserve_bytes": 11410065408,
+          "projected_peak_bytes": 8589934592
+        },
+        "scope": "The existing schema-4 comparator validates all gate and core records and the fresh/hit contracts; only its documented volatile fields are normalized",
+        "limits": "Cumulative metadata review against the previous accepted run is separate; filesystem movement and timings include concurrent work"
+      },
+      "payloads": [
+        {
+          "sha256": "5c84587d19cb2a5867e337d5cf6bd46a40f829de8d6343d90cecee6900e16784",
+          "path": "local-state/caches/quoted-symbols-20261108/ReleaseFast/export/71471e956d4cec8821bf12cad98f76e80cb478ef9a121a474108bb855c0efce6.5c84587d19cb2a5867e337d5cf6bd46a40f829de8d6343d90cecee6900e16784.air"
+        },
+        {
+          "sha256": "1d5bc7d71763b846a14ad82e4b048b1786fc890dfec5fd834da866c0a565ad11",
+          "path": "local-state/caches/quoted-symbols-20261108/ReleaseSafe/export/c1486271fda3685bb5c78b742a380fdccf440d3ec643924797b7694745b616de.1d5bc7d71763b846a14ad82e4b048b1786fc890dfec5fd834da866c0a565ad11.air"
+        },
+        {
+          "sha256": "92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6",
+          "path": "local-state/caches/quoted-symbols-20261108/ReleaseSmall/export/db4e165d3cb8437cafe16ceefc550cd880113a826bf9b9257a234c03cf8e60e7.92f88bf868a6fa11406e0bdddf018414a579f4cc59525e63fb9328161ffb72e6.air"
+        }
+      ],
+      "hashes_verified_before_and_after": true,
+      "comparison": "All three replacement payload hashes differ. Retirement relies on the accepted replacement execution proof, not byte equality."
+    }
+  },
+  "idle_compiler_caches": {
+    "complete_roots_removed": 4,
+    "allocated_bytes_removed": 1351233536,
+    "regular_files_removed": 4848,
+    "roots": [
+      {
+        "root": "local-state/caches/quoted-symbols-tooling-20261108",
+        "allocated_bytes": 1225023488
+      },
+      {
+        "root": "tmp/inbox66_abi_diff/run-945702/global-cache",
+        "allocated_bytes": 42070016
+      },
+      {
+        "root": "tmp/inbox66_abi_diff/run-997870/global-cache",
+        "allocated_bytes": 42070016
+      },
+      {
+        "root": "tmp/inbox66_abi_diff/run-1087562/global-cache",
+        "allocated_bytes": 42070016
+      }
+    ],
+    "file_hardlinks_outside_removed_paths": 0,
+    "inventory_unchanged_before_deletion": true,
+    "removal": "Complete cache roots, including objects and metadata; subsequent builds can regenerate them"
+  },
+  "deletion_interval": {
+    "started_utc": "2026-11-09T01:40:44Z",
+    "completed_utc": "2026-11-09T01:40:44Z",
+    "available_before_bytes": 43976261632,
+    "available_after_bytes": 49251389440,
+    "observed_filesystem_available_increase_bytes": 5275127808,
+    "method": "Distinct inode allocation from stat blocks for the three AIR payloads, plus du allocation for complete cache roots; all candidate regular files have no hardlinks outside the deletion set",
+    "limitation": "Filesystem free-space movement includes unrelated activity; owned allocation removed is reported separately. Audit records consume some space. This does not predict future cache growth."
+  },
+  "final_observation": {
+    "available_bytes": 49248866304
+  },
+  "active_consumer_audit": {
+    "method": "lsof checks of all five candidate roots cover open files, executable mappings and directory consumers; visible zig/z_llvm compiler processes were also checked",
+    "pre_delete_path_matches": 0,
+    "pre_delete_compiler_processes": 0,
+    "initial_observation": "The first concurrent lsof observation saw this cleanup's old-AIR sha256sum reader. It completed before the final consumer check and deletion.",
+    "limitation": "lsof reported inaccessible unrelated Docker overlay and network mounts. Exact warnings remain in lsof-pre-delete.stderr.",
+    "processes_stopped": 0
+  },
+  "preservation": {
+    "current_acceptance_artifacts_verified": 1057,
+    "preceding_acceptance_artifacts_verified": 831,
+    "implementation_inputs_verified": 1766,
+    "original_scratch_files_verified": 13,
+    "scratch_membership_unchanged": true,
+    "original_compiler_inputs_verified": 2,
+    "original_input_inode_link_count_and_allocation_unchanged": true,
+    "retained_temporary_files_verified": 26183,
+    "installed_compiler_verified": true,
+    "pinned_frontend_verified": true,
+    "accepted_compiler_snapshots_verified": true,
+    "accepted_status_and_receipts_unchanged": true,
+    "implementation_modified": false,
+    "full_compiler_validation_rerun": false,
+    "validation_scope": "Hash preservation and storage retirement only; the accepted compiler behavior results remain those of the completed quoted-symbol pair"
+  },
+  "documentation_check": {
+    "status": "passed",
+    "result": "documentation check ok: 19 current documents, 358 internal file links, 2 status blocks",
+    "command": "local-state/caches/quoted-symbols-tooling-20261108/local/o/b73bb624a5cea47ddc6f33ae087cc938/check_project_docs",
+    "note": "Executed the already-built checker after updating the retention and next-step documents, before retiring its completed build-cache root"
+  },
+  "headroom_policy": {
+    "admission_bytes": 20000000000,
+    "reserve_bytes": 11410065408,
+    "changed": false
+  },
+  "artifact_store_modified": false,
+  "shared_cache_removed": false,
+  "diagnostic_worktrees_removed": false,
+  "performance_inputs_removed": false,
+  "dependency_repositories_modified": false,
+  "archives_created": false,
+  "audit_artifact_manifest": {
+    "path": "local-state/validations/quoted-symbols-cleanup-20261108/artifacts.sha256",
+    "sha256": "01abc83806a18ce6309f86fe44ff47402dc648496b9097cc7f040f2321367560",
+    "files": 67
+  }
+}

@@ -29,13 +29,27 @@ name in the manifests and retrieved with `artifact-store get`.
 
 ## Generated run cleanup
 
+The [quoted-symbol cleanup](evidence/quoted_symbol_space_cleanup_20261108.json)
+retires 3.92 GB of superseded `core-execution-20261107` AIR payload allocation
+and 1.35 GB from four complete idle compiler-cache roots. The replacement
+`quoted-symbols-20261108` generation passes both full 17-gate runs with all
+1,501 canonical records matching. All six old/new payload hashes are checked
+before retirement; the three current payloads are reverified afterward.
+Original metadata, payload identities and historical acceptance evidence remain.
+The latest and preceding sealed validation roots, implementation inputs,
+original compiler inputs, installed compiler and all 13 scratch files remain
+unchanged. No archives are created and no processes are stopped. Shared caches,
+diagnostic worktrees and performance inputs remain. Future builds recreate
+compiler caches; the 5.28 GB removed is an allocation measurement for this
+cleanup interval, not a reduction in future build requirements.
+
 The [selection-census cleanup](evidence/selection_census_cleanup_20261107.json)
 reclaims 8.94 GB of project allocation: 3.92 GB of superseded
 `execution-breadth-20261106` AIR, 1.17 GB from 52 complete idle compiler-cache
 roots, 0.30 GB of regenerable temporary binaries, and 3.55 GB from eight
 duplicate compiler-input copies. All nine replay paths retain identical bytes
 through hardlinks; the original frontend and backend captures remain independent.
-The current `core-execution-20261107` AIR generation has an accepted 45-record
+That checkpoint's `core-execution-20261107` AIR generation has an accepted 45-record
 fresh/cached comparison and passes hash verification before and after cleanup.
 ReleaseSmall differs from the retired generation; its retirement relies on the
 accepted replacement proof, rather than byte equality. Old metadata and hashes
@@ -220,7 +234,9 @@ allowance; reported minima are 40.06 GB and 40.13 GB. An additional 240 samples
 reach 40.06 GB. Both runs start above 20 GB: this validates the configured
 admission/reserve contract, not a guarantee that every workload finishes from
 exactly 20 GB free. The authenticated AIR generation is
-`local-state/caches/quoted-symbols-20261108`; the preceding generation is retained.
+`local-state/caches/quoted-symbols-20261108`. The preceding generation's payloads
+are retired by the quoted-symbol cleanup above; its metadata and historical
+validation evidence remain.
 
 The runner's numerical headroom checks remain owned by
 `tools/distribution_headroom_policy.zig` and

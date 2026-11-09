@@ -155,12 +155,16 @@ It lies outside the 100-row prefix, so declare any additional execution
 population separately. Preserve the twelve-member cohort and existing programs.
 The retained diagnostic does not prove that payload width is its only gap.
 
-Use `local-state/validations/core-execution-20261107/` and
-`local-state/caches/core-execution-20261107/` for current core evidence/AIR.
-Admission remains 32,949,672,960 bytes; execution reserve is 24,359,738,368 bytes.
-The lowest additional disk sample is 40.53 GB and final recorded free space
-41.10 GB. Original probes, prior evidence and compilers remain; no archives were
-created. The older worker-inbox directive is historical and remains superseded.
+Historical core evidence remains in `local-state/validations/core-execution-20261107/`.
+Current core evidence and authenticated AIR use the `quoted-symbols-20261108`
+validation and cache roots described above. The superseded AIR payloads are
+retired in the [quoted-symbol cleanup](evidence/quoted_symbol_space_cleanup_20261108.json).
+At the older core checkpoint, admission was 32,949,672,960 bytes and the execution
+reserve was 24,359,738,368 bytes; the current limits are 20,000,000,000 and
+11,410,065,408 bytes. That checkpoint's lowest additional disk sample was
+40.53 GB and final recorded free space was 41.10 GB. Original probes, prior
+evidence and compilers remain; no archives were created. The older worker-inbox
+directive is historical and remains superseded.
 
 The entries below describe preceding checkpoints.
 
