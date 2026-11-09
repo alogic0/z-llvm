@@ -9,12 +9,14 @@ const attrs = @import("intrinsic_attrs.zig");
 pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl };
 
 pub fn operation(call: ir.CallInst) ?Operation {
-    if (!std.mem.startsWith(u8, call.callee, "llvm.") or call.ret_ty != .int or call.ret_ty.int == 0 or call.ret_ty.int > 64) return null;
+    if (!std.mem.startsWith(u8, call.callee, "llvm.") or call.ret_ty != .int or call.ret_ty.int == 0 or
+        (call.ret_ty.int > 64 and call.ret_ty.int != 128)) return null;
     const bits = call.ret_ty.int;
     var buffer: [48]u8 = undefined;
     inline for (std.meta.tags(Operation)) |op| {
         const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
         if (std.mem.eql(u8, call.callee, name)) {
+            if (bits == 128 and op != .ctlz) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
             if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl) @as(usize, 3) else @as(usize, 1))) return null;
@@ -22,7 +24,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
                 const expected: ir.Type = if (flag and index == 1) .{ .int = 1 } else call.ret_ty;
                 if (!arg.ty.eql(expected) or (arg.value != .named and arg.value != .int)) return null;
                 if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
-                if (arg.value == .int and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(expected.int - 1))) or
+                if (arg.value == .int and expected.int < 128 and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(expected.int - 1))) or
                     arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(expected.int))))) return null;
                 if (flag and index == 1 and (arg.value != .int or (arg.value.int != 0 and arg.value.int != 1))) return null;
             }
@@ -31,7 +33,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
             if (op == .ctpop and bits == 64) return null;
             if (op == .cttz and (bits == 32 or bits == 64)) return null;
             if (op == .ctlz and (bits == 32 or bits == 64)) return null;
-            if (op == .abs and (bits == 32 or bits == 64)) return null;
+            if (op == .abs and (bits == 32 or bits == 64) and call.args.items[1].value.int == 0) return null;
             if (op == .bswap and (bits % 16 != 0 or bits == 16 or bits == 32 or bits == 64)) return null;
             if (op == .fshl and bits == 32 and call.args.items[2].value == .int and call.ret_attrs == null) {
                 var plain = true;
@@ -87,6 +89,47 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
     const call = inst.kind.call;
     const bits = call.ret_ty.int;
     const b: Builder = .{ .allocator = allocator, .function = function, .block = block, .serial = serial, .wide = .{ .int = if (op == .ctpop or bits >= 32) 64 else 32 } };
+    if (op == .abs and (bits == 32 or bits == 64)) {
+        // A fixed result for INT_MIN refines the true-flag poison case. Keep
+        // the existing native abs path; do not mutate borrowed argument lists.
+        var replacement = inst;
+        replacement.kind.call.args = try call.args.clone(allocator);
+        if (call.args.items[0].value == .int) {
+            const mask = (@as(i128, 1) << @as(u7, @intCast(bits))) - 1;
+            replacement.kind.call.args.items[0].value = try b.emit(.{ .binary = .{
+                .op = .add,
+                .ty = call.ret_ty,
+                .lhs = .{ .int = call.args.items[0].value.int & mask },
+                .rhs = .{ .int = 0 },
+            } });
+        }
+        replacement.kind.call.args.items[1].value = .{ .int = 0 };
+        replacement.kind.call.ret_attrs = null;
+        for (replacement.kind.call.args.items) |*arg| arg.attrs = null;
+        try block.instructions.append(allocator, replacement);
+        return;
+    }
+    if (bits == 128) {
+        std.debug.assert(op == .ctlz);
+        const word: ir.Type = .{ .int = 64 };
+        const pair: ir.Type = .{ .int = 128 };
+        const input = call.args.items[0].value;
+        const lo = if (input == .int)
+            try b.binary(.add, .{ .int = @as(u64, @truncate(@as(u128, @bitCast(input.int)))) }, .{ .int = 0 })
+        else
+            try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = input, .to_ty = word } });
+        const hi = if (input == .int)
+            try b.binary(.add, .{ .int = @as(u64, @truncate(@as(u128, @bitCast(input.int)) >> 64)) }, .{ .int = 0 })
+        else
+            try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = try b.emit(.{ .binary = .{ .op = .lshr, .ty = pair, .lhs = input, .rhs = .{ .int = 64 } } }), .to_ty = word } });
+        // Both speculative counts are defined at zero. A zero high word
+        // contributes64 plus the low count, yielding128 for an all-zero pair.
+        const high_count = try b.call(.ctlz, hi, true);
+        const low_count = try b.call(.ctlz, lo, true);
+        const value = try b.select(try b.compare(.ne, hi, .{ .int = 0 }), high_count, try b.binary(.add, low_count, .{ .int = 64 }));
+        try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .zext, .from_ty = word, .value = value, .to_ty = pair } } });
+        return;
+    }
     const input = try b.widen(bits, call.args.items[0].value);
     const value = switch (op) {
         .ctpop => try b.call(.ctpop, input, false),

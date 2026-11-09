@@ -1,6 +1,7 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/generic_cfg/integer_intrinsics_frontier_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_accumulator_transaction_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_frame_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_state_tests.zig");

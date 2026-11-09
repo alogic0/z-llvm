@@ -2086,6 +2086,14 @@
       "observations": 64,
       "guard_probe": true,
       "stdout": "large-frame observations=64 objects=2m=4m=7m pages=clobbers=live=guards=preserved\n"
+    },
+    {
+      "population": "integer_intrinsic_frontier",
+      "prefix": "integer-intrinsic-frontier",
+      "fixture": "integer_intrinsic_frontier",
+      "functions": ["frontier_ssub8", "frontier_ssub8_left", "frontier_ssub8_right", "frontier_sadd8", "frontier_sadd8_left", "frontier_sadd8_right", "frontier_ssub16", "frontier_ssub16_left", "frontier_ssub16_right", "frontier_sadd16", "frontier_sadd16_left", "frontier_sadd16_right", "frontier_ssub32", "frontier_ssub32_left", "frontier_ssub32_right", "frontier_sadd32", "frontier_sadd32_left", "frontier_sadd32_right", "frontier_ssub64", "frontier_ssub64_left", "frontier_ssub64_right", "frontier_sadd64", "frontier_sadd64_left", "frontier_sadd64_right", "frontier_ssub96", "frontier_ssub96_left", "frontier_ssub96_right", "frontier_sadd96", "frontier_sadd96_left", "frontier_sadd96_right", "frontier_scmp32", "frontier_scmp32_left", "frontier_ctlz128", "frontier_ctlz128_poison", "frontier_abs32", "frontier_abs64", "frontier_abs32_ignored", "frontier_abs64_ignored", "frontier_mul_sat16", "frontier_mul_sat16_left", "frontier_mul_sat16_right", "frontier_ushl64_one", "frontier_ushl64_one_constant"],
+      "observations": 11264,
+      "stdout": "integer-intrinsic-frontier observations=11264 signed=wide=poison=clobbers=live=guards=preserved\n"
     }
   ]
 }
