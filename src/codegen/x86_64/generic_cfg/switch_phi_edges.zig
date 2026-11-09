@@ -11,17 +11,29 @@ const Edge = struct { from: usize, to: usize, name: []const u8 };
 // Original block names borrow the module's lifetime. Added block names borrow
 // the private legalization arena, so selected machine branches must own them.
 pub fn retainLabels(allocator: std.mem.Allocator, output: *machine.MachineFunction, blocks: []const ir.BasicBlock) !void {
+    const original_owned_count = output.owned_labels.items.len;
+    errdefer {
+        for (output.owned_labels.items[original_owned_count..]) |label| allocator.free(label);
+        output.owned_labels.items.len = original_owned_count;
+    }
+    var labels = std.HashMap([]const u8, []const u8, ir.identifiers.Context, std.hash_map.default_max_load_percentage).init(allocator);
+    defer labels.deinit();
     for (blocks) |block| {
+        const entry = try labels.getOrPut(block.name);
+        if (entry.found_existing) return error.DuplicateBlock;
         const label = try allocator.dupe(u8, block.name);
         errdefer allocator.free(label);
         try output.owned_labels.append(allocator, label);
-        for (output.instructions.items) |*inst| switch (inst.*) {
-            .label, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |*target| {
-                if (std.mem.eql(u8, target.*, block.name)) target.* = label;
-            },
-            else => {},
-        };
+        entry.value_ptr.* = label;
     }
+    // All fallible ownership work finishes before changing any instruction.
+    // One lookup per branch/label replaces a blocks-by-instructions scan.
+    for (output.instructions.items) |*inst| switch (inst.*) {
+        .label, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |*target| {
+            if (labels.get(target.*)) |label| target.* = label;
+        },
+        else => {},
+    };
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {

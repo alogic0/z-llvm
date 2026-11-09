@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const cfg = @import("../../../analysis/cfg.zig");
 const x86_64_machine = @import("../machine.zig");
 const x86_64_types = @import("../types.zig");
 const inspection = @import("inspection.zig");
@@ -80,6 +81,13 @@ const i64Value = composed_helpers.i64Value;
 const max_compare_chain_switch_cases = 8;
 
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
+
+fn blockIndex(selector: *const ComposedBlockSelector, function: ir.Function, name: []const u8) ?usize {
+    if (selector.allocation_plan) |plan| {
+        if (plan.block_indexes.count() != 0) return plan.blockIndex(name);
+    }
+    return function.blockIndex(name);
+}
 
 pub fn blockEndsInTrap(block: ir.BasicBlock) bool {
     var index = block.instructions.items.len;
@@ -279,7 +287,7 @@ pub fn lowerCfgTerminator(
             break :blk try lowerReturn(selector, ret);
         },
         .br => |br| {
-            const target_index = function.blockIndex(br.target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+            const target_index = blockIndex(selector, function, br.target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
             if (selector.stack_frame_bytes != 0) {
                 selector_state.spillLiveValuesForCfgBoundary(selector) catch return .{ .no_spill_envelope = "stage2-cfg-boundary-spill" };
             } else if (!blockHasPhiIncomingFrom(function.blocks.items[target_index], function.blocks.items[block_index].name)) {
@@ -293,8 +301,8 @@ pub fn lowerCfgTerminator(
         },
         .condbr => |condbr| {
             if (!condbr.cond_ty.eql(.{ .int = 1 })) return .{ .no_emitter = "stage2-condbr-type" };
-            const then_index = function.blockIndex(condbr.then_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
-            const else_index = function.blockIndex(condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+            const then_index = blockIndex(selector, function, condbr.then_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
+            const else_index = blockIndex(selector, function, condbr.else_target) orelse return .{ .unsupported_control_flow = "stage2-branch-target" };
             const then_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[then_index], function.blocks.items[block_index].name);
             const else_has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[else_index], function.blocks.items[block_index].name);
             if (selector.stack_frame_bytes != 0) {
@@ -325,7 +333,7 @@ pub fn lowerCfgTerminator(
         .indirectbr => |branch| blk: {
             if (branch.targets.items.len == 0) break :blk .{ .unsupported_control_flow = "stage2-indirect-targets" };
             for (branch.targets.items) |name| {
-                const target = function.blockIndex(name) orelse break :blk .{ .unsupported_control_flow = "stage2-indirect-target" };
+                const target = blockIndex(selector, function, name) orelse break :blk .{ .unsupported_control_flow = "stage2-indirect-target" };
                 // PHI destinations require edge-specific snapshots; retain that
                 // boundary until indirect edge trampolines are implemented.
                 for (function.blocks.items[target].instructions.items) |inst| {
@@ -364,7 +372,7 @@ fn lowerSwitch(
     var case_values: [max_compare_chain_switch_cases]i32 = undefined;
     var case_target_indices: [max_compare_chain_switch_cases]usize = undefined;
     const predecessor = function.blocks.items[block_index].name;
-    const default_index = function.blockIndex(switch_term.default_target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
+    const default_index = blockIndex(selector, function, switch_term.default_target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
     var has_phi_edge = blockHasPhiIncomingFrom(function.blocks.items[default_index], predecessor);
 
     for (switch_term.cases.items, 0..) |case, case_index| {
@@ -374,7 +382,7 @@ fn lowerSwitch(
             if (previous == value) return .{ .no_emitter = "stage2-switch-duplicate-case" };
         }
         case_values[case_index] = value;
-        const target_index = function.blockIndex(case.target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
+        const target_index = blockIndex(selector, function, case.target) orelse return .{ .unsupported_control_flow = "stage2-switch-target" };
         case_target_indices[case_index] = target_index;
         has_phi_edge = has_phi_edge or blockHasPhiIncomingFrom(function.blocks.items[target_index], predecessor);
     }
@@ -396,14 +404,15 @@ fn lowerSwitch(
             case_target_indices[0..switch_term.cases.items.len],
             default_index,
         );
-        if (!isExactEiEntrySwitchPhiShape(
+        if (!(try isExactEiEntrySwitchPhiShape(
+            selector.allocator,
             function,
             block_index,
             switch_term,
             case_values[0..switch_term.cases.items.len],
             case_target_indices[0..switch_term.cases.items.len],
             default_index,
-        )) return .{ .no_emitter = "stage2-switch-phi-edge" };
+        ))) return .{ .no_emitter = "stage2-switch-phi-edge" };
         return lowerExactEiEntrySwitchPhiEdges(
             selector,
             function,
@@ -609,13 +618,14 @@ fn lowerExactFrexpSwitchPhiEdge(
 }
 
 fn isExactEiEntrySwitchPhiShape(
+    allocator: std.mem.Allocator,
     function: ir.Function,
     block_index: usize,
     switch_term: ir.SwitchTerminator,
     case_values: []const i32,
     case_target_indices: []const usize,
     default_index: usize,
-) bool {
+) !bool {
     if (block_index != 0 or !switch_term.cond_ty.eql(.{ .int = 16 }) or case_values.len != 5 or case_target_indices.len != 5) return false;
 
     var switch_count: usize = 0;
@@ -725,7 +735,7 @@ fn isExactEiEntrySwitchPhiShape(
     const default_terminator = default_predecessor.terminator orelse return false;
     if (default_terminator != .br or !std.mem.eql(u8, default_terminator.br.target, return_block.name)) return false;
     if (blockIsPlainUnreachable(function.blocks.items[default_index])) return false;
-    return blockCanReachViaOwnedBranches(function, default_index, default_predecessor_index);
+    return try blockCanReachViaOwnedBranches(allocator, function, default_index, default_predecessor_index);
 }
 
 fn isExactPositiveFpZero(value: ir.Value, ty: ir.Type) bool {
@@ -735,10 +745,19 @@ fn isExactPositiveFpZero(value: ir.Value, ty: ir.Type) bool {
     return false;
 }
 
-fn blockCanReachViaOwnedBranches(function: ir.Function, start_index: usize, target_index: usize) bool {
-    if (function.blocks.items.len > stage2_max_blocks) return false;
-    var seen: [stage2_max_blocks]bool = @splat(false);
-    var queue: [stage2_max_blocks]usize = undefined;
+fn blockCanReachViaOwnedBranches(allocator: std.mem.Allocator, function: ir.Function, start_index: usize, target_index: usize) !bool {
+    const count = function.blocks.items.len;
+    if (count > stage2_max_blocks or start_index >= count or target_index >= count) return false;
+    var graph = cfg.Graph.build(allocator, function) catch |err| {
+        if (err == error.UnknownBlock or err == error.DuplicateBlock) return false;
+        return err;
+    };
+    defer graph.deinit();
+    const seen = try allocator.alloc(bool, count);
+    defer allocator.free(seen);
+    @memset(seen, false);
+    const queue = try allocator.alloc(usize, count);
+    defer allocator.free(queue);
     var read_index: usize = 0;
     var write_index: usize = 1;
     queue[0] = start_index;
@@ -749,30 +768,16 @@ fn blockCanReachViaOwnedBranches(function: ir.Function, start_index: usize, targ
         if (block_index == target_index) return true;
         const terminator = function.blocks.items[block_index].terminator orelse return false;
         switch (terminator) {
-            .br => |br| {
-                const next = function.blockIndex(br.target) orelse return false;
-                if (!seen[next]) {
-                    if (write_index == queue.len) return false;
-                    seen[next] = true;
-                    queue[write_index] = next;
-                    write_index += 1;
-                }
-            },
-            .condbr => |condbr| {
-                const then_index = function.blockIndex(condbr.then_target) orelse return false;
-                const else_index = function.blockIndex(condbr.else_target) orelse return false;
-                inline for (.{ then_index, else_index }) |next| {
-                    if (!seen[next]) {
-                        if (write_index == queue.len) return false;
-                        seen[next] = true;
-                        queue[write_index] = next;
-                        write_index += 1;
-                    }
-                }
-            },
-            .ret, .@"unreachable" => {},
+            .br, .condbr => {},
+            .ret, .@"unreachable" => continue,
             .@"switch", .indirectbr => return false,
         }
+        for (graph.successors(block_index)) |next| if (!seen[next]) {
+            if (write_index == queue.len) return false;
+            seen[next] = true;
+            queue[write_index] = next;
+            write_index += 1;
+        };
     }
     return false;
 }

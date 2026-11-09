@@ -45,6 +45,7 @@ const VerifyContext = struct {
     allocator: std.mem.Allocator,
     function: core.Function,
     defs: std.StringHashMap(Definition),
+    block_indexes: SymbolMap(usize),
     predecessors: []bool,
     predecessor_lists: []std.ArrayList(usize),
     successor_lists: []std.ArrayList(usize),
@@ -62,6 +63,7 @@ const VerifyContext = struct {
             .allocator = allocator,
             .function = function,
             .defs = std.StringHashMap(Definition).init(allocator),
+            .block_indexes = SymbolMap(usize).init(allocator),
             .predecessors = &.{},
             .predecessor_lists = &.{},
             .successor_lists = &.{},
@@ -97,6 +99,7 @@ const VerifyContext = struct {
 
     fn deinit(ctx: *VerifyContext) void {
         ctx.defs.deinit();
+        ctx.block_indexes.deinit();
         for (ctx.predecessor_lists) |*list| list.deinit(ctx.allocator);
         for (ctx.successor_lists) |*list| list.deinit(ctx.allocator);
         ctx.allocator.free(ctx.predecessor_lists);
@@ -107,12 +110,10 @@ const VerifyContext = struct {
     }
 
     fn verifyBlockNames(ctx: *VerifyContext) !void {
-        var block_defs = std.StringHashMap(void).init(ctx.allocator);
-        defer block_defs.deinit();
-
-        for (ctx.function.blocks.items) |block| {
-            if (block_defs.contains(block.name)) return error.DuplicateBlock;
-            try block_defs.put(block.name, {});
+        for (ctx.function.blocks.items, 0..) |block, index| {
+            const entry = try ctx.block_indexes.getOrPut(block.name);
+            if (entry.found_existing) return error.DuplicateBlock;
+            entry.value_ptr.* = index;
         }
     }
 
@@ -138,7 +139,7 @@ const VerifyContext = struct {
     }
 
     fn addEdge(ctx: *VerifyContext, from: usize, target_name: []const u8) !void {
-        const to = ctx.function.blockIndex(target_name) orelse return error.UnknownBlock;
+        const to = ctx.block_indexes.get(target_name) orelse return error.UnknownBlock;
         if (!ctx.hasEdge(from, to)) {
             try ctx.successor_lists[from].append(ctx.allocator, to);
             try ctx.predecessor_lists[to].append(ctx.allocator, from);
@@ -309,7 +310,7 @@ const VerifyContext = struct {
         @memset(incoming_values, null);
 
         for (phi.incoming.items) |incoming| {
-            const predecessor_index = ctx.function.blockIndex(incoming.block) orelse return error.UnknownBlock;
+            const predecessor_index = ctx.block_indexes.get(incoming.block) orelse return error.UnknownBlock;
             const edge_count = ctx.edgeCount(predecessor_index, block_index);
             if (edge_count == 0) return error.PhiIncomingNotPredecessor;
             if (incoming_values[predecessor_index]) |existing_value| {
@@ -589,7 +590,7 @@ pub fn verify(module: core.Module) !void {
                         if (phi.incoming.items.len == 0) return error.EmptyPhi;
                         try ctx.verifyPhiIncomingBlocks(block_index, phi);
                         for (phi.incoming.items) |incoming| {
-                            const predecessor_index = function.blockIndex(incoming.block) orelse return error.UnknownBlock;
+                            const predecessor_index = ctx.block_indexes.get(incoming.block) orelse return error.UnknownBlock;
                             try ctx.verifyPhiIncomingValue(phi.ty, incoming.value, predecessor_index);
                         }
                     },
@@ -717,12 +718,12 @@ pub fn verify(module: core.Module) !void {
                         try ctx.verifyValue(ret.ty, ret.value orelse return error.InvalidRet, block_index, block.instructions.items.len);
                     }
                 },
-                .br => |br| try verifyBlockTarget(function, br.target),
+                .br => |br| try verifyBlockTarget(&ctx, br.target),
                 .condbr => |condbr| {
                     if (!condbr.cond_ty.eql(.{ .int = 1 })) return error.BranchConditionTypeMismatch;
                     try ctx.verifyValue(condbr.cond_ty, condbr.cond, block_index, block.instructions.items.len);
-                    try verifyBlockTarget(function, condbr.then_target);
-                    try verifyBlockTarget(function, condbr.else_target);
+                    try verifyBlockTarget(&ctx, condbr.then_target);
+                    try verifyBlockTarget(&ctx, condbr.else_target);
                 },
                 .@"switch" => |switch_term| {
                     switch (switch_term.cond_ty) {
@@ -730,21 +731,21 @@ pub fn verify(module: core.Module) !void {
                         else => return error.SwitchConditionTypeMismatch,
                     }
                     try ctx.verifyValue(switch_term.cond_ty, switch_term.cond, block_index, block.instructions.items.len);
-                    try verifyBlockTarget(function, switch_term.default_target);
+                    try verifyBlockTarget(&ctx, switch_term.default_target);
                     for (switch_term.cases.items) |case| {
                         if (!case.value_ty.eql(switch_term.cond_ty)) return error.SwitchCaseTypeMismatch;
                         switch (case.value) {
                             .int => {},
                             else => return error.InvalidSwitch,
                         }
-                        try verifyBlockTarget(function, case.target);
+                        try verifyBlockTarget(&ctx, case.target);
                     }
                 },
                 .indirectbr => |indirectbr| {
                     if (!indirectbr.addr_ty.eql(.ptr)) return error.BranchConditionTypeMismatch;
                     try ctx.verifyValue(indirectbr.addr_ty, indirectbr.addr, block_index, block.instructions.items.len);
                     if (indirectbr.targets.items.len == 0) return error.InvalidBr;
-                    for (indirectbr.targets.items) |target_name| try verifyBlockTarget(function, target_name);
+                    for (indirectbr.targets.items) |target_name| try verifyBlockTarget(&ctx, target_name);
                 },
                 .@"unreachable" => {},
             }
@@ -2179,8 +2180,8 @@ fn verifySyncScope(syncscope: ?[]const u8) !void {
     if (text.len <= "syncscope(\"\")".len) return error.InvalidAtomicMemory;
 }
 
-fn verifyBlockTarget(function: core.Function, block_name: []const u8) !void {
-    if (function.blockIndex(block_name) == null) return error.UnknownBlock;
+fn verifyBlockTarget(ctx: *const VerifyContext, block_name: []const u8) !void {
+    if (!ctx.block_indexes.contains(block_name)) return error.UnknownBlock;
 }
 
 fn callingConventionsMatch(lhs: ?[]const u8, rhs: ?[]const u8) bool {

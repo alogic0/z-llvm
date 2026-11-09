@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const cfg = @import("../../../analysis/cfg.zig");
 const selector_types = @import("selector_types.zig");
 const sysv_abi = @import("../sysv_abi.zig");
 
@@ -47,7 +48,8 @@ pub const StageTwoSummary = struct {
 const no_spill_register_values = 6;
 const stage2_frame_slots = 32;
 pub const stage2_spill_slots = stage2_frame_slots;
-pub const stage2_max_blocks = 1024;
+// Explicit private-graph resource ceiling; traversal storage uses actual sizes.
+pub const stage2_max_blocks = 65_536;
 pub fn analyzeStageTwoNoSpillEnvelope(allocator: std.mem.Allocator, function: ir.Function) !StageTwoSummary {
     var liveness = try buildStageTwoLiveness(allocator, function);
     defer liveness.deinit();
@@ -202,7 +204,20 @@ fn collectIntraBlockPressure(
     }
 }
 
+fn planningGraph(allocator: std.mem.Allocator, function: ir.Function) !cfg.Graph {
+    return cfg.Graph.build(allocator, function) catch |err| {
+        if (err == error.UnknownBlock or err == error.DuplicateBlock) return error.UnsupportedCodegenControlFlow;
+        return err;
+    };
+}
+
 fn buildStageTwoLiveness(allocator: std.mem.Allocator, function: ir.Function) !StageTwoLiveness {
+    var graph = try planningGraph(allocator, function);
+    defer graph.deinit();
+    return buildStageTwoLivenessWithGraph(allocator, function, graph);
+}
+
+fn buildStageTwoLivenessWithGraph(allocator: std.mem.Allocator, function: ir.Function, graph: cfg.Graph) !StageTwoLiveness {
     var pressure_exempt_values = NameSet.init(allocator);
     defer pressure_exempt_values.deinit();
     try collectPressureExemptValues(&pressure_exempt_values, function);
@@ -226,12 +241,7 @@ fn buildStageTwoLiveness(allocator: std.mem.Allocator, function: ir.Function) !S
     var edge_count: usize = 0;
     for (function.blocks.items, 0..) |block, block_index| {
         try collectBlockUsesAndDefs(&blocks.items[block_index], block, pressure_exempt_values);
-        const block_successors = try successors(block);
-        for (block_successors.names[0..block_successors.len]) |successor_name| {
-            if (successor_name.len == 0) continue;
-            edge_count += 1;
-            _ = function.blockIndex(successor_name) orelse return error.UnsupportedCodegenControlFlow;
-        }
+        edge_count += graph.successors(block_index).len;
     }
 
     for (function.blocks.items) |block| {
@@ -239,39 +249,42 @@ fn buildStageTwoLiveness(allocator: std.mem.Allocator, function: ir.Function) !S
             if (instruction.removed or instruction.kind != .phi) continue;
             const phi = instruction.kind.phi;
             for (phi.incoming.items) |incoming| {
-                const predecessor_index = function.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
+                const predecessor_index = graph.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
                 try addNamedPressureUse(&blocks.items[predecessor_index].phi_out, incoming.value, pressure_exempt_values);
             }
         }
     }
 
-    var changed = true;
-    while (changed) {
-        changed = false;
-        var reverse_index = blocks.items.len;
-        while (reverse_index > 0) {
-            reverse_index -= 1;
-            var next_live_out = NameSet.init(allocator);
-            defer next_live_out.deinit();
-            try unionSet(&next_live_out, blocks.items[reverse_index].phi_out);
-            const block_successors = try successors(function.blocks.items[reverse_index]);
-            for (block_successors.names[0..block_successors.len]) |successor_name| {
-                if (successor_name.len == 0) continue;
-                const successor_index = function.blockIndex(successor_name) orelse return error.UnsupportedCodegenControlFlow;
-                try unionSet(&next_live_out, blocks.items[successor_index].live_in);
-            }
-
-            var next_live_in = NameSet.init(allocator);
-            defer next_live_in.deinit();
-            try unionSet(&next_live_in, next_live_out);
-            var def_it = blocks.items[reverse_index].defs.iterator();
-            while (def_it.next()) |entry| {
-                _ = next_live_in.remove(entry.key_ptr.*);
-            }
-            try unionSet(&next_live_in, blocks.items[reverse_index].uses);
-
-            if (try replaceSet(&blocks.items[reverse_index].live_out, next_live_out)) changed = true;
-            if (try replaceSet(&blocks.items[reverse_index].live_in, next_live_in)) changed = true;
+    const queued = try allocator.alloc(bool, blocks.items.len);
+    defer allocator.free(queued);
+    @memset(queued, true);
+    var pending: std.ArrayList(usize) = .empty;
+    defer pending.deinit(allocator);
+    try pending.ensureTotalCapacity(allocator, blocks.items.len);
+    for (0..blocks.items.len) |index| pending.appendAssumeCapacity(index);
+    var next_live_out = NameSet.init(allocator);
+    defer next_live_out.deinit();
+    var next_live_in = NameSet.init(allocator);
+    defer next_live_in.deinit();
+    while (pending.pop()) |index| {
+        queued[index] = false;
+        next_live_out.clearRetainingCapacity();
+        try unionSet(&next_live_out, blocks.items[index].phi_out);
+        for (graph.successors(index)) |successor|
+            try unionSet(&next_live_out, blocks.items[successor].live_in);
+        next_live_in.clearRetainingCapacity();
+        try unionSet(&next_live_in, next_live_out);
+        var def_it = blocks.items[index].defs.iterator();
+        while (def_it.next()) |entry| _ = next_live_in.remove(entry.key_ptr.*);
+        try unionSet(&next_live_in, blocks.items[index].uses);
+        _ = try replaceSet(&blocks.items[index].live_out, next_live_out);
+        // Only live_in affects predecessors. The queue has at most one entry
+        // per block, including self loops, so its original capacity suffices.
+        if (try replaceSet(&blocks.items[index].live_in, next_live_in)) {
+            for (graph.predecessors(index)) |predecessor| if (!queued[predecessor]) {
+                queued[predecessor] = true;
+                pending.appendAssumeCapacity(predecessor);
+            };
         }
     }
 
@@ -368,6 +381,7 @@ pub const SelectorAllocationPlan = struct {
     interval_ends: std.StringHashMap(usize),
     forward_values: std.StringHashMap(ForwardValuePlan),
     preservation_values: std.StringHashMap(void),
+    block_indexes: cfg.BlockIndexes = .empty,
     spill_slots: usize = 0,
     preservation_spill_slots: usize = 0,
     max_active_values: usize = 0,
@@ -383,6 +397,7 @@ pub const SelectorAllocationPlan = struct {
     }
 
     pub fn deinit(plan: *SelectorAllocationPlan) void {
+        plan.block_indexes.deinit(plan.allocator);
         plan.preservation_values.deinit();
         plan.forward_values.deinit();
         plan.interval_ends.deinit();
@@ -391,6 +406,10 @@ pub const SelectorAllocationPlan = struct {
 
     pub fn assignment(plan: SelectorAllocationPlan, name: []const u8) ?PlannedValueAssignment {
         return plan.assignments.get(name);
+    }
+
+    pub fn blockIndex(plan: SelectorAllocationPlan, name: []const u8) ?usize {
+        return plan.block_indexes.get(name);
     }
 
     pub fn intervalEnd(plan: SelectorAllocationPlan, name: []const u8) ?usize {
@@ -460,6 +479,8 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
         try recordSelectorIntervalDef(allocator, &intervals, &interval_indexes, param.name, metadata, position);
     }
 
+    var graph = try planningGraph(allocator, function);
+    defer graph.deinit();
     position = 1;
     for (function.blocks.items) |block| {
         for (block.instructions.items) |instruction| {
@@ -525,7 +546,7 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
                     var incoming_use = NameSet.init(allocator);
                     defer incoming_use.deinit();
                     try addNamedPressureUse(&incoming_use, incoming.value, pressure_exempt_values);
-                    const predecessor_index = function.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
+                    const predecessor_index = graph.blockIndex(incoming.block) orelse return error.UnsupportedCodegenControlFlow;
                     try recordSelectorIntervalUses(intervals.items, interval_indexes, incoming_use, terminator_positions.items[predecessor_index]);
                 }
             } else {
@@ -544,7 +565,7 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
         }
     }
 
-    var cfg_liveness = try buildStageTwoLiveness(allocator, function);
+    var cfg_liveness = try buildStageTwoLivenessWithGraph(allocator, function, graph);
     defer cfg_liveness.deinit();
     for (cfg_liveness.blocks.items, 0..) |block, block_index| {
         try recordSelectorIntervalUses(intervals.items, interval_indexes, block.live_out, terminator_positions.items[block_index]);
@@ -566,6 +587,7 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
     }
 
     var plan = try allocateSelectorIntervals(allocator, intervals.items);
+    errdefer plan.deinit();
     // Pressure-exempt values historically had no interval entry and were
     // therefore treated as unbounded-live. Preserve that behavior explicitly
     // so every address-dependency owner still has validated plan metadata.
@@ -600,6 +622,8 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
         }
         plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
     }
+    plan.block_indexes = graph.block_indexes;
+    graph.block_indexes = .empty;
     return plan;
 }
 
@@ -1261,36 +1285,168 @@ fn setEquals(lhs: NameSet, rhs: NameSet) bool {
     return true;
 }
 
-const BlockSuccessors = struct {
-    names: [16][]const u8 = @splat(""),
-    len: usize = 0,
+const worklist_loop_source =
+    \\define i64 @cycle(i64 %value, i1 %choose, i1 %again) {
+    \\entry:
+    \\ br label %header
+    \\header:
+    \\ %current = phi i64 [ %value, %entry ], [ %left_value, %left ], [ %right_value, %right ]
+    \\ br i1 %choose, label %left, label %right
+    \\left:
+    \\ %left_value = add i64 %current, 1
+    \\ br i1 %again, label %header, label %exit
+    \\right:
+    \\ %right_value = sub i64 %current, 1
+    \\ br i1 %again, label %header, label %exit
+    \\exit:
+    \\ %result = phi i64 [ %left_value, %left ], [ %right_value, %right ]
+    \\ ret i64 %result
+    \\dead:
+    \\ ret i64 %value
+    \\}
+;
 
-    fn add(successors_list: *BlockSuccessors, name: []const u8) !void {
-        if (successors_list.len == successors_list.names.len) return error.UnsupportedCodegenControlFlow;
-        successors_list.names[successors_list.len] = name;
-        successors_list.len += 1;
-    }
-};
+test "stage two worklist retains uses through every indirect successor" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i64 @indirect(ptr %address, i64 %a, i64 %b) {
+        \\entry:
+        \\ indirectbr ptr %address, [label %left, label %right]
+        \\left:
+        \\ %x = add i64 %a, 1
+        \\ ret i64 %x
+        \\right:
+        \\ %y = add i64 %b, 2
+        \\ ret i64 %y
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var live = try buildStageTwoLiveness(std.testing.allocator, module.functions.items[0]);
+    defer live.deinit();
+    try std.testing.expectEqual(@as(usize, 2), live.edge_count);
+    try std.testing.expectEqual(@as(usize, 2), live.blocks.items[0].live_out.count());
+    try std.testing.expect(live.blocks.items[0].live_out.contains("a"));
+    try std.testing.expect(live.blocks.items[0].live_out.contains("b"));
+    try std.testing.expectEqual(@as(usize, 0), live.blocks.items[0].live_in.count());
+}
 
-fn successors(block: ir.BasicBlock) !BlockSuccessors {
-    var result = BlockSuccessors{};
-    if (block.terminator) |terminator| switch (terminator) {
-        .br => |br| try result.add(br.target),
-        .condbr => |condbr| {
-            try result.add(condbr.then_target);
-            if (!std.mem.eql(u8, condbr.then_target, condbr.else_target)) try result.add(condbr.else_target);
-        },
-        .@"switch" => |switch_term| {
-            try result.add(switch_term.default_target);
-            for (switch_term.cases.items) |case| {
-                var seen = std.mem.eql(u8, case.target, switch_term.default_target);
-                for (result.names[0..result.len]) |name| {
-                    if (std.mem.eql(u8, name, case.target)) seen = true;
-                }
-                if (!seen) try result.add(case.target);
-            }
-        },
-        .indirectbr, .ret, .@"unreachable" => {},
+test "stage two worklist matches independent full sweeps across loop edges and unreachable blocks" {
+    const a = std.testing.allocator;
+    var module = try ir.Module.parse(a, worklist_loop_source);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+    var live = try buildStageTwoLiveness(a, function);
+    defer live.deinit();
+    var graph = try planningGraph(a, function);
+    defer graph.deinit();
+    const State = struct { incoming: NameSet, outgoing: NameSet };
+    const expected = try a.alloc(State, function.blocks.items.len);
+    defer a.free(expected);
+    for (expected) |*state| state.* = .{ .incoming = NameSet.init(a), .outgoing = NameSet.init(a) };
+    defer for (expected) |*state| {
+        state.incoming.deinit();
+        state.outgoing.deinit();
     };
-    return result;
+    var next_out = NameSet.init(a);
+    defer next_out.deinit();
+    var next_in = NameSet.init(a);
+    defer next_in.deinit();
+    var changed = true;
+    var sweeps: usize = 0;
+    while (changed) {
+        changed = false;
+        sweeps += 1;
+        try std.testing.expect(sweeps < 64);
+        // Deliberately use complete forward sweeps instead of the production
+        // predecessor worklist. Uses/defs are fixed; propagation is independent.
+        for (live.blocks.items, 0..) |block, index| {
+            next_out.clearRetainingCapacity();
+            try unionSet(&next_out, block.phi_out);
+            for (graph.successors(index)) |successor| try unionSet(&next_out, expected[successor].incoming);
+            next_in.clearRetainingCapacity();
+            try unionSet(&next_in, next_out);
+            var defs = block.defs.keyIterator();
+            while (defs.next()) |name| _ = next_in.remove(name.*);
+            try unionSet(&next_in, block.uses);
+            if (try replaceSet(&expected[index].outgoing, next_out)) changed = true;
+            if (try replaceSet(&expected[index].incoming, next_in)) changed = true;
+        }
+    }
+    for (live.blocks.items, expected) |block, state| {
+        try std.testing.expect(setEquals(block.live_in, state.incoming));
+        try std.testing.expect(setEquals(block.live_out, state.outgoing));
+    }
+    try std.testing.expect(live.blocks.items[5].live_in.contains("value"));
+}
+
+test "stage two worklist handles more than sixteen unique switch successors" {
+    const a = std.testing.allocator;
+    var output: std.Io.Writer.Allocating = .init(a);
+    defer output.deinit();
+    const writer = &output.writer;
+    try writer.writeAll("define i64 @fanout(i32 %index, i64 %live) {\nentry:\n switch i32 %index, label %target0 [\n");
+    for (0..20) |index| try writer.print(" i32 {d}, label %target{d}\n", .{ index, index });
+    try writer.writeAll(" ]\n");
+    for (0..20) |index| try writer.print("target{d}:\n ret i64 %live\n", .{index});
+    try writer.writeAll("}\n");
+    var module = try ir.Module.parse(a, output.written());
+    defer module.deinit();
+    try module.verify();
+    const summary = try analyzeStageTwoNoSpillEnvelope(a, module.functions.items[0]);
+    try std.testing.expectEqual(@as(usize, 21), summary.blocks);
+    try std.testing.expectEqual(@as(usize, 20), summary.edges);
+    try std.testing.expectEqual(@as(usize, 1), summary.max_live_out);
+    try std.testing.expectEqual(@as(usize, 2), summary.max_pressure);
+}
+
+fn checkWorklistAllocation(allocator: std.mem.Allocator, function: ir.Function) !void {
+    const summary = try analyzeStageTwoNoSpillEnvelope(allocator, function);
+    try std.testing.expectEqual(@as(usize, 6), summary.blocks);
+    try std.testing.expectEqual(@as(usize, 7), summary.edges);
+}
+
+test "stage two worklist cleans every partial allocation without mutating source" {
+    var module = try ir.Module.parse(std.testing.allocator, worklist_loop_source);
+    defer module.deinit();
+    // In-place list growth depends on allocator page layout. Force moving
+    // growth so each injected index identifies the same allocation every run.
+    var moving = std.testing.FailingAllocator.init(std.testing.allocator, .{ .resize_fail_index = 0 });
+    try std.testing.checkAllAllocationFailures(moving.allocator(), checkWorklistAllocation, .{module.functions.items[0]});
+    try module.verify();
+}
+
+fn checkIndexedPlanAllocation(allocator: std.mem.Allocator, function: ir.Function) !void {
+    var plan = try buildSelectorAllocationPlan(allocator, function);
+    defer plan.deinit();
+    try std.testing.expectEqual(@as(usize, 4), plan.block_indexes.count());
+    try std.testing.expectEqual(@as(?usize, 1), plan.blockIndex("\"left\""));
+    try std.testing.expectEqual(@as(?usize, null), plan.blockIndex("absent"));
+}
+
+test "stage two indexed plan owns its transferred graph index through every allocation failure" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare i64 @helper(i64)
+        \\define i64 @indexed_plan(ptr %output, i64 %input, i1 %choose) {
+        \\entry:
+        \\ %seed = add i64 %input, 1
+        \\ store i64 %seed, ptr %output
+        \\ br i1 %choose, label %left, label %right
+        \\left:
+        \\ %x = call i64 @helper(i64 %seed)
+        \\ br label %join
+        \\right:
+        \\ %y = sub i64 %seed, 2
+        \\ br label %join
+        \\join:
+        \\ %v = phi i64 [ %x, %left ], [ %y, %right ]
+        \\ store i64 %v, ptr %output
+        \\ ret i64 %v
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var moving = std.testing.FailingAllocator.init(std.testing.allocator, .{ .resize_fail_index = 0 });
+    try std.testing.checkAllAllocationFailures(moving.allocator(), checkIndexedPlanAllocation, .{module.functions.items[0]});
+    try module.verify();
 }

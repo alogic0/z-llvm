@@ -1,5 +1,6 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
+pub const BlockIndexes = std.HashMapUnmanaged([]const u8, usize, ir.identifiers.Context, std.hash_map.default_max_load_percentage);
 
 pub const BlockEdges = struct {
     successors: std.ArrayList(usize) = .empty,
@@ -16,6 +17,7 @@ pub const BlockEdges = struct {
 pub const Graph = struct {
     allocator: std.mem.Allocator,
     edges: std.ArrayList(BlockEdges),
+    block_indexes: BlockIndexes = .empty,
 
     pub fn build(allocator: std.mem.Allocator, function: ir.Function) !Graph {
         var graph: Graph = .{
@@ -24,6 +26,11 @@ pub const Graph = struct {
         };
         errdefer graph.deinit();
 
+        for (function.blocks.items, 0..) |block, index| {
+            const entry = try graph.block_indexes.getOrPut(allocator, block.name);
+            if (entry.found_existing) return error.DuplicateBlock;
+            entry.value_ptr.* = index;
+        }
         try graph.edges.appendNTimes(allocator, .{}, function.blocks.items.len);
 
         for (function.blocks.items, 0..) |block, block_index| {
@@ -31,17 +38,17 @@ pub const Graph = struct {
             switch (terminator) {
                 .ret => {},
                 .@"unreachable" => {},
-                .br => |br| try graph.addEdge(function, block_index, br.target),
+                .br => |br| try graph.addEdge(block_index, br.target),
                 .condbr => |condbr| {
-                    try graph.addEdge(function, block_index, condbr.then_target);
-                    try graph.addEdge(function, block_index, condbr.else_target);
+                    try graph.addEdge(block_index, condbr.then_target);
+                    try graph.addEdge(block_index, condbr.else_target);
                 },
                 .@"switch" => |switch_term| {
-                    try graph.addEdge(function, block_index, switch_term.default_target);
-                    for (switch_term.cases.items) |case| try graph.addEdge(function, block_index, case.target);
+                    try graph.addEdge(block_index, switch_term.default_target);
+                    for (switch_term.cases.items) |case| try graph.addEdge(block_index, case.target);
                 },
                 .indirectbr => |indirectbr| {
-                    for (indirectbr.targets.items) |target| try graph.addEdge(function, block_index, target);
+                    for (indirectbr.targets.items) |target| try graph.addEdge(block_index, target);
                 },
             }
         }
@@ -52,6 +59,11 @@ pub const Graph = struct {
     pub fn deinit(graph: *Graph) void {
         for (graph.edges.items) |*edges| edges.deinit(graph.allocator);
         graph.edges.deinit(graph.allocator);
+        graph.block_indexes.deinit(graph.allocator);
+    }
+
+    pub fn blockIndex(graph: Graph, name: []const u8) ?usize {
+        return graph.block_indexes.get(name);
     }
 
     pub fn successors(graph: Graph, block_index: usize) []const usize {
@@ -95,8 +107,8 @@ pub const Graph = struct {
         return reachable;
     }
 
-    fn addEdge(graph: *Graph, function: ir.Function, from: usize, target_name: []const u8) !void {
-        const to = function.blockIndex(target_name) orelse return error.UnknownBlock;
+    fn addEdge(graph: *Graph, from: usize, target_name: []const u8) !void {
+        const to = graph.blockIndex(target_name) orelse return error.UnknownBlock;
         const edges = &graph.edges.items[from];
         for (edges.successors.items, 0..) |successor, i| {
             if (successor == to) {
@@ -106,13 +118,8 @@ pub const Graph = struct {
         }
         try edges.successors.append(graph.allocator, to);
         try edges.successor_counts.append(graph.allocator, 1);
-        try appendUnique(graph.allocator, &graph.edges.items[to].predecessors, from);
+        // The outgoing list admits this (from,to) pair once. Its inverse
+        // predecessor entry is therefore unique without scanning a large join.
+        try graph.edges.items[to].predecessors.append(graph.allocator, from);
     }
 };
-
-fn appendUnique(allocator: std.mem.Allocator, list: *std.ArrayList(usize), value: usize) !void {
-    for (list.items) |existing| {
-        if (existing == value) return;
-    }
-    try list.append(allocator, value);
-}

@@ -52,7 +52,7 @@ test "indirect jump propagates flag liveness to every successor" {
     try std.testing.expectError(error.EflagsClobberedWhileLive, flags.validateInstructions(std.testing.allocator, &instructions));
 }
 
-test "indirect branch retains the unsupported PHI edge boundary" {
+test "indirect branch selects a scalar PHI without changing the original target" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\define i64 @f(ptr %address, i64 %value) {
         \\entry:
@@ -67,8 +67,11 @@ test "indirect branch retains the unsupported PHI edge boundary" {
     var output = machine.MachineFunction.init("f", .{ .int = 64 });
     defer output.deinit(std.testing.allocator);
     const result = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
-    try std.testing.expect(result == .unsupported);
-    try std.testing.expectEqualStrings("stage2-indirect-phi", result.unsupported.detail());
+    try std.testing.expect(result == .selected);
+    try std.testing.expectEqual(.composed_cfg, output.selection_owner);
+    try verify.verifyFunction(output);
+    try module.verify();
+    try std.testing.expect(module.functions.items[0].blocks.items[1].instructions.items[0].kind == .phi);
 }
 
 test "block address relocations reject absent and duplicate machine labels" {

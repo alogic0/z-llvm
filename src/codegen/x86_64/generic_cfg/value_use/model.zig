@@ -37,7 +37,9 @@ fn optionalPreparedActionEql(
 }
 
 pub const max_requests = 16;
-pub const max_identity_bytes = 192;
+// Original compiler control labels reach 406 bytes. Keep a bounded, owned
+// identity with enough headroom for generated suffixes and no truncation.
+pub const max_identity_bytes = 512;
 pub const address_domain_snapshot_copies: usize = 1;
 pub const address_domain_copies_per_request: usize = 0;
 pub const address_domain_snapshot_bytes: usize = @sizeOf(AddressDependencyDomain);
@@ -169,7 +171,7 @@ pub const PreparedViewLease = struct {
 /// name, never storage discovered from selector state.
 pub const ActionIdentity = struct {
     bytes: [max_identity_bytes]u8 = @splat(0),
-    len: u8 = 0,
+    len: u16 = 0,
 
     pub fn init(name: []const u8) !ActionIdentity {
         if (name.len == 0) return error.ValueUseEmptyIdentity;
@@ -858,7 +860,7 @@ pub const CopyDestination = union(enum) {
 
 pub const PreparedIdentity = struct {
     bytes: [max_identity_bytes]u8 = undefined,
-    len: u8 = 0,
+    len: u16 = 0,
 
     pub fn init(name: []const u8) !PreparedIdentity {
         if (name.len == 0) return error.ValueUseEmptyIdentity;
@@ -1018,7 +1020,7 @@ pub const Lifecycle = enum { active, committed, rolled_back };
 
 pub const Identity = struct {
     bytes: [max_identity_bytes]u8 = undefined,
-    len: u8 = 0,
+    len: u16 = 0,
 
     pub fn init(name: []const u8) !Identity {
         if (name.len == 0) return error.ValueUseEmptyIdentity;

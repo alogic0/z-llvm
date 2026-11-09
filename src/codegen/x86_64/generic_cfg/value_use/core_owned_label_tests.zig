@@ -55,6 +55,64 @@ const expectTableLoadFailure = support.expectTableLoadFailure;
 const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
 
+test "value-use long owned identities preserve shared prefixes and reject beyond bound" {
+    const model = @import("model.zig");
+    var names: [2][model.max_identity_bytes + 1]u8 = @splat(@splat('x'));
+    names[0][model.max_identity_bytes - 1] = 'a';
+    names[1][model.max_identity_bytes - 1] = 'b';
+    inline for (.{ model.ActionIdentity, model.PreparedIdentity, model.Identity }) |IdentityType| {
+        const first = try IdentityType.init(names[0][0..model.max_identity_bytes]);
+        const second = try IdentityType.init(names[1][0..model.max_identity_bytes]);
+        try std.testing.expectEqual(@as(u16, 512), first.len);
+        try std.testing.expectEqualStrings(names[0][0..model.max_identity_bytes], first.slice());
+        try std.testing.expect(!std.mem.eql(u8, first.slice(), second.slice()));
+        try std.testing.expectError(error.ValueUseEmptyIdentity, IdentityType.init(""));
+        try std.testing.expectError(error.ValueUseIdentityTooLong, IdentityType.init(&names[0]));
+    }
+    var owned = try model.ActionIdentity.init(names[0][0..406]);
+    names[0][0] = 'y';
+    try std.testing.expectEqual(@as(u8, 'x'), owned.slice()[0]);
+    owned.len = model.max_identity_bytes + 1;
+    try std.testing.expectError(error.ValueUseIdentityTooLong, owned.validate());
+}
+
+test "value-use long source identity registration has exact rollback and no prefix collisions" {
+    var machine = MachineFunction.init("long-owned-identities", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    var names: [2][406]u8 = @splat(@splat('p'));
+    names[0][405] = 'a';
+    names[1][405] = 'b';
+    for (&names) |*name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, &names[0], .{ .arg64 = .rdi });
+    try selector_state.bindValueLoc(&selector, &names[1], .{ .arg64 = .rsi });
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    const first = try transaction.register(preparedRequest(&names[0], .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } }));
+    const second = try transaction.register(preparedRequest(&names[1], .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rsi } }));
+    try std.testing.expect(first.index != second.index);
+    const oversized: [513]u8 = @splat('q');
+    try std.testing.expectError(error.ValueUseIdentityTooLong, transaction.register(preparedRequest(&oversized, .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } })));
+    try std.testing.expectEqual(@as(u8, 2), transaction.request_count);
+    try transaction.seal();
+    try transaction.prepare();
+    try transaction.materializeAll();
+    const first_view = try transaction.preparedView(first);
+    const second_view = try transaction.preparedView(second);
+    try transaction.executePreparedAction(first_view);
+    try transaction.executePreparedAction(second_view);
+    try transaction.rollback();
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+    try std.testing.expect(selector.values.get(&names[0]).?.loc == .arg64);
+    try std.testing.expectEqual(.rdi, selector.values.get(&names[0]).?.loc.arg64);
+    try std.testing.expectEqual(.rsi, selector.values.get(&names[1]).?.loc.arg64);
+}
+
 test "value-use rollback releases speculative owned labels after instructions and commit retains them" {
     var machine = MachineFunction.init("value-use-owned-labels", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);

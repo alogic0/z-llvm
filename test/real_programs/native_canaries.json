@@ -2061,6 +2061,22 @@
       "functions": ["undefined_select_1", "undefined_select_8", "undefined_select_16", "undefined_select_32", "undefined_select_64", "undefined_select_128", "undefined_select_pointer"],
       "observations": 896,
       "stdout": "undefined-selects observations=896 defined=conditions=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "large_cfg",
+      "prefix": "large-cfg",
+      "fixture": "large_cfg",
+      "functions": ["large_cfg_chain_64", "large_cfg_chain_32", "large_cfg_labels_64", "large_cfg_labels_32", "large_cfg_switch"],
+      "observations": 2624,
+      "stdout": "large-cfg observations=2624 chain=20976 switch=1025 labels=406 clobbers=guards=preserved\n"
+    },
+    {
+      "population": "indirect_phi_slots",
+      "prefix": "indirect-phi-slots",
+      "fixture": "indirect_phi_slots",
+      "functions": ["indirect_phi_integer_1", "indirect_phi_integer_2", "indirect_phi_integer_8", "indirect_phi_integer_16", "indirect_phi_integer_24", "indirect_phi_integer_32", "indirect_phi_integer_40", "indirect_phi_integer_56", "indirect_phi_integer_64", "indirect_phi_integer_65", "indirect_phi_integer_96", "indirect_phi_integer_128", "indirect_phi_floating_16", "indirect_phi_floating_32", "indirect_phi_floating_64", "indirect_phi_pointer_64", "indirect_phi_inactive_poison"],
+      "observations": 2176,
+      "stdout": "indirect-phi-slots observations=2176 targets=parallel=poison=clobbers=guards=preserved\n"
     }
   ]
 }

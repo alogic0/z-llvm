@@ -14,6 +14,9 @@ comptime {
     _ = @import("tests/ir_packed_structures.zig");
     _ = @import("compilation_profile.zig");
     _ = @import("codegen/x86_64/generic_cfg/optional_legalization.zig");
+    _ = @import("codegen/x86_64/generic_cfg/stage2_planning.zig");
+    _ = @import("codegen/x86_64/generic_cfg/switch_phi_edges_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/indirect_phi_slots_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/rewrite_candidate_tests.zig");
     _ = @import("zig_air_atomic_exchange_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_value_use_transaction_tests.zig");
@@ -68,6 +71,7 @@ comptime {
     _ = @import("tests/ir_operands.zig");
     _ = @import("tests/ir_numeric_names.zig");
     _ = @import("tests/ir_identifiers.zig");
+    _ = @import("tests/analysis_cfg_indexing.zig");
     _ = @import("tests/ir_parser_ownership.zig");
     _ = @import("tests/ir_parser_parameters.zig");
     _ = @import("tests/ir_instruction_ownership.zig");

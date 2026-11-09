@@ -376,8 +376,10 @@ fn byteTransfersAreAcyclic(selector: *ComposedBlockSelector) !bool {
     if (function.blocks.items.len > stage2_max_blocks) return false;
     var graph = try cfg.Graph.build(selector.allocator, function.*);
     defer graph.deinit();
-    var remaining: [stage2_max_blocks]usize = undefined;
-    var queue: [stage2_max_blocks]usize = undefined;
+    const remaining = try selector.allocator.alloc(usize, function.blocks.items.len);
+    defer selector.allocator.free(remaining);
+    const queue = try selector.allocator.alloc(usize, function.blocks.items.len);
+    defer selector.allocator.free(queue);
     var end: usize = 0;
     for (graph.edges.items, 0..) |edges, index| {
         remaining[index] = edges.predecessors.items.len;
