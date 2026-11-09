@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `a9e9c0f1404b3b4e98ff0f66e25760b91990b286`; tree: `a8b95d4326653055fdf1e2b04a093c7f4ebd521b`.
+Accepted revision: `29e034a72a83844e1a3fdf856da9ae93e71548c7`; tree: `d8d0d0be6fd864eb355d166008e43cb47011acf6`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,7 +31,34 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [quoted-symbol slice](evidence/quoted_symbol_addresses.md) is accepted at
+The [checked-multiply operand slice](evidence/checked_multiply_operands.md) is
+accepted at `29e034a7`. The full serial run passes all 17 gates and 63 native
+populations, preserving all 62 preceding populations. Debug and ReleaseSafe
+each pass 1,983 units and 23 structural checks; all nine readiness commands,
+both input corpora, all five fixed programs and all 54 core fault controls pass.
+
+Compiler selection increases from 7,657 to **7,713 of 8,928**, with no lost
+successes. Runtime remains **284 of 455**. Both production replays match their
+complete censuses and pass event audits. All 59 targeted unsigned checked
+multiply calls pass the repaired operand boundary: 56 functions select, two
+reach freeze-width limits and one reaches a PHI destination limit.
+
+Shared scratch transfers now materialize validated integer literals while
+preserving destination aliases and leaving the accumulator input and EFLAGS
+intact. The new eight-function native population passes direct/release routes
+in all modes with frozen Debug and ReleaseFast builds. Literal accumulator,
+unsupported-width and undef/poison boundaries are unchanged.
+
+The suite records 1,968,132 local observations against 984,066 references.
+All 36 core records preserve selected objects, descriptors, observations and
+linked sizes. Wrapper metadata differences are recorded separately. The
+twelve-function execution cohort, 100-row prefix and ratchet 130 remain intact.
+All source, compiler, frontend, original-input and scratch hashes verify; the
+manifest seals 461 retained artifacts. See [the handoff](next_steps.md) for the
+remaining classified groups. Whole-compiler object emission and self-rebuild
+remain unsupported.
+
+The preceding [quoted-symbol slice](evidence/quoted_symbol_addresses.md) is accepted at
 `a9e9c0f1`: fresh and cached full runs each pass all 17 gates and 62 native
 populations. All 1,501 canonical records match between runs. Debug and
 ReleaseSafe each pass 1,979 units and 23 structural checks. Readiness, profiling,
@@ -69,9 +96,8 @@ space is 42.61 GB. No cache retirement occurred during the pair and no archives
 were created. The evidence also records an earlier process-stop mistake whose
 impact on unrelated jobs is unconfirmed.
 
-The next shared repair is the 59 observed unsigned overflow-multiply calls with
-a spilled left operand and constant right operand. See [the active handoff](next_steps.md)
-for its scope and the remaining classified groups.
+Its recommended repair of the 59 unsigned overflow-multiply operand failures
+is completed by the checked-multiply checkpoint above.
 
 The preceding [symbolic integer call-address checkpoint](evidence/symbolic_call_addresses.md)
 at `b43dd3dc` selected 7,441 compiler and 284 runtime definitions, with 17 gates

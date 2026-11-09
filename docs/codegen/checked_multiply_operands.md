@@ -49,3 +49,9 @@ range-fact/select shape uses operands that satisfy its range. Direct and
 accepted-release routes are compared against LLVM in all three release modes.
 See the [implementation plan](../plans/2026-11-08-checked-multiply-operands.md)
 for replay and cumulative acceptance requirements.
+
+The [accepted checkpoint](../evidence/checked_multiply_operands.md) passes all
+17 integration gates and preserves all preceding execution populations.
+All 59 observed operand failures advance; 56 functions newly select and three
+reach later freeze-width/PHI limitations. Complete compiler selection is
+7,713/8,928 with no lost successes; runtime remains 284/455.

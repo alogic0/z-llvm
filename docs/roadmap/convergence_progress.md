@@ -4636,6 +4636,20 @@ One line per completed cycle, append-only, newest last. This is the
   compilers remain; no archives were created. Evidence:
   `docs/evidence/compiler_parser_vector_casts_acceptance_20261107.json`.
 
+- 2026-11-08 (checked multiply operand transfers, `29e034a7`)
+  Shared scratch transfers admit validated integer literals while preserving
+  aliases and the existing fixed-product/rollback contracts. All 59 observed
+  unsigned multiply operand failures advance: 56 functions select and three
+  reach later freeze-width/PHI boundaries. Complete compiler selection rises
+  to 7,713/8,928 with no lost successes; runtime stays 284/455. Production
+  replays and complete event audits match the censuses. All 17 integration
+  gates and 63 native populations pass, preserving all 62 prior populations,
+  36 selected core object/observation records, twelve executed core functions
+  per mode and ratchet 130. Debug and ReleaseSafe each pass 1,983 units and
+  23 structural checks; readiness, both input corpora, all five fixed programs
+  and 54 core fault controls pass. Evidence:
+  `docs/evidence/checked_multiply_operands_acceptance_20261108.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4643,7 +4657,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `a9e9c0f1404b3b4e98ff0f66e25760b91990b286`; tree: `a8b95d4326653055fdf1e2b04a093c7f4ebd521b`.
+Accepted revision: `29e034a72a83844e1a3fdf856da9ae93e71548c7`; tree: `d8d0d0be6fd864eb355d166008e43cb47011acf6`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

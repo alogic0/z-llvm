@@ -1,66 +1,60 @@
 # Active direction
 
 The [checked-multiply operand slice](plans/2026-11-08-checked-multiply-operands.md)
-is implemented and under validation. Debug and ReleaseSafe each pass 1,983
-units and 23 structural checks; the new eight-function native population passes
-all modes with the Debug compiler. Complete compiler replay and cumulative
-Tier-3 acceptance remain pending. The accepted baseline below is unchanged.
+is complete and accepted at `29e034a7`. Compiler selection is **7,713/8,928**:
+56 additions, preserving all 7,657 preceding successes. Runtime stays
+**284/455**. Both complete production replays match their censuses and pass
+event audits. The full serial run passes 17 gates and 63 native populations,
+preserving all 62 preceding populations and all 36 stable core records. See the
+[evidence](evidence/checked_multiply_operands.md) and
+[acceptance record](evidence/checked_multiply_operands_acceptance_20261108.json).
 
-The [quoted-symbol plan](plans/2026-11-08-quoted-symbol-addresses.md) is complete
-and accepted at `a9e9c0f1`, following `b51fc4aa`. Compiler selection is
-**7,657/8,928**, with 216 additions and no lost successes; runtime remains
-**284/455**. Both complete production replays and event audits pass. Fresh and
-cached full runs each pass 17 gates and 62 native populations, preserving all
-61 preceding populations and all 36 stable core records. The full comparator
-matches 1,501 records. See the [evidence](evidence/quoted_symbol_addresses.md)
-and [acceptance record](evidence/quoted_symbol_addresses_acceptance_20261108.json).
+All 59 `composed-block-smulo-i64-rhs` failures advance. Shared scalar transfers
+now materialize their constant operands through the existing register and
+rollback contracts while retaining argument facts. Fifty-six functions select;
+the later rejections are `composed-block-freeze-width` in `link.Coff.addReloc`
+and `link.Elf2.addGlobalSymbol`, and `stage2-phi-dst` in
+`codegen.wasm.CodeGen.airSwitchBr`. The repaired multiply boundary should not be
+repeated. Literal accumulator operands retain their existing boundary.
 
-All 225 quoted-table first failures advance: 216 select, five reach an
-overflow-multiply operand limit, three a load-width limit and one a store-width
-limit. Canonical names now span shared addressing, verification, aliases and
-ELF. Structured construction preserves LLVM spelling; AIR literal names are
-encoded at its producer boundary. Do not repeat this repair or the earlier
-symbolic integer call-address work.
+Debug and ReleaseSafe each pass 1,983 units and 23 structural checks. The new
+eight-function native population passes all modes and both routes with Debug
+and ReleaseFast compilers. All nine readiness commands, both input corpora,
+five fixed programs and 54 core fault controls pass. The suite records
+1,968,132 local observations against 984,066 references.
 
-The next shared repair should target the **59 `composed-block-smulo-i64-rhs`
-failures**. Their observed calls are all `llvm.umul.with.overflow.i64`, despite
-the diagnostic tag's spelling. Each has a spilled i64 left operand and constant
-i64 right operand. Fifty-eight left values come from selects and one from binary
-arithmetic; common constants are 24, 40, 12, 48, 20 and 56. The complete concrete
-classification is `local-state/validations/quoted-symbols-20261108/checked-multiply-frontier.json`.
-
-1. Materialize the constant operand through the common value-transfer and
-   register-effect contracts. Preserve live values around the RAX/RDX multiply
-   sequence and preserve transactional rollback.
-2. Cover overflow/no-overflow, aliases, spills, calls and live neighboring
-   values with focused checks and independent native execution in all modes.
-3. Replay both unchanged complete inputs, preserving all 7,657 compiler and
-   284 runtime successes. Report actual additions and later rejections, then
-   complete the required cumulative gate before promoting the next checkpoint.
-
-Group size does not predict completed functions. The other leading groups are
+The remaining classified groups are prioritization evidence for a subsequent
+bounded task. Their concrete definitions should be inspected before choosing
+the next repair. Leading groups include
 133 general-value failures, 123 main allocation failures, 115 unknown call
-arguments, 102 comparisons, 92 freeze-width failures, 90 call-attribute ABI
-failures and 72 load-type failures. General-value observations include 67
+arguments, 102 comparisons, 94 freeze-width failures, 90 call-attribute ABI
+failures, 72 load-type failures and 59 immediate-comparison range failures.
+General-value observations include 67
 `<16 x i1>` comparisons and thirteen `<2 x ptr>` loads. Allocation observations
 include fp128 slots, `%sort.block.Pull` arrays and large byte arrays. The 115
 unknown call arguments are i32 undef (86), i64 poison (23) and i64 undef (six);
 keep their semantics as a separate decision.
 
-Raw evidence is under `local-state/validations/quoted-symbols-20261108/`.
+Raw evidence is under `local-state/validations/checked-multiply-20261108/`.
 Preserve the twelve-function core cohort, ratchet 130 and every execution
-population. Keep focused and suite Debug identities distinct and review
-executable metadata separately from selected objects and observations.
+population. The suite Debug binary matches the frozen Debug binary exactly;
+review wrapper metadata separately from selected objects and observations.
 No complete compiler/runtime object, startup or self-rebuild is claimed.
 
-The 20 GB admission and 11.41 GB execution-reserve settings now have complete
-fresh/cache acceptance with the unchanged 8 GiB working allowance. Reuse the
+The 20 GB admission and 11.41 GB execution-reserve settings retain their prior
+fresh/cache acceptance and unchanged 8 GiB working allowance. Reuse the
 authenticated `local-state/caches/quoted-symbols-20261108` generation when its
 inputs match. Finish any cache retirement before validation; preserve original
 inputs, accepted evidence, AIR payloads and all thirteen scratch files. Create
 no archives. See the [headroom policy](retention_headroom_policy.md#headroom).
 
 ## Preceding checkpoints
+
+The [quoted-symbol checkpoint](evidence/quoted_symbol_addresses.md) at
+`a9e9c0f1` selected 7,657 compiler and 284 runtime definitions, with fresh and
+cached full runs passing 17 gates and 62 native populations. It closed the
+225 quoted-table first failures with 216 additions. Its checked-multiply
+recommendation is completed by the current checkpoint above.
 
 The [symbolic integer call-address checkpoint](evidence/symbolic_call_addresses.md)
 at `b43dd3dc` selected 7,441 compiler and 284 runtime definitions, with all 17
