@@ -36,6 +36,7 @@ const docs = [_][]const u8{
     "docs/zllvm_artifact_retention_contract.md",
     "docs/evidence/project_improvement/implementation.md",
     "docs/environment.md",
+    "docs/compiler_profiling.md",
     "docs/build_steps.md",
     "docs/working-cycle.md",
     "docs/roadmap/convergence_progress.md",

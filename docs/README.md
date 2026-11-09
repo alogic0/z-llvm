@@ -7,6 +7,9 @@ the completed bounded consolidation and performance baseline. [Current state](cu
 [next steps](next_steps.md) owns active direction. The long roadmap and completion
 lists below are historical context, not proof of current general capability.
 
+For compiler performance investigations, follow [compiler profiling](compiler_profiling.md)
+for the verified hardware-sampling setup, recording commands and evidence checks.
+
 This document is the main roadmap entrypoint for replacing the LLVM library
 dependency that Zig uses in its distribution. The local replacement is scoped
 around the LLVM IR, optimizer, target, and backend handoff behavior Zig

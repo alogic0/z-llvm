@@ -422,7 +422,9 @@ The [implementation and timing evidence](evidence/execution_breadth.md) separate
 compiler throughput from generated-code quality. On the same Safe Fibonacci IR,
 emission plus ownership replay took about 650 seconds with a Debug compiler and
 65 seconds with ReleaseFast, with byte-identical outputs. These are single samples
-concurrent with validation; host policy blocks sampling-based profiling.
+concurrent with validation; host policy blocked sampling-based profiling during
+that checkpoint. The [current profiling workflow](compiler_profiling.md) records
+the subsequently verified user-space hardware sampling setup.
 The [completed plan](plans/2026-11-06-execution-breadth.md) records the order and
 remaining work: optional legalization, explicit register effects and larger state
 and memory programs. This checkpoint does not establish self-hosting or release

@@ -60,6 +60,12 @@ Reuse the authenticated `local-state/caches/quoted-symbols-20261108` generation
 when producer identities match. Create no archives. See the
 [headroom policy](retention_headroom_policy.md#headroom).
 
+For performance diagnosis during this work, follow
+[compiler profiling](compiler_profiling.md). Hardware sampling and caller stacks
+now work on R780M with user-space events and frame-pointer recording. Run the
+preflight before reporting sampling unavailable, and profile the current compiler
+when attributing current bottlenecks.
+
 ## Preceding checkpoints
 
 The [integer vector graph checkpoint](evidence/integer_vector_graphs.md)

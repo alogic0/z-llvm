@@ -54,6 +54,13 @@ Unit tests and storage tests do not require the patched sibling compiler,
 historical worktrees, or LLVM utilities. `zig build test` additionally runs the
 ABI integration gate and retains its external requirements.
 
+## Compiler profiling
+
+For compiler performance investigations, use the [profiling guide](docs/compiler_profiling.md).
+User-space hardware sampling was verified on R780M with `perf_event_paranoid=2`
+and `--call-graph fp --user-callchains`. Check access before each investigation;
+the guide includes recording, stack verification, and separate throughput measurements.
+
 ## Integration
 
 Integration uses the pinned patched compiler in `../ziglang/build/stage4/bin/zig`

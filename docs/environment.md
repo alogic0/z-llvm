@@ -12,6 +12,18 @@ Authoritative Zig fixture emitter: ../ziglang/build/stage4/bin/zig
 Project checkout: z_llvm/
 ```
 
+## Hardware profiling
+
+User-space hardware counters and frame-pointer call stacks were verified on
+R780M on 2026-11-09 after setting `kernel.perf_event_paranoid=2`. Use
+`cycles:u` with `--call-graph fp --user-callchains`. The recorded DWARF attempt
+failed during stack decoding; it did not indicate a hardware-access failure.
+Recheck access after reboot because persistence has not been confirmed.
+
+Follow [compiler profiling](compiler_profiling.md) for preflight, host setup,
+current-source builds, recording and interpretation. Older evidence reporting
+`perf_event_paranoid=4` describes the policy at the time of those measurements.
+
 ## Zig Compiler Selection Policy
 
 Use different Zig executables for different jobs:
