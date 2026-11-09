@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "9ba5e61c20c3ed5632514eeb56ca933fa1e57469",
-  "accepted_tree": "85de42914a3089185193d7e0b7ca2127bd31101f",
+  "accepted_revision": "636816def582b8bd28fc23f6191363dc975235db",
+  "accepted_tree": "f38cdf6393ea2b84816a97849dfec0d9494d0841",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "9ba5e61c",
+  "declaration_revision": "636816de",
   "evidence": [
+    "docs/evidence/call_values_pointer_promises_acceptance_20261109.json",
+    "docs/evidence/call_values_pointer_promises.md",
     "docs/evidence/scalar_comparisons_pointer_freeze_acceptance_20261109.json",
     "docs/evidence/scalar_comparisons_pointer_freeze.md",
     "docs/evidence/narrow_freeze_acceptance_20261108.json",

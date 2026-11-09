@@ -53,9 +53,18 @@ readiness and all 17 integration gates pass. The 66 native populations record
 2,043,396 local observations and preserve all 64 preceding populations. See the
 [accepted evidence](../evidence/scalar_comparisons_pointer_freeze.md).
 
-The objective remains active with 985 failures. Continue with private call-value
-refinements, validated advisory pointer attributes, and vector/scalar bitcasts,
-then the later observed limits. The retained read-only inventory identifies
+The second checkpoint is accepted at `636816de`: mandatory private zero/null
+refinement of undefined call operands and validated pointer capture, readnone
+and initialization promises. Compiler census and production replay select
+8,170/8,928, adding 227 with no lost successes; runtime retains 285/455.
+Debug/ReleaseSafe each pass 1,999 units and 24 structural checks. All nine
+readiness commands and 17 integration gates pass. All 67 native populations
+pass, preserving the preceding 66, and the twelve-function new call population
+passes both routes and all modes with frozen Debug/Fast builds. See the
+[accepted evidence](../evidence/call_values_pointer_promises.md).
+
+The objective remains active with 758 failures. Continue with vector/scalar
+bitcasts, then the later observed limits. The retained read-only inventory identifies
 60 rejected original CFGs exceeding 1,024 blocks, internal vector expansions,
 FP storage/ABI limits, and long labels. These are work groups under the existing
 authorization, not new permission boundaries.

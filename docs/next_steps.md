@@ -4,37 +4,37 @@ Continue until **all 8,928 definitions** in the unchanged original compiler
 input select. The user's [complete-selection plan](plans/2026-11-08-complete-compiler-selection.md)
 authorizes the successive necessary groups without further per-slice permission.
 
-The [comparison and pointer-freeze checkpoint](evidence/scalar_comparisons_pointer_freeze.md)
-is accepted at `9ba5e61c`: **7,943/8,928**, adding 144 selections with no lost
-successes. Runtime reaches **285/455**, adding one and preserving its prior
-successes. Both complete production replays match their censuses and pass
-event audits. [Acceptance record](evidence/scalar_comparisons_pointer_freeze_acceptance_20261109.json).
+The [call values and pointer-promises checkpoint](evidence/call_values_pointer_promises.md)
+is accepted at `636816de`: **8,170/8,928**, adding 227 selections with no lost
+successes. Runtime retains **285/455**. Both complete production replays match
+their censuses and pass event audits.
+[Acceptance record](evidence/call_values_pointer_promises_acceptance_20261109.json).
 
-All 17 serial integration gates and 66 native populations pass, preserving
-all 64 preceding populations. Debug and ReleaseSafe each pass 1,995 units
-and 23 structural checks; all nine readiness commands pass. The suite records
-2,043,396 local observations against 1,021,698 references. Five fixed programs,
+All 17 serial integration gates and 67 native populations pass, preserving
+all 66 preceding populations. Debug and ReleaseSafe each pass 1,999 units
+and 24 structural checks; all nine readiness commands pass. The suite records
+2,067,972 local observations against 1,033,986 references. Five fixed programs,
 both input corpora, and all 54 core fault controls pass. All 36 core selected
-objects and behavioral records match. Executable metadata is reviewed separately,
-including one 4,096-byte linked-wrapper increase. The 920-artifact seal is retained.
+objects, behavioral records and linked/reference sizes match. Executable hashes
+are reviewed separately. The 648-artifact seal is retained.
 
-The remaining **985 failures** are still authorized work. Next:
+The remaining **758 failures** are still authorized work. Next:
 
-1. Refine explicit undefined scalar and pointer call operands in private IR,
-   preserving source attributes and signatures. The current unknown scalar
-   arguments are i32/i64 undef or poison; eight unknown pointers are poison.
-   Validate defined neighboring values, calls, liveness, and guards.
-2. Admit validated pointer promises such as `initializes(...)`,
-   `captures(address)`, `captures(address_is_null)`, and `readnone` through
-   the existing attribute checker. All 90 current attribute failures contain
-   these entry-parameter promises. Retain malformed-attribute rejection.
-3. Extend existing integer-vector lane expansion for exact-width vector/scalar
-   bitcasts. The 169 mask first failures include `<16 x i1>` to i16 casts.
-   Preserve the public ABI and reject incomplete expansions.
-4. Continue through allocation/copy constraints, wider internal vector lanes,
-   long owned identities, indirect PHIs, large CFGs, and FP limits as observed.
+1. Extend integer-vector lane expansion for exact-width vector/scalar bitcasts.
+   The 169 mask first failures include `<16 x i1>` to i16 casts. Preserve the
+   public ABI, exact lane bit positions and complete private SSA graphs.
+2. Continue through vector PHIs, explicit undefined lanes, pointer lanes and
+   wider internal vectors. Separate per-lane limits from scalar packing and ABI
+   limits; original internal vectors reach sixteen i128 lanes.
+3. Repair exact-byte non-native integer memory accesses, general storage views
+   with runtime copies, and undefined select arms. Keep guards, source ownership
+   and unsupported barrier/address-space boundaries explicit.
+4. Continue through wider ABI carriers, aggregate/indirect PHIs, large CFGs,
+   long owned identities and FP limits as observed.
    Original rejected functions include 60 CFGs over 1,024 blocks, with a
-   maximum of 20,976; quoted block labels reach 406 bytes.
+   maximum of 20,976; quoted block labels reach 406 bytes. Read-only inspection
+   also connects unannotated large-switch failures to a sixteen-successor
+   planning limit; verify that hypothesis in the CFG cycle.
 
 Replay affected original functions after each cohesive change, preserve all
 accepted selected identities, and reclassify later limits. Use the validation
@@ -42,7 +42,7 @@ tiers, including immediate Tier 3 for correctness or shared ABI/frame changes.
 Keep this checkpoint authoritative until the next cumulative acceptance.
 
 Raw batch evidence is sealed under
-`local-state/validations/compiler-selection-completion-20261108/batch-01/`;
+`local-state/validations/compiler-selection-completion-20261108/batch-02/`;
 ongoing notes and read-only classifications are in its parent. Preserve the
 100-row prefix, twelve-function core cohort, ratchet 130, every execution
 population, original inputs, prior evidence, AIR payloads, and thirteen scratch
@@ -54,6 +54,11 @@ when producer identities match. Create no archives. See the
 [headroom policy](retention_headroom_policy.md#headroom).
 
 ## Preceding checkpoints
+
+The [comparison and pointer-freeze checkpoint](evidence/scalar_comparisons_pointer_freeze.md)
+at `9ba5e61c` selected 7,943 compiler and 285 runtime definitions, with all 17
+gates and 66 native populations passing. Its private-call and pointer-promise
+recommendations are completed by the checkpoint above.
 
 The [narrow-freeze checkpoint](evidence/narrow_freeze.md) at `7080d454`
 selected 7,799 compiler and 284 runtime definitions. All 17 gates and 64 native

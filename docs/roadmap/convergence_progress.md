@@ -4680,6 +4680,23 @@ One line per completed cycle, append-only, newest last. This is the
   The all-8,928 objective stays active with 985 failures. Evidence:
   `docs/evidence/scalar_comparisons_pointer_freeze_acceptance_20261109.json`.
 
+- 2026-11-09 (private call values and pointer promises, `636816de`)
+  Mandatory zero/null refinement handles explicit undefined integer/pointer
+  call operands before ABI widening; validated pointer capture, readnone and
+  initialization promises preserve source facts and signatures. Compiler
+  selection reaches 8,170/8,928 (+227), with no lost preceding successes;
+  runtime retains 285/455. Complete production replays match their censuses
+  and pass event audits. All 17 gates and 67 native populations pass,
+  preserving the preceding 66 and recording 2,067,972 local observations.
+  Debug/ReleaseSafe each pass 1,999 units and 24 structural checks; readiness,
+  both input corpora, five fixed programs and all 54 fault controls pass.
+  All 36 core selected objects and behavior fields match, as do all linked
+  and reference sizes; executable hashes are reviewed separately. The
+  100-row prefix, twelve-function cohort and ratchet 130 are unchanged.
+  A 648-artifact seal retains the proof. Continue the active all-8,928
+  objective with 758 remaining failures. Evidence:
+  `docs/evidence/call_values_pointer_promises_acceptance_20261109.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4687,7 +4704,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `9ba5e61c20c3ed5632514eeb56ca933fa1e57469`; tree: `85de42914a3089185193d7e0b7ca2127bd31101f`.
+Accepted revision: `636816def582b8bd28fc23f6191363dc975235db`; tree: `f38cdf6393ea2b84816a97849dfec0d9494d0841`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
