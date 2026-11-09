@@ -6,7 +6,7 @@ below is generated and checked by `zig build check-docs`; regenerate it with
 
 <!-- accepted-status:start -->
 
-Accepted revision: `29e034a72a83844e1a3fdf856da9ae93e71548c7`; tree: `d8d0d0be6fd864eb355d166008e43cb47011acf6`.
+Accepted revision: `7080d4544ee966079b76270081c6cf10e1d3bd32`; tree: `3d78027ce8914fa6c6ec0601aef593774316a4ec`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.
@@ -31,7 +31,32 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
 
-The [checked-multiply operand slice](evidence/checked_multiply_operands.md) is
+The [narrow freeze slice](evidence/narrow_freeze.md) is accepted at `7080d454`.
+All 17 serial integration gates and 64 native populations pass, preserving
+all 63 prior populations. Debug and ReleaseSafe each pass 1,989 units and
+23 structural checks; readiness, both input corpora, all five fixed programs
+and all 54 core fault controls pass.
+
+Compiler selection reaches **7,799 of 8,928**, adding 86 functions without
+losing a prior success. Runtime remains **284 of 455**. Both complete production
+replays match their censuses and pass event audits. All 94 targeted freeze-width
+failures advance; eight reach later comparison, load or half-precision limits.
+
+Defined i1 through i32 values freeze as aliases of existing compatible registers
+or scalar spill slots, emitting no instruction or mask. Wider aliases and EFLAGS
+are preserved. The ten-function native population passes both routes and all
+modes with frozen Debug and ReleaseFast builds. Explicit undef/poison literals,
+unsupported types/widths and incompatible locations retain their boundaries.
+
+The full suite records 1,983,492 local observations against 991,746 references.
+All 36 core records preserve selected objects, descriptors, observations and
+linked sizes; wrapper metadata is reviewed separately. The twelve-function
+cohort, 100-row prefix and ratchet 130 remain intact. All source, compiler,
+frontend, input and scratch checks verify; the manifest seals 602 artifacts.
+See [the handoff](next_steps.md) for remaining groups. No complete compiler or
+runtime object, startup or self-rebuild is claimed.
+
+The preceding [checked-multiply operand slice](evidence/checked_multiply_operands.md) is
 accepted at `29e034a7`. The full serial run passes all 17 gates and 63 native
 populations, preserving all 62 preceding populations. Debug and ReleaseSafe
 each pass 1,983 units and 23 structural checks; all nine readiness commands,

@@ -4650,6 +4650,19 @@ One line per completed cycle, append-only, newest last. This is the
   and 54 core fault controls pass. Evidence:
   `docs/evidence/checked_multiply_operands_acceptance_20261108.json`.
 
+- 2026-11-08 (narrow integer freeze, `7080d454`)
+  Defined i1 through i32 values alias compatible existing registers and scalar
+  spill slots without an instruction, mask or flag write. All 94 freeze-width
+  first failures advance: 86 select and eight reach later existing limits.
+  Complete compiler selection rises to 7,799/8,928 with no lost successes;
+  runtime remains 284/455. Both production replays and event audits match their
+  censuses. All 17 integration gates and 64 native populations pass, preserving
+  all 63 prior populations, 36 core selected-object/observation records, twelve
+  executed core functions per mode and ratchet 130. Debug/ReleaseSafe each pass
+  1,989 units and 23 structural checks. Readiness, both corpora, five fixed
+  programs and all 54 fault controls pass. Evidence:
+  `docs/evidence/narrow_freeze_acceptance_20261108.json`.
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
@@ -4657,7 +4670,7 @@ Historical discovery tables above retain their original populations and dates.
 
 <!-- accepted-status:start -->
 
-Accepted revision: `29e034a72a83844e1a3fdf856da9ae93e71548c7`; tree: `d8d0d0be6fd864eb355d166008e43cb47011acf6`.
+Accepted revision: `7080d4544ee966079b76270081c6cf10e1d3bd32`; tree: `3d78027ce8914fa6c6ec0601aef593774316a4ec`.
 
 Population: compiler-core candidate prefix (100 rows), selector `real-candidate-selector-v3`.
 Modes: ReleaseFast, ReleaseSafe, ReleaseSmall. Source pin: `1c08b09d1c847f4f02c8216e3b62df323861a437`.

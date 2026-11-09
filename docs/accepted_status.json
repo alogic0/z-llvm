@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "accepted_revision": "29e034a72a83844e1a3fdf856da9ae93e71548c7",
-  "accepted_tree": "d8d0d0be6fd864eb355d166008e43cb47011acf6",
+  "accepted_revision": "7080d4544ee966079b76270081c6cf10e1d3bd32",
+  "accepted_tree": "3d78027ce8914fa6c6ec0601aef593774316a4ec",
   "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
   "candidate_sha256": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
   "modes": [
@@ -17,8 +17,10 @@
   "paired_harnesses_ok": 12,
   "local_fail": 0,
   "compiler_rt_bypass_ratchet": 130,
-  "declaration_revision": "29e034a7",
+  "declaration_revision": "7080d454",
   "evidence": [
+    "docs/evidence/narrow_freeze_acceptance_20261108.json",
+    "docs/evidence/narrow_freeze.md",
     "docs/evidence/checked_multiply_operands_acceptance_20261108.json",
     "docs/evidence/checked_multiply_operands.md",
     "docs/evidence/quoted_symbol_addresses_acceptance_20261108.json",

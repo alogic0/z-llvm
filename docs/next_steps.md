@@ -1,47 +1,42 @@
 # Active direction
 
-The user authorized the [narrow freeze slice](plans/2026-11-08-narrow-freeze.md).
-Implementation and validation are in progress; the accepted checkpoint below
-remains authoritative until its complete validation passes. The 94 classified
-first failures use i1/i3/i8/i10/i16 in EAX, 32-bit scratch registers and scalar
-spill slots. Preserve their existing carriers and validate aliases and consumers.
+The authorized [narrow freeze slice](plans/2026-11-08-narrow-freeze.md) is
+complete and accepted at `7080d454`. No successor slice is active. Compiler
+selection is **7,799/8,928**: 86 additions, preserving all 7,713 preceding
+successes. Runtime remains **284/455**. Both production replays match their
+complete censuses and pass event audits. All 17 integration gates and 64 native
+populations pass, preserving all 63 preceding populations and all 36 stable
+core records. See the [evidence](evidence/narrow_freeze.md) and
+[acceptance record](evidence/narrow_freeze_acceptance_20261108.json).
 
-The [checked-multiply operand slice](plans/2026-11-08-checked-multiply-operands.md)
-is complete and accepted at `29e034a7`. Compiler selection is **7,713/8,928**:
-56 additions, preserving all 7,657 preceding successes. Runtime stays
-**284/455**. Both complete production replays match their censuses and pass
-event audits. The full serial run passes 17 gates and 63 native populations,
-preserving all 62 preceding populations and all 36 stable core records. See the
-[evidence](evidence/checked_multiply_operands.md) and
-[acceptance record](evidence/checked_multiply_operands_acceptance_20261108.json).
+All 94 `composed-block-freeze-width` first failures advance. Their
+i1/i3/i8/i10/i16 values retain existing 32-bit registers or scalar spill slots,
+without a mask that could damage a wider alias. Eight functions reach later
+limits: two immediate-comparison ranges, two FP load pointers, two load widths,
+one integer comparison form and one half-precision operation. The previous
+checked-multiply residuals in `link.Coff.addReloc` and
+`link.Elf2.addGlobalSymbol` now select. Explicit undef/poison literals,
+pointer/FP freezes and incompatible carriers retain their boundaries.
 
-All 59 `composed-block-smulo-i64-rhs` failures advance. Shared scalar transfers
-now materialize their constant operands through the existing register and
-rollback contracts while retaining argument facts. Fifty-six functions select;
-the later rejections are `composed-block-freeze-width` in `link.Coff.addReloc`
-and `link.Elf2.addGlobalSymbol`, and `stage2-phi-dst` in
-`codegen.wasm.CodeGen.airSwitchBr`. The repaired multiply boundary should not be
-repeated. Literal accumulator operands retain their existing boundary.
+Debug and ReleaseSafe each pass 1,989 units and 23 structural checks. The
+ten-function native population passes all modes and both routes with frozen
+Debug and ReleaseFast compilers. Readiness, both input corpora, five fixed
+programs and all 54 core fault controls pass. The suite records 1,983,492 local
+observations against 991,746 references. The manifest seals 602 artifacts.
 
-Debug and ReleaseSafe each pass 1,983 units and 23 structural checks. The new
-eight-function native population passes all modes and both routes with Debug
-and ReleaseFast compilers. All nine readiness commands, both input corpora,
-five fixed programs and 54 core fault controls pass. The suite records
-1,968,132 local observations against 984,066 references.
-
-The remaining classified groups are prioritization evidence for a subsequent
-bounded task. Their concrete definitions should be inspected before choosing
-the next repair. Leading groups include
-133 general-value failures, 123 main allocation failures, 115 unknown call
-arguments, 102 comparisons, 94 freeze-width failures, 90 call-attribute ABI
-failures, 72 load-type failures and 59 immediate-comparison range failures.
+The remaining groups are prioritization evidence for a future authorized
+bounded task. Inspect their concrete definitions before choosing a repair.
+Leading groups include 133 general-value failures, 123 main allocation
+failures, 115 unknown call arguments, 102 comparisons, 90 call-attribute ABI
+failures, 72 load-type failures, 61 immediate-comparison ranges, 56 integer
+comparison forms, 45 indirect PHIs and 42 freeze-type failures.
 General-value observations include 67
 `<16 x i1>` comparisons and thirteen `<2 x ptr>` loads. Allocation observations
 include fp128 slots, `%sort.block.Pull` arrays and large byte arrays. The 115
 unknown call arguments are i32 undef (86), i64 poison (23) and i64 undef (six);
 keep their semantics as a separate decision.
 
-Raw evidence is under `local-state/validations/checked-multiply-20261108/`.
+Raw evidence is under `local-state/validations/narrow-freeze-20261108/`.
 Preserve the twelve-function core cohort, ratchet 130 and every execution
 population. The suite Debug binary matches the frozen Debug binary exactly;
 review wrapper metadata separately from selected objects and observations.
@@ -55,6 +50,12 @@ inputs, accepted evidence, AIR payloads and all thirteen scratch files. Create
 no archives. See the [headroom policy](retention_headroom_policy.md#headroom).
 
 ## Preceding checkpoints
+
+The [checked-multiply checkpoint](evidence/checked_multiply_operands.md) at
+`29e034a7` selected 7,713 compiler and 284 runtime definitions, with 17 gates
+and 63 native populations passing. All 59 unsigned multiply operand failures
+advanced, adding 56 selections. Its narrow-freeze recommendation is completed
+by the current checkpoint above.
 
 The [quoted-symbol checkpoint](evidence/quoted_symbol_addresses.md) at
 `a9e9c0f1` selected 7,657 compiler and 284 runtime definitions, with fresh and
