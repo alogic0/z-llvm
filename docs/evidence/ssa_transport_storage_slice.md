@@ -51,7 +51,10 @@ and Debug SHA-256
   observations and release-pipeline policy. The unit/structural and profile
   commands reuse the results above; `aggregate-check-reuse-after-tools.json`
   verifies unchanged compiler, test, provider and tabular contract inputs after
-  the tooling migration. Thus all nine readiness procedures are covered.
+  the tooling migration. A dependency audit additionally runs the first command's
+  ABI differential separately: all 60 cases match across three modes with the
+  audited reference source/emitter and frozen Debug compiler. Thus all nine
+  readiness procedures, including that dependency, are covered.
 - `full-aggregate.{json,log}`: checked return code zero, all 17 serial integration
   gates pass. `source-aggregate-verified-after-full.log` verifies the frozen
   snapshot afterward. Serial run ID `e948f7a36368e168534ab0e44f3c788e`; the
