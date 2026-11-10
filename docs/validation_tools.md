@@ -29,7 +29,11 @@ remain in this repository.
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
 | Final selection rejection types, attributes and locations | `src/selection_census.zig` |
-| Upstream C program and 76 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
+| Upstream C program and registered native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
+| One native population, optionally with injected failures | `tools/run_native_canary.zig` |
+| Calibrate retained native executables and compare fault reports | `tools/run_native_fault_checks.zig` |
+| Preserve native command outcomes, artifacts and registry entries | `tools/compare_native_runs.zig` |
+| Generate flag-pair, freeze and atomic-storage fixtures | `tools/generate_ssa_transport_canaries.zig` |
 | Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
 | Unchanged Zig tool with runtime document inputs and exact file outputs | `tools/run_real_program.zig` / `zig-input-program` |
 | Fibonacci, four fixed programs and the document-input tool in three modes | `tools/run_distribution_zig_integrated_exe.zig` / `distribution-all` |
@@ -50,6 +54,100 @@ existing proof/manifest paths. Candidate replay retains its explicit output
 replacement behavior. Historical Python helpers in ignored validation evidence
 remain historical records; they are not dependencies of the active workflow.
 No archives were made.
+
+Batch-08 fixture generation, research runs, oracle calibration and comparisons
+also use maintained Zig entry points. The retained `generate-native-pairs.py`,
+`staged-frontier/generate-fixtures.py` and `staged-frontier/generate-drivers.py`
+are replaced by one deterministic generator:
+
+```sh
+zig run tools/generate_ssa_transport_canaries.zig -- \
+  --output-root local-state/validations/generated-ssa-transport
+```
+
+It writes three LLVM fixtures, two C drivers and `functions.json`, with SHA-256
+digests in `generation.json`. It constructs cases from typed width/variant
+inventories and contains its own clobber template; it does not read generated
+fixtures as templates. Optional `--verify-root DIR` checks all six outputs
+against a retained directory. Generated files preserve the previous bytes.
+
+The existing native runner replaces `staged-frontier/run-native-research.py`:
+
+```sh
+zig run tools/run_native_canary.zig -- \
+  --population integer_freeze_values --zllvm /absolute/path/to/z_llvm \
+  --fault-count 5 --output-root local-state/validations/freeze-native
+```
+
+Omitting `--mode` runs ReleaseFast, ReleaseSafe and ReleaseSmall. Each mode
+checks independent LLVM, direct local selection and the accepted optimizer
+pipeline, exact driver stdout and complete composed-owner membership. Optional
+`--fault-count N` then requires every numbered injection to exit 1, write no
+stdout and identify the exact `fault=N` token. It repeats the successful baseline
+first. Timeouts, signals, missing executables and always-failing drivers cannot
+pass calibration. Default runs retain their existing procedure and report fields.
+A private research compiler remains research evidence; using this entry point
+does not grant production acceptance.
+
+`tools/run_native_fault_checks.zig` replaces `check-pair-faults.py` and
+`check-aggregate-faults.py` when binaries already exist. Its input manifest is:
+
+```json
+{
+  "fault_count": 5,
+  "runs": [
+    {
+      "root": "local-state/validations/freeze-native",
+      "population": "integer_freeze_values",
+      "build": "Debug",
+      "modes": ["ReleaseFast", "ReleaseSafe", "ReleaseSmall"]
+    }
+  ]
+}
+```
+
+```sh
+zig run tools/run_native_fault_checks.zig -- \
+  --input-manifest local-state/validations/fault-inputs.json \
+  --output-root local-state/validations/fault-checks
+```
+
+Every input report must have passed. Modes may be omitted to select all three.
+The runner records input/report and executable hashes, baseline observations,
+supervised commands and each injected failure in a separate new output root.
+Optional `--compare-with FILE` compares all control identities, statuses,
+stdout, stderr and executable hashes against a prior detailed report. For old
+single-population reports without population fields, also pass
+`--legacy-population NAME`. Historical `fast`/`debug` labels normalize to
+`ReleaseFast`/`Debug`. Wrapper telemetry with only an exit status and log is not
+a detailed fault report. Keep wrapper output and application reports separate.
+
+`tools/compare_native_runs.zig` replaces `compare-native-pairs.py` and the
+registry-preservation part of `check-pair-faults.py`:
+
+```sh
+zig run tools/compare_native_runs.zig -- \
+  --baseline-root local-state/validations/prior-native \
+  --candidate-root local-state/validations/current-native \
+  --added-populations flag_pair_values,integer_freeze_values,atomic_storage_views \
+  --baseline-registry local-state/validations/prior-registry.json \
+  --output-root local-state/validations/native-comparison
+```
+
+Both runs must pass with identical source hashes, all prior fixture hashes and
+integer observation/control counters. Additional fixtures and commands must
+belong to the explicitly named registry populations. Compiler paths and evidence
+roots normalize for command matching; an occurrence index preserves repeated
+identical command lines. Prior return codes, supervision outcomes, actual
+statuses and timeouts must match, and successful compiler stdout artifacts must
+be byte identical. Any artifact difference fails the comparison and is listed
+for review. Optional registry comparison requires exact retention of every
+prior entry in order and exactly the approved additions. Reports and command
+manifests are hashed into the new comparison report.
+
+Use `jq` and the maintained Zig report tools for inspection, `rg` for searches,
+and patches for source edits. Historical Python files remain immutable evidence;
+new validation commands do not invoke them or inline Python.
 
 The [whole-compiler diagnostic plan](plans/2026-11-07-whole-compiler-diagnostic.md)
 adds an opt-in runner outside the accepted gate inventory. It attempts the

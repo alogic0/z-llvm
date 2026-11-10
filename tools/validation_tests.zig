@@ -2,6 +2,166 @@ const std = @import("std");
 const u = @import("validation/common.zig");
 const Runner = @import("validation/runner.zig").Runner;
 const elf = @import("validation/object_contract.zig");
+const native_faults = @import("validation/native_faults.zig");
+const native_comparison = @import("validation/native_comparison.zig");
+
+test "native fault oracle requires a completed failure, empty stdout and exact numbered marker" {
+    const passed: Runner.Result = .{ .code = 1, .wall_ns = 0, .completed = true };
+    try expect(native_faults.detected(passed, "", "mismatch function=0 fault=1\n", "fault=1"));
+    for ([_][]const u8{ "", "fault=10\n", "notfault=1\n", "fault=1trailing\n", "mismatch fault=2\n" }) |stderr| try expect(!native_faults.detected(passed, "", stderr, "fault=1"));
+    try expect(!native_faults.detected(passed, "unexpected output", "fault=1\n", "fault=1"));
+    for ([_]Runner.Result{
+        .{ .code = 0, .wall_ns = 0, .completed = true },
+        .{ .code = 2, .wall_ns = 0, .completed = true },
+        .{ .code = -11, .wall_ns = 0, .completed = false },
+        .{ .code = 124, .wall_ns = 0, .completed = false },
+        .{ .code = 1, .wall_ns = 0, .completed = false },
+    }) |result| try expect(!native_faults.detected(result, "", "fault=1\n", "fault=1"));
+}
+test "native fault calibration rejects an always-failing executable before accepting any controls" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const input = try f.path("input");
+    try f.c.mkdir(try f.c.join(&.{ input, "ReleaseFast" }));
+    const executable = try f.write("input/ReleaseFast/oracle-reference", "#!/bin/sh\nprintf 'fault=1\\n' >&2\nexit 1\n");
+    _ = try f.c.capture(&.{ "chmod", "+x", executable });
+    var runner = Runner.init(&f.c, f.directory);
+    var report = u.object(f.c.a);
+    const canary = try u.toValue(f.c.a, .{ .population = "oracle", .prefix = "oracle", .stdout = "success\n" });
+    try std.testing.expectError(error.ValidationFailed, native_faults.run(&runner, input, &.{"ReleaseFast"}, canary, "Debug", 5, &report));
+    try std.testing.expectEqual(@as(usize, 0), (try u.json.array(try u.get(report, "records"))).len);
+    try std.testing.expectEqual(@as(usize, 1), runner.commands.array.items.len);
+}
+test "native fault report comparison normalizes old labels and rejects duplicate or altered controls" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    var prior = try u.toValue(f.c.a, .{ .status = "passed", .controls = 1, .records = .{.{
+        .compiler_build = "fast",
+        .mode = "ReleaseSafe",
+        .route = "direct",
+        .fault = 1,
+        .returncode = 1,
+        .stdout = "",
+        .stderr = "mismatch fault=1\n",
+        .executable_sha256 = "same executable",
+    }} });
+    var current = try u.toValue(f.c.a, .{ .controls = 1, .records = .{.{
+        .build = "ReleaseFast",
+        .population = "population",
+        .mode = "ReleaseSafe",
+        .route = "direct",
+        .fault = 1,
+        .returncode = 1,
+        .stdout = "",
+        .stderr = "mismatch fault=1\n",
+        .executable_sha256 = "same executable",
+        .detected = true,
+    }} });
+    try native_faults.compare(&f.c, prior, current, "population");
+    const record = &current.object.getPtr("records").?.array.items[0];
+    try u.put(f.c.a, record, "executable_sha256", u.s("changed executable"));
+    try std.testing.expectError(error.ValidationFailed, native_faults.compare(&f.c, prior, current, "population"));
+    try u.put(f.c.a, record, "executable_sha256", u.s("same executable"));
+    const duplicate = prior.object.getPtr("records").?.array.items[0];
+    try u.add(prior.object.getPtr("records").?, duplicate);
+    try u.put(f.c.a, &prior, "controls", u.n(2));
+    try u.add(current.object.getPtr("records").?, record.*);
+    try u.put(f.c.a, &current, "controls", u.n(2));
+    try std.testing.expectError(error.DuplicateFaultControl, native_faults.compare(&f.c, prior, current, "population"));
+}
+test "native comparison preserves duplicate argv occurrences and rejects changed artifacts and outcomes" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const roots = [_][]const u8{ try f.path("before"), try f.path("after") };
+    for (roots) |root| {
+        try f.c.mkdir(root);
+        try f.c.writeJson(try f.c.join(&.{ root, "report.json" }), .{ .status = "passed", .source_sha256 = "same source", .fixture_sha256 = u.object(f.c.a), .observations = 99 });
+        var commands = u.array(f.c.a);
+        for ([_][]const u8{ "first", "second" }) |name| {
+            const stdout = try f.c.join(&.{ root, name });
+            try f.c.write(stdout, name);
+            try u.add(&commands, try u.toValue(f.c.a, .{
+                .argv = &.{ try f.c.join(&.{ root, "bin/z_llvm" }), "--emit=obj", try f.c.join(&.{ root, "same.ll" }) },
+                .returncode = 0,
+                .actual_returncode = 0,
+                .outcome = "completed",
+                .timeout_ms = 1000,
+                .stdout = stdout,
+            }));
+        }
+        try f.c.writeJson(try f.c.join(&.{ root, "commands.json" }), commands);
+    }
+    var report = u.object(f.c.a);
+    try native_comparison.compare(&f.c, roots[0], roots[1], &.{}, &report);
+    try std.testing.expectEqual(@as(i64, 2), try u.json.integer(try u.get(report, "retained_command_outcomes")));
+    try std.testing.expectEqual(@as(i64, 2), try u.json.integer(try u.get(try u.get(report, "byte_identical_prior_artifacts"), "--emit=obj")));
+    const second = try f.c.join(&.{ roots[1], "second" });
+    try f.c.write(second, "corrupted second occurrence");
+    try std.testing.expectError(error.NativeArtifactsRequireReview, native_comparison.compare(&f.c, roots[0], roots[1], &.{}, &report));
+    try f.c.write(second, "second");
+    const path = try f.c.join(&.{ roots[1], "commands.json" });
+    var commands = try f.c.load(path);
+    try u.put(f.c.a, &commands.array.items[1], "actual_returncode", u.n(1));
+    try f.c.writeJson(path, commands);
+    try std.testing.expectError(error.ValidationFailed, native_comparison.compare(&f.c, roots[0], roots[1], &.{}, &report));
+    try u.put(f.c.a, &commands.array.items[1], "actual_returncode", u.n(0));
+    _ = commands.array.pop();
+    try f.c.writeJson(path, commands);
+    try std.testing.expectError(error.ValidationFailed, native_comparison.compare(&f.c, roots[0], roots[1], &.{}, &report));
+}
+test "native comparison rejects changed prior counts, fixtures and unrelated new commands" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const before = try f.path("before");
+    const after = try f.path("after");
+    for ([_][]const u8{ before, after }) |root| {
+        try f.c.mkdir(root);
+        try f.c.writeJson(try f.c.join(&.{ root, "commands.json" }), [_]u.Value{});
+        try f.c.writeJson(try f.c.join(&.{ root, "report.json" }), .{ .status = "passed", .source_sha256 = "same", .fixture_sha256 = .{ .old = "old bytes" }, .observations = 99 });
+    }
+    const path = try f.c.join(&.{ after, "report.json" });
+    var changed = try f.c.load(path);
+    var report = u.object(f.c.a);
+    try u.put(f.c.a, &changed, "observations", u.n(100));
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.ValidationFailed, native_comparison.compare(&f.c, before, after, &.{}, &report));
+    try u.put(f.c.a, &changed, "observations", u.n(99));
+    try u.put(f.c.a, changed.object.getPtr("fixture_sha256").?, "old", u.s("changed bytes"));
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.PriorFixtureChanged, native_comparison.compare(&f.c, before, after, &.{}, &report));
+    try u.put(f.c.a, changed.object.getPtr("fixture_sha256").?, "old", u.s("old bytes"));
+    try u.put(f.c.a, changed.object.getPtr("fixture_sha256").?, "extra.ll", u.s("new bytes"));
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.UnexpectedNativeFixture, native_comparison.compare(&f.c, before, after, &.{}, &report));
+    try u.put(f.c.a, &changed, "fixture_sha256", u.array(f.c.a));
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.ExpectedFixtureObject, native_comparison.compare(&f.c, before, after, &.{}, &report));
+    try u.put(f.c.a, &changed, "fixture_sha256", try u.toValue(f.c.a, .{ .old = "old bytes", .@"extra.ll" = "new bytes" }));
+    _ = changed.object.getPtr("fixture_sha256").?.object.orderedRemove("extra.ll");
+    try f.c.writeJson(path, changed);
+    try f.c.writeJson(try f.c.join(&.{ after, "commands.json" }), .{.{ .argv = .{ "/bin/true", "unrelated" } }});
+    try std.testing.expectError(error.ValidationFailed, native_comparison.compare(&f.c, before, after, &.{}, &report));
+}
+test "registry preservation rejects changed or missing prior entries and unapproved additions" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const old = try u.toValue(f.c.a, .{ .schema = 1, .canaries = .{.{ .population = "prior", .observations = 99 }} });
+    const addition = try u.toValue(f.c.a, .{ .population = "added", .observations = 17 });
+    var current = try u.toValue(f.c.a, .{ .schema = 1, .canaries = .{ .{ .population = "prior", .observations = 99 }, .{ .population = "added", .observations = 17 } } });
+    _ = try native_comparison.registry(&f.c, old, current, &.{addition});
+    try std.testing.expectError(error.NativeRegistryCountDiffers, native_comparison.registry(&f.c, old, current, &.{}));
+    const entries = current.object.getPtr("canaries").?.array.items;
+    try u.put(f.c.a, &entries[0], "observations", u.n(98));
+    try std.testing.expectError(error.PriorRegistryEntryChanged, native_comparison.registry(&f.c, old, current, &.{addition}));
+    try u.put(f.c.a, &entries[0], "observations", u.n(99));
+    try u.put(f.c.a, &entries[1], "observations", u.n(18));
+    try std.testing.expectError(error.RegistryAdditionChanged, native_comparison.registry(&f.c, old, current, &.{addition}));
+}
 
 const candidates = @import("validation/candidates.zig");
 const facts = candidates.facts;

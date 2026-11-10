@@ -4,12 +4,15 @@ const std = @import("std");
 const u = @import("validation/common.zig");
 const canaries = @import("validation/native_canaries.zig");
 const Runner = @import("validation/runner.zig").Runner;
+const faults = @import("validation/native_faults.zig");
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
     u.installSignals();
     const argv = try init.minimal.args.toSlice(c.a);
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "population", "zllvm", "mode" }, &.{});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "population", "zllvm", "mode", "fault-count" }, &.{});
+    const fault_count = if (args.get("fault-count")) |text| try std.fmt.parseInt(u16, text, 10) else 0;
+    if (args.get("fault-count") != null and (fault_count == 0 or fault_count > 1000)) return error.InvalidFaultCount;
     const population = try args.require("population");
     const registry = try canaries.load(&c);
     const canary = for (registry) |entry| {
@@ -39,6 +42,18 @@ pub fn main(init: std.process.Init) !void {
             try u.put(c.a, &report, "error", u.s(c.diagnostic orelse @errorName(err)));
             break;
         };
+    }
+    if (passed and fault_count != 0) {
+        const directory = try c.newOutput(try c.join(&.{ output, "fault-checks" }));
+        var fault_runner = Runner.init(&c, directory);
+        var fault_report = u.object(c.a);
+        faults.run(&fault_runner, output, modes, canary, "selected", fault_count, &fault_report) catch |err| {
+            passed = false;
+            try u.put(c.a, &fault_report, "error", u.s(c.diagnostic orelse @errorName(err)));
+        };
+        try u.put(c.a, &fault_report, "status", u.s(if (passed) "passed" else "failed"));
+        try c.writeJson(try c.join(&.{ directory, "report.json" }), fault_report);
+        try u.put(c.a, &report, "fault_checks", fault_report);
     }
     try u.put(c.a, &report, "status", u.s(if (passed) "passed" else "failed"));
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
