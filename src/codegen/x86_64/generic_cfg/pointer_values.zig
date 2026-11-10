@@ -13,17 +13,21 @@ fn constant(value: ir.Value) bool {
     return addresses.fromValue(value) != null or addresses.pointerBits(value) != null;
 }
 
+fn appendSymbolAddress(allocator: std.mem.Allocator, block: *ir.BasicBlock, name: []const u8, address: addresses.Address) !void {
+    var indices: std.ArrayList(ir.GepIndex) = .empty;
+    try indices.append(allocator, .{ .ty = word, .value = .{ .int = address.addend } });
+    try block.instructions.append(allocator, .{ .result = name, .kind = .{ .gep = .{
+        .source_ty = .{ .int = 8 },
+        .ptr = .{ .named = try std.fmt.allocPrint(allocator, "@{s}", .{address.symbol}) },
+        .indices = indices,
+    } } });
+}
+
 fn materialize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, value: ir.Value) !ir.Value {
     if (!constant(value)) return value;
     const name = try forms.temporary(allocator, function, serial);
     if (addresses.fromValue(value)) |address| {
-        var indices: std.ArrayList(ir.GepIndex) = .empty;
-        try indices.append(allocator, .{ .ty = word, .value = .{ .int = address.addend } });
-        try block.instructions.append(allocator, .{ .result = name, .kind = .{ .gep = .{
-            .source_ty = .{ .int = 8 },
-            .ptr = .{ .named = try std.fmt.allocPrint(allocator, "@{s}", .{address.symbol}) },
-            .indices = indices,
-        } } });
+        try appendSymbolAddress(allocator, block, name, address);
     } else {
         const integer = try forms.temporary(allocator, function, serial);
         try block.instructions.append(allocator, .{ .result = integer, .kind = .{ .binary = .{
@@ -40,6 +44,20 @@ fn materialize(allocator: std.mem.Allocator, function: ir.Function, block: *ir.B
         } } });
     }
     return .{ .named = name };
+}
+
+fn materializeIntegerAddress(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, value: ir.Value) !ir.Value {
+    const address = addresses.fromIntegerValue(ty, value) orelse return value;
+    const pointer = try forms.temporary(allocator, function, serial);
+    try appendSymbolAddress(allocator, block, pointer, address);
+    const integer = try forms.temporary(allocator, function, serial);
+    try block.instructions.append(allocator, .{ .result = integer, .kind = .{ .cast = .{
+        .op = .ptrtoint,
+        .from_ty = .ptr,
+        .value = .{ .named = pointer },
+        .to_ty = word,
+    } } });
+    return .{ .named = integer };
 }
 
 fn tableGep(allocator: std.mem.Allocator, context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) !bool {
@@ -69,6 +87,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
             var copy = inst;
             const before = block.instructions.items.len;
             if (!inst.removed) switch (inst.kind) {
+                .binary => |binary| {
+                    copy.kind.binary.lhs = try materializeIntegerAddress(allocator, function, &block, &serial, binary.ty, binary.lhs);
+                    copy.kind.binary.rhs = try materializeIntegerAddress(allocator, function, &block, &serial, binary.ty, binary.rhs);
+                },
                 .cast => |cast| if (cast.op == .ptrtoint and cast.from_ty == .ptr and cast.to_ty.eql(word) and !cast.flags.any()) {
                     copy.kind.cast.value = try materialize(allocator, function, &block, &serial, cast.value);
                 } else if (cast.from_ty.eql(word) and !cast.flags.any() and cast.value == .int and

@@ -154,7 +154,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         const layout = slotLayout(context, alloca.allocated_ty) orelse continue;
         const usage = uses.get(inst.result.?) orelse continue;
         if (!usage.scalar) continue;
-        if (!usage.bounded) return null;
+        // Leave this object's allocation and uses intact; independent eligible
+        // allocations can still receive their ordinary pointer-valued views.
+        if (!usage.bounded) continue;
         if (!alloca.isSingleObject() or alloca.allocated_ty_addrspace != null) return null;
         var alignment = layout.alignment;
         if (alloca.attrs) |attrs| {

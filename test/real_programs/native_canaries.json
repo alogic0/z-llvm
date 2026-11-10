@@ -2243,6 +2243,42 @@
       ],
       "observations": 9480,
       "stdout": "stack-object-addresses observations=9480 copies=offsets=phis=loops=overlap=calls=guards=preserved\n"
+    },
+    {
+      "population": "stack_address_eligibility",
+      "prefix": "stack-address-eligibility",
+      "fixture": "stack_address_eligibility",
+      "functions": [
+        "eligibility_i8_false",
+        "eligibility_i8_true",
+        "eligibility_i16_false",
+        "eligibility_i16_true",
+        "eligibility_i32_false",
+        "eligibility_i32_true",
+        "eligibility_i64_false",
+        "eligibility_i64_true",
+        "eligibility_i128_false",
+        "eligibility_i128_true",
+        "eligibility_array16_false",
+        "eligibility_array16_true"
+      ],
+      "observations": 3780,
+      "stdout": "stack-address-eligibility observations=3780 choices=copies=live=guards=preserved\n"
+    },
+    {
+      "population": "integer_symbolic_operands",
+      "prefix": "integer-symbolic-operands",
+      "fixture": "integer_symbolic_operands",
+      "functions": [
+        "symbolic_word_lhs",
+        "symbolic_word_rhs",
+        "symbolic_word_offset",
+        "symbolic_word_quoted",
+        "symbolic_word_both",
+        "symbolic_word_pressure"
+      ],
+      "observations": 384,
+      "stdout": "integer-symbolic-operands observations=384 lhs=rhs=offsets=quoted=pressure=preserved\n"
     }
   ]
 }

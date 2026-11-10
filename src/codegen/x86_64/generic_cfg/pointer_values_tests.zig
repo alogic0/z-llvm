@@ -24,6 +24,84 @@ const pointer_values = @import("pointer_values.zig");
 const pair_values = @import("word_pair_values.zig");
 const Pair = extern struct { first: u64, second: u64 };
 
+test "integer symbolic operands retain source identities and closed layout boundaries" {
+    const text =
+        \\@table = internal global [64 x i8] zeroinitializer, align 16
+        \\define i64 @choose(i64 %__zllvm_scalar_form_0) {
+        \\entry:
+        \\ %left = sub i64 ptrtoint (ptr getelementptr (i8, ptr @table, i64 17) to i64), %__zllvm_scalar_form_0
+        \\ %right = sub i64 %left, ptrtoint (ptr @table to i64)
+        \\ ret i64 %right
+        \\}
+        \\define i32 @narrow() {
+        \\entry:
+        \\ %result = sub i32 ptrtoint (ptr @table to i32), 1
+        \\ ret i32 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const original = module.functions.items[0];
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = &.{}, .target_datalayout = module.target_datalayout };
+    const view = (try pointer_values.legalize(arena.allocator(), original, &context)) orelse return error.TestExpectedRewrite;
+    try std.testing.expect(try pointer_values.legalize(arena.allocator(), view, &context) == null);
+    try std.testing.expect(try pointer_values.legalize(arena.allocator(), module.functions.items[1], &context) == null);
+    try std.testing.expectEqual(@as(usize, 2), original.blocks.items[0].instructions.items.len);
+    try std.testing.expect(original.blocks.items[0].instructions.items[0].kind.binary.lhs == .constant_expr);
+    try std.testing.expect(original.blocks.items[0].instructions.items[1].kind.binary.rhs == .constant_expr);
+    {
+        module.functions.items[0] = view;
+        defer module.functions.items[0] = original;
+        try module.verify();
+    }
+    for ([_][]const u8{ "E-p:64:64", "e-p:32:32", "e-ni:0", "e-p:64:64:64:32" }) |layout| {
+        context.target_datalayout = layout;
+        try std.testing.expect(try pointer_values.legalize(arena.allocator(), original, &context) == null);
+    }
+    try module.verify();
+}
+
+test "pointer frontier keeps independent frame address selection beside a dynamic copy" {
+    const text =
+        \\declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+        \\define i64 @choose(ptr %external, i64 %value, i1 %take_local, i64 %length, i64 %seed) {
+        \\entry:
+        \\ %slot = alloca i32, align 4
+        \\ %other = alloca [3 x i32], align 4
+        \\ %small = trunc i64 %value to i32
+        \\ store i32 %small, ptr %slot, align 4
+        \\ store i32 %small, ptr %other, align 4
+        \\ call void @llvm.memcpy.p0.p0.i64(ptr %external, ptr %other, i64 %length, i1 false)
+        \\ %p = select i1 %take_local, ptr %slot, ptr %external
+        \\ %read = load i32, ptr %p, align 4
+        \\ %wide = zext i32 %read to i64
+        \\ %r = xor i64 %wide, %seed
+        \\ ret i64 %r
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (*u32, u64, bool, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    for ([_]u64{ 0, 0x0123456789abcdef, std.math.maxInt(u64) }) |value| {
+        const small: u32 = @truncate(value);
+        const seed: u64 = 0xa55aa55a12345678;
+        for (0..5) |length| for ([_]bool{ false, true }) |take_local| {
+            var external = [_]u32{ 0x19283746, small ^ 0x80000001, 0xabcdef12 };
+            var expected = external;
+            @memcpy(std.mem.asBytes(&expected[1])[0..length], std.mem.asBytes(&small)[0..length]);
+            const result = run(&external[1], value, take_local, length, seed);
+            try std.testing.expectEqual(@as(u64, if (take_local) small else expected[1]) ^ seed, result);
+            try std.testing.expectEqualSlices(u32, &expected, &external);
+        };
+    }
+}
+
 test "pointer flow returns two word PHIs with all integer pointer field combinations" {
     for ([_][2][]const u8{ .{ "ptr", "i64" }, .{ "i64", "ptr" }, .{ "ptr", "ptr" }, .{ "i64", "i64" } }) |types| {
         const ty = try std.fmt.allocPrint(std.testing.allocator, "{{ {s}, {s} }}", .{ types[0], types[1] });
@@ -119,12 +197,9 @@ test "pointer flow rejects incompatible pointer layouts and flagged casts" {
 
 test "pointer flow boolean truncations branch on bit zero and preserve live input bits" {
     for ([_]u16{ 8, 16, 32, 64, 128 }) |bits| {
-        const conversion = if (bits == 64) try std.testing.allocator.dupe(u8, "") else
-            try std.fmt.allocPrint(std.testing.allocator, "  %source = {s} i64 %input to i{d}\n", .{ if (bits < 64) "trunc" else "zext", bits });
+        const conversion = if (bits == 64) try std.testing.allocator.dupe(u8, "") else try std.fmt.allocPrint(std.testing.allocator, "  %source = {s} i64 %input to i{d}\n", .{ if (bits < 64) "trunc" else "zext", bits });
         defer std.testing.allocator.free(conversion);
-        const text = try std.fmt.allocPrint(std.testing.allocator,
-            "define i64 @choose(i64 %input, i64 %live) {{\nentry:\n{s}  %condition = trunc i{d} {s} to i1\n  br i1 %condition, label %yes, label %no\nyes:\n  ret i64 %input\nno:\n  ret i64 %live\n}}\n",
-            .{ conversion, bits, if (bits == 64) "%input" else "%source" });
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @choose(i64 %input, i64 %live) {{\nentry:\n{s}  %condition = trunc i{d} {s} to i1\n  br i1 %condition, label %yes, label %no\nyes:\n  ret i64 %input\nno:\n  ret i64 %live\n}}\n", .{ conversion, bits, if (bits == 64) "%input" else "%source" });
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
@@ -144,8 +219,7 @@ test "pointer flow boolean truncations branch on bit zero and preserve live inpu
 
 test "pointer flow byte boolean loads ignore dirty upper bits and reject volatile access" {
     for ([_][]const u8{ "", "volatile " }) |qualifier| {
-        const text = try std.fmt.allocPrint(std.testing.allocator,
-            "define i64 @choose(ptr %p, i64 %live) {{\nentry:\n  %condition = load {s}i1, ptr %p, align 1\n  %r = select i1 %condition, i64 %live, i64 42\n  ret i64 %r\n}}\n", .{qualifier});
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @choose(ptr %p, i64 %live) {{\nentry:\n  %condition = load {s}i1, ptr %p, align 1\n  %r = select i1 %condition, i64 %live, i64 42\n  ret i64 %r\n}}\n", .{qualifier});
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
@@ -176,8 +250,7 @@ test "pointer flow byte boolean loads ignore dirty upper bits and reject volatil
 
 test "pointer flow constant boolean truncations preserve only their low bit" {
     for ([_]i64{ 0, 1, 2, 3, -1, -2, std.math.minInt(i64) }) |input| {
-        const text = try std.fmt.allocPrint(std.testing.allocator,
-            "define i64 @choose() {{\nentry:\n  %condition = trunc i64 {d} to i1\n  %r = select i1 %condition, i64 7, i64 42\n  ret i64 %r\n}}\n", .{input});
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @choose() {{\nentry:\n  %condition = trunc i64 {d} to i1\n  %r = select i1 %condition, i64 7, i64 42\n  ret i64 %r\n}}\n", .{input});
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
