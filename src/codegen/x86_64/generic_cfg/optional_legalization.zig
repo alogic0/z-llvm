@@ -7,6 +7,8 @@ const profiling = @import("../../../compilation_profile.zig");
 
 pub const Stage = enum {
     @"aligned_stack.zig.legalize",
+    @"binary128_arithmetic.zig.legalize",
+    @"floating_payloads.zig.legalize",
     @"integer_vectors.zig.legalize",
     @"integer_memory.zig.legalize",
     @"pair_memory.zig.legalize",
@@ -68,6 +70,8 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
     const measured = attempt.allocator();
     const candidate = try switch (stage) {
         .@"aligned_stack.zig.legalize" => @import("aligned_stack.zig").legalize(measured, function, context),
+        .@"binary128_arithmetic.zig.legalize" => @import("binary128_arithmetic.zig").legalize(measured, function),
+        .@"floating_payloads.zig.legalize" => @import("floating_payloads.zig").legalize(measured, function, context),
         .@"integer_vectors.zig.legalize" => @import("integer_vectors.zig").legalize(measured, function, context),
         .@"integer_memory.zig.legalize" => @import("integer_memory.zig").legalize(measured, function, context),
         .@"pair_memory.zig.legalize" => @import("pair_memory.zig").legalize(measured, function, context),

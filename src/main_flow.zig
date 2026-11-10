@@ -268,6 +268,7 @@ pub fn main(init: std.process.Init) !void {
                 // Prepared typed adapters use mandatory normalization and
                 // compositional selection, including optimized instruction forms.
                 .generic_cfg_selector = true,
+                .resolve_direct_definitions = true,
                 .codegen_reachable = codegen_reachable,
                 .profile = profile,
                 .owner_output = owner_path,
@@ -303,6 +304,7 @@ pub fn main(init: std.process.Init) !void {
                 .quiet = quiet,
                 .report_all_failures = report_all_codegen_failures,
                 .generic_cfg_selector = true,
+                .resolve_direct_definitions = true,
                 .codegen_reachable = codegen_reachable,
                 .profile = profile,
                 .owner_output = owner_path,

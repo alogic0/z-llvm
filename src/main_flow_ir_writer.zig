@@ -93,6 +93,9 @@ pub const CodegenEmitOptions = struct {
     report_all_failures: bool = false,
     generic_cfg_selector: bool = false,
     codegen_reachable: bool = false,
+    // Structured modules provide their own direct helper definitions. Imported
+    // Zig IR retains the existing external runtime/linker boundary policy.
+    resolve_direct_definitions: bool = false,
 };
 
 pub fn fatal(io: std.Io, comptime fmt: []const u8, args: anytype) noreturn {
@@ -511,9 +514,15 @@ pub fn emitCodegenModule(
         .functions = module.functions.items,
         .declarations = module.declarations.items,
     };
-    for (module.functions.items) |function| {
+    var required = try @import("codegen/x86_64/direct_callees.zig").Queue.init(allocator, module.functions.items);
+    defer required.deinit();
+    for (module.functions.items, 0..) |function, index| {
         const selected = if (reachable) |selection| selection.contains(.function, function.name) else shouldLowerCodegenFunction(module, function);
-        if (!selected) continue;
+        if (selected) try required.include(index);
+    }
+    var next_function: usize = 0;
+    while (next_function < required.items.items.len) : (next_function += 1) {
+        const function = module.functions.items[required.items.items[next_function]];
         if (options.codegen_reachable) switch (function.linkage) {
             .default, .external, .internal, .private => {},
             else => return error.UnsupportedFunctionLinkage,
@@ -575,6 +584,8 @@ pub fn emitCodegenModule(
             machine.symbol_linkage = function.linkage;
             machine.symbol_visibility = function.visibility;
         }
+        if (options.resolve_direct_definitions and reachable == null)
+            try required.includeCallees(machine.instructions.items);
         try machines.append(allocator, machine);
     }
     var stdout_buffer: [4096]u8 = undefined;

@@ -1,6 +1,7 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/direct_callees.zig");
     _ = @import("codegen/x86_64/generic_cfg/integer_intrinsics_frontier_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_accumulator_transaction_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_frame_tests.zig");
@@ -61,6 +62,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/indirect_stack_calls_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/stack_arguments.zig");
     _ = @import("codegen/x86_64/generic_cfg/integer_stack_abi_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/floating_payloads_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/general_stride_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/rax_load_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/constant_remainder_tests.zig");

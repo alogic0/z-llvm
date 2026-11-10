@@ -537,7 +537,7 @@ pub fn entryXmmDefinedBits(function: ir.Function) [8]u16 {
     var result: [8]u16 = @splat(0);
     var xmm_index: usize = 0;
     for (function.params.items) |param| {
-        if (isVector128AbiType(param.ty)) {
+        if (param.ty == .fp128 or isVector128AbiType(param.ty)) {
             if (xmm_index < result.len) result[xmm_index] = 128;
             xmm_index += 1;
             continue;

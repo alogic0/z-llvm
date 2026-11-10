@@ -1595,11 +1595,11 @@ fn integratedNeedsDefaultPanicStub(case: Case) bool {
 fn writeIntegratedIntegerOverflowStub(io: std.Io, path: []const u8) !void {
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data =
         \\.text
-        \\.globl "debug.FullPanic((function 'defaultPanic')).integerOverflow"
+        \\.weak "debug.FullPanic((function 'defaultPanic')).integerOverflow"
         \\.type "debug.FullPanic((function 'defaultPanic')).integerOverflow", @function
         \\"debug.FullPanic((function 'defaultPanic')).integerOverflow":
         \\    ud2
-        \\.globl "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds"
+        \\.weak "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds"
         \\.type "debug.FullPanic((function 'defaultPanic')).integerOutOfBounds", @function
         \\"debug.FullPanic((function 'defaultPanic')).integerOutOfBounds":
         \\    ud2
@@ -1610,7 +1610,7 @@ fn writeIntegratedIntegerOverflowStub(io: std.Io, path: []const u8) !void {
 fn writeIntegratedDefaultPanicStub(io: std.Io, path: []const u8) !void {
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data =
         \\.text
-        \\.globl debug.defaultPanic
+        \\.weak debug.defaultPanic
         \\.type debug.defaultPanic, @function
         \\debug.defaultPanic:
         \\    ud2
