@@ -321,6 +321,9 @@ pub const IcmpPredicate = enum {
 };
 
 pub const Param = struct {
+    /// Private integer carrier: retain the non-i128 source ABI's separate words.
+    /// Parsing never sets this field; it is not an LLVM attribute.
+    abi_split_integer: bool = false,
     ty: Type,
     attrs: ?[]const u8 = null,
     name: []const u8,
@@ -756,6 +759,8 @@ pub const GepInst = struct {
 };
 
 pub const CallArg = struct {
+    /// Set only by private integer-carrier legalization, like Param's field.
+    abi_split_integer: bool = false,
     ty: Type,
     attrs: ?[]const u8 = null,
     value: Value,

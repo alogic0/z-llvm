@@ -418,6 +418,54 @@ test "value-use pair-low scalar cast preserves existing pair low-limb streams" {
     );
 }
 
+test "value-use pair-low scalar cast preserves current operands and restores pressure spills" {
+    for ([_]?Transaction.ScalarCastTestFailure{ null, .after_pair_staging, .after_result_definition }) |failure| {
+        var machine = MachineFunction.init("pair-low-pressure", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addLive(&plan, "source");
+        const names = [_][]const u8{ "a", "b", "c", "d", "e", "f", "alias" };
+        for (names) |name| try addAtCurrent(&plan, name);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.stack_frame_bytes = 256;
+        selector.next_spill_slot = 2;
+        selector_state.beginPhysicalBindingFacts(&selector);
+        try selector_state.bindValueLoc(&selector, "source", .{ .spill128 = .{ .lo = .slot0, .hi = .slot1 } });
+        for (names, 0..) |name, i| try selector_state.bindValueLoc(&selector, name, .{ .arg64 = selector_types.selector_allocatable_regs[i % 6] });
+        const before_facts = selector.physical_binding_facts;
+        const before_virtual = selector.next_virtual_reg;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const source = try registerPairLowCast(&transaction, "result", 64);
+        try transaction.seal();
+        try transaction.prepare();
+        try transaction.materializeAll();
+        if (failure) |boundary| {
+            try transaction.setScalarCastTestFailure(boundary);
+            try std.testing.expectError(error.ValueUseScalarCastTestFailure, transaction.executePreparedAction(try transaction.preparedView(source)));
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+            try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+            try std.testing.expectEqual(@as(usize, 2), selector.next_spill_slot);
+            try std.testing.expectEqual(before_virtual, selector.next_virtual_reg);
+            try std.testing.expectEqualDeep(before_facts, selector.physical_binding_facts);
+            for (names, 0..) |name, i| try std.testing.expectEqual(ValueLoc{ .arg64 = selector_types.selector_allocatable_regs[i % 6] }, selector.values.get(name).?.loc);
+            try std.testing.expect(selector.values.get("result") == null);
+        } else {
+            try transaction.executePreparedAction(try transaction.preparedView(source));
+            try transaction.commit();
+            try std.testing.expect(selector.values.get("a").?.loc == .spill64);
+            try std.testing.expect(selector.values.get("alias").?.loc == .spill64);
+            try std.testing.expectEqual(ValueLoc{ .scratch64 = .rdi }, selector.values.get("result").?.loc);
+            for (names[1..6], 1..) |name, i| try std.testing.expectEqual(ValueLoc{ .arg64 = selector_types.selector_allocatable_regs[i] }, selector.values.get(name).?.loc);
+        }
+        try std.testing.expect(!selector.preserve_current_position_values);
+    }
+}
+
 test "value-use accumulator scalar cast reproduces ordinary exact-EI and i52 streams" {
     try executeAccumulatorCase(
         .{ .named = "source" },

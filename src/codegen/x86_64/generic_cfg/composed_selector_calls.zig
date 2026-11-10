@@ -184,25 +184,66 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         if (try selector_state.preserveVariadicArgumentSources(selector, call)) |diagnostic| return diagnostic;
     }
     if (try selector_state.preserveCallArgumentSources(selector, call)) |diagnostic| return diagnostic;
-    const stack_count = stack_arguments.callCount(call) orelse 0;
-    var stack_sources: [stack_arguments.max_arguments - 6]FrameIndex = undefined;
+    const integer_layout = stack_arguments.callLayout(call);
+    const stack_count = if (integer_layout) |layout| layout.stack_words else 0;
+    var stack_sources: [stack_arguments.max_stack_words]?FrameIndex = @splat(null);
     if (stack_count != 0) {
-        for (call.args.items[6..], 0..) |arg, index| {
-            if (try lowerDirectCallArg(selector, arg, .rdi)) |diagnostic| return diagnostic;
-            // NUL cannot be an unquoted IR identifier. The state authority
-            // owns a copy of this private slot key and reuses it across calls.
-            var key_buffer: [40]u8 = undefined;
-            const key = try std.fmt.bufPrint(&key_buffer, "\x00outgoing.{d}", .{index});
-            const frame = selector_state.allocateSpillSlot(selector, key) orelse return .{ .no_spill_envelope = "composed-block-call-stack-slots" };
-            stack_sources[index] = frame;
-            try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame, .reg = .rdi } });
+        for (call.args.items, 0..) |arg, argument_index| {
+            const first_word = switch (integer_layout.?.locations[argument_index]) {
+                .stack => |word| word,
+                .split => |split| split.stack,
+                .register, .pair => continue,
+            };
+            const split = integer_layout.?.locations[argument_index] == .split;
+            const pair = arg.ty.eql(.{ .int = 128 });
+            const constant_pair = pair and arg.value == .int;
+            if (!constant_pair) if (try lowerDirectCallArg(selector, arg, .rdi)) |diagnostic| return diagnostic;
+            for (0..if (pair) @as(usize, 2) else 1) |word| {
+                if (split and word == 0) continue;
+                var source: ArgReg = if (pair and word == 1) .rsi else .rdi;
+                if (constant_pair) {
+                    const raw: u128 = @bitCast(arg.value.int);
+                    const part: u64 = @truncate(raw >> @as(u7, @intCast(word * 64)));
+                    if (try lowerDirectCallArg(selector, .{ .ty = .{ .int = 64 }, .value = .{ .int = @as(i64, @bitCast(part)) } }, .rdi)) |diagnostic| return diagnostic;
+                    source = .rdi;
+                }
+                // The private slot's physical word offset also accounts for
+                // alignment holes. The state authority owns its retained key.
+                var key_buffer: [40]u8 = undefined;
+                const stack_word = first_word + word - @intFromBool(split);
+                const key = try std.fmt.bufPrint(&key_buffer, "\x00outgoing.{d}", .{stack_word});
+                const frame = selector_state.allocateSpillSlot(selector, key) orelse return .{ .no_spill_envelope = "composed-block-call-stack-slots" };
+                stack_sources[stack_word] = frame;
+                try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame, .reg = source } });
+            }
         }
     }
-    for (call.args.items[0..if (stack_count != 0) 6 else call.args.items.len]) |arg| {
-        const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
-        if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
-        abi_index += callArgRegisterCount(arg.ty) orelse return .{ .no_emitter = "composed-block-call-arg-type" };
-        if (abi_index > 6) return .{ .unsupported_value = "composed-block-call-arg-count" };
+    if (integer_layout) |layout| {
+        for (call.args.items, 0..) |arg, index| {
+            const register = switch (layout.locations[index]) {
+                .register, .pair => |reg| reg,
+                .stack => continue,
+                .split => |split| {
+                    const target = ArgReg.fromIndex(split.register) catch unreachable;
+                    if (!arg.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-call-arg-width" };
+                    if (arg.value == .int) {
+                        const low: u64 = @truncate(@as(u128, @bitCast(arg.value.int)));
+                        if (try lowerDirectCallArg(selector, .{ .ty = .{ .int = 64 }, .value = .{ .int = @as(i64, @bitCast(low)) } }, target)) |diagnostic| return diagnostic;
+                    } else try selector_state.emitPairLowLaneIntoScratch(selector, arg.value, target);
+                    continue;
+                },
+            };
+            const target = ArgReg.fromIndex(register) catch unreachable;
+            if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
+        }
+    } else {
+        // Preserve the existing unsupported-type and indirect-envelope paths.
+        for (call.args.items) |arg| {
+            const target = ArgReg.fromIndex(abi_index) catch return .{ .unsupported_value = "composed-block-call-arg-reg" };
+            if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic;
+            abi_index += callArgRegisterCount(arg.ty) orelse return .{ .no_emitter = "composed-block-call-arg-type" };
+            if (abi_index > 6) return .{ .unsupported_value = "composed-block-call-arg-count" };
+        }
     }
     if (transaction) |*active| try active.finishCallPreparationAfterArguments();
 
@@ -218,9 +259,13 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         var index = stack_count;
         while (index != 0) {
             index -= 1;
-            const displacement = std.math.add(u32, try stack_sources[index].byteOffset(), pushed_bytes) catch
-                return .{ .no_spill_envelope = "composed-block-call-stack-offset" };
-            try selector.machine.instructions.append(selector.allocator, .{ .push_stack_disp32 = displacement });
+            if (stack_sources[index]) |source| {
+                const displacement = std.math.add(u32, try source.byteOffset(), pushed_bytes) catch
+                    return .{ .no_spill_envelope = "composed-block-call-stack-offset" };
+                try selector.machine.instructions.append(selector.allocator, .{ .push_stack_disp32 = displacement });
+            } else {
+                try selector_frame.appendSubRsp(selector, 8);
+            }
             pushed_bytes += 8;
         }
     }

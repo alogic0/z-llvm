@@ -146,7 +146,7 @@ pub fn tryLowerComposedCfgObserved(
     defer composed.deinit();
     defer dependency_domain.* = composed.address_dependencies;
 
-    if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try bindPhysicalParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindPhiResults(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try prepareObservedStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
@@ -195,6 +195,27 @@ pub fn tryLowerComposedCfgObserved(
 }
 
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
+
+fn bindPhysicalParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+    const layout = stack_arguments.parameters(function) orelse return bindParams(selector, function);
+    if (layout.stack_words == 0) return bindParams(selector, function);
+    var registers: [stack_arguments.max_arguments]ir.Param = undefined;
+    var count: usize = 0;
+    for (function.params.items, 0..) |param, index| {
+        try sysv_abi.rejectUnsupportedCallArgAttrs(.{ .ty = param.ty, .attrs = param.attrs, .value = .{ .named = param.name } });
+        switch (layout.locations[index]) {
+            .register, .pair => {
+                registers[count] = param;
+                count += 1;
+            },
+            .stack => {},
+            .split => if (!param.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-param-width" },
+        }
+    }
+    var register_view = function;
+    register_view.params = .fromOwnedSlice(registers[0..count]);
+    return bindParams(selector, register_view);
+}
 
 fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
     if (stack_arguments.hasParameters(function)) for (function.params.items) |param| {
@@ -256,28 +277,60 @@ fn bindParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnos
 }
 
 fn bindStackParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
-    if (!stack_arguments.hasParameters(function)) return null;
-    for (function.params.items[6..], 0..) |param, index| {
+    const layout = stack_arguments.parameters(function) orelse return null;
+    if (layout.stack_words == 0) return null;
+    for (function.params.items, 0..) |param, index| {
+        const word_offset = switch (layout.locations[index]) {
+            .stack => |word| word,
+            .split => |split| split.stack,
+            .register, .pair => continue,
+        };
         // The incoming return address precedes 8-byte argument slots. Copy
         // only the declared scalar width into our own persistent spill home.
-        const offset: u32 = std.math.cast(u32, @as(usize, selector.stack_frame_bytes) + 8 + index * 8) orelse
+        const offset: u32 = std.math.cast(u32, @as(usize, selector.stack_frame_bytes) + 8 + word_offset * 8) orelse
             return .{ .no_spill_envelope = "composed-block-stack-param-offset" };
         const bits: u16 = if (param.ty == .ptr) 64 else param.ty.int;
-        var definition = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
-        defer definition.deinit();
-        if (try definition.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
-        try selector.machine.instructions.append(selector.allocator, if (bits == 32)
-            .{ .load_stack_disp32_eax = offset }
-        else
-            .{ .load_stack_disp32_rax = offset });
-        try definition.define(param.name, if (bits == 32) .zeroExtending(32) else .fullRax());
-        try definition.commit();
+        if (bits == 128) {
+            const home = selector_state.allocatePairSpillSlots(selector, param.name) orelse
+                return .{ .no_spill_envelope = "composed-block-stack-param-pair-home" };
+            // Incoming register parameters may die at the first IR instruction.
+            // Capture through RAX without clobbering those simultaneous inputs.
+            // The reserved internal name cannot collide with an IR identifier.
+            const word_name = "\x00incoming.integer.word";
+            for ([_]x86_64_types.FrameIndex{ home.lo, home.hi }, 0..) |word_home, word| {
+                const source: IncomingWord = if (layout.locations[index] == .split)
+                    if (word == 0) .{ .register = ArgReg.fromIndex(layout.locations[index].split.register) catch unreachable } else .{ .stack = offset }
+                else
+                    .{ .stack = offset + @as(u32, @intCast(word * 8)) };
+                if (try captureIncomingWord(selector, word_name, 64, source)) |diagnostic| return diagnostic;
+                try selector_state.storeCapturedIncomingPairWord(selector, word_name, word_home);
+            }
+            try selector_state.defineIncomingPairHome(selector, param, home);
+            continue;
+        }
+        if (bits != 32 and bits != 64) return .{ .no_emitter = "composed-block-stack-param-width" };
+        if (try captureIncomingWord(selector, param.name, bits, .{ .stack = offset })) |diagnostic| return diagnostic;
         if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic;
         if (param.ty == .ptr) {
             try selector.abi_pointer_params.put(param.name, {});
             if (param.attrs) |attrs| if (hasAttrToken(attrs, "readonly")) try selector.readonly_pointer_params.put(param.name, {});
         }
     }
+    return null;
+}
+
+const IncomingWord = union(enum) { register: ArgReg, stack: u32 };
+
+fn captureIncomingWord(selector: *ComposedBlockSelector, name: []const u8, bits: u16, source: IncomingWord) !?Diagnostic {
+    var definition = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+    defer definition.deinit();
+    if (try definition.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+    try selector.machine.instructions.append(selector.allocator, switch (source) {
+        .register => |reg| .{ .mov_arg_rax = reg },
+        .stack => |offset| if (bits == 32) .{ .load_stack_disp32_eax = offset } else .{ .load_stack_disp32_rax = offset },
+    });
+    try definition.define(name, if (bits == 32) .zeroExtending(32) else .fullRax());
+    try definition.commit();
     return null;
 }
 
@@ -599,7 +652,7 @@ pub fn tryLowerComposedBlockObserved(
     defer composed.deinit();
     defer dependency_domain.* = composed.address_dependencies;
 
-    if (try bindParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
+    if (try bindPhysicalParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try prepareObservedStackFrame(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);

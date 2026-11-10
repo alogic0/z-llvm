@@ -1395,6 +1395,24 @@ pub fn frameIndexFitsFrame(selector: *const ComposedBlockSelector, frame_index: 
     return end <= selector.stack_frame_bytes;
 }
 
+/// Store one entry word after its typed accumulator definition commits. This
+/// entry-only transfer consumes the temporary definition, never an IR value or
+/// a borrowed caller-stack location. Pair storage is owned by the callee.
+pub fn storeCapturedIncomingPairWord(selector: *ComposedBlockSelector, name: []const u8, frame: FrameIndex) !void {
+    const binding = selector.values.get(name) orelse return error.UnsupportedCodegenValue;
+    if (binding.vreg.class != .gpr64 or binding.vreg.bits != 64 or binding.loc != .rax or
+        !frameIndexFitsFrame(selector, frame)) return error.UnsupportedCodegenValue;
+    try selector.machine.instructions.append(selector.allocator, .{ .spill_rax_rsp = frame });
+    _ = removeValueBinding(selector, name);
+    selector.accumulator_domain.invalidate();
+}
+
+pub fn defineIncomingPairHome(selector: *ComposedBlockSelector, parameter: ir.Param, home: PairSpillLoc) !void {
+    if (!parameter.ty.eql(.{ .int = 128 }) or !frameIndexFitsFrame(selector, home.lo) or
+        !frameIndexFitsFrame(selector, home.hi)) return error.UnsupportedCodegenValue;
+    try bindValueLoc(selector, parameter.name, .{ .spill128 = home });
+}
+
 pub fn valueLoc(selector: *const ComposedBlockSelector, name: []const u8) ?ValueLoc {
     const binding = selector.values.get(name) orelse return null;
     return binding.loc;

@@ -286,6 +286,11 @@ pub fn spillReservedBytes(selector: *const ComposedBlockSelector, reserve_spill_
     if (!reserve_spill_area) return 0;
     const preallocated_slots = if (selector.allocation_plan) |plan| @max(plan.spill_slots, selector.next_spill_slot) else selector.next_spill_slot;
     var emergency_slots: usize = stage2_spill_slots;
+    if (selector.function) |function| if (stack_arguments.parameters(function.*)) |layout| {
+        // The original scalar envelope needs at most ten stack homes plus
+        // six register homes. Extended signatures reserve every incoming word.
+        emergency_slots = @max(emergency_slots, layout.stack_words + 6);
+    };
     if (selector.allocation_plan) |plan| {
         const value_slots = std.math.mul(usize, plan.assignments.count(), 2) catch return null;
         emergency_slots = @max(emergency_slots, value_slots);

@@ -46,3 +46,43 @@ test "wide integer carriers reject memory other widths and unsupported ABI forms
         try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0])) == null);
     }
 }
+
+test "physical integer carriers validate source promises and keep legacy boundaries" {
+    for ([_]u16{ 65, 66, 80, 96, 127 }) |bits| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "declare i{0d} @callee(i64, i64, i64, i64, i64, i{0d}, i64)\n" ++
+            "define noundef i{0d} @f(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i{0d} noundef range(i{0d} -1, 0) %wide, i64 %tail) {{\nentry:\n" ++
+            " %r = call noundef i{0d} @callee(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i{0d} range(i{0d} -1, 0) %wide, i64 %tail)\n ret i{0d} %r\n}}\n", .{bits});
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try forms.legalize(arena.allocator(), original)) == null);
+        const private = (try forms.legalizeForPhysicalAbi(arena.allocator(), original)).?;
+        try std.testing.expectEqual(@as(u16, 128), private.ret_ty.int);
+        try std.testing.expect(private.ret_attrs == null);
+        try std.testing.expect(private.params.items[5].attrs == null);
+        try std.testing.expect(private.params.items[5].abi_split_integer);
+        try std.testing.expect(!original.params.items[5].abi_split_integer);
+        try std.testing.expect((try forms.legalizeForPhysicalAbi(arena.allocator(), private)) == null);
+        try std.testing.expectEqual(bits, original.params.items[5].ty.int);
+        try std.testing.expect(original.params.items[5].attrs != null);
+        try std.testing.expectEqual(bits, module.declarations.items[0].params.items[5].ty.int);
+        for (private.blocks.items) |block| for (block.instructions.items) |inst| if (inst.kind == .call) {
+            try std.testing.expect(inst.kind.call.ret_attrs == null);
+            try std.testing.expect(inst.kind.call.args.items[5].attrs == null);
+            try std.testing.expect(inst.kind.call.args.items[5].abi_split_integer);
+        };
+    }
+    for ([_][]const u8{ "signext", "zeroext", "range(i64 0, 0)", "noundef noundef", "byval(i80)" }) |attrs| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define i80 @f(i80 {s} %a) {{\nentry:\n ret i80 %a\n}}\n", .{attrs});
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try forms.legalizeForPhysicalAbi(arena.allocator(), module.functions.items[0])) == null);
+    }
+}

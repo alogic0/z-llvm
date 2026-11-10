@@ -545,7 +545,13 @@ fn pairLowScalarCastDestination(
     for (selector_types.selector_allocatable_regs) |reg| {
         if (scalarCastScratchAvailable(selector, reg)) return reg;
     }
-    return error.ValueUseScalarCastScratchUnavailable;
+    // The write plan preserves this physical home before materialization,
+    // including aliases and values whose last use is the current instruction.
+    // A stacked pair can arrive while all six scalar registers are live.
+    if (selector.allocation_plan) |plan| if (plan.assignment(result.slice())) |assignment| {
+        if (assignment == .gpr64) return assignment.gpr64;
+    };
+    return selector_types.selector_allocatable_regs[0];
 }
 
 fn signExtendScratchDestination(current: ValueLoc) !ArgReg {

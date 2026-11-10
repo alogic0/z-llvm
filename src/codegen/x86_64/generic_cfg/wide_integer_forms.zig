@@ -1,15 +1,17 @@
-//! Private two-register carriers for i65/i96 SSA and register ABI values.
+//! Private two-register carriers with an explicit physical integer ABI view.
 //! Mask at incoming boundaries and original definitions; memory stays separate.
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const helpers = @import("composed_helpers.zig");
 const sysv = @import("../sysv_abi.zig");
+const stack_arguments = @import("stack_arguments.zig");
 const pair: ir.Type = .{ .int = 128 };
 const word: ir.Type = .{ .int = 64 };
+const Mode = enum { legacy_registers, physical_abi };
 
-fn wide(ty: ir.Type) bool {
-    return ty == .int and (ty.int == 65 or ty.int == 96);
+fn wide(mode: Mode, ty: ir.Type) bool {
+    return ty == .int and (if (mode == .physical_abi) ty.int > 64 and ty.int < 128 else ty.int == 65 or ty.int == 96);
 }
 fn operand(value: ir.Value) bool {
     return value == .int or (value == .named and !std.mem.startsWith(u8, value.named, "@"));
@@ -20,14 +22,15 @@ fn mask(bits: u16) i128 {
 fn normalized(value: ir.Value, bits: u16) ir.Value {
     return if (value == .int) .{ .int = value.int & mask(bits) } else value;
 }
-fn advisory(attrs: ?[]const u8) bool {
+fn advisory(mode: Mode, ty: ir.Type, attrs: ?[]const u8) bool {
+    if (mode == .physical_abi) return sysv.callReturnAttrsSupported(.{ .callee = "", .ret_ty = ty, .ret_attrs = attrs, .args = .empty });
     return attrs == null or std.mem.eql(u8, std.mem.trim(u8, attrs.?, " \t"), "noundef");
 }
-fn registers(ty: ir.Type) ?usize {
+fn registers(mode: Mode, ty: ir.Type) ?usize {
     if (ty == .ptr) return 1;
     if (ty != .int or ty.int == 0) return null;
     if (ty.int <= 64) return 1;
-    if (wide(ty) or ty.eql(pair)) return 2;
+    if (wide(mode, ty) or ty.eql(pair)) return 2;
     return null;
 }
 fn supported(op: ir.BinaryOp) bool {
@@ -38,29 +41,31 @@ fn supported(op: ir.BinaryOp) bool {
 }
 const WideUse = struct {
     pub const Error = error{};
+    mode: Mode,
     found: *bool,
     pub fn visit(self: WideUse, _: *const ir.Value, ty: ir.Type) Error!void {
-        if (wide(ty)) self.found.* = true;
+        if (wide(self.mode, ty)) self.found.* = true;
     }
 };
-fn touches(inst: *const ir.Instruction) bool {
-    var found = if (inst.resultType()) |ty| wide(ty) else false;
-    _ = ir.operands.instruction(inst, WideUse{ .found = &found }) catch unreachable;
+fn touches(mode: Mode, inst: *const ir.Instruction) bool {
+    var found = if (inst.resultType()) |ty| wide(mode, ty) else false;
+    _ = ir.operands.instruction(inst, WideUse{ .mode = mode, .found = &found }) catch unreachable;
     return found;
 }
-fn callForm(call: ir.CallInst) bool {
+fn callForm(mode: Mode, call: ir.CallInst) bool {
     if (!helpers.isDefaultOrFastcc(call.calling_conv) or call.inline_asm != null or
         call.raw_args != null or call.operand_bundle != null or call.callee_function_ty != null or
         std.mem.startsWith(u8, call.callee, "llvm.")) return false;
-    if (wide(call.ret_ty) and call.ret_attrs != null) return false;
+    if (wide(mode, call.ret_ty) and !advisory(mode, call.ret_ty, call.ret_attrs)) return false;
+    if (mode == .legacy_registers and wide(mode, call.ret_ty) and call.ret_attrs != null) return false;
     sysv.rejectUnsupportedCallEnvelope(call) catch return false;
     var count: usize = 0;
     for (call.args.items) |arg| {
         sysv.rejectUnsupportedCallArgAttrs(arg) catch return false;
-        count += registers(arg.ty) orelse return false;
-        if (wide(arg.ty) and (!advisory(arg.attrs) or !operand(arg.value))) return false;
+        count += registers(mode, arg.ty) orelse return false;
+        if (wide(mode, arg.ty) and (!advisory(mode, arg.ty, arg.attrs) or !operand(arg.value))) return false;
     }
-    return count <= 6;
+    return if (mode == .physical_abi) stack_arguments.callLayout(call) != null else count <= 6;
 }
 const Builder = struct {
     allocator: std.mem.Allocator,
@@ -95,35 +100,48 @@ const Builder = struct {
 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    return legalizeImpl(.legacy_registers, allocator, function);
+}
+
+/// The source ABI remains immutable. The shared caller/callee layout supports
+/// all two-word integer carriers and owns complete aligned stack arguments.
+pub fn legalizeForPhysicalAbi(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    return legalizeImpl(.physical_abi, allocator, function);
+}
+
+fn legalizeImpl(mode: Mode, allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     if (!helpers.isDefaultOrFastcc(function.calling_conv) or function.blocks.items.len == 0) return null;
-    var needed = wide(function.ret_ty);
-    if (needed and function.ret_attrs != null) return null;
+    var needed = wide(mode, function.ret_ty);
+    if (needed and (!advisory(mode, function.ret_ty, function.ret_attrs) or
+        (mode == .legacy_registers and function.ret_attrs != null))) return null;
     var param_registers: usize = 0;
     for (function.params.items) |param| {
-        param_registers += registers(param.ty) orelse 7;
-        if (wide(param.ty)) {
-            if (!advisory(param.attrs)) return null;
+        param_registers += registers(mode, param.ty) orelse 7;
+        if (wide(mode, param.ty)) {
+            if (!advisory(mode, param.ty, param.attrs)) return null;
             needed = true;
         }
     }
-    if (param_registers > 6) return null;
+    if (mode == .physical_abi) {
+        if (stack_arguments.parameters(function) == null) return null;
+    } else if (param_registers > 6) return null;
     for (function.blocks.items) |block| for (block.instructions.items) |*inst| {
-        if (inst.removed or !touches(inst)) continue;
+        if (inst.removed or !touches(mode, inst)) continue;
         needed = true;
         switch (inst.kind) {
-            .binary => |x| if (!wide(x.ty) or !supported(x.op) or !operand(x.lhs) or !operand(x.rhs)) return null,
-            .icmp => |x| if (!wide(x.operand_ty) or !operand(x.lhs) or !operand(x.rhs)) return null,
-            .select => |x| if (!wide(x.ty) or !x.cond_ty.eql(.{ .int = 1 }) or !operand(x.cond) or !operand(x.true_value) or !operand(x.false_value)) return null,
-            .freeze => |x| if (!wide(x.ty) or (!operand(x.value) and x.value != .undef and x.value != .poison)) return null,
+            .binary => |x| if (!wide(mode, x.ty) or !supported(x.op) or !operand(x.lhs) or !operand(x.rhs)) return null,
+            .icmp => |x| if (!wide(mode, x.operand_ty) or !operand(x.lhs) or !operand(x.rhs)) return null,
+            .select => |x| if (!wide(mode, x.ty) or !x.cond_ty.eql(.{ .int = 1 }) or !operand(x.cond) or !operand(x.true_value) or !operand(x.false_value)) return null,
+            .freeze => |x| if (!wide(mode, x.ty) or (!operand(x.value) and x.value != .undef and x.value != .poison)) return null,
             .phi => |x| {
-                if (!wide(x.ty)) return null;
+                if (!wide(mode, x.ty)) return null;
                 for (x.incoming.items) |incoming| if (!operand(incoming.value)) return null;
             },
             .cast => |x| if (x.from_ty != .int or x.to_ty != .int or x.from_ty.int == 0 or x.to_ty.int == 0 or x.from_ty.int > 128 or x.to_ty.int > 128 or
-                (x.from_ty.int > 64 and !wide(x.from_ty) and !x.from_ty.eql(pair)) or
-                (x.to_ty.int > 64 and !wide(x.to_ty) and !x.to_ty.eql(pair)) or
+                (x.from_ty.int > 64 and !wide(mode, x.from_ty) and !x.from_ty.eql(pair)) or
+                (x.to_ty.int > 64 and !wide(mode, x.to_ty) and !x.to_ty.eql(pair)) or
                 (x.op != .zext and x.op != .sext and x.op != .trunc) or !operand(x.value)) return null,
-            .call => |x| if (!callForm(x)) return null,
+            .call => |x| if (!callForm(mode, x)) return null,
             // Do not widen a memory access along with its register carrier.
             // Loads and stores of these widths remain outside this form.
             else => return null,
@@ -133,11 +151,16 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     var result = function;
     result.params = try function.params.clone(allocator);
     result.blocks = .empty;
-    if (wide(result.ret_ty)) result.ret_ty = pair;
+    if (wide(mode, result.ret_ty)) {
+        result.ret_ty = pair;
+        if (mode == .physical_abi) result.ret_attrs = null;
+    }
     var serial: forms.TemporaryNames = .{};
     defer serial.deinit(allocator);
-    for (result.params.items) |*param| if (wide(param.ty)) {
+    for (result.params.items) |*param| if (wide(mode, param.ty)) {
         param.ty = pair;
+        if (mode == .physical_abi) param.abi_split_integer = true;
+        if (mode == .physical_abi and !advisory(.legacy_registers, pair, param.attrs)) param.attrs = null;
         param.name = try forms.temporary(allocator, function, &serial);
     };
     for (function.blocks.items, 0..) |original, index| {
@@ -145,11 +168,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
         if (index == 0) for (function.params.items, result.params.items) |param, incoming| {
-            if (wide(param.ty)) try b.finish(.{ .result = param.name, .kind = undefined }, .{ .named = incoming.name }, param.ty.int);
+            if (wide(mode, param.ty)) try b.finish(.{ .result = param.name, .kind = undefined }, .{ .named = incoming.name }, param.ty.int);
         };
         for (original.instructions.items) |inst| {
             var copy = inst;
-            if (!inst.removed and touches(&inst)) switch (inst.kind) {
+            if (!inst.removed and touches(mode, &inst)) switch (inst.kind) {
                 .binary => |x| {
                     const sign = x.op == .sdiv or x.op == .srem or x.op == .ashr;
                     const lhs = if (sign) try b.signed(x.lhs, x.ty.int) else normalized(x.lhs, x.ty.int);
@@ -185,13 +208,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 },
                 .cast => |x| {
                     var value: ir.Value = x.value;
-                    if (wide(x.from_ty)) {
+                    if (wide(mode, x.from_ty)) {
                         value = if (x.op == .sext) try b.signed(value, x.from_ty.int) else normalized(value, x.from_ty.int);
                     } else if (x.from_ty.int <= 64) {
                         const low = if (x.from_ty.eql(word)) value else try b.cast(if (x.op == .sext) .sext else .zext, x.from_ty, value, word);
                         value = try b.cast(if (x.op == .sext) .sext else .zext, word, low, pair);
                     }
-                    if (wide(x.to_ty)) {
+                    if (wide(mode, x.to_ty)) {
                         try b.finish(inst, value, x.to_ty.int);
                         continue;
                     }
@@ -199,12 +222,15 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 },
                 .call => |x| {
                     copy.kind.call.args = try x.args.clone(allocator);
-                    for (copy.kind.call.args.items) |*arg| if (wide(arg.ty)) {
+                    for (copy.kind.call.args.items) |*arg| if (wide(mode, arg.ty)) {
                         arg.value = normalized(arg.value, arg.ty.int);
                         arg.ty = pair;
+                        if (mode == .physical_abi) arg.abi_split_integer = true;
+                        if (mode == .physical_abi and !advisory(.legacy_registers, pair, arg.attrs)) arg.attrs = null;
                     };
-                    if (wide(x.ret_ty)) {
+                    if (wide(mode, x.ret_ty)) {
                         copy.kind.call.ret_ty = pair;
+                        if (mode == .physical_abi) copy.kind.call.ret_attrs = null;
                         if (inst.result != null) copy.result = try forms.temporary(allocator, function, &serial);
                         try block.instructions.append(allocator, copy);
                         if (inst.result != null) try b.finish(inst, .{ .named = copy.result.? }, x.ret_ty.int);
@@ -215,7 +241,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
             };
             try block.instructions.append(allocator, copy);
         }
-        if (wide(function.ret_ty)) if (block.terminator) |*term| if (term.* == .ret) {
+        if (wide(mode, function.ret_ty)) if (block.terminator) |*term| if (term.* == .ret) {
             term.ret.ty = pair;
             if (term.ret.value) |value| term.ret.value = normalized(value, function.ret_ty.int);
         };

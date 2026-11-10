@@ -144,12 +144,21 @@ pub fn executePairLowScalarCast(
 
     const stored_action = &transaction.requests[source_index].prepared_action.?.pair_low_scalar_cast;
     const result_identity = &stored_action.result;
+    const available = scalarCastScratchForUse(transaction.selector);
+    var pressure_fallback = false;
     const destination = plannedScalarCastScratch(transaction.selector, result_identity.slice()) orelse
         if (selector_state.resolvePairValue(transaction.selector, .{ .named = source_name })) |pair|
             pair.lo
         else
-            scalarCastScratchForUse(transaction.selector) orelse
-                return scalarCastRequestError(Authority, transaction, source_index, error.ValueUseScalarCastScratchUnavailable);
+            available orelse fallback: {
+                pressure_fallback = true;
+                break :fallback preservingPairLowScratch(transaction.selector, result_identity.slice());
+            };
+    const saved_preserve = transaction.selector.preserve_current_position_values;
+    // This action owns ordered writes. A pressure fallback preserves all
+    // current operands and aliases before its existing low-limb transfer.
+    if (pressure_fallback) transaction.selector.preserve_current_position_values = true;
+    defer transaction.selector.preserve_current_position_values = saved_preserve;
     try failScalarCastForTest(Authority, transaction, .after_scratch_selection);
     selector_state.emitPairLowLaneIntoScratch(
         transaction.selector,
@@ -417,6 +426,13 @@ fn scalarCastScratchForUse(selector: *const ComposedBlockSelector) ?ArgReg {
     for (selector_types.selector_allocatable_regs) |reg|
         if (scalarCastScratchAvailable(selector, reg)) return reg;
     return null;
+}
+
+fn preservingPairLowScratch(selector: *const ComposedBlockSelector, result: []const u8) ArgReg {
+    if (selector.allocation_plan) |plan| if (plan.assignment(result)) |assignment| {
+        if (assignment == .gpr64) return assignment.gpr64;
+    };
+    return selector_types.selector_allocatable_regs[0];
 }
 
 fn scalarCastScratchAvailable(selector: *const ComposedBlockSelector, reg: ArgReg) bool {
