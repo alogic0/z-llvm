@@ -9,6 +9,8 @@ Implementation results and remaining limits are recorded in
 [validation performance evidence](../evidence/validation_performance.md).
 All 17 integration gates and the three-mode fresh/cache comparison pass.
 The compiler-selection goal remains paused, with accepted counters unchanged.
+The subsequent [bounded compiler-throughput slice](../evidence/compiler_throughput.md)
+validates faster preservation planning with identical plans and native artifacts.
 
 ## Objective and scope
 

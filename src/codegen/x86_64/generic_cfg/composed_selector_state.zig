@@ -2845,7 +2845,11 @@ pub fn valueIsLiveAtBoundary(
         return error.AddressDependencyMissingPlan;
     const plan = selector.allocation_plan orelse return false;
     const context = AddressDependencyLivenessContext{ .selector = selector, .boundary = boundary };
-    if (try selector.address_dependencies.dependencyIsRequired(name, context)) return true;
+    // An empty domain has no transitive dependencies to validate or traverse.
+    // Keep ordinary interval queries on their direct path; populated domains
+    // retain every graph, binding and plan check on each query.
+    if (selector.address_dependencies.count() != 0 and
+        try selector.address_dependencies.dependencyIsRequired(name, context)) return true;
     const end = plan.intervalEnd(name) orelse return true;
     return intervalIsLiveAtBoundary(end, selector.current_position, boundary);
 }

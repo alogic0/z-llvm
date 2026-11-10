@@ -315,6 +315,34 @@ test "generic cfg selector unified liveness boundary includes dependencies whose
     try std.testing.expect(try selector_state.valueIsLiveAtOrAfterCurrent(&selector, "index"));
 }
 
+test "generic cfg selector empty dependency queries keep interval boundaries and revalidate a later graph" {
+    var machine = MachineFunction.init("empty-dependency-boundary", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    try std.testing.expect(!try selector_state.valueIsLiveAfterCurrent(&selector, "ordinary"));
+    try std.testing.expect(!try selector_state.valueIsLiveAtOrAfterCurrent(&selector, "ordinary"));
+
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("ordinary", 5);
+    selector.allocation_plan = &plan;
+    selector.current_position = 5;
+    try std.testing.expect(!try selector_state.valueIsLiveAfterCurrent(&selector, "ordinary"));
+    try std.testing.expect(try selector_state.valueIsLiveAtOrAfterCurrent(&selector, "ordinary"));
+    try std.testing.expect(try selector_state.valueIsLiveAfterCurrent(&selector, "unbounded"));
+    try std.testing.expect(try selector_state.valueIsLiveAtOrAfterCurrent(&selector, "unbounded"));
+
+    try selector.address_dependencies.replaceAddress("pointer", &.{
+        .{ .name = "ordinary", .identity_type = .integer, .role = .index },
+    });
+    try std.testing.expectError(error.AddressDependencyMissingOwnerPlanEntry, selector_state.valueIsLiveAfterCurrent(&selector, "ordinary"));
+    try std.testing.expectError(error.AddressDependencyMissingOwnerPlanEntry, selector_state.valueIsLiveAtOrAfterCurrent(&selector, "ordinary"));
+    selector.allocation_plan = null;
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.valueIsLiveAfterCurrent(&selector, "ordinary"));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.valueIsLiveAtOrAfterCurrent(&selector, "ordinary"));
+}
+
 test "generic cfg selector address dependencies remain transitive through the at-or-after boundary" {
     var domain: AddressDependencyDomain = .{};
     try domain.replaceAddress("outer", &.{

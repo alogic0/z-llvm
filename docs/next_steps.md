@@ -1,4 +1,20 @@
-# Validation performance delivery complete; compiler selection remains paused
+# Bounded compiler-throughput delivery complete; selection remains paused
+
+The [allocation-planning throughput slice](evidence/compiler_throughput.md)
+replaces repeated interval/site scans with range queries and skips dependency
+traversal for empty graphs. On two captured large private plans, median planning
+time falls from about 10.98 seconds to 0.45–0.46 seconds with exact plan output.
+All 17 integration gates pass. Complete Debug and ReleaseFast native suites
+retain all 76 populations and match every baseline command outcome and all
+1,161 successful compiler artifacts per build mode. Debug/ReleaseSafe each pass
+2,046 units, 24 structural checks and two profiling/interruption checks.
+
+Current bounded sampling identifies ordinary interval lookups and binding scans
+as the next question. The original function still times out, and no complete
+compiler census, object or production replay is accepted by this slice. Accepted
+counters and the paused complete-selection goal remain unchanged.
+
+## Preceding validation performance delivery
 
 The [validation performance plan](plans/2026-11-09-validation-performance-improvement.md)
 is implemented with explicit nested toolchain selection, compiler build receipts,
@@ -9,12 +25,10 @@ policy and profiling checks are retained. See the
 [measured outcomes](evidence/validation_performance.md) and
 [tool usage](validation_tools.md#selecting-and-retaining-validation-compilers).
 
-The remaining duplicate native calls cost 20.09 seconds with ReleaseFast, so a
-new native result cache is deferred. Bounded scheduling measurements support
-keeping existing concurrency. A 90-second original-function profile identifies
-allocation-plan scans and dependency validation for a bounded next investigation;
-it establishes no complete-input acceptance or compiler algorithm improvement.
-This delivery preserves accepted counters and does not resume the paused goal.
+That delivery is committed at `c19bdc66`. The remaining duplicate native calls
+cost 20.09 seconds with ReleaseFast, so a new native result cache is deferred.
+Bounded scheduling measurements support keeping existing concurrency. Its
+allocation-plan recommendation is completed by the throughput slice above.
 
 ## Paused after the integer intrinsic slice
 

@@ -597,31 +597,15 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
     }
     var forward_it = forward_values.iterator();
     while (forward_it.next()) |entry| try plan.forward_values.put(entry.key_ptr.*, entry.value_ptr.*);
-    try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items);
-    try recordCallPreparationDemands(&plan, intervals.items, call_preparation_positions.items);
+    try recordPreservationDemands(&plan, intervals.items, preservation_barrier_positions.items, .across_action);
+    try recordPreservationDemands(&plan, intervals.items, call_preparation_positions.items, .call_arguments);
     // These actions preserve their actual clobbers on demand. Reserve space
     // without moving unaffected incoming arguments away from their ABI homes.
-    for (fixed_scalar_positions.items) |scalar_position| {
-        var live_slots: usize = 0;
-        for (intervals.items) |interval| {
-            if (interval.start >= scalar_position or interval.end <= scalar_position) continue;
-            live_slots += selectorSpillSlotCount(interval);
-        }
-        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
-    }
+    try recordPreservationDemands(&plan, intervals.items, fixed_scalar_positions.items, .fixed_scalar);
     // Scalar results and their aliases may remain in RAX until their next use.
     // Stores also use RAX, so every instruction-produced scalar that survives
     // a store may need preservation even below peak register pressure.
-    for (store_positions.items) |store_position| {
-        var live_slots: usize = 0;
-        for (intervals.items) |interval| {
-            if (interval.start == 0 or interval.start >= store_position or interval.end <= store_position) continue;
-            if (interval.class != .gpr32 and interval.class != .gpr64) continue;
-            live_slots += selectorSpillSlotCount(interval);
-            try plan.preservation_values.put(interval.name, {});
-        }
-        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
-    }
+    try recordPreservationDemands(&plan, intervals.items, store_positions.items, .store);
     plan.block_indexes = graph.block_indexes;
     graph.block_indexes = .empty;
     return plan;
@@ -698,31 +682,59 @@ fn arrayStrideRequiresPreservationFrame(gep: ir.GepInst) bool {
         gep.indices.items[0].value == .named;
 }
 
-fn recordPreservationDemands(plan: *SelectorAllocationPlan, intervals: []const SelectorValueInterval, barrier_positions: []const usize) !void {
-    for (barrier_positions) |position| {
-        var live_slots: usize = 0;
-        for (intervals) |interval| {
-            if (interval.start >= position or interval.end <= position) continue;
-            live_slots += selectorSpillSlotCount(interval);
-            try plan.preservation_values.put(interval.name, {});
-        }
+const PreservationDemand = enum { across_action, call_arguments, fixed_scalar, store };
+
+/// Sites are recorded in instruction order. Each interval contributes its slot
+/// width to one contiguous range of sites, and membership needs only one insert.
+/// This keeps the original per-site maximum without scanning every interval at
+/// every site. Register assignments and interval endpoints are unchanged.
+fn recordPreservationDemands(
+    plan: *SelectorAllocationPlan,
+    intervals: []const SelectorValueInterval,
+    positions: []const usize,
+    comptime demand: PreservationDemand,
+) !void {
+    if (positions.len == 0 or intervals.len == 0) return;
+    const Change = struct { begin: usize = 0, end: usize = 0 };
+    const changes = try plan.allocator.alloc(Change, positions.len + 1);
+    defer plan.allocator.free(changes);
+    @memset(changes, .{});
+
+    for (intervals) |interval| {
+        if (demand == .store and (interval.start == 0 or
+            (interval.class != .gpr32 and interval.class != .gpr64))) continue;
+        const begin = positionBound(positions, interval.start, true);
+        // Argument placement can overwrite a final-use home before a later
+        // argument consumes it. Calls include the interval end; other sites
+        // require the value to survive the action.
+        const end = positionBound(positions, interval.end, demand == .call_arguments);
+        if (begin >= end) continue;
+        const slots = selectorSpillSlotCount(interval);
+        changes[begin].begin += slots;
+        changes[end].end += slots;
+        if (demand != .fixed_scalar) try plan.preservation_values.put(interval.name, {});
+    }
+    var live_slots: usize = 0;
+    for (changes[0..positions.len]) |change| {
+        live_slots -= change.end;
+        live_slots += change.begin;
         plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
     }
 }
 
-fn recordCallPreparationDemands(plan: *SelectorAllocationPlan, intervals: []const SelectorValueInterval, positions: []const usize) !void {
-    for (positions) |position| {
-        var live_slots: usize = 0;
-        for (intervals) |interval| {
-            if (interval.start >= position or interval.end < position) continue;
-            // Argument placement can overwrite even a parameter's final-use
-            // home before a later argument consumes it. Reserve for the whole
-            // simultaneous input set, including entry parameters.
-            live_slots += selectorSpillSlotCount(interval);
-            try plan.preservation_values.put(interval.name, {});
+/// First site >= position, or > position when equal sites must be excluded.
+fn positionBound(positions: []const usize, position: usize, comptime after_equal: bool) usize {
+    var low: usize = 0;
+    var high = positions.len;
+    while (low < high) {
+        const middle = low + (high - low) / 2;
+        if (positions[middle] < position or (after_equal and positions[middle] == position)) {
+            low = middle + 1;
+        } else {
+            high = middle;
         }
-        plan.preservation_spill_slots = @max(plan.preservation_spill_slots, live_slots);
     }
+    return low;
 }
 
 pub fn selectorValueMetadata(ty: ir.Type) ?VirtualRegMetadata {
@@ -1449,4 +1461,77 @@ test "stage two indexed plan owns its transferred graph index through every allo
     var moving = std.testing.FailingAllocator.init(std.testing.allocator, .{ .resize_fail_index = 0 });
     try std.testing.checkAllAllocationFailures(moving.allocator(), checkIndexedPlanAllocation, .{module.functions.items[0]});
     try module.verify();
+}
+
+test "preservation demand keeps final-use call arguments and excludes final-use clobbers" {
+    const intervals = [_]SelectorValueInterval{
+        .{ .name = "argument", .class = .gpr64, .bits = 64, .start = 0, .end = 2 },
+        .{ .name = "result", .class = .gpr32, .bits = 32, .start = 2, .end = 4 },
+        .{ .name = "pair", .class = .gpr128, .bits = 128, .start = 1, .end = 4 },
+    };
+    inline for (std.enums.values(PreservationDemand)) |demand| {
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try recordPreservationDemands(&plan, &intervals, &.{2}, demand);
+        try std.testing.expectEqual(@as(usize, switch (demand) {
+            .across_action, .fixed_scalar => 2,
+            .call_arguments => 3,
+            .store => 0,
+        }), plan.preservation_spill_slots);
+        try std.testing.expectEqual(demand == .call_arguments, plan.preservation_values.contains("argument"));
+        try std.testing.expectEqual(demand == .across_action or demand == .call_arguments, plan.preservation_values.contains("pair"));
+        try std.testing.expect(!plan.preservation_values.contains("result"));
+    }
+}
+
+test "preservation demand matches independent site scans for mixed widths endpoints and repeated sites" {
+    var random = std.Random.DefaultPrng.init(0x6af280e9);
+    var names: [24][24]u8 = undefined;
+    var intervals: [24]SelectorValueInterval = undefined;
+    var positions: [16]usize = undefined;
+    for (0..200) |trial| {
+        const interval_count = random.random().uintLessThan(usize, intervals.len + 1);
+        const site_count = random.random().uintLessThan(usize, positions.len + 1);
+        for (intervals[0..interval_count], 0..) |*interval, index| {
+            const start = random.random().uintLessThan(usize, 12);
+            const end = start + random.random().uintLessThan(usize, 12);
+            const wide = index % 3 == 0;
+            interval.* = .{
+                .name = try std.fmt.bufPrint(&names[index], "value-{d}", .{index}),
+                .class = if (wide) .gpr128 else if (index % 2 == 0) .gpr32 else .gpr64,
+                .bits = if (wide) 128 else if (index % 2 == 0) 32 else 64,
+                .start = start,
+                .end = if (trial % 7 == 0 and index == 0) std.math.maxInt(usize) else end,
+            };
+        }
+        for (positions[0..site_count], 0..) |*position, index| {
+            position.* = if (trial % 11 == 0 and index == 0) std.math.maxInt(usize) else random.random().uintLessThan(usize, 24);
+        }
+        std.mem.sort(usize, positions[0..site_count], {}, std.sort.asc(usize));
+        inline for (std.enums.values(PreservationDemand)) |demand| {
+            var expected = SelectorAllocationPlan.init(std.testing.allocator);
+            defer expected.deinit();
+            for (positions[0..site_count]) |position| {
+                var live_slots: usize = 0;
+                for (intervals[0..interval_count]) |interval| {
+                    if (interval.start >= position) continue;
+                    if (demand == .call_arguments) {
+                        if (interval.end < position) continue;
+                    } else if (interval.end <= position) continue;
+                    if (demand == .store and (interval.start == 0 or
+                        (interval.class != .gpr32 and interval.class != .gpr64))) continue;
+                    live_slots += if (interval.bits > 64) @as(usize, 2) else 1;
+                    if (demand != .fixed_scalar) try expected.preservation_values.put(interval.name, {});
+                }
+                expected.preservation_spill_slots = @max(expected.preservation_spill_slots, live_slots);
+            }
+            var actual = SelectorAllocationPlan.init(std.testing.allocator);
+            defer actual.deinit();
+            try recordPreservationDemands(&actual, intervals[0..interval_count], positions[0..site_count], demand);
+            try std.testing.expectEqual(expected.preservation_spill_slots, actual.preservation_spill_slots);
+            try std.testing.expectEqual(expected.preservation_values.count(), actual.preservation_values.count());
+            var it = expected.preservation_values.keyIterator();
+            while (it.next()) |name| try std.testing.expect(actual.preservation_values.contains(name.*));
+        }
+    }
 }
