@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `7d419080`,
-selecting 8,739/8,928 compiler definitions and 296/455 runtime definitions.
-Continue through all 189 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `7a96ace8`,
+selecting 8,754/8,928 compiler definitions and 318/455 runtime definitions.
+Continue through all 174 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -179,3 +179,19 @@ verify. Both production reports still stop at remaining selection failures.
 Continue through all 189 remaining compiler definitions, beginning with the
 observed fp128 storage/transport and structured-value families. See the
 [accepted physical ABI evidence](../evidence/integer_physical_abi.md).
+
+Batch 10 is accepted at `7a96ace8`: exact private binary128 transport, owned
+bitcasts/freezes, standard numerical helpers and all sixteen comparisons, with
+complete XMM return verification and preserved bitwise negation. Explicit
+structured-module ownership closes emitted helper definitions while imported
+Zig IR retains its external runtime policy. Debug/ReleaseSafe each pass 2,086
+units, 24 structural and two profile checks; readiness and all seventeen serial
+gates pass. Both complete 81-population native suites preserve all 80 preceding
+entries, 2,981 outcomes and 1,221 compiler artifacts byte for byte. All 126 new
+fault controls are detected. Complete original-input census and independent
+production agree on 8,754 compiler and 318 runtime selections, adding fifteen and
+twenty-two without lost successes or owners. All 4,379,680 compiler events balance
+and all 3,186 frozen file hashes bind to the committed tree. Production still
+stops at remaining selection failures. Continue through all 174 original compiler
+rejections, beginning with stack-object copy and PHI pointer views. See the
+[accepted binary128 evidence](../evidence/binary128_payloads.md).

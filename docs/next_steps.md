@@ -1,11 +1,11 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [physical integer ABI checkpoint](evidence/integer_physical_abi.md)
-at `7d419080`: **8,739/8,928** compiler definitions and **296/455** runtime
-definitions. All 189 remaining original compiler definitions stay in scope. The
-complete current census identifies fp128 storage/transport, structured values,
-symbolic pointer operands and call-attribute boundaries for subsequent coherent
+from the accepted [binary128 checkpoint](evidence/binary128_payloads.md)
+at `7a96ace8`: **8,754/8,928** compiler definitions and **318/455** runtime
+definitions. All 174 remaining original compiler definitions stay in scope. The
+complete current census identifies stack-object copy/PHI pointer views, remaining
+floating/structured values and call-attribute boundaries for subsequent coherent
 groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
@@ -34,6 +34,18 @@ binds the 3,173 validated file hashes and both compiler receipts to the committe
 tree. The frozen core harness requires the main checkout for its final replay;
 the validated source is adopted there. Continue this main plan without waiting
 for renewed authorization.
+
+Batch 10's private binary128 carrier preserves raw payloads and uses standard
+numerical helpers and all sixteen comparisons. Its complete census and independent
+production agree on fifteen compiler and twenty-two runtime additions without
+lost successes or owners. Debug/ReleaseSafe each pass 2,086 units, 24 structural
+and two profile checks; all nine readiness procedures and seventeen serial gates
+pass. Both 81-population native suites preserve every preceding entry, all 2,981
+outcomes and 1,221 compiler artifacts per build. The
+[acceptance record](evidence/binary128_payloads_acceptance_20261110.json)
+binds all 3,186 frozen file hashes and final compiler receipts to the committed
+tree. The main plan continues with shared stack-object address materialization;
+the fixed prefix/cohort, ratchet and original inputs remain unchanged.
 
 ## Completed bounded compiler-throughput delivery
 
