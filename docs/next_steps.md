@@ -1,23 +1,26 @@
 # Complete compiler selection resumed
 
-The user resumed the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-after the validated performance deliveries. Start batch 08 by replaying the
-retained post-intrinsic original-function frontier, then close shared capability
-boundaries beginning with aggregate PHIs/freezes where the current failures
-support it. Use focused original-function and native checks during implementation;
-complete unchanged-input census and independent production replay accept counts
-at cohesive checkpoints. Revisit performance only when a required replay cannot
-finish. Accepted counts remain 8,664/8,928 and 285/455 until new cumulative proof.
+Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
+from the accepted [batch-08 checkpoint](evidence/compiler_selection_batch08.md)
+at `dba98f43`: **8,722/8,928** compiler definitions and **285/455** runtime
+definitions. All 206 remaining compiler definitions stay in scope. The complete
+current census identifies integer-carrier and physical stack-argument boundaries
+for the next coherent group, followed by observed floating, structured-value and
+pointer-transport limits. Use focused original-function and native checks during
+implementation; complete unchanged-input census and independent production
+replay accept counts at cohesive checkpoints. Revisit performance only when a
+required replay cannot finish.
 
-Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) now passes
-all 17 serial gates, all 79 native populations with Debug and ReleaseFast
-compilers, and 2,061 units plus 24 structural/two profile checks in both Debug
-and ReleaseSafe. All nineteen retained original targets select, up from eleven;
-runtime retains 285/455. The [Zig helper migration](evidence/batch08_zig_helpers.md)
-replaces its seven ad hoc Python scripts and inline Python workflow. Complete
-compiler acceptance remains pending. The required census timed out in the large
-LoongArch parser; bounded profiling and an isolated performance prototype address
-that measured blocker before continuing later capability boundaries.
+Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) and
+selector snapshot-storage changes pass all 17 serial gates, all 79 native
+populations with Debug and ReleaseFast compilers, and 2,066 units plus 24
+structural/two profile checks in both Debug and ReleaseSafe. Complete original
+census and production replays agree on 8,722 selections, adding 58 with no lost
+successes or owners. The [acceptance record](evidence/compiler_selection_batch08_acceptance_20261110.json)
+retains the complete event audits and source binding. The
+[Zig helper migration](evidence/batch08_zig_helpers.md) replaces all seven ad hoc
+Python scripts and inline Python workflow. The replay bottleneck is cleared;
+capability work resumes in an isolated batch-09 worktree.
 
 ## Completed bounded compiler-throughput delivery
 
@@ -30,10 +33,10 @@ retain all 76 populations and match every baseline command outcome and all
 1,161 successful compiler artifacts per build mode. Debug/ReleaseSafe each pass
 2,046 units, 24 structural checks and two profiling/interruption checks.
 
-Current bounded sampling identifies ordinary interval lookups and binding scans
-as the next question. The original function still times out, and no complete
-compiler census, object or production replay is accepted by this slice. Accepted
-counters were unchanged by that performance delivery.
+At that earlier checkpoint, bounded sampling identified ordinary interval
+lookups and binding scans, and the original function still timed out. That slice
+alone accepted no whole-compiler census, object or production replay. The later
+batch-08 checkpoint above completes the selection replays.
 
 ## Preceding validation performance delivery
 
@@ -62,12 +65,11 @@ gates and 76 native populations passing, with 2,200,836 local observations again
 and ReleaseFast compilers; eight deliberately faulty variants are detected by
 both LLVM and local execution. The full source and artifact checks verify.
 
-The accepted [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
-remains `bb74a371`: **8,664/8,928** compiler definitions and **285/455** runtime
-definitions. The current slice adds versioned targeted probes and a complete
-runtime census, without a complete current compiler census or production replay.
-The [accepted record](evidence/scalable_cfg_indirect_phi_acceptance_20261109.json)
-and `accepted_status.json` remain unchanged.
+The preceding accepted [scalable CFG checkpoint](evidence/scalable_cfg_indirect_phi.md)
+at `bb74a371` selected **8,664/8,928** compiler definitions and **285/455** runtime
+definitions. Its [accepted record](evidence/scalable_cfg_indirect_phi_acceptance_20261109.json)
+remains historical evidence. Batch 08 supplies the new whole-input proof above;
+the fixed-population `accepted_status.json` remains unchanged.
 
 The preceding frame source at `726a7c55` passed all 17 integration gates and
 75 native populations. Its incomplete whole-input attempts were explicitly

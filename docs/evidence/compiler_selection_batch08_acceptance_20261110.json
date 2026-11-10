@@ -1,0 +1,861 @@
+{
+  "schema": "compiler-selection-batch08-acceptance-v1",
+  "status": "passed",
+  "recorded_date": "2026-11-10",
+  "accepted_revision": "dba98f4347d614643233cde6db535976eb557992",
+  "accepted_tree": "328613232aade0857c99aea79d033b6b0f58f253",
+  "baseline_accepted_revision": "bb74a371b7b84c023da8356ef4d7a13da3b7ca35",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "evidence_root": "local-state/validations/compiler-selection-completion-20261108/batch-08/parser-throughput",
+  "active_objective": {
+    "definitions": 8928,
+    "selected": 8722,
+    "remaining": 206,
+    "complete": false
+  },
+  "compiler": {
+    "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+    "input_bytes": 443624107,
+    "before": {
+      "event": "complete",
+      "examined": 8928,
+      "selected": 8664,
+      "failed": 264
+    },
+    "after": {
+      "event": "complete",
+      "examined": 8928,
+      "selected": 8722,
+      "failed": 206
+    },
+    "new_successes": [
+      "Build.Cache.Manifest.check",
+      "Build.Cache.Manifest.hashFileAppend",
+      "Compilation.Timer.finish",
+      "Compilation.dispatchPrelinkWork",
+      "Compilation.dumpArgv",
+      "Compilation.flush",
+      "Compilation.update",
+      "Io.Condition.deregister",
+      "Io.Condition.wait",
+      "Io.Group.async__func_51216.TypeErased.start",
+      "Io.Group.async__func_51223.TypeErased.start",
+      "Io.Group.async__func_51224.TypeErased.start",
+      "Io.Group.async__func_51225.TypeErased.start",
+      "Io.Group.async__func_51226.TypeErased.start",
+      "Io.Group.async__func_51227.TypeErased.start",
+      "Io.Threaded.Future.waitForCancelWithSignaling",
+      "Io.Threaded.Group.waitForCancelWithSignaling",
+      "Io.Threaded.await",
+      "Io.Threaded.deinit",
+      "Io.Threaded.dirSetTimestamps",
+      "Io.Threaded.fileSetTimestamps",
+      "Io.Threaded.groupAwait",
+      "Io.Threaded.sleep",
+      "Io.lockStderr",
+      "Progress.Node.end",
+      "Progress.Node.start",
+      "Progress.computeNode",
+      "Progress.serialize",
+      "Thread.PosixThreadImpl.spawn__func_1422.Instance.entryFn",
+      "Zcu.PerThread.runCodegen",
+      "Zcu.PerThread.update",
+      "Zcu.PerThread.workerUpdateFile",
+      "Zcu.TrackedUnitSema.end",
+      "Zcu.trackUnitSema",
+      "codegen.aarch64.Select.Value.Index.copyAdvanced",
+      "codegen.aarch64.Select.Value.Index.defUndef",
+      "codegen.aarch64.Select.Value.Index.store",
+      "codegen.llvm.FuncGen.genBody",
+      "codegen.loongarch.Assemble.parseInstruction",
+      "codegen.riscv64.CodeGen.generate",
+      "debug.unlockStderr",
+      "heap.ArenaAllocator.alloc",
+      "heap.ArenaAllocator.remap",
+      "link.C.flush",
+      "link.Elf.Atom.resolveRelocsAlloc",
+      "link.Elf.Atom.resolveRelocsNonAlloc__func_14559",
+      "link.Elf2.flushInner",
+      "link.File.prelink",
+      "link.File.updateExports",
+      "link.MachO.Dylib.parseTbd",
+      "link.MachO.dumpArgv",
+      "link.Spirv.flush",
+      "link.doPrelinkTask",
+      "link.doZcuTask",
+      "sort.block.block__func_15047",
+      "sort.pdq.pdqContext__func_15099",
+      "zig.llvm.BitcodeReader.nextRecord",
+      "zig.llvm.Builder.toBitcode"
+    ],
+    "lost_successes": [],
+    "owner_changes": [],
+    "census_complete_unfiltered": true,
+    "census_process": {
+      "status": "finished",
+      "returncode": 0,
+      "wall_ns": 4019548897120
+    },
+    "production_process": {
+      "status": "finished",
+      "returncode": 1,
+      "outcome": "completed",
+      "wall_ns": 4260179396822
+    },
+    "production_selection": {
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 8722,
+        "failed": 206
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": [
+        "Build.Cache.Manifest.check",
+        "Build.Cache.Manifest.hashFileAppend",
+        "Compilation.Timer.finish",
+        "Compilation.dispatchPrelinkWork",
+        "Compilation.dumpArgv",
+        "Compilation.flush",
+        "Compilation.update",
+        "Io.Condition.deregister",
+        "Io.Condition.wait",
+        "Io.Group.async__func_51216.TypeErased.start",
+        "Io.Group.async__func_51223.TypeErased.start",
+        "Io.Group.async__func_51224.TypeErased.start",
+        "Io.Group.async__func_51225.TypeErased.start",
+        "Io.Group.async__func_51226.TypeErased.start",
+        "Io.Group.async__func_51227.TypeErased.start",
+        "Io.Threaded.Future.waitForCancelWithSignaling",
+        "Io.Threaded.Group.waitForCancelWithSignaling",
+        "Io.Threaded.await",
+        "Io.Threaded.deinit",
+        "Io.Threaded.dirSetTimestamps",
+        "Io.Threaded.fileSetTimestamps",
+        "Io.Threaded.groupAwait",
+        "Io.Threaded.sleep",
+        "Io.lockStderr",
+        "Progress.Node.end",
+        "Progress.Node.start",
+        "Progress.computeNode",
+        "Progress.serialize",
+        "Thread.PosixThreadImpl.spawn__func_1422.Instance.entryFn",
+        "Zcu.PerThread.runCodegen",
+        "Zcu.PerThread.update",
+        "Zcu.PerThread.workerUpdateFile",
+        "Zcu.TrackedUnitSema.end",
+        "Zcu.trackUnitSema",
+        "codegen.aarch64.Select.Value.Index.copyAdvanced",
+        "codegen.aarch64.Select.Value.Index.defUndef",
+        "codegen.aarch64.Select.Value.Index.store",
+        "codegen.llvm.FuncGen.genBody",
+        "codegen.loongarch.Assemble.parseInstruction",
+        "codegen.riscv64.CodeGen.generate",
+        "debug.unlockStderr",
+        "heap.ArenaAllocator.alloc",
+        "heap.ArenaAllocator.remap",
+        "link.C.flush",
+        "link.Elf.Atom.resolveRelocsAlloc",
+        "link.Elf.Atom.resolveRelocsNonAlloc__func_14559",
+        "link.Elf2.flushInner",
+        "link.File.prelink",
+        "link.File.updateExports",
+        "link.MachO.Dylib.parseTbd",
+        "link.MachO.dumpArgv",
+        "link.Spirv.flush",
+        "link.doPrelinkTask",
+        "link.doZcuTask",
+        "sort.block.block__func_15047",
+        "sort.pdq.pdqContext__func_15099",
+        "zig.llvm.BitcodeReader.nextRecord",
+        "zig.llvm.Builder.toBitcode"
+      ],
+      "probe_selected_identities_match": true,
+      "probe_failure_tuples_match": true,
+      "profile_function_count": 8928,
+      "final_failure_groups": [
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "functions": 73,
+          "example": "print_value.print"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "functions": 74,
+          "example": "InternPool.Key.eql"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "functions": 51,
+          "example": "hash.auto_hash.autoHash__func_432"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "functions": 7,
+          "example": "main.buildOutputType"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "\"crypto.siphash.SipHash(u128,1,3).final\""
+        }
+      ]
+    },
+    "production_function_audit": {
+      "schema": 1,
+      "profile_functions": 8928,
+      "unique_functions": 8928,
+      "all_original_identities_match": true,
+      "all_function_outcomes_match": true,
+      "selected": 8722,
+      "failed": 206
+    },
+    "production_events": {
+      "sequence": 4110182,
+      "elapsed_ns": 4229361102384,
+      "begins": 8928,
+      "ends": 8928,
+      "selected": 8722,
+      "failed": 206,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 8722,
+        "failed_functions": 206,
+        "normalization_runs": 66436,
+        "legalizer_attempts": 1372709,
+        "legalizer_rewrites": 64649,
+        "original_form_retries": 33379,
+        "original_form_selected": 7141,
+        "selection_iterations": 66436,
+        "max_selection_iterations": 32,
+        "emitted_instructions": 18351526,
+        "emitted_spill_instructions": 4376060
+      },
+      "unique_functions": 8928
+    },
+    "source_and_backend_verified": true,
+    "object_complete": false
+  },
+  "runtime": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "definitions": 455,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 285,
+        "failed": 170
+      },
+      "after": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 285,
+        "failed": 170
+      },
+      "lost_selections": [],
+      "gained_selections": [],
+      "owner_changes": []
+    },
+    "production_selection": {
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 285,
+        "failed": 170
+      },
+      "preserved_successes": true,
+      "lost_successes": [],
+      "new_successes": [],
+      "probe_selected_identities_match": true,
+      "probe_failure_tuples_match": true,
+      "profile_function_count": 455,
+      "final_failure_groups": [
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_type",
+          "functions": 19,
+          "example": "compiler_rt.__negxf2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "no_emitter",
+          "functions": 27,
+          "example": "compiler_rt.atomics.__atomic_fetch_umin_16"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_type",
+          "functions": 93,
+          "example": "compiler_rt.trunc.truncq"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_instruction",
+          "functions": 11,
+          "example": "compiler_rt.sqrt.__sqrth"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_type",
+          "functions": 1,
+          "example": "compiler_rt.trig.cosq"
+        },
+        {
+          "diagnostic": "UnsupportedLongDoubleAbi",
+          "selector_tag": "unsupported_type",
+          "functions": 11,
+          "example": "compiler_rt.round.roundq"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_instruction",
+          "functions": 1,
+          "example": "compiler_rt.addf3.__subhf3"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenControlFlow",
+          "selector_tag": "unsupported_value",
+          "functions": 3,
+          "example": "compiler_rt.float_from_int.__floattidf"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "no_spill_envelope",
+          "functions": 2,
+          "example": "compiler_rt.cmp.__ucmpti2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenType",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "compiler_rt.bswap.__bswapti2"
+        },
+        {
+          "diagnostic": "UnsupportedCodegenInstruction",
+          "selector_tag": "unsupported_value",
+          "functions": 1,
+          "example": "compiler_rt.bitreverse.__bitreverseti2"
+        }
+      ]
+    },
+    "production_events": {
+      "sequence": 85352,
+      "elapsed_ns": 4354152339,
+      "begins": 455,
+      "ends": 455,
+      "selected": 285,
+      "failed": 170,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 285,
+        "failed_functions": 170,
+        "normalization_runs": 1424,
+        "legalizer_attempts": 27455,
+        "legalizer_rewrites": 1128,
+        "original_form_retries": 778,
+        "original_form_selected": 159,
+        "selection_iterations": 1424,
+        "max_selection_iterations": 13,
+        "emitted_instructions": 64082,
+        "emitted_spill_instructions": 12848
+      },
+      "unique_functions": 455
+    },
+    "source_and_backend_verified": true,
+    "object_complete": false
+  },
+  "validation": {
+    "units": {
+      "Debug": 2066,
+      "ReleaseSafe": 2066
+    },
+    "structural": {
+      "Debug": 24,
+      "ReleaseSafe": 24
+    },
+    "profile": {
+      "Debug": 2,
+      "ReleaseSafe": 2
+    },
+    "readiness_procedures": 9,
+    "readiness_returncode": 0,
+    "abi_differential": {
+      "matched_cases": 60,
+      "function_mode_matches": 30
+    },
+    "native_populations": 79,
+    "debug_native_comparison": {
+      "status": "passed",
+      "retained_command_outcomes": 2945,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 246,
+        "--emit=selection-owner-manifest": 477,
+        "--emit=obj": 483
+      }
+    },
+    "fast_native_comparison": {
+      "status": "passed",
+      "retained_command_outcomes": 2945,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 246,
+        "--emit=selection-owner-manifest": 477,
+        "--emit=obj": 483
+      }
+    },
+    "core_cohort": {
+      "records": 36,
+      "selected_objects_and_observations_match": true,
+      "wrapper_metadata": [
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4153816",
+          "reference_bytes_after": "4153880",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4153816",
+          "reference_bytes_after": "4153880",
+          "linked_bytes_before": "6287668",
+          "linked_bytes_after": "6287668",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4151600",
+          "reference_bytes_after": "4151664",
+          "linked_bytes_before": "6288265",
+          "linked_bytes_after": "6288265",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4154368",
+          "reference_bytes_after": "4154432",
+          "linked_bytes_before": "6292446",
+          "linked_bytes_after": "6292446",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4148432",
+          "reference_bytes_after": "4148496",
+          "linked_bytes_before": "6287753",
+          "linked_bytes_after": "6287753",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4153968",
+          "reference_bytes_after": "4154032",
+          "linked_bytes_before": "6287625",
+          "linked_bytes_after": "6287625",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4152456",
+          "reference_bytes_after": "4152520",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4147864",
+          "reference_bytes_after": "4147928",
+          "linked_bytes_before": "6291977",
+          "linked_bytes_after": "6291977",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4148288",
+          "reference_bytes_after": "4148352",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4148376",
+          "reference_bytes_after": "4148440",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4148344",
+          "reference_bytes_after": "4148408",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseFast",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4148640",
+          "reference_bytes_after": "4148704",
+          "linked_bytes_before": "6291806",
+          "linked_bytes_after": "6291806",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "4039664",
+          "reference_bytes_after": "4039728",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "4039672",
+          "reference_bytes_after": "4039736",
+          "linked_bytes_before": "6142796",
+          "linked_bytes_after": "6142796",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "4035744",
+          "reference_bytes_after": "4035808",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "4040384",
+          "reference_bytes_after": "4040448",
+          "linked_bytes_before": "6147638",
+          "linked_bytes_after": "6147638",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "4034240",
+          "reference_bytes_after": "4034304",
+          "linked_bytes_before": "6142646",
+          "linked_bytes_after": "6142646",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "4039856",
+          "reference_bytes_after": "4039920",
+          "linked_bytes_before": "6142732",
+          "linked_bytes_after": "6142732",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "4038560",
+          "reference_bytes_after": "4038624",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "4034512",
+          "reference_bytes_after": "4034576",
+          "linked_bytes_before": "6147318",
+          "linked_bytes_after": "6147318",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "4034376",
+          "reference_bytes_after": "4034440",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "4034424",
+          "reference_bytes_after": "4034488",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "4034400",
+          "reference_bytes_after": "4034464",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSafe",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "4034480",
+          "reference_bytes_after": "4034544",
+          "linked_bytes_before": "6147062",
+          "linked_bytes_after": "6147062",
+          "reference_hash_equal": false,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.get",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "InternPool.PackedU64.init",
+          "reference_bytes_before": "149944",
+          "reference_bytes_after": "149944",
+          "linked_bytes_before": "356030",
+          "linked_bytes_after": "356030",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "Io.Event.reset",
+          "reference_bytes_before": "149992",
+          "reference_bytes_after": "149992",
+          "linked_bytes_before": "356217",
+          "linked_bytes_after": "356217",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "ascii.isAscii",
+          "reference_bytes_before": "149824",
+          "reference_bytes_after": "149824",
+          "linked_bytes_before": "356198",
+          "linked_bytes_after": "356198",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "atomic.Mutex.tryLock",
+          "reference_bytes_before": "149712",
+          "reference_bytes_after": "149712",
+          "linked_bytes_before": "356205",
+          "linked_bytes_after": "356205",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "bit_set.Dynamic.maskIndex",
+          "reference_bytes_before": "149872",
+          "reference_bytes_after": "149872",
+          "linked_bytes_before": "356005",
+          "linked_bytes_after": "356005",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356041",
+          "linked_bytes_after": "356041",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+          "reference_bytes_before": "149768",
+          "reference_bytes_after": "149768",
+          "linked_bytes_before": "356042",
+          "linked_bytes_after": "356042",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Requirements.slotType",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.size",
+          "reference_bytes_before": "149664",
+          "reference_bytes_after": "149664",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": false
+        },
+        {
+          "mode": "ReleaseSmall",
+          "function": "link.MachO.CodeSignature.Signature.slotType",
+          "reference_bytes_before": "149696",
+          "reference_bytes_after": "149696",
+          "linked_bytes_before": "355886",
+          "linked_bytes_after": "355886",
+          "reference_hash_equal": true,
+          "linked_hash_equal": true
+        }
+      ]
+    },
+    "full_run": {
+      "checked_returncode": 0,
+      "actual_returncode": 0,
+      "checked_wall_ns": 3942321796616,
+      "serial_run_id": "52bdae32f1af577fb6c4e9a0518e1e92",
+      "subgates": 17,
+      "serial_wall_ms": 3799067
+    },
+    "release_object_bundle": {
+      "rows": 100,
+      "producers": 1,
+      "consumers": 3,
+      "identity": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+      "matches_preceding_bundle": true,
+      "executions_cached": false
+    },
+    "execution_controls": {
+      "schema": "execution-breadth-controls-v2",
+      "harness_reuse": true,
+      "negative_controls": 54,
+      "function_modes": 21,
+      "observations": 22788,
+      "status": "passed"
+    }
+  },
+  "source_binding": {
+    "schema": 1,
+    "frozen_head": "44e51afc1f59ae8786a295c16699a63b01118c49",
+    "committed_head": "dba98f4347d614643233cde6db535976eb557992",
+    "committed_tree": "328613232aade0857c99aea79d033b6b0f58f253",
+    "files": 3164,
+    "all_file_hashes_match": true
+  },
+  "compiler_builds": {
+    "ReleaseFast": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-08/parser-throughput/adopted-compilers/ReleaseFast/bin/z_llvm",
+      "sha256": "61f44899356c505c61511a70107dbe4e15d65d6cce4cfeeb87c4c600c137d9f3",
+      "mode": "ReleaseFast",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline"
+    },
+    "Debug_native": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-08/parser-throughput/worktree-v3/local-state/compiler-debug-v3/Debug/bin/z_llvm",
+      "sha256": "0279f75b1fc99e6c994e884c1da0c689456ec71ceddd257aeeffe24df9b76e89",
+      "mode": "Debug",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline"
+    }
+  },
+  "fixed_contracts": {
+    "real_prefix": 100,
+    "core_execution_cohort": 12,
+    "compiler_rt_bypass_ratchet": 130,
+    "accepted_status_json_unchanged": true
+  },
+  "measurements": {
+    "census_seconds": 4019.40,
+    "production_checked_seconds": 4260.18,
+    "preceding_census_timeout_seconds": 7200.56,
+    "preceding_census_complete": false,
+    "controlled_speed_ratio_claimed": false
+  },
+  "limitations": [
+    "All 206 remaining original compiler rejections remain in scope for implementation and validation",
+    "Both production reports stop at remaining selection failures; no complete object, compiler startup or self-rebuild is established",
+    "Strict full-log equality is not claimed: selected compiler paths and independently built executable-wrapper metadata differ",
+    "All 36 cohort selected objects and observed fields match; four wrapper size/hash fields are retained separately without claiming an ELF-section cause",
+    "The active-union-copy experiment is unadopted and contributes no acceptance credit",
+    "Timings were measured under concurrent load and do not establish a controlled overall speedup"
+  ]
+}

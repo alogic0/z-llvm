@@ -1,8 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. Continue from the retained post-intrinsic frontier;
-accepted counts remain at `bb74a371` until a new cumulative acceptance passes.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `dba98f43`,
+selecting 8,722/8,928 compiler definitions and 285/455 runtime definitions.
+Continue through all 206 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -96,7 +97,7 @@ attempt timed out; the completed same-source retry with an explicit existing
 two-hour deadline supplies the matched production proof. The 2,759-file seal
 verifies. See the [accepted evidence](../evidence/scalable_cfg_indirect_phi.md).
 
-The accepted remaining count is 264 compiler definitions. The following frame
+That checkpoint leaves 264 compiler definitions. The following frame
 source at `726a7c55` passed all 17 integration gates and 75 native populations;
 its incomplete whole-input attempts were explicitly superseded. The integer
 intrinsic slice at `f955509f` then passed all 17 gates and 76 populations,
@@ -149,5 +150,17 @@ deadline in `codegen.loongarch.Assemble.parseInstruction`, with 211 complete
 function records and no terminal census event. It supplies no complete coverage
 count. Bounded final-source profiling identifies liveness lookups, hashing and
 binding scans as the remaining replay bottleneck; an isolated prototype follows
-the plan's explicit performance exception. Accepted compiler counts still await
-an unfiltered all-8,928 census and independent production replay.
+the plan's explicit performance exception. Those interrupted attempts are
+superseded by the complete unchanged-input proof below.
+
+Batch 08 is accepted at `dba98f43`: reusable eager selector snapshots and derived
+physical-binding counts preserve capture timing, rollback, dependency errors and
+fixed transaction guards. Debug/ReleaseSafe each pass 2,066 units, 24 structural
+and two profile checks; readiness and all 17 serial gates pass. Both complete
+79-population native suites preserve 2,945 outcomes and 1,206 compiler artifacts.
+The original-input census and independent production replay both traverse all
+8,928 definitions and select 8,722, adding 58 with every prior success and owner
+preserved. Complete event and source audits verify; runtime retains 285/455.
+The 206 remaining definitions are still in scope, beginning with observed
+integer-carrier and physical stack-argument boundaries. See the
+[accepted checkpoint](../evidence/compiler_selection_batch08.md).

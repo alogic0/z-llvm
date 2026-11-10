@@ -1,5 +1,10 @@
 # SSA transport and atomic-storage slice
 
+The subsequent [batch-08 checkpoint](compiler_selection_batch08.md) accepts this
+cumulative work at `dba98f43`: complete original census and production replays
+agree on 8,722/8,928 selections with no lost successes or owners; runtime remains
+285/455. The source-specific checks below retain the earlier slice's provenance.
+
 Batch 08 adds typed private normalization for literal integer/pointer-and-flag
 SSA values: PHIs, selects, insert/extract operations and stable freezes. Integer
 freezes use exact native carriers, including named widths 33..63 and i65/i96.
@@ -76,9 +81,9 @@ classification only. Neither proves complete compiler coverage. Bounded
 profiling on the final compiler confirms ordinary liveness/hash lookups dominate
 that function; an isolated performance prototype investigates the required replay.
 
-This is a validated capability slice, not whole-compiler acceptance. The original
+The initial source above was a validated capability slice. The original
 compiler input remains SHA-256
 `de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e`,
-with all 8,928 definitions required. Accepted counts remain 8,664/8,928 and
-285/455 until a complete original-input census and independent production replay
-pass together. Compiler startup and self-rebuild are not established here.
+with all 8,928 definitions required. The later batch-08 census and production
+replay now accept 8,722/8,928 and retain 285/455. All 206 remaining compiler
+definitions stay in scope. Compiler startup and self-rebuild are not established.

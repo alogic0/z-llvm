@@ -8,7 +8,8 @@ Review baseline: `ee1b8317767eb6de5443fd9850f8a0d6098b6aeb`.
 Implementation results and remaining limits are recorded in
 [validation performance evidence](../evidence/validation_performance.md).
 All 17 integration gates and the three-mode fresh/cache comparison pass.
-The compiler-selection goal remains paused, with accepted counters unchanged.
+That delivery left accepted counters unchanged. The compiler-selection goal has
+since resumed under the [main plan](2026-11-08-complete-compiler-selection.md).
 The subsequent [bounded compiler-throughput slice](../evidence/compiler_throughput.md)
 validates faster preservation planning with identical plans and native artifacts.
 
