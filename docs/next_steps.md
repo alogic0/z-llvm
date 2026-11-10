@@ -1,12 +1,12 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [binary128 checkpoint](evidence/binary128_payloads.md)
-at `7a96ace8`: **8,754/8,928** compiler definitions and **318/455** runtime
-definitions. All 174 remaining original compiler definitions stay in scope. The
-complete current census identifies stack-object copy/PHI pointer views, remaining
-floating/structured values and call-attribute boundaries for subsequent coherent
-groups. Use focused original-function and native checks during
+from the accepted [frame-address checkpoint](evidence/stack_object_addresses.md)
+at `948fad9c`: **8,777/8,928** compiler definitions and **318/455** runtime
+definitions. All 151 remaining original compiler definitions stay in scope. The
+complete current census identifies remaining floating/structured values, scalar
+operands, call attributes and independent frame-address legalization boundaries
+for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
 required replay cannot finish.
@@ -46,6 +46,23 @@ outcomes and 1,221 compiler artifacts per build. The
 binds all 3,186 frozen file hashes and final compiler receipts to the committed
 tree. The main plan continues with shared stack-object address materialization;
 the fixed prefix/cohort, ratchet and original inputs remain unchanged.
+
+Batch 11's shared owned-object addresses fix pointer-PHI swaps and simultaneous
+copy-source preservation. Complete census and independent production agree on
+23 compiler additions without lost successes or owners; runtime retains 318.
+Debug/ReleaseSafe each pass 2,095 units, 24 structural and two profile checks;
+all nine readiness procedures and seventeen serial gates pass. Both complete
+82-population native suites preserve the preceding 81 entries and 3,017 command
+outcomes. The eighteen intentional object differences in three populations retain
+their strict requires-review results and explicit LLVM/native review. All 180
+new fault controls are detected. The
+[acceptance record](evidence/stack_object_addresses_acceptance_20261110.json)
+binds 3,195 source hashes and both final compiler receipts to the code commit.
+The final Debug native replay matches all 3,053 same-source outcomes and 1,251
+artifacts; its older inspection discrepancy remains explicit. Continue with the
+isolated regression where an unrelated dynamic-copy object blocks a valid local
+pointer select, then reclassify later boundaries. Continue the main plan without
+waiting for renewed authorization.
 
 ## Completed bounded compiler-throughput delivery
 

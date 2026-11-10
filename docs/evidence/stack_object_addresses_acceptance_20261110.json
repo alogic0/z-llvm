@@ -1,0 +1,1184 @@
+{
+  "schema": "compiler-selection-batch11-acceptance-v1",
+  "status": "passed",
+  "recorded_date": "2026-11-10",
+  "accepted_revision": "948fad9c6801bcda68ff2c1fea3a089008be5889",
+  "accepted_tree": "438b7d87e25b6f2d8f1005faf2ffcd6d240253e6",
+  "baseline_accepted_revision": "7a96ace81d515b120ec246464720a4a84b64ec19",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "evidence_root": "local-state/validations/compiler-selection-completion-20261108/batch-11",
+  "active_objective": {
+    "definitions": 8928,
+    "selected": 8777,
+    "remaining": 151,
+    "complete": false
+  },
+  "compiler": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "definitions": 8928,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 8928,
+        "selected": 8754,
+        "failed": 174
+      },
+      "after": {
+        "event": "complete",
+        "examined": 8928,
+        "selected": 8777,
+        "failed": 151
+      },
+      "lost_selections": [],
+      "gained_selections": [
+        "\"crypto.sha3.ShakeLike(128,31,12).hash\"",
+        "Air.Liveness.analyzeBody__func_49723",
+        "Air.Liveness.analyzeBody__func_49725",
+        "Builtin.hash",
+        "InternPool.Key.hash64",
+        "Zcu.PerThread.errorSetFromUnsortedNames",
+        "codegen.riscv64.CodeGen.airAggregateInit",
+        "codegen.sparc64.CodeGen.airCall",
+        "codegen.sparc64.CodeGen.genBody",
+        "hash.auto_hash.autoHash__func_431",
+        "hash.auto_hash.hash__func_10563",
+        "hash.auto_hash.hash__func_490",
+        "hash.auto_hash.hash__func_491",
+        "hash.auto_hash.hash__func_492",
+        "hash.auto_hash.hash__func_493",
+        "hash.auto_hash.hash__func_52183",
+        "link.MachO.checkDuplicates",
+        "sort.block.block__func_13181",
+        "sort.block.block__func_13871",
+        "sort.block.block__func_14023",
+        "sort.block.block__func_15116",
+        "sort.block.block__func_15175",
+        "sort.block.block__func_29110"
+      ],
+      "owner_changes": []
+    },
+    "census_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 4066265060077
+    },
+    "production_audit": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "input_bytes": 443624107,
+      "definitions": 8928,
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 8777,
+        "failed": 151
+      },
+      "profile_function_count": 8928,
+      "all_function_outcomes_match": true,
+      "selected_identities_match": true,
+      "failure_tuples_match": true,
+      "prior_successes_preserved": true,
+      "gained_selections": [
+        "\"crypto.sha3.ShakeLike(128,31,12).hash\"",
+        "Air.Liveness.analyzeBody__func_49723",
+        "Air.Liveness.analyzeBody__func_49725",
+        "Builtin.hash",
+        "InternPool.Key.hash64",
+        "Zcu.PerThread.errorSetFromUnsortedNames",
+        "codegen.riscv64.CodeGen.airAggregateInit",
+        "codegen.sparc64.CodeGen.airCall",
+        "codegen.sparc64.CodeGen.genBody",
+        "hash.auto_hash.autoHash__func_431",
+        "hash.auto_hash.hash__func_10563",
+        "hash.auto_hash.hash__func_490",
+        "hash.auto_hash.hash__func_491",
+        "hash.auto_hash.hash__func_492",
+        "hash.auto_hash.hash__func_493",
+        "hash.auto_hash.hash__func_52183",
+        "link.MachO.checkDuplicates",
+        "sort.block.block__func_13181",
+        "sort.block.block__func_13871",
+        "sort.block.block__func_14023",
+        "sort.block.block__func_15116",
+        "sort.block.block__func_15175",
+        "sort.block.block__func_29110"
+      ],
+      "source_and_backend_verified": true,
+      "process_completed": true,
+      "actual_returncode": 1,
+      "object_complete": false
+    },
+    "production_process": {
+      "status": "finished",
+      "actual_returncode": 1,
+      "outcome": "completed",
+      "wall_ns": 4409477617196
+    },
+    "production_events": {
+      "sequence": 4363840,
+      "elapsed_ns": 4378756826962,
+      "begins": 8928,
+      "ends": 8928,
+      "selected": 8777,
+      "failed": 151,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 8777,
+        "failed_functions": 151,
+        "normalization_runs": 66388,
+        "legalizer_attempts": 1500148,
+        "legalizer_rewrites": 64639,
+        "original_form_retries": 33225,
+        "original_form_selected": 7179,
+        "selection_iterations": 66388,
+        "max_selection_iterations": 32,
+        "emitted_instructions": 19803142,
+        "emitted_spill_instructions": 4716012
+      },
+      "unique_functions": 8928
+    },
+    "object_complete": false
+  },
+  "runtime": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "definitions": 455,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 318,
+        "failed": 137
+      },
+      "after": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 318,
+        "failed": 137
+      },
+      "lost_selections": [],
+      "gained_selections": [],
+      "owner_changes": []
+    },
+    "production_audit": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "input_bytes": 1856543,
+      "definitions": 455,
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 318,
+        "failed": 137
+      },
+      "profile_function_count": 455,
+      "all_function_outcomes_match": true,
+      "selected_identities_match": true,
+      "failure_tuples_match": true,
+      "prior_successes_preserved": true,
+      "gained_selections": [],
+      "source_and_backend_verified": true,
+      "process_completed": true,
+      "actual_returncode": 1,
+      "object_complete": false
+    },
+    "production_events": {
+      "sequence": 94130,
+      "elapsed_ns": 2876440971,
+      "begins": 455,
+      "ends": 455,
+      "selected": 318,
+      "failed": 137,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 318,
+        "failed_functions": 137,
+        "normalization_runs": 1534,
+        "legalizer_attempts": 30779,
+        "legalizer_rewrites": 1256,
+        "original_form_retries": 798,
+        "original_form_selected": 177,
+        "selection_iterations": 1534,
+        "max_selection_iterations": 13,
+        "emitted_instructions": 76291,
+        "emitted_spill_instructions": 15343
+      },
+      "unique_functions": 455
+    },
+    "object_complete": false
+  },
+  "validation": {
+    "units": {
+      "Debug": 2095,
+      "ReleaseSafe": 2095
+    },
+    "structural": {
+      "Debug": 24,
+      "ReleaseSafe": 24
+    },
+    "profile": {
+      "Debug": 2,
+      "ReleaseSafe": 2
+    },
+    "debug_unit_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 272159265244
+    },
+    "safe_unit_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 310713264459
+    },
+    "unit_source_binding": {
+      "status": "passed",
+      "files": 3195,
+      "all_unit_validated_files_match": true
+    },
+    "readiness_procedures": 9,
+    "readiness_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 643496391746
+    },
+    "abi_differential": {
+      "matched_cases": 60,
+      "function_mode_matches": 30
+    },
+    "native_populations": 82,
+    "Debug": {
+      "local": 2533722,
+      "reference": 1266861
+    },
+    "ReleaseFast": {
+      "local": 2533722,
+      "reference": 1266861
+    },
+    "debug_native_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 963207449835
+    },
+    "debug_native_comparison": {
+      "status": "failed",
+      "requires_review": true,
+      "registry": {
+        "prior_populations": 81,
+        "current_populations": 82,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3017,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 252,
+        "--emit=selection-owner-manifest": 489,
+        "--emit=obj": 477
+      },
+      "new_population_commands": 36,
+      "artifact_differences": [
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSmall/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSmall/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#0",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseFast/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseFast/stack-addresses-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSafe/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSafe/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSmall/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSmall/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSafe/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSafe/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSafe/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSafe/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#1",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSafe/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSafe/stack-addresses-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#2",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSmall/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSmall/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseFast/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseFast/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseFast/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseFast/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#1",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSafe/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSafe/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseFast/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseFast/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSmall/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSmall/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#1",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSafe/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSafe/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#0",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseFast/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseFast/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#2",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSmall/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSmall/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseFast/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseFast/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#2",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/native-all-debug-v9-result/ReleaseSmall/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/native-all-debug-v5-result/ReleaseSmall/stack-addresses-direct-object.stdout"
+        }
+      ]
+    },
+    "fast_native_comparison": {
+      "status": "failed",
+      "requires_review": true,
+      "registry": {
+        "prior_populations": 81,
+        "current_populations": 82,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3017,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 252,
+        "--emit=selection-owner-manifest": 489,
+        "--emit=obj": 477
+      },
+      "new_population_commands": 36,
+      "artifact_differences": [
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#0",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/stack-addresses-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#1",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/stack-addresses-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#2",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#1",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#1",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#0",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#2",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#2",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/stack-addresses-direct-object.stdout"
+        }
+      ]
+    },
+    "native_artifact_review": {
+      "schema": 1,
+      "debug_review": "native-artifact-review-v4/debug-review.json",
+      "fast_native_status": "passed",
+      "registry": {
+        "prior_populations": 81,
+        "current_populations": 82,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3017,
+      "new_population_commands": 36,
+      "identical_prior_artifacts": {
+        "optimizer": 252,
+        "--emit=selection-owner-manifest": 489,
+        "--emit=obj": 477
+      },
+      "changed_objects": 18,
+      "same_changes_in_both_compiler_builds": true,
+      "object_differences": [
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#0",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/stack-addresses-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#1",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/stack-addresses-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#2",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/address-flow-optimized.ll\"]#0",
+          "baseline_sha256": "9b53de6bb1443a45c8f7bd38e1a22d9403a1a27ba2281b5400d8c1a97caa913d",
+          "candidate_sha256": "716e314bc1b2bff2d7703a4f086d28232f51dbf7fbe6c5062ed9dfc1fbdc7bce",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/address-flow-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/address-flow-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/large-frame-optimized.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/large-frame-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/large-frame-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#1",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/stack-addresses-optimized.ll\"]#0",
+          "baseline_sha256": "3a1dc7a2aa96c169bda2660b8d58eb3bc5a830ce1338111b498c70ead3e1c7e0",
+          "candidate_sha256": "7d45926810fbc4a40542df59d5ab5dc1ffd92e3c1b27f2620372658d0b18ce13",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/stack-addresses-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/stack-addresses-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#1",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSafe/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSafe/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#0",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/address_flow.ll\"]#2",
+          "baseline_sha256": "2b990c5d28d74bcef40b4640b809dc2a489d4bd0696f5cf46c3aa0cbeddc9019",
+          "candidate_sha256": "4aa16d02f0c49e2526be17192ebd94fbc1f1697a884e5b859cab77bf55713653",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/address-flow-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/address-flow-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/large_frame.ll\"]#0",
+          "baseline_sha256": "e09d63e04ffe8a0c1cf83910b81db2e9366e72d08c5c0f7f85b2f30300c16c3f",
+          "candidate_sha256": "967a8d2aec992693506831b3db7acb24d440d5a25cdbdad4127cfa64d63f29bd",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseFast/large-frame-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseFast/large-frame-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/stack_addresses.ll\"]#2",
+          "baseline_sha256": "41746aabb3950cf308021e97a66421ee68b73d6e66bb0db4e9470adbbc8c6ffe",
+          "candidate_sha256": "7c79530c1e0b20525e42f94605f91afea9d8d7d51c34754e426585dab7b5e7f9",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-10/integrated-v9/unchanged-upstream-c/ReleaseSmall/stack-addresses-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/integrated-v5/unchanged-upstream-c/ReleaseSmall/stack-addresses-direct-object.stdout"
+        }
+      ],
+      "local_observations": 2533722,
+      "reference_observations": 1266861,
+      "status": "reviewed",
+      "all_previous_native_semantics_preserved": true,
+      "all_prior_artifact_bytes_identical": false,
+      "final_debug_replay_verified": true,
+      "final_debug_comparison": "native-compare-debug-v5/report.json",
+      "complete_debug_replay_comparison": "native-debug-replay-compare-v5/report.json",
+      "final_debug_build": "compiler-v5/Debug/bin/z_llvm.build.json",
+      "prior_debug_acceptance_superseded": true
+    },
+    "debug_replay_comparison": {
+      "status": "passed",
+      "requires_review": null,
+      "registry": {
+        "prior_populations": 82,
+        "current_populations": 82,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3053,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 255,
+        "--emit=selection-owner-manifest": 495,
+        "--emit=obj": 501
+      },
+      "new_population_commands": 0,
+      "artifact_differences": []
+    },
+    "stack_object_addresses": {
+      "functions": 19,
+      "Debug": {
+        "status": "passed",
+        "compiler_sha256": "378d57e6d8f7c5b71e482aaf94ca89c023ae927fe4acb1d426bd1b4afe7e3df2",
+        "local_observations": 56880,
+        "reference_observations": 28440,
+        "faults": {
+          "status": "passed",
+          "controls": 90,
+          "detected": 90
+        }
+      },
+      "ReleaseFast": {
+        "status": "passed",
+        "compiler_sha256": "0291cbc02d4c11d16714f623b4e79086374d616c9fdccdb1c824c9790909d619",
+        "local_observations": 56880,
+        "reference_observations": 28440,
+        "faults": {
+          "status": "passed",
+          "controls": 90,
+          "detected": 90
+        }
+      }
+    },
+    "core_cohort": {
+      "schema": 1,
+      "records": 36,
+      "identities_match": true,
+      "unique_identities": 36,
+      "mode_counts": [
+        {
+          "mode": "ReleaseFast",
+          "records": 12
+        },
+        {
+          "mode": "ReleaseSafe",
+          "records": 12
+        },
+        {
+          "mode": "ReleaseSmall",
+          "records": 12
+        }
+      ],
+      "all_selected_objects_and_observations_match": true,
+      "strict_all_field_equality": false,
+      "wrapper_metadata": {
+        "reviewed_fields": [
+          "reference_bytes",
+          "reference_sha256",
+          "linked_bytes",
+          "linked_sha256"
+        ],
+        "differing_records": 31
+      },
+      "status": "passed"
+    },
+    "full_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 3759581716131
+    },
+    "full_run": {
+      "schema": 1,
+      "subgates": 17,
+      "unique_subgates": 17,
+      "all_gates_passed": true,
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "67783",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "2075",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "3720",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "3684",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "21808",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "86947",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "36622",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "17968",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "14370",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "918906",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "883516",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "497708",
+          "cache_status": "hit"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "2424006",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "891",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1941",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1692",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "12203",
+          "cache_status": "none"
+        }
+      ],
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "serial": [
+        {
+          "schema_version": "1",
+          "run_id": "2aaac0a7ad8df52c38673a0fed4ebbec",
+          "scratch_path": "local-state/validations/compiler-selection-completion-20261108/batch-11/serial-v5",
+          "bundle_path": "local-state/validations/compiler-selection-completion-20261108/batch-11/serial-v5/release_source_object_bundle",
+          "target": "x86_64-unknown-linux-gnu",
+          "mode": "serial",
+          "real_rows_concurrency": "3",
+          "subgates": "17",
+          "wall_ms": "3759365",
+          "starting_free_bytes": "29715955712",
+          "minimum_observed_free_bytes": "25684123648",
+          "final_free_bytes": "45223350272",
+          "observed_peak_bytes": "4031832064",
+          "reserve_bytes": "11410065408",
+          "required_start_bytes": "20000000000",
+          "local_fail": "0"
+        }
+      ],
+      "release_object_bundle": [
+        {
+          "schema_version": "1",
+          "produced": "1",
+          "consumers": "3",
+          "identity": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+          "executions_cached": "false",
+          "local_fail": "0"
+        }
+      ],
+      "inventory": [
+        {
+          "schema_version": "1",
+          "subgates": "17",
+          "runner": "zig-run",
+          "runner_input_scope": "command",
+          "target": "x86_64-unknown-linux-gnu",
+          "reported_cache_contracts": "3",
+          "unreported_cache_contracts": "14",
+          "release_source_object_bundle_contracts": "4",
+          "no_artifact_contracts": "13",
+          "local_fail": "0"
+        }
+      ],
+      "status": "passed"
+    },
+    "strict_log_comparisons": {
+      "full": {
+        "status": "finished",
+        "actual_returncode": 1,
+        "outcome": "completed",
+        "wall_ns": 700759817
+      },
+      "real_rows": {
+        "status": "finished",
+        "actual_returncode": 1,
+        "outcome": "completed",
+        "wall_ns": 700661746
+      },
+      "canonical_rows": {
+        "before": 1520,
+        "after": 1521
+      },
+      "equality_claimed": false
+    },
+    "execution_controls": {
+      "schema": "execution-breadth-controls-v2",
+      "harness_reuse": true,
+      "negative_controls": 54,
+      "function_modes": 21,
+      "observations": 22788,
+      "status": "passed"
+    }
+  },
+  "source_binding": {
+    "schema": 1,
+    "frozen_head": "64641b61d1f3ac962e3c3d96b9f079abb111480a",
+    "committed_head": "948fad9c6801bcda68ff2c1fea3a089008be5889",
+    "committed_tree": "438b7d87e25b6f2d8f1005faf2ffcd6d240253e6",
+    "files": 3195,
+    "compiler_source_files": 596,
+    "all_file_hashes_match": true,
+    "build_receipts_match": true,
+    "frozen_source_verified_after_integration": true,
+    "status": "passed"
+  },
+  "rebuild_binding": {
+    "status": "passed",
+    "source_delta": {
+      "schema": 1,
+      "baseline_file_count": 3195,
+      "candidate_file_count": 3195,
+      "same_membership": true,
+      "changed_files": [
+        {
+          "path": "src/codegen/x86_64/generic_cfg/padded_frame_tests.zig",
+          "before": "bac98f2a6803699bbf7a8c25c3ac8346e492f3755265e2b07e2e38f3f8a343ce",
+          "after": "3d026b0122d377d12aa29c7a8b1652d337b9ee782daa44d8ca6611b288bcd1a8"
+        }
+      ],
+      "status": "passed",
+      "production_sources_unchanged": true
+    },
+    "ReleaseFast": {
+      "before": "0291cbc02d4c11d16714f623b4e79086374d616c9fdccdb1c824c9790909d619",
+      "after": "0291cbc02d4c11d16714f623b4e79086374d616c9fdccdb1c824c9790909d619",
+      "actual": "0291cbc02d4c11d16714f623b4e79086374d616c9fdccdb1c824c9790909d619",
+      "byte_identical": true
+    },
+    "census": {
+      "before": "5d7c45ff19f06effb114b29f8819b041e8258bccf34e7ce201fe443240c0e507",
+      "after": "5d7c45ff19f06effb114b29f8819b041e8258bccf34e7ce201fe443240c0e507",
+      "byte_identical": true
+    },
+    "Debug": {
+      "byte_identical": false,
+      "validation_replayed": true,
+      "incident_record": "binary-review-v5/inspection-incident.json",
+      "validation_status": "passed"
+    }
+  },
+  "compiler_builds": {
+    "Debug": {
+      "compiler": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/compiler-v5/Debug/bin/z_llvm",
+      "compiler_sha256": "378d57e6d8f7c5b71e482aaf94ca89c023ae927fe4acb1d426bd1b4afe7e3df2",
+      "build_mode": "Debug",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    },
+    "ReleaseFast": {
+      "compiler": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-11/compiler-v5/ReleaseFast/bin/z_llvm",
+      "compiler_sha256": "0291cbc02d4c11d16714f623b4e79086374d616c9fdccdb1c824c9790909d619",
+      "build_mode": "ReleaseFast",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    }
+  },
+  "superseded_debug_inspection": {
+    "schema": 1,
+    "status": "superseded-debug-validation",
+    "operation": "GNU objcopy --dump-section without an explicit output object repacked both Debug installs in place",
+    "initial_debug_v4_sha256": "f69bac4024c1a9c8cc688076321fb5e9bcb84387d679b544c197601111227de1",
+    "repacked_debug_v4_sha256": "db03461e04b0f42352180d8de448e025f4f944b028b6bc42105d589ef0b4f329",
+    "initial_debug_v5_sha256": "378d57e6d8f7c5b71e482aaf94ca89c023ae927fe4acb1d426bd1b4afe7e3df2",
+    "repacked_debug_v5_sha256": "1fa1cfdc88aa1af469d6e8789ea4ee317f806fbcca1c5c0be1f0c0a41a36e325",
+    "debug_v5_recovery": "Restored from the unchanged Zig build-cache artifact and verified against the original v5 build receipt",
+    "debug_v4_recovery": "No matching original cache artifact remains; retain the repacked install and original receipt as an explicit discrepancy, with no final acceptance credit",
+    "fresh_debug_validation": [
+      "native-all-debug-v5",
+      "native-debug-v5"
+    ],
+    "release_fast_and_census_untouched": true,
+    "release_fast_v4_v5_byte_identical": true,
+    "census_v4_v5_byte_identical": true,
+    "debug_v4_v5_byte_identical": false,
+    "debug_code_identity_claimed": false
+  },
+  "fixed_contracts": {
+    "real_prefix": 100,
+    "core_execution_cohort": 12,
+    "compiler_rt_bypass_ratchet": 130,
+    "accepted_status_json_unchanged": true,
+    "frozen_audit": "passed",
+    "scratch_pins_verified": 13,
+    "scratch_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 202529348
+    },
+    "air_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 3761143076
+    }
+  },
+  "limitations": [
+    "All 151 remaining original compiler rejections remain in scope",
+    "Production completes selection and stops at remaining rejections; complete objects, compiler startup and self-rebuild are not established",
+    "The native comparator remains failed/requires-review for 18 intentionally changed objects; all other prior artifacts and all prior outcomes are preserved",
+    "No strict full-log equality is claimed; the new mandatory summary and four explicit core wrapper metadata fields differ",
+    "The final test-only correction leaves ReleaseFast and census bytes identical; Debug differs and its complete native/fault validation is freshly replayed",
+    "Earlier Debug v4 proofs are superseded after its install was repacked during inspection; its original receipt and discrepancy remain explicit",
+    "Earlier prototypes, failures and incomplete attempts remain retained without acceptance credit",
+    "Concurrent replay timings establish completion without a controlled performance ratio"
+  ]
+}

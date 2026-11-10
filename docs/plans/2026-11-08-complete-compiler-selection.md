@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `7a96ace8`,
-selecting 8,754/8,928 compiler definitions and 318/455 runtime definitions.
-Continue through all 174 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `948fad9c`,
+selecting 8,777/8,928 compiler definitions and 318/455 runtime definitions.
+Continue through all 151 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -195,3 +195,21 @@ and all 3,186 frozen file hashes bind to the committed tree. Production still
 stops at remaining selection failures. Continue through all 174 original compiler
 rejections, beginning with stack-object copy and PHI pointer views. See the
 [accepted binary128 evidence](../evidence/binary128_payloads.md).
+
+Batch 11 is accepted at `948fad9c`: owned scalar, integer-pair and array frame
+addresses pass through copy, pointer-PHI, byte-offset and direct-call contracts.
+The change fixes confirmed pointer-PHI swap and simultaneous copy-source
+miscompiles. Debug/ReleaseSafe each pass 2,095 units, 24 structural and two
+profile checks; readiness and all seventeen serial gates pass. Both complete
+82-population native suites preserve all 81 preceding entries and 3,017 outcomes.
+Of 1,236 prior artifacts, 1,218 are byte-identical; the same eighteen intentional
+object changes in three populations pass LLVM comparison and explicit review.
+The strict requires-review results remain intact. All 180 new fault checks
+detect their errors. Complete original-input census and independent production
+agree on 8,777 compiler selections, adding 23 without lost successes or owners;
+runtime retains 318. All 4,363,840 compiler events balance, and 3,195 frozen file
+hashes bind to the code commit. The final test-only correction preserves exact
+Fast/census binaries; Debug native/fault proofs are freshly replayed, with its
+inspection discrepancy and superseded records explicit. Continue through the
+remaining 151 original compiler rejections. See the
+[accepted frame-address evidence](../evidence/stack_object_addresses.md).
