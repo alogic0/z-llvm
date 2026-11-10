@@ -126,10 +126,7 @@ const control_compare_module = @import("actions/control_compare.zig");
 const scalar_arithmetic_module = @import("actions/scalar_arithmetic.zig");
 const calls = @import("actions/calls.zig");
 
-const ValueEntry = struct {
-    name: []const u8,
-    binding: ValueBinding,
-};
+const ValueEntry = selector_types.ValueSnapshotEntry;
 
 const SpillEntry = selector_state.SpillSlotSnapshotEntry;
 
@@ -159,8 +156,8 @@ const CoreSnapshot = struct {
     preserve_current_position_values: bool,
 
     fn init(selector: *ComposedBlockSelector) !CoreSnapshot {
-        const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
-        errdefer selector.allocator.free(values);
+        const values = try selector.value_snapshot_buffers.acquire(selector.allocator, selector.values.count());
+        errdefer selector.value_snapshot_buffers.release(values);
         const spill_slots = try selector_state.captureSpillSlots(selector);
         errdefer spill_slots.deinit(selector.allocator);
         const phi_destinations = try selector.allocator.alloc(PhiDestinationEntry, selector.phi_destinations.count());
@@ -222,6 +219,7 @@ const CoreSnapshot = struct {
         selector.stack_frame_bytes = snapshot.stack_frame_bytes;
         selector.expired_binding_this_position = snapshot.expired_binding_this_position;
         selector.accumulator_domain = snapshot.accumulator_domain;
+        selector_state.restorePhysicalBindingFacts(selector);
         selector.address_dependencies = snapshot.address_dependencies;
         selector.eflags.restore(snapshot.eflags_snapshot);
         selector.eflags_semantics.items.len = snapshot.eflags_semantics_len;
@@ -231,7 +229,7 @@ const CoreSnapshot = struct {
     fn deinit(snapshot: *CoreSnapshot, selector: *ComposedBlockSelector) void {
         selector.allocator.free(snapshot.phi_destinations);
         snapshot.spill_slots.deinit(selector.allocator);
-        selector.allocator.free(snapshot.values);
+        selector.value_snapshot_buffers.release(snapshot.values);
     }
 };
 

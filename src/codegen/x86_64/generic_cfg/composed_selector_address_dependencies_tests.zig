@@ -10,6 +10,66 @@ const ComposedBlockSelector = state_data.ComposedBlockSelector;
 const MachineFunction = x86_64_machine.MachineFunction;
 const SelectorAllocationPlan = stage2_planning.SelectorAllocationPlan;
 
+test "generic cfg selector physical lookups preserve dependency errors on unrelated spill homes" {
+    var machine = MachineFunction.init("physical-lookup-errors", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector_state.beginPhysicalBindingFacts(&selector);
+    try selector_state.bindValueLoc(&selector, "unrelated", .{ .spill64 = .slot0 });
+    try std.testing.expect(try selector_state.liveAccumulatorName(&selector) == null);
+    try std.testing.expect(try selector_state.liveAccumulatorNameAfterCurrent(&selector) == null);
+    try std.testing.expect(try selector_state.liveAccumulatorNameExcept(&selector, "ignored") == null);
+    try std.testing.expect(try selector_state.liveEaxName(&selector) == null);
+    try std.testing.expect(try selector_state.liveRaxName(&selector) == null);
+    try std.testing.expect(try selector_state.liveScalarNameInRegExcept(&selector, .r8, null) == null);
+    try std.testing.expect(try selector_state.livePairNameContainingRegExcept(&selector, .r8, null) == null);
+    try selector.address_dependencies.replaceAddress("owner", &.{
+        .{ .name = "dependency", .identity_type = .integer, .role = .index },
+    });
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.liveAccumulatorName(&selector));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.liveAccumulatorNameAfterCurrent(&selector));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.liveAccumulatorNameExcept(&selector, "ignored"));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.liveEaxName(&selector));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.liveRaxName(&selector));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.liveScalarNameInRegExcept(&selector, .r8, null));
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_state.livePairNameContainingRegExcept(&selector, .r8, null));
+}
+
+test "generic cfg selector physical lookup filters preserve width aliasing and liveness boundaries" {
+    var machine = MachineFunction.init("physical-lookup-boundaries", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 5;
+    try selector_state.bindValueLoc(&selector, "unrelated", .{ .spill64 = .slot0 });
+    try selector_state.bindValueLoc(&selector, "accumulator", .eax);
+    try plan.interval_ends.put("accumulator", 5);
+    try std.testing.expectEqualStrings("accumulator", (try selector_state.liveAccumulatorName(&selector)).?);
+    try std.testing.expect(try selector_state.liveAccumulatorNameAfterCurrent(&selector) == null);
+    try std.testing.expect(try selector_state.liveEaxName(&selector) == null);
+    try plan.interval_ends.put("accumulator", 6);
+    try std.testing.expectEqualStrings("accumulator", (try selector_state.liveEaxName(&selector)).?);
+    try std.testing.expect(try selector_state.liveRaxName(&selector) == null);
+    try std.testing.expect(try selector_state.liveAccumulatorNameExcept(&selector, "accumulator") == null);
+    try selector_state.bindValueLoc(&selector, "accumulator", .rax);
+    try std.testing.expect(try selector_state.liveEaxName(&selector) == null);
+    try std.testing.expectEqualStrings("accumulator", (try selector_state.liveRaxName(&selector)).?);
+    try selector_state.bindValueLoc(&selector, "scalar", .{ .scratch32 = .r8 });
+    try plan.interval_ends.put("scalar", 6);
+    try std.testing.expectEqualStrings("scalar", (try selector_state.liveScalarNameInRegExcept(&selector, .r8, null)).?);
+    try std.testing.expect(try selector_state.liveScalarNameInRegExcept(&selector, .r8, "scalar") == null);
+    try std.testing.expect(try selector_state.livePairNameContainingRegExcept(&selector, .r8, null) == null);
+    try selector_state.bindValueLoc(&selector, "pair", .{ .scratch128 = .{ .lo = .r9, .hi = .rdi } });
+    try plan.interval_ends.put("pair", 6);
+    try std.testing.expectEqualStrings("pair", (try selector_state.livePairNameContainingRegExcept(&selector, .rdi, null)).?);
+    try std.testing.expect(try selector_state.livePairNameContainingRegExcept(&selector, .rdi, "pair") == null);
+    try std.testing.expect(try selector_state.liveScalarNameInRegExcept(&selector, .rdi, null) == null);
+}
+
 const TypedIdentity = struct {
     name: []const u8,
     identity_type: AddressDependencyDomain.IdentityType,

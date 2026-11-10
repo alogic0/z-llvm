@@ -61,6 +61,8 @@ pub const ComposedBlockSelector = struct {
     eflags: eflags.Liveness = .{},
     eflags_semantics: std.ArrayList(EflagsSemanticRecord) = .empty,
     accumulator_domain: AccumulatorDomain = .{},
+    value_snapshot_buffers: selector_types.ValueSnapshotBuffers = .{},
+    physical_binding_facts: selector_types.PhysicalBindingFacts = .{},
     address_dependencies: AddressDependencyDomain = .{},
 
     pub fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
@@ -91,6 +93,7 @@ pub const ComposedBlockSelector = struct {
         selector.phi_results.deinit();
         selector.abi_pointer_params.deinit();
         selector.readonly_pointer_params.deinit();
+        selector.value_snapshot_buffers.deinit(selector.allocator);
         selector.values.deinit();
     }
 };

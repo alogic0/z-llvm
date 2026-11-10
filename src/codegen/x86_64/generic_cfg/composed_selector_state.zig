@@ -470,6 +470,7 @@ pub const AccumulatorDefinitionSession = struct {
     }
 
     fn requireAccumulatorReadyForCommit(session: *const AccumulatorDefinitionSession) !void {
+        if (session.selector.physical_binding_facts.accumulatorEmpty()) return;
         const reused_source = session.reused_source;
         var it = session.selector.values.iterator();
         while (it.next()) |entry| switch (entry.value_ptr.loc) {
@@ -483,6 +484,7 @@ pub const AccumulatorDefinitionSession = struct {
     }
 
     fn requireAccumulatorUnbound(session: *const AccumulatorDefinitionSession) !void {
+        if (session.selector.physical_binding_facts.accumulatorEmpty()) return;
         var it = session.selector.values.iterator();
         while (it.next()) |entry| switch (entry.value_ptr.loc) {
             .eax, .rax => return error.AccumulatorAliasConflict,
@@ -606,14 +608,11 @@ pub const AccumulatorDefinitionTransaction = struct {
 
     const Lifecycle = enum { active, committed, rolled_back };
 
-    const ValueEntry = struct {
-        name: []const u8,
-        binding: ValueBinding,
-    };
+    const ValueEntry = selector_types.ValueSnapshotEntry;
 
     pub fn begin(selector: *ComposedBlockSelector) !AccumulatorDefinitionTransaction {
-        const values = try selector.allocator.alloc(ValueEntry, selector.values.count());
-        errdefer selector.allocator.free(values);
+        const values = try selector.value_snapshot_buffers.acquire(selector.allocator, selector.values.count());
+        errdefer selector.value_snapshot_buffers.release(values);
         const spill_slots = try captureSpillSlots(selector);
         errdefer spill_slots.deinit(selector.allocator);
 
@@ -639,7 +638,7 @@ pub const AccumulatorDefinitionTransaction = struct {
     pub fn deinit(transaction: *AccumulatorDefinitionTransaction) void {
         if (transaction.lifecycle == .active) transaction.restore(.rolled_back);
         transaction.spill_slots.deinit(transaction.selector.allocator);
-        transaction.selector.allocator.free(transaction.values);
+        transaction.selector.value_snapshot_buffers.release(transaction.values);
     }
 
     pub fn prepare(
@@ -739,6 +738,7 @@ pub const AccumulatorDefinitionTransaction = struct {
         transaction.selector.next_virtual_reg = transaction.next_virtual_reg;
         transaction.selector.next_spill_slot = transaction.next_spill_slot;
         transaction.selector.accumulator_domain = transaction.accumulator_domain;
+        restorePhysicalBindingFacts(transaction.selector);
         transaction.selector.address_dependencies = transaction.address_dependencies;
         transaction.selector.eflags.restore(transaction.eflags_snapshot);
         transaction.selector.eflags_semantics.items.len = transaction.eflags_semantics_len;
@@ -898,6 +898,21 @@ pub fn bindResultLoc(selector: *ComposedBlockSelector, name: []const u8, actual:
     try putValueBinding(selector, name, .{ .vreg = vreg, .loc = target });
 }
 
+pub fn beginPhysicalBindingFacts(selector: *ComposedBlockSelector) void {
+    std.debug.assert(selector.values.count() == 0);
+    selector.physical_binding_facts = .{ .active = true };
+}
+
+/// Rollback restores canonical bindings first. Rebuild derived counts without
+/// expanding either transaction snapshot's pinned representation.
+pub fn restorePhysicalBindingFacts(selector: *ComposedBlockSelector) void {
+    if (!selector.physical_binding_facts.active) return;
+    var restored: selector_types.PhysicalBindingFacts = .{ .active = true };
+    var it = selector.values.iterator();
+    while (it.next()) |entry| restored.change(null, entry.value_ptr.loc);
+    selector.physical_binding_facts = restored;
+}
+
 fn putValueBinding(
     selector: *ComposedBlockSelector,
     name: []const u8,
@@ -906,14 +921,18 @@ fn putValueBinding(
     var next_dependencies = selector.address_dependencies;
     try updateAddressDependenciesForBinding(&next_dependencies, name, binding.loc);
     try selector.values.ensureUnusedCapacity(1);
+    const before = if (selector.values.get(name)) |old| old.loc else null;
     selector.values.putAssumeCapacity(name, binding);
+    selector.physical_binding_facts.change(before, binding.loc);
     selector.address_dependencies = next_dependencies;
 }
 
 pub fn removeValueBinding(selector: *ComposedBlockSelector, name: []const u8) bool {
     var next_dependencies = selector.address_dependencies;
     next_dependencies.removeOwner(name);
+    const before = if (selector.values.get(name)) |old| old.loc else null;
     const removed = selector.values.remove(name);
+    if (removed) selector.physical_binding_facts.change(before, null);
     selector.address_dependencies = next_dependencies;
     return removed;
 }
@@ -2493,6 +2512,7 @@ pub fn clobberXmmReg(selector: *ComposedBlockSelector, reg: XmmReg) !void {
 }
 
 fn fpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) ?[]const u8 {
+    if (selector.physical_binding_facts.xmmEmpty(reg)) return null;
     var it = selector.values.iterator();
     while (it.next()) |entry| switch (entry.value_ptr.loc) {
         .xmm => |fp| if (fp.reg == reg) return entry.key_ptr.*,
@@ -2527,9 +2547,12 @@ pub fn spillAccumulatorAliasesExcept(selector: *ComposedBlockSelector, value: ir
 }
 
 pub fn liveAccumulatorNameExcept(selector: *const ComposedBlockSelector, ignored: []const u8) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.accumulatorEmpty()) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
+        if (!has_dependencies and entry.value_ptr.loc != .eax and entry.value_ptr.loc != .rax) continue;
         if (!try valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax, .rax => return entry.key_ptr.*,
@@ -2541,6 +2564,7 @@ pub fn liveAccumulatorNameExcept(selector: *const ComposedBlockSelector, ignored
 
 pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) !void {
     while (true) {
+        if (selector.physical_binding_facts.accumulatorEmpty()) return;
         var expired_name: ?[]const u8 = null;
         var it = selector.values.iterator();
         while (it.next()) |entry| {
@@ -2565,6 +2589,7 @@ pub fn dropExpiredAccumulatorBindings(selector: *ComposedBlockSelector) !void {
 /// this exclusion.
 fn dropExpiredAccumulatorBindingsExcept(selector: *ComposedBlockSelector, excluded_name: []const u8) !void {
     while (true) {
+        if (selector.physical_binding_facts.accumulatorEmpty()) return;
         var expired_name: ?[]const u8 = null;
         var it = selector.values.iterator();
         while (it.next()) |entry| {
@@ -2690,6 +2715,7 @@ pub fn spillLiveCallerClobbersForCall(selector: *ComposedBlockSelector) !?Diagno
 }
 
 fn liveFpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.xmmEmpty(reg)) return null;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
@@ -2702,8 +2728,11 @@ fn liveFpNameInReg(selector: *const ComposedBlockSelector, reg: XmmReg) !?[]cons
 }
 
 pub fn liveAccumulatorName(selector: *const ComposedBlockSelector) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.accumulatorEmpty()) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
+        if (!has_dependencies and entry.value_ptr.loc != .eax and entry.value_ptr.loc != .rax) continue;
         if (!try valueIsLiveAtOrAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax, .rax => return entry.key_ptr.*,
@@ -2714,8 +2743,11 @@ pub fn liveAccumulatorName(selector: *const ComposedBlockSelector) !?[]const u8 
 }
 
 pub fn liveAccumulatorNameAfterCurrent(selector: *const ComposedBlockSelector) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.accumulatorEmpty()) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
+        if (!has_dependencies and entry.value_ptr.loc != .eax and entry.value_ptr.loc != .rax) continue;
         if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax, .rax => return entry.key_ptr.*,
@@ -2730,8 +2762,11 @@ pub fn valueIsLiveAtOrAfterCurrent(selector: *const ComposedBlockSelector, name:
 }
 
 pub fn liveEaxName(selector: *const ComposedBlockSelector) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.accumulatorEmpty()) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
+        if (!has_dependencies and entry.value_ptr.loc != .eax) continue;
         if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .eax => return entry.key_ptr.*,
@@ -2742,8 +2777,11 @@ pub fn liveEaxName(selector: *const ComposedBlockSelector) !?[]const u8 {
 }
 
 pub fn liveRaxName(selector: *const ComposedBlockSelector) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.accumulatorEmpty()) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
+        if (!has_dependencies and entry.value_ptr.loc != .rax) continue;
         if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .rax => return entry.key_ptr.*,
@@ -2758,6 +2796,7 @@ pub fn liveScalarNameInReg(selector: *const ComposedBlockSelector, reg: ArgReg) 
 }
 
 pub fn scalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+    if (selector.physical_binding_facts.scalarEmpty(reg)) return null;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (ignore_name) |ignored| {
@@ -2776,11 +2815,14 @@ pub fn scalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg
 }
 
 pub fn liveScalarNameInRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.scalarEmpty(reg)) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (ignore_name) |ignored| {
             if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
         }
+        if (!has_dependencies and !locContainsReg(entry.value_ptr.loc, reg)) continue;
         if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .arg32, .arg64, .scratch32, .scratch64 => |value_reg| if (value_reg == reg) return entry.key_ptr.*,
@@ -2799,6 +2841,7 @@ pub fn livePairNameContainingReg(selector: *const ComposedBlockSelector, reg: Ar
 }
 
 pub fn pairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) ?[]const u8 {
+    if (selector.physical_binding_facts.pairEmpty(reg)) return null;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (ignore_name) |ignored| {
@@ -2813,11 +2856,14 @@ pub fn pairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: 
 }
 
 pub fn livePairNameContainingRegExcept(selector: *const ComposedBlockSelector, reg: ArgReg, ignore_name: ?[]const u8) !?[]const u8 {
+    if (selector.address_dependencies.count() == 0 and selector.physical_binding_facts.pairEmpty(reg)) return null;
+    const has_dependencies = selector.address_dependencies.count() != 0;
     var it = selector.values.iterator();
     while (it.next()) |entry| {
         if (ignore_name) |ignored| {
             if (std.mem.eql(u8, entry.key_ptr.*, ignored)) continue;
         }
+        if (!has_dependencies and !locContainsReg(entry.value_ptr.loc, reg)) continue;
         if (!try valueIsLiveAfterCurrent(selector, entry.key_ptr.*)) continue;
         switch (entry.value_ptr.loc) {
             .arg128, .scratch128 => |pair| if (pair.contains(reg)) return entry.key_ptr.*,

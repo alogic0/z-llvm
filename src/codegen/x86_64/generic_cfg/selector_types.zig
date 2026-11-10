@@ -98,6 +98,108 @@ pub const ValueBinding = struct {
     loc: ValueLoc,
 };
 
+pub const ValueSnapshotEntry = struct { name: []const u8, binding: ValueBinding };
+
+/// Reuse storage only. Every capture overwrites its entire borrowed slice, and
+/// simultaneous snapshots always hold distinct buffers. Inactive contents are
+/// never read; names remain borrowed exactly as in ordinary snapshot arrays.
+pub const ValueSnapshotBuffers = struct {
+    buffers: std.ArrayList(Buffer) = .empty,
+    const Buffer = struct { entries: []ValueSnapshotEntry, in_use: bool };
+
+    pub fn acquire(pool: *ValueSnapshotBuffers, allocator: std.mem.Allocator, count: usize) ![]ValueSnapshotEntry {
+        if (count == 0) return &.{};
+        var reusable: ?usize = null;
+        for (pool.buffers.items, 0..) |*buffer, i| {
+            if (buffer.in_use) continue;
+            if (buffer.entries.len >= count) {
+                buffer.in_use = true;
+                return buffer.entries[0..count];
+            }
+            if (reusable == null) reusable = i;
+        }
+        if (reusable) |i| {
+            const capacity = @max(count, std.math.mul(usize, pool.buffers.items[i].entries.len, 2) catch count);
+            const entries = try allocator.alloc(ValueSnapshotEntry, capacity);
+            allocator.free(pool.buffers.items[i].entries);
+            pool.buffers.items[i] = .{ .entries = entries, .in_use = true };
+            return entries[0..count];
+        }
+        try pool.buffers.ensureUnusedCapacity(allocator, 1);
+        const entries = try allocator.alloc(ValueSnapshotEntry, count);
+        pool.buffers.appendAssumeCapacity(.{ .entries = entries, .in_use = true });
+        return entries;
+    }
+    pub fn release(pool: *ValueSnapshotBuffers, entries: []ValueSnapshotEntry) void {
+        if (entries.len == 0) return;
+        for (pool.buffers.items) |*buffer| {
+            if (buffer.entries.ptr != entries.ptr) continue;
+            std.debug.assert(buffer.in_use and entries.len <= buffer.entries.len);
+            buffer.in_use = false;
+            return;
+        }
+        unreachable;
+    }
+    pub fn deinit(pool: *ValueSnapshotBuffers, allocator: std.mem.Allocator) void {
+        for (pool.buffers.items) |buffer| {
+            std.debug.assert(!buffer.in_use);
+            allocator.free(buffer.entries);
+        }
+        pool.buffers.deinit(allocator);
+    }
+};
+
+/// Counts mirror canonical binding writes; they never choose a binding or home.
+/// Only production selectors enable tracking, before their first binding.
+/// Manually assembled selector states retain ordinary complete scans.
+pub const PhysicalBindingFacts = struct {
+    active: bool = false,
+    accumulator: usize = 0,
+    scalar: [6]usize = @splat(0),
+    pair: [6]usize = @splat(0),
+    xmm: [8]usize = @splat(0),
+
+    pub fn accumulatorEmpty(facts: PhysicalBindingFacts) bool {
+        return facts.active and facts.accumulator == 0;
+    }
+    pub fn scalarEmpty(facts: PhysicalBindingFacts, reg: ArgReg) bool {
+        return facts.active and facts.scalar[@backingInt(reg)] == 0;
+    }
+    pub fn pairEmpty(facts: PhysicalBindingFacts, reg: ArgReg) bool {
+        return facts.active and facts.pair[@backingInt(reg)] == 0;
+    }
+    pub fn xmmEmpty(facts: PhysicalBindingFacts, reg: XmmReg) bool {
+        return facts.active and facts.xmm[@backingInt(reg)] == 0;
+    }
+    pub fn change(facts: *PhysicalBindingFacts, before: ?ValueLoc, after: ?ValueLoc) void {
+        if (!facts.active) return;
+        if (before) |loc| facts.account(loc, false);
+        if (after) |loc| facts.account(loc, true);
+    }
+    fn adjust(count: *usize, add: bool) void {
+        if (add) count.* += 1 else {
+            std.debug.assert(count.* != 0);
+            count.* -= 1;
+        }
+    }
+    fn account(facts: *PhysicalBindingFacts, loc: ValueLoc, add: bool) void {
+        switch (loc) {
+            .eax, .rax => adjust(&facts.accumulator, add),
+            .arg32, .arg64, .scratch32, .scratch64 => |reg| adjust(&facts.scalar[@backingInt(reg)], add),
+            .arg128, .scratch128 => |pair| {
+                adjust(&facts.pair[@backingInt(pair.lo)], add);
+                adjust(&facts.pair[@backingInt(pair.hi)], add);
+            },
+            .xmm => |fp| adjust(&facts.xmm[@backingInt(fp.reg)], add),
+            .readonly_table_ptr => |ptr| switch (ptr.storage) {
+                .reg => |reg| adjust(&facts.scalar[@backingInt(reg)], add),
+                .spill => {},
+            },
+            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .spill64, .spill128, .spill_fp, .spill_vector, .aggregate_sse => {},
+        }
+    }
+};
+
 /// EAX and RAX are one physical accumulator alias.  This domain is the single
 /// selector-state representation of the value occupying that alias and of the
 /// bits defined by its most recent committed definition.

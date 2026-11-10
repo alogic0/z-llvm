@@ -135,6 +135,7 @@ pub fn tryLowerComposedCfgObserved(
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
+    selector_state.beginPhysicalBindingFacts(&composed);
     composed.rejection_observer = observer;
     composed.module_context = module_context;
     composed.function = &function;
@@ -588,6 +589,7 @@ pub fn tryLowerComposedBlockObserved(
 
     const start_len = machine.instructions.items.len;
     var composed = ComposedBlockSelector.init(allocator, machine);
+    selector_state.beginPhysicalBindingFacts(&composed);
     composed.rejection_observer = observer;
     composed.module_context = module_context;
     composed.function = &function;

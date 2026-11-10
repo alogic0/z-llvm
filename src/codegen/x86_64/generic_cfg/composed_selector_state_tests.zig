@@ -12,6 +12,106 @@ const selector_cfg = @import("composed_selector_cfg.zig");
 const selector_frame = @import("composed_selector_frame.zig");
 const selector_memory = @import("composed_selector_memory.zig");
 
+test "generic cfg selector snapshot workspace preserves nested snapshots and reuses released storage" {
+    var machine = MachineFunction.init("snapshot-workspace", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector_state.beginPhysicalBindingFacts(&selector);
+    try selector_state.bindValueLoc(&selector, "root", .rax);
+    const Transaction = @import("composed_selector_value_use_transaction.zig").ValueUseTransaction;
+    {
+        var outer = try Transaction.begin(&selector);
+        defer outer.deinit();
+        try selector_state.bindValueLoc(&selector, "outer", .{ .scratch64 = .r8 });
+        {
+            var inner = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+            defer inner.deinit();
+            try selector_state.bindValueLoc(&selector, "root", .{ .spill64 = .slot0 });
+            try inner.rollback();
+            try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "root").?);
+            try std.testing.expectEqual(ValueLoc{ .scratch64 = .r8 }, selector_state.valueLoc(&selector, "outer").?);
+        }
+        try outer.rollback();
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "root").?);
+        try std.testing.expect(selector_state.valueLoc(&selector, "outer") == null);
+    }
+    const buffers = selector.value_snapshot_buffers.buffers.items.len;
+    {
+        var reused = try Transaction.begin(&selector);
+        defer reused.deinit();
+        try std.testing.expectEqual(buffers, selector.value_snapshot_buffers.buffers.items.len);
+        _ = selector_state.removeValueBinding(&selector, "root");
+        try reused.rollback();
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "root").?);
+    }
+}
+
+fn snapshotWorkspaceAllocationCase(allocator: std.mem.Allocator) !void {
+    var pool: selector_types.ValueSnapshotBuffers = .{};
+    defer pool.deinit(allocator);
+    const first = try pool.acquire(allocator, 2);
+    defer pool.release(first);
+    first[0] = .{ .name = "retained", .binding = .{ .vreg = .{ .index = 0, .class = .gpr64, .bits = 64 }, .loc = .rax } };
+    {
+        const nested = try pool.acquire(allocator, 32);
+        defer pool.release(nested);
+        try std.testing.expect(first.ptr != nested.ptr);
+    }
+    const grown = try pool.acquire(allocator, 1024);
+    defer pool.release(grown);
+    try std.testing.expect(first.ptr != grown.ptr);
+    try std.testing.expectEqualStrings("retained", first[0].name);
+    try std.testing.expectEqual(ValueLoc.rax, first[0].binding.loc);
+}
+test "generic cfg selector snapshot workspace allocation failures preserve active snapshots" {
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, snapshotWorkspaceAllocationCase, .{});
+}
+
+test "generic cfg selector physical emptiness facts survive both transaction rollbacks" {
+    var machine = MachineFunction.init("binding-facts", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector_state.beginPhysicalBindingFacts(&selector);
+    try selector_state.bindValueLoc(&selector, "narrow", .eax);
+    try selector_state.bindValueLoc(&selector, "wide", .rax);
+    try selector_state.bindValueLoc(&selector, "scalar", .{ .scratch64 = .r8 });
+    try selector_state.bindValueLoc(&selector, "pair", .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } });
+    try selector_state.bindValueLoc(&selector, "fp", .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
+    const before = selector.physical_binding_facts;
+    try std.testing.expectEqual(@as(usize, 2), before.accumulator);
+    try std.testing.expectEqual(@as(usize, 1), before.scalar[@backingInt(x86_64_types.ArgReg.r8)]);
+    try std.testing.expect(!before.pairEmpty(.rdi) and !before.pairEmpty(.rsi));
+    try std.testing.expect(!before.xmmEmpty(.xmm0));
+    {
+        var transaction = try @import("composed_selector_value_use_transaction.zig").ValueUseTransaction.begin(&selector);
+        defer transaction.deinit();
+        try selector_state.bindValueLoc(&selector, "narrow", .{ .spill64 = .slot0 });
+        _ = selector_state.removeValueBinding(&selector, "wide");
+        try selector_state.bindValueLoc(&selector, "scalar", .{ .spill64 = .slot1 });
+        try std.testing.expect(selector.physical_binding_facts.accumulatorEmpty());
+        try std.testing.expect(selector.physical_binding_facts.scalarEmpty(.r8));
+        try transaction.rollback();
+        try std.testing.expectEqualDeep(before, selector.physical_binding_facts);
+    }
+    {
+        var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(&selector);
+        defer transaction.deinit();
+        _ = selector_state.removeValueBinding(&selector, "pair");
+        _ = selector_state.removeValueBinding(&selector, "fp");
+        try std.testing.expect(selector.physical_binding_facts.pairEmpty(.rdi));
+        try std.testing.expect(selector.physical_binding_facts.xmmEmpty(.xmm0));
+        try transaction.rollback();
+        try std.testing.expectEqualDeep(before, selector.physical_binding_facts);
+    }
+    for ([_][]const u8{ "narrow", "wide", "scalar", "pair", "fp" }) |name| _ = selector_state.removeValueBinding(&selector, name);
+    try std.testing.expect(selector.physical_binding_facts.accumulatorEmpty());
+    try std.testing.expect(selector.physical_binding_facts.scalarEmpty(.r8));
+    try std.testing.expect(selector.physical_binding_facts.pairEmpty(.rdi));
+    try std.testing.expect(selector.physical_binding_facts.xmmEmpty(.xmm0));
+}
+
 const MachineFunction = impl.MachineFunction;
 const ComposedBlockSelector = impl.ComposedBlockSelector;
 const ValueLoc = selector_types.ValueLoc;
