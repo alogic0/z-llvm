@@ -1,11 +1,11 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [frame-address checkpoint](evidence/stack_object_addresses.md)
-at `948fad9c`: **8,777/8,928** compiler definitions and **318/455** runtime
-definitions. All 151 remaining original compiler definitions stay in scope. The
+from the accepted [address-operand checkpoint](evidence/address_value_operands.md)
+at `08616a11`: **8,792/8,928** compiler definitions and **318/455** runtime
+definitions. All 136 remaining original compiler definitions stay in scope. The
 complete current census identifies remaining floating/structured values, scalar
-operands, call attributes and independent frame-address legalization boundaries
+shifts, casts and call-attribute boundaries
 for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
@@ -59,10 +59,23 @@ new fault controls are detected. The
 [acceptance record](evidence/stack_object_addresses_acceptance_20261110.json)
 binds 3,195 source hashes and both final compiler receipts to the code commit.
 The final Debug native replay matches all 3,053 same-source outcomes and 1,251
-artifacts; its older inspection discrepancy remains explicit. Continue with the
-isolated regression where an unrelated dynamic-copy object blocks a valid local
-pointer select, then reclassify later boundaries. Continue the main plan without
-waiting for renewed authorization.
+artifacts; its older inspection discrepancy remains explicit. The following
+checkpoint resolves the independent frame-address regression and symbolic
+integer operand boundaries.
+
+Batch 12's independent object eligibility and symbolic integer operands add
+fifteen compiler selections without lost successes or owner changes. Complete
+census and independent production agree on 8,792 compiler and 318 runtime
+selections; all 4,364,586 compiler events balance. Debug/ReleaseSafe each pass
+2,097 units, 24 structural and two profile checks; all nine readiness procedures
+and seventeen serial integration gates pass. Both complete 84-population native
+suites preserve the preceding 82 entries, 3,053 command outcomes and 1,251
+compiler artifacts byte for byte. All 126 new fault controls are detected. The
+[acceptance record](evidence/address_value_operands_acceptance_20261110.json)
+binds 3,205 source hashes and unchanged executed binaries to the code commit.
+Continue through the measured constant-left scalar shifts, scratch-pair shift
+and narrow or nullable call-return attributes, then every remaining original
+compiler rejection. The all-8,928 plan remains active without renewed approval.
 
 ## Completed bounded compiler-throughput delivery
 

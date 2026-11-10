@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `948fad9c`,
-selecting 8,777/8,928 compiler definitions and 318/455 runtime definitions.
-Continue through all 151 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `08616a11`,
+selecting 8,792/8,928 compiler definitions and 318/455 runtime definitions.
+Continue through all 136 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -213,3 +213,18 @@ Fast/census binaries; Debug native/fault proofs are freshly replayed, with its
 inspection discrepancy and superseded records explicit. Continue through the
 remaining 151 original compiler rejections. See the
 [accepted frame-address evidence](../evidence/stack_object_addresses.md).
+
+Batch 12 is accepted at `08616a11`: independent owned-object eligibility and
+checked symbolic integer operands use the existing typed address contracts.
+Debug/ReleaseSafe each pass 2,097 units, 24 structural and two profile checks;
+all nine readiness procedures and seventeen serial integration gates pass.
+Both complete 84-population native suites preserve all 82 preceding entries,
+3,053 command outcomes and 1,251 compiler artifacts byte for byte. All 126
+new fault controls detect their errors. Complete unchanged-input census and
+independent production agree on 8,792 compiler selections, adding fifteen with
+no lost successes or owners; runtime retains 318. All 4,364,586 compiler events
+balance, and all 3,205 frozen file hashes bind to the accepted code tree.
+Production still stops at the remaining 136 selection failures. Continue with
+the measured scalar shift and call-attribute boundaries, then every remaining
+original rejection. See the
+[accepted address-operand evidence](../evidence/address_value_operands.md).
