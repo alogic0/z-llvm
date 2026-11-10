@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `dba98f43`,
-selecting 8,722/8,928 compiler definitions and 285/455 runtime definitions.
-Continue through all 206 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `7d419080`,
+selecting 8,739/8,928 compiler definitions and 296/455 runtime definitions.
+Continue through all 189 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -164,3 +164,18 @@ preserved. Complete event and source audits verify; runtime retains 285/455.
 The 206 remaining definitions are still in scope, beginning with observed
 integer-carrier and physical stack-argument boundaries. See the
 [accepted checkpoint](../evidence/compiler_selection_batch08.md).
+
+Batch 09 is accepted at `7d419080`: shared incoming/outgoing physical integer
+locations, aligned native i128 stack pairs, split i65–i127 words, private carrier
+classification and preserving pair-low extraction under full register pressure.
+Debug/ReleaseSafe each pass 2,076 units, 24 structural and two profile checks;
+readiness and all seventeen serial gates pass. Both complete 80-population native
+suites preserve the preceding 79 entries, 2,945 outcomes and 1,206 artifacts.
+All 126 new-population fault checks detect their injected errors. Complete
+unchanged-input census and independent production agree on 8,739 compiler and
+296 runtime selections, adding seventeen and eleven respectively without lost
+successes or owners. Complete event audits and all 3,173 committed source hashes
+verify. Both production reports still stop at remaining selection failures.
+Continue through all 189 remaining compiler definitions, beginning with the
+observed fp128 storage/transport and structured-value families. See the
+[accepted physical ABI evidence](../evidence/integer_physical_abi.md).

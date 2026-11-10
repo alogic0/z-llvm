@@ -1,12 +1,12 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [batch-08 checkpoint](evidence/compiler_selection_batch08.md)
-at `dba98f43`: **8,722/8,928** compiler definitions and **285/455** runtime
-definitions. All 206 remaining compiler definitions stay in scope. The complete
-current census identifies integer-carrier and physical stack-argument boundaries
-for the next coherent group, followed by observed floating, structured-value and
-pointer-transport limits. Use focused original-function and native checks during
+from the accepted [physical integer ABI checkpoint](evidence/integer_physical_abi.md)
+at `7d419080`: **8,739/8,928** compiler definitions and **296/455** runtime
+definitions. All 189 remaining original compiler definitions stay in scope. The
+complete current census identifies fp128 storage/transport, structured values,
+symbolic pointer operands and call-attribute boundaries for subsequent coherent
+groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
 required replay cannot finish.
@@ -20,7 +20,20 @@ successes or owners. The [acceptance record](evidence/compiler_selection_batch08
 retains the complete event audits and source binding. The
 [Zig helper migration](evidence/batch08_zig_helpers.md) replaces all seven ad hoc
 Python scripts and inline Python workflow. The replay bottleneck is cleared;
-capability work resumes in an isolated batch-09 worktree.
+capability work has resumed.
+
+Batch 09's shared integer locations preserve the source-width distinction
+between split i65–i127 words and aligned whole i128 pairs. Complete original
+census and independent production agree on seventeen compiler and eleven runtime
+additions with no lost successes or owners. Debug/ReleaseSafe pass 2,076 units,
+24 structural and two profile checks each; readiness, all 80 native populations
+and all seventeen serial gates pass. Both native build modes preserve the prior
+2,945 outcomes and 1,206 compiler artifacts. The
+[acceptance record](evidence/integer_physical_abi_acceptance_20261110.json)
+binds the 3,173 validated file hashes and both compiler receipts to the committed
+tree. The frozen core harness requires the main checkout for its final replay;
+the validated source is adopted there. Continue this main plan without waiting
+for renewed authorization.
 
 ## Completed bounded compiler-throughput delivery
 
