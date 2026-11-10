@@ -532,6 +532,7 @@ fn stageValidatedCallArgument(
         const disp = switch (current) {
             .stack_scalar => |stack| stack.base_disp,
             .stack128 => |value| value,
+            .stack_i32_array => |array| array.base_disp,
             else => return error.ValueUseCallPointerLocationUnsupported,
         };
         try selector_state.clobberArgReg(transaction.selector, target);
@@ -751,7 +752,15 @@ fn materializeMemcpyRequestUnchecked(
         return error.ValueUseUnsupportedSource;
     };
     switch (current) {
-        .stack128, .stack_i32_array => try materialization.materializePointer(transaction.selector, current, .{ .gpr64 = destination }),
+        .stack_scalar, .stack128, .stack_i32_array => {
+            const action = transaction.requests[index].prepared_action;
+            if (action == null or action.? == .inline_memcpy) {
+                // A frame address needs only its destination register. The
+                // ordinary pointer helper's RCX scratch can hold a pending
+                // simultaneous copy source and must remain intact here.
+                try selector_state.materializeLocIntoLocWithBits(transaction.selector, current, .{ .scratch64 = destination }, 64);
+            } else try materialization.materializePointer(transaction.selector, current, .{ .gpr64 = destination });
+        },
         .arg128, .scratch128 => |pair| {
             if (pair.lo == destination) return;
             try selector_state.clobberArgReg(transaction.selector, destination);

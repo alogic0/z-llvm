@@ -1724,7 +1724,12 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
                 }
                 return null;
             },
-            .stack128 => |disp| {
+            .stack128, .stack_i32_array => {
+                const disp = switch (loc) {
+                    .stack128 => |offset| offset,
+                    .stack_i32_array => |array| array.base_disp,
+                    else => unreachable,
+                };
                 try selector_state.clobberArgReg(selector, target);
                 try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = target });
                 if (disp != 0) {
@@ -1750,7 +1755,7 @@ pub fn lowerDirectCallArg(selector: *ComposedBlockSelector, arg: ir.CallArg, tar
                 try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = target, .frame_index = frame_index } });
                 return null;
             },
-            .arg32, .arg128, .eax, .scratch32, .scratch128, .xmm, .stack128_value, .stack_i32_array, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-ptr-arg" },
+            .arg32, .arg128, .eax, .scratch32, .scratch128, .xmm, .stack128_value, .stack_i32_ptr, .stack_f32_pair_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return .{ .no_emitter = "composed-block-call-ptr-arg" },
         }
     }
 

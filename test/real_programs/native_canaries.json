@@ -2215,6 +2215,34 @@
       ],
       "observations": 5041,
       "stdout": "binary128-payloads observations=5041 bits=abi=memory=arithmetic=conversions=comparisons=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "stack_object_addresses",
+      "prefix": "stack-object-addresses",
+      "fixture": "stack_object_addresses",
+      "functions": [
+        "stack_copy_i8",
+        "stack_copy_i16",
+        "stack_copy_i32",
+        "stack_copy_i64",
+        "stack_copy_f32",
+        "stack_copy_f64",
+        "stack_copy_i128",
+        "stack_copy_array3",
+        "stack_copy_array16",
+        "stack_phi_i64",
+        "stack_phi_i128",
+        "stack_phi_array3",
+        "stack_phi_array16",
+        "stack_phi_swap_2",
+        "stack_phi_swap_16",
+        "stack_window",
+        "stack_move",
+        "stack_call_array",
+        "stack_call_bool"
+      ],
+      "observations": 9480,
+      "stdout": "stack-object-addresses observations=9480 copies=offsets=phis=loops=overlap=calls=guards=preserved\n"
     }
   ]
 }

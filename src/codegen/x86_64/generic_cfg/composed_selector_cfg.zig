@@ -1094,6 +1094,10 @@ fn snapshotScalarPhiSources(
     snapshots: *std.ArrayList(ScalarPhiSnapshot),
 ) !?Diagnostic {
     var unavailable: [selector_allocatable_regs.len]bool = @splat(false);
+    var earlier_writes: std.ArrayList(ValueLoc) = .empty;
+    defer earlier_writes.deinit(selector.allocator);
+    var pointer_snapshot_names = std.StringHashMap(void).init(selector.allocator);
+    defer pointer_snapshot_names.deinit();
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -1103,7 +1107,20 @@ fn snapshotScalarPhiSources(
         const result_name = instruction.result orelse return .{ .unsupported_value = "stage2-phi-missing-result" };
         if (selector.phi_destinations.get(result_name)) |destination| markScalarLocRegsUnavailable(destination, &unavailable);
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
-        if (selector_state.resolveValue(selector, incoming.value)) |source| markScalarLocRegsUnavailable(source, &unavailable);
+        const source = selector_state.resolveValue(selector, incoming.value);
+        if (source) |loc| {
+            markScalarLocRegsUnavailable(loc, &unavailable);
+            if (phi.ty == .ptr) for (earlier_writes.items) |written| {
+                if (scalarLocsOverlap(loc, written)) {
+                    try pointer_snapshot_names.put(result_name, {});
+                    break;
+                }
+            };
+        }
+        if (selector.phi_destinations.get(result_name)) |destination| {
+            if (source == null or !valueLocEql(source.?, destination))
+                try earlier_writes.append(selector.allocator, destination);
+        }
     }
 
     for (target.instructions.items) |instruction| {
@@ -1141,10 +1158,11 @@ fn snapshotScalarPhiSources(
             else => break,
         };
         const metadata = selectorValueMetadata(phi.ty) orelse return .{ .no_emitter = "stage2-phi-type" };
-        if ((metadata.class != .gpr32 and metadata.class != .gpr64) or intBits(phi.ty) == null) continue;
+        if ((metadata.class != .gpr32 and metadata.class != .gpr64) or (phi.ty != .ptr and intBits(phi.ty) == null)) continue;
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
         if (incoming.value != .named) continue;
         const source = selector_state.resolveValue(selector, incoming.value) orelse return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) };
+        if (phi.ty == .ptr and !pointer_snapshot_names.contains(instruction.result.?)) continue;
         if (!scalarSourceOverlapsPhiDestination(selector, target, source)) continue;
         const reg = for (selector_allocatable_regs) |candidate| {
             const index = argRegIndex(candidate);
@@ -1342,7 +1360,8 @@ fn stabilizePhiEdgeSources(selector: *ComposedBlockSelector, target: ir.BasicBlo
             .arg128, .scratch128 => if (try selector_state.spillPairValue(selector, name)) |diagnostic| return diagnostic,
             .spill64, .spill128, .spill_fp, .spill_vector, .stack_f32_pair_ptr => {},
             .xmm => if (try selector_state.spillValue(selector, name)) |diagnostic| return diagnostic,
-            .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
+            .stack_scalar, .stack128, .stack_i32_array => if (phi.ty != .ptr) return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
+            .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .aggregate_sse => return .{ .unsupported_value = selector_state.phiSourceDiagnostic(selector, incoming.value) },
         }
     }
     return null;

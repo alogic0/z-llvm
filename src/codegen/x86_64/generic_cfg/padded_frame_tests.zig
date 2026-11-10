@@ -224,7 +224,7 @@ test "bounded frame address authority checks actual extent before emission and r
                 else => .{ .request = offset },
             },
         } }));
-        if (boundary < 2 and case.extent != 0) {
+        if ((boundary < 2 or boundary == 4) and case.extent != 0) {
             try transaction.seal();
             try transaction.prepare();
             try transaction.materializeAll();

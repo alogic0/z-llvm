@@ -1151,6 +1151,10 @@ pub fn expireExpiredBindings(selector: *ComposedBlockSelector) !void {
 }
 
 pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc, target: ValueLoc) !void {
+    switch (actual) {
+        .stack_scalar, .stack128, .stack_i32_array => _ = try ownedStackPointerDisplacement(selector, actual),
+        else => {},
+    }
     switch (target) {
         .scratch32 => |dst| switch (actual) {
             .arg32, .scratch32, .arg64, .scratch64 => |src| {
@@ -1286,7 +1290,11 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
                 try clobberArgReg(selector, dst);
                 try emitStackF32PairPointerIntoReg(selector, ptr, dst);
             },
-            .arg32, .scratch32, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return error.UnsupportedCodegenValue,
+            .stack_scalar, .stack128, .stack_i32_array => {
+                try clobberArgReg(selector, dst);
+                try emitOwnedStackPointerIntoReg(selector, actual, dst);
+            },
+            .arg32, .scratch32, .xmm, .eax, .stack128_value, .stack_i32_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return error.UnsupportedCodegenValue,
         },
         .scratch128 => |dst| switch (actual) {
             .arg128, .scratch128 => |src| try emitPairIntoScratch(selector, src, dst),
@@ -1327,7 +1335,12 @@ pub fn materializeLocIntoLoc(selector: *ComposedBlockSelector, actual: ValueLoc,
                     try emitStackF32PairPointerIntoReg(selector, ptr, .rcx);
                     try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = .rcx } });
                 },
-                .arg128, .scratch128, .xmm, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return error.UnsupportedCodegenValue,
+                .stack_scalar, .stack128, .stack_i32_array => {
+                    try clobberArgReg(selector, .rcx);
+                    try emitOwnedStackPointerIntoReg(selector, actual, .rcx);
+                    try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame_index, .reg = .rcx } });
+                },
+                .arg128, .scratch128, .xmm, .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return error.UnsupportedCodegenValue,
             }
         },
         .spill128 => |spill| {
@@ -1373,7 +1386,29 @@ fn emitStackF32PairPointerIntoReg(selector: *ComposedBlockSelector, ptr: selecto
     if (disp != 0) try selector.machine.instructions.append(selector.allocator, .{ .add_arg64_imm32 = .{ .reg = reg, .imm = disp } });
 }
 
+fn ownedStackPointerDisplacement(selector: *const ComposedBlockSelector, object: ValueLoc) !i32 {
+    const disp, const bytes: u32 = switch (object) {
+        .stack_scalar => |stack| .{ stack.base_disp, @as(u32, stack.bits) / 8 },
+        .stack128 => |offset| .{ offset, 16 },
+        .stack_i32_array => |array| .{ array.base_disp, std.math.mul(u32, array.len, 4) catch return error.UnsupportedCodegenValue },
+        else => return error.UnsupportedCodegenValue,
+    };
+    if (bytes == 0 or disp > selector.stack_frame_bytes or bytes > selector.stack_frame_bytes - disp)
+        return error.UnsupportedCodegenValue;
+    return std.math.cast(i32, disp) orelse error.UnsupportedCodegenValue;
+}
+
+fn emitOwnedStackPointerIntoReg(selector: *ComposedBlockSelector, object: ValueLoc, reg: ArgReg) !void {
+    const immediate = try ownedStackPointerDisplacement(selector, object);
+    try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = reg });
+    if (immediate != 0) try emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = reg, .imm = immediate } }, .write);
+}
+
 pub fn materializeLocIntoLocWithBits(selector: *ComposedBlockSelector, actual: ValueLoc, target: ValueLoc, bits: u16) !void {
+    switch (actual) {
+        .stack_scalar, .stack128, .stack_i32_array => if (bits != 64) return error.UnsupportedCodegenValue,
+        else => {},
+    }
     const target_frame = switch (target) {
         .spill64 => |frame_index| frame_index,
         else => return materializeLocIntoLoc(selector, actual, target),
@@ -2134,7 +2169,8 @@ pub fn emitPhiValueIntoScratch(selector: *ComposedBlockSelector, value: ir.Value
                     .spill64 => |frame_index| try selector.machine.instructions.append(selector.allocator, .{ .reload_arg64_rsp = .{ .reg = reg, .frame_index = frame_index } }),
                     .arg128, .scratch128 => |pair| if (pair.lo != reg) try selector.machine.instructions.append(selector.allocator, .{ .mov_arg64_arg = .{ .dst = reg, .src = pair.lo } }),
                     .stack_f32_pair_ptr => |ptr| try emitStackF32PairPointerIntoReg(selector, ptr, reg),
-                    .arg32, .scratch32, .xmm, .eax, .stack_scalar, .stack128, .stack128_value, .stack_i32_array, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return error.UnsupportedCodegenValue,
+                    .stack_scalar, .stack128, .stack_i32_array => try emitOwnedStackPointerIntoReg(selector, loc, reg),
+                    .arg32, .scratch32, .xmm, .eax, .stack128_value, .stack_i32_ptr, .readonly_table_ptr, .spill128, .spill_fp, .spill_vector, .aggregate_sse => return error.UnsupportedCodegenValue,
                 }
             } else {
                 switch (loc) {

@@ -69,6 +69,13 @@ pub fn validateRequest(
             if (request.form == .stack_object_address) {
                 if (request.prepared_action) |action| if (action == .form_byte_address) {
                     const extent: u32 = switch (current) {
+                        .stack_scalar => |stack| blk: {
+                            const bytes: u32 = @as(u32, stack.bits) / 8;
+                            const frame_bytes = transaction.selector.stack_frame_bytes;
+                            if (bytes == 0 or stack.base_disp > frame_bytes or bytes > frame_bytes - stack.base_disp)
+                                return error.ValueUseUnsupportedAddressForm;
+                            break :blk bytes;
+                        },
                         .stack128 => 16,
                         .stack_i32_array => |array| blk: {
                             if (array.len == 0 or array.len > selector_types.max_stack_frame_bytes / 4)
@@ -83,9 +90,12 @@ pub fn validateRequest(
                         },
                         else => return error.ValueUseUnsupportedAddressForm,
                     };
-                    if (action.form_byte_address.offset != .constant or
-                        action.form_byte_address.offset.constant < 0 or action.form_byte_address.offset.constant > extent)
-                        return error.ValueUseUnsupportedAddressForm;
+                    // Forming a dynamic address performs no memory access.
+                    // Constant offsets retain the existing bounded envelope.
+                    if (action.form_byte_address.offset == .constant) {
+                        if (action.form_byte_address.offset.constant < 0 or action.form_byte_address.offset.constant > extent)
+                            return error.ValueUseUnsupportedAddressForm;
+                    }
                 };
             }
             return current;
