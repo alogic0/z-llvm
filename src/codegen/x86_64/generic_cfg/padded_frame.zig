@@ -133,12 +133,16 @@ fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{@max(alignment(alloca).?, natural)});
                     }
                 },
+                // General atomic storage keeps the complete operation,
+                // including volatility, width, alignment and ordering.
                 .load => |load| if (slotSize(slots, load.ptr) != null) {
-                    if (load.attrs.isBarrier() or load.attrs.syncscope != null or load.ty_addrspace != null or load.ptr_addrspace != null) return null;
+                    if ((!(general and load.attrs.isAtomic()) and (load.attrs.isBarrier() or load.attrs.syncscope != null)) or
+                        load.ty_addrspace != null or load.ptr_addrspace != null) return null;
                     copy.kind.load.ptr = try address(allocator, function, &block, &serial, load.ptr);
                 },
                 .store => |store| if (slotSize(slots, store.ptr) != null) {
-                    if (store.attrs.isBarrier() or store.attrs.syncscope != null or store.ty_addrspace != null or store.ptr_addrspace != null) return null;
+                    if ((!(general and store.attrs.isAtomic()) and (store.attrs.isBarrier() or store.attrs.syncscope != null)) or
+                        store.ty_addrspace != null or store.ptr_addrspace != null) return null;
                     copy.kind.store.ptr = try address(allocator, function, &block, &serial, store.ptr);
                 },
                 .call => |call| {

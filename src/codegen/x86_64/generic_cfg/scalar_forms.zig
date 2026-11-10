@@ -98,6 +98,32 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
+                .freeze => |freeze| if (freeze.ty == .int and freeze.ty.int > 32 and freeze.ty.int < 64 and
+                    freeze.value == .named and !std.mem.startsWith(u8, freeze.value.named, "@"))
+                {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const input = try temporary(allocator, function, &serial);
+                    const stable = try temporary(allocator, function, &serial);
+                    // Freeze a native carrier, then retain precisely the source
+                    // bits. The original wider alias remains a separate value.
+                    try block.instructions.append(allocator, .{ .result = input, .kind = .{ .cast = .{
+                        .op = .zext,
+                        .from_ty = freeze.ty,
+                        .value = freeze.value,
+                        .to_ty = .{ .int = 64 },
+                    } } });
+                    try block.instructions.append(allocator, .{ .result = stable, .metadata = inst.metadata, .kind = .{ .freeze = .{
+                        .ty = .{ .int = 64 },
+                        .value = .{ .named = input },
+                    } } });
+                    try block.instructions.append(allocator, .{ .result = inst.result, .kind = .{ .cast = .{
+                        .op = .trunc,
+                        .from_ty = .{ .int = 64 },
+                        .value = .{ .named = stable },
+                        .to_ty = freeze.ty,
+                    } } });
+                    continue;
+                },
                 .call => |call| if (unsignedMin(call)) {
                     try candidate.begin(&block, block_index, instruction_index);
                     const condition = try temporary(allocator, function, &serial);

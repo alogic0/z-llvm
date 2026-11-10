@@ -40,6 +40,8 @@ comptime {
     _ = @import("codegen/x86_64/inline_asm_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/pair_arithmetic_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/constant_pair_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/flag_pair_values_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/frontier_views_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/value_use/actions/scalar_immediate_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/pointer_values_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/address_flow_tests.zig");

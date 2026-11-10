@@ -1,4 +1,25 @@
-# Bounded compiler-throughput delivery complete; selection remains paused
+# Complete compiler selection resumed
+
+The user resumed the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
+after the validated performance deliveries. Start batch 08 by replaying the
+retained post-intrinsic original-function frontier, then close shared capability
+boundaries beginning with aggregate PHIs/freezes where the current failures
+support it. Use focused original-function and native checks during implementation;
+complete unchanged-input census and independent production replay accept counts
+at cohesive checkpoints. Revisit performance only when a required replay cannot
+finish. Accepted counts remain 8,664/8,928 and 285/455 until new cumulative proof.
+
+Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) now passes
+all 17 serial gates, all 79 native populations with Debug and ReleaseFast
+compilers, and 2,061 units plus 24 structural/two profile checks in both Debug
+and ReleaseSafe. All nineteen retained original targets select, up from eleven;
+runtime retains 285/455. The [Zig helper migration](evidence/batch08_zig_helpers.md)
+replaces its seven ad hoc Python scripts and inline Python workflow. Complete
+compiler acceptance remains pending. The required census timed out in the large
+LoongArch parser; bounded profiling and an isolated performance prototype address
+that measured blocker before continuing later capability boundaries.
+
+## Completed bounded compiler-throughput delivery
 
 The [allocation-planning throughput slice](evidence/compiler_throughput.md)
 replaces repeated interval/site scans with range queries and skips dependency
@@ -12,7 +33,7 @@ retain all 76 populations and match every baseline command outcome and all
 Current bounded sampling identifies ordinary interval lookups and binding scans
 as the next question. The original function still times out, and no complete
 compiler census, object or production replay is accepted by this slice. Accepted
-counters and the paused complete-selection goal remain unchanged.
+counters were unchanged by that performance delivery.
 
 ## Preceding validation performance delivery
 
@@ -30,12 +51,10 @@ cost 20.09 seconds with ReleaseFast, so a new native result cache is deferred.
 Bounded scheduling measurements support keeping existing concurrency. Its
 allocation-plan recommendation is completed by the throughput slice above.
 
-## Paused after the integer intrinsic slice
+## Preceding integer intrinsic slice
 
-The user requested **finish the current slice and stop**. The integer intrinsic
-slice at `f955509f` is complete, and the
-[all-8,928 goal](plans/2026-11-08-complete-compiler-selection.md) is paused.
-No successor capability family or complete compiler replay is running.
+The earlier request to finish the integer intrinsic slice and stop was honored
+at `f955509f`. The main plan is now resumed as described above.
 
 The [slice evidence](evidence/integer_intrinsic_slice.md) records all 17 serial
 gates and 76 native populations passing, with 2,200,836 local observations against
@@ -55,7 +74,7 @@ The preceding frame source at `726a7c55` passed all 17 integration gates and
 superseded. Its frame and spill implementation is included in the current source;
 its earlier full execution evidence remains separate from complete-input acceptance.
 
-Future work, if the user resumes the goal, follows measured aggregate PHIs and
+Resumed work follows measured aggregate PHIs and
 freezes, pointer flows, atomic stack views, and wide/FP ABI limits. A complete
 unchanged-input census and production replay remain final cumulative acceptance
 checks. Selection does not establish complete objects, startup or self-rebuild.

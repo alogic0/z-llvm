@@ -191,7 +191,7 @@ fn ordinaryLoadValueUseDiagnostic(
 ) ?Diagnostic {
     if (!transaction.failedRequestIs(pointer_request)) return null;
     return switch (err) {
-        error.ValueUseUnresolvedSource => .{ .unsupported_value = "composed-block-unknown-load-ptr" },
+        error.ValueUseUnresolvedSource, error.ValueUseUnsupportedSource => .{ .unsupported_value = "composed-block-unknown-load-ptr" },
         error.ValueUseLoadOrdinaryStackWidth => .{ .no_emitter = "composed-block-load-stack-width" },
         error.ValueUseLoadOrdinaryStackArrayWidth => .{ .no_emitter = "composed-block-load-stack-array-width" },
         error.ValueUseLoadOrdinaryPointerWidth => .{ .no_emitter = "composed-block-load-ptr-width" },

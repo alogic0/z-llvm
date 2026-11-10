@@ -1,8 +1,8 @@
 # Complete compiler selection
 
-Status: paused at the user's request after finishing the integer intrinsic
-slice at `f955509f`. The original work plan below applies when the user resumes
-the goal.
+Status: resumed at the user's request after the validated performance deliveries
+at `c19bdc66` and `0bf96594`. Continue from the retained post-intrinsic frontier;
+accepted counts remain at `bb74a371` until a new cumulative acceptance passes.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -108,6 +108,46 @@ runtime census retains 285/455 without lost successes. The accepted whole-compil
 count remains 8,664/8,928 because complete current-input acceptance is pending.
 See the [slice evidence](../evidence/integer_intrinsic_slice.md).
 
-The user requested **finish the current slice and stop**. The slice is finished,
-and the all-8,928 goal is paused. No further capability work or full compiler
-replay is running.
+The earlier request to finish the integer intrinsic slice and stop was honored.
+The user subsequently resumed this main plan. Batch 08 begins with current-source
+replays of the retained nineteen-function frontier and shared aggregate PHI/freeze
+boundaries. Performance work interrupts capability work only when a required
+replay cannot finish. Evidence is retained under the existing root's `batch-08/`.
+
+Batch 08 implements private integer/pointer-and-flag PHIs, selects, constructors
+and freezes, named integer freezes through 64 bits and i65/i96 carriers, and
+preserving atomic storage views. The first integer-pair source passes 2,053 units,
+24 structural checks and two profile checks in both Debug and ReleaseSafe. Its
+77-population Debug native run preserves all previous observations and all 1,161
+prior compiler artifacts byte for byte. The nineteen original targets advance
+from eleven to fourteen selections, with no lost preceding successes; runtime
+retains 285/455 and the preceding slice's owners. Its cumulative integration run
+passes twelve gates before a missing temporary Zig cache object stops a harness
+link. The exact harness passes all modes/routes with isolated caches. No complete
+Tier-3 or whole-compiler acceptance is claimed for that attempt. The expanded
+aggregate group receives fresh cumulative validation with isolated harness caches;
+full original-input census and independent production replay still accept counts.
+
+The final combined source passes 2,061 units, 24 structural checks and two
+profile checks in both Debug and ReleaseSafe, with all nine readiness procedures
+covered by fresh checks and verified reuse. Its complete 79-population Debug
+and ReleaseFast native suites preserve all 76 preceding registry entries,
+2,837 command outcomes and 1,161 compiler artifacts per build. All 270 calibrated
+faults are detected. All nineteen retained original targets select, with the
+expanded diagnostic selecting 24/25; the runtime census retains 285/455 and
+preceding owner identities. All 17 cumulative serial gates pass with checked
+return code zero and the 3,157-file source snapshot verified afterward. See the
+[validated slice](../evidence/ssa_transport_storage_slice.md).
+
+The [seven-helper Zig migration](../evidence/batch08_zig_helpers.md) is committed
+at `2afa81e8`. Generators reproduce all retained bytes; the maintained native
+runner, fault checker and comparator replace research and comparison scripts.
+The active workflow uses no Python, including inline inspections and edits.
+
+The first-source 264-target diagnostic actually times out at its one-hour
+deadline in `codegen.loongarch.Assemble.parseInstruction`, with 211 complete
+function records and no terminal census event. It supplies no complete coverage
+count. Bounded final-source profiling identifies liveness lookups, hashing and
+binding scans as the remaining replay bottleneck; an isolated prototype follows
+the plan's explicit performance exception. Accepted compiler counts still await
+an unfiltered all-8,928 census and independent production replay.

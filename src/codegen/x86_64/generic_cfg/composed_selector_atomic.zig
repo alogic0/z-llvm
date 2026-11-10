@@ -82,10 +82,13 @@ fn specialOperand(ty: ir.Type, value: ir.Value) bool {
 fn registerOperand(transaction: *ValueUseTransaction, ty: ir.Type, value: ir.Value, target: types.ArgReg) !void {
     if (specialOperand(ty, value)) return;
     const bits = width(ty) orelse return error.UnsupportedCodegenValue;
+    const source_class = if (ty == .ptr) selector_state.valueRegisterClass(transaction.selector, value) else null;
+    const stack_address = source_class == .stack_pointer;
+    const stack_object = source_class == .stack_object;
     _ = try transaction.register(.{
         .source = value,
-        .expected = .{ .ty = ty, .register_class = if (bits <= 32) .gpr32 else .gpr64, .pointer_address_space = if (ty == .ptr) @as(?u32, 0) else null },
-        .form = if (ty == .ptr) .pointer else if (bits <= 32) .gpr32 else .gpr64,
+        .expected = .{ .ty = ty, .register_class = if (stack_object) .stack_object else if (stack_address) .stack_pointer else if (bits <= 32) .gpr32 else .gpr64, .pointer_address_space = if (ty == .ptr) @as(?u32, 0) else null },
+        .form = if (stack_object) .stack_object_address else if (ty == .ptr) .pointer else if (bits <= 32) .gpr32 else .gpr64,
         .destination = if (bits <= 32) .{ .gpr32 = target } else .{ .gpr64 = target },
     });
 }

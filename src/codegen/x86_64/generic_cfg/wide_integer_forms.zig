@@ -114,6 +114,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
             .binary => |x| if (!wide(x.ty) or !supported(x.op) or !operand(x.lhs) or !operand(x.rhs)) return null,
             .icmp => |x| if (!wide(x.operand_ty) or !operand(x.lhs) or !operand(x.rhs)) return null,
             .select => |x| if (!wide(x.ty) or !x.cond_ty.eql(.{ .int = 1 }) or !operand(x.cond) or !operand(x.true_value) or !operand(x.false_value)) return null,
+            .freeze => |x| if (!wide(x.ty) or (!operand(x.value) and x.value != .undef and x.value != .poison)) return null,
             .phi => |x| {
                 if (!wide(x.ty)) return null;
                 for (x.incoming.items) |incoming| if (!operand(incoming.value)) return null;
@@ -171,6 +172,16 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     copy.kind.phi.ty = pair;
                     copy.kind.phi.incoming = try x.incoming.clone(allocator);
                     for (copy.kind.phi.incoming.items) |*incoming| incoming.value = normalized(incoming.value, x.ty.int);
+                },
+                .freeze => |x| {
+                    var value: ir.Value = if (x.value == .undef or x.value == .poison) .{ .int = 0 } else normalized(x.value, x.ty.int);
+                    if (value == .int) value = try b.binary(.add, value, .{ .int = 0 });
+                    copy.result = try forms.temporary(allocator, function, &serial);
+                    copy.kind.freeze.ty = pair;
+                    copy.kind.freeze.value = value;
+                    try block.instructions.append(allocator, copy);
+                    try b.finish(inst, .{ .named = copy.result.? }, x.ty.int);
+                    continue;
                 },
                 .cast => |x| {
                     var value: ir.Value = x.value;

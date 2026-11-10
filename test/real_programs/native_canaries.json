@@ -2094,6 +2094,30 @@
       "functions": ["frontier_ssub8", "frontier_ssub8_left", "frontier_ssub8_right", "frontier_sadd8", "frontier_sadd8_left", "frontier_sadd8_right", "frontier_ssub16", "frontier_ssub16_left", "frontier_ssub16_right", "frontier_sadd16", "frontier_sadd16_left", "frontier_sadd16_right", "frontier_ssub32", "frontier_ssub32_left", "frontier_ssub32_right", "frontier_sadd32", "frontier_sadd32_left", "frontier_sadd32_right", "frontier_ssub64", "frontier_ssub64_left", "frontier_ssub64_right", "frontier_sadd64", "frontier_sadd64_left", "frontier_sadd64_right", "frontier_ssub96", "frontier_ssub96_left", "frontier_ssub96_right", "frontier_sadd96", "frontier_sadd96_left", "frontier_sadd96_right", "frontier_scmp32", "frontier_scmp32_left", "frontier_ctlz128", "frontier_ctlz128_poison", "frontier_abs32", "frontier_abs64", "frontier_abs32_ignored", "frontier_abs64_ignored", "frontier_mul_sat16", "frontier_mul_sat16_left", "frontier_mul_sat16_right", "frontier_ushl64_one", "frontier_ushl64_one_constant"],
       "observations": 11264,
       "stdout": "integer-intrinsic-frontier observations=11264 signed=wide=poison=clobbers=live=guards=preserved\n"
+    },
+    {
+      "population": "flag_pair_values",
+      "prefix": "flag-pair-values",
+      "fixture": "flag_pair_values",
+      "functions": ["flag_pair_overflow8", "flag_pair_overflow16", "flag_pair_overflow32", "flag_pair_overflow64", "flag_pair_overflow128", "flag_pair_atomic8", "flag_pair_atomic16", "flag_pair_atomic32", "flag_pair_atomic64", "flag_pair_select", "flag_pair_freeze"],
+      "observations": 11264,
+      "stdout": "flag-pair-values observations=11264 pairs=parallel=atomic=freeze=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "integer_freeze_values",
+      "prefix": "integer-freeze-values",
+      "fixture": "integer_freeze_values",
+      "functions": ["freeze_values_33_alias", "freeze_values_40_alias", "freeze_values_48_alias", "freeze_values_56_alias", "freeze_values_63_alias", "freeze_values_65_bits", "freeze_values_65_signed", "freeze_values_65_poison", "freeze_values_65_constant", "freeze_values_96_bits", "freeze_values_96_signed", "freeze_values_96_poison", "freeze_values_96_constant"],
+      "observations": 6656,
+      "stdout": "integer-freeze-values observations=6656 alias=wide=stable=clobbers=guards=preserved\n"
+    },
+    {
+      "population": "atomic_storage_views",
+      "prefix": "atomic-storage-views",
+      "fixture": "atomic_storage_views",
+      "functions": ["atomic_storage_8", "atomic_storage_16", "atomic_storage_32", "atomic_storage_64", "atomic_storage_pointer"],
+      "observations": 2560,
+      "stdout": "atomic-storage-views observations=2560 ordering=volatile=width=pointer=clobbers=guards=preserved\n"
     }
   ]
 }
