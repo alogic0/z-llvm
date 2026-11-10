@@ -5,6 +5,7 @@ const canaries = @import("native_canaries.zig");
 const Runner = @import("runner.zig").Runner;
 const elf = @import("object_contract.zig");
 const provenance = @import("provenance.zig");
+const toolchain = @import("toolchain.zig");
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -54,6 +55,8 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     const source_root = try c.join(&.{args.get("zig-source") orelse "../ziglang"});
     const zig = try c.join(&.{args.get("zig-emitter") orelse try c.join(&.{ source_root, "build/stage4/bin/zig" })});
     const zllvm = try c.join(&.{args.get("zllvm") orelse "zig-out/bin/z_llvm"});
+    const selected_toolchain = try toolchain.record(c, zllvm, zig, source_root);
+    try u.put(c.a, report, "toolchain", selected_toolchain);
     const pin = u.trim(try c.read(try c.join(&.{"docs/evidence/ziglang_pin.txt"})));
     const source = try c.join(&.{ source_root, try u.str(manifest, "source") });
     if (!std.mem.eql(u8, u.trim(try c.capture(&.{ "git", "-C", source_root, "rev-parse", "HEAD" })), pin)) return c.fail("upstream revision differs from the tracked pin", .{});
@@ -104,6 +107,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     }
     if (!std.mem.eql(u8, try c.digest(source), try u.str(report.*, "source_sha256"))) return error.UpstreamSourceChangedDuringExecution;
     try provenance.verifyTools(c, procedure);
+    try toolchain.verify(c, selected_toolchain);
     try u.put(c.a, report, "status", u.s("passed"));
 }
 

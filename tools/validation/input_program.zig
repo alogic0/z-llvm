@@ -66,7 +66,10 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, r: *Runner, report: 
     try u.put(c.a, report, "manifest_sha256", u.s(manifest_hash));
     try u.put(c.a, report, "tool_provenance", tools);
     try u.put(c.a, report, "compiler_sha256", u.s(try c.digest(compiler)));
+    try u.put(c.a, report, "compiler", u.s(compiler));
+    try u.put(c.a, report, "compiler_build", try @import("toolchain.zig").compilerBuild(c, compiler));
     try u.put(c.a, report, "frontend_sha256", u.s(try c.digest(zig)));
+    try u.put(c.a, report, "frontend", u.s(zig));
     try u.put(c.a, report, "source_head", u.s(u.trim(try c.capture(&.{ "git", "rev-parse", "HEAD" }))));
     var env = try c.cleanEnvironment();
     try env.put("ZIG_LOCAL_CACHE_DIR", try c.join(&.{ output, "frontend-cache" }));
@@ -101,6 +104,9 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, r: *Runner, report: 
     try authenticate(c, manifest);
     if (!std.mem.eql(u8, manifest_hash, try c.digest(manifest_path))) return error.InputCorpusChanged;
     try provenance.verifyTools(c, tools);
+    if (!std.mem.eql(u8, try c.digest(compiler), try u.str(report.*, "compiler_sha256")) or
+        !std.mem.eql(u8, try c.digest(zig), try u.str(report.*, "frontend_sha256")) or
+        !u.json.eql(try u.get(report.*, "compiler_build"), try @import("toolchain.zig").compilerBuild(c, compiler))) return error.SelectedToolchainChanged;
     try u.put(c.a, report, "status", u.s("passed"));
 }
 

@@ -8,6 +8,8 @@ pub fn main(init: std.process.Init) !void {
 pub fn run(init: std.process.Init) !void {
     const a = init.gpa;
     const io = init.io;
+    const zllvm = try common.resolveZllvm(init);
+    defer a.free(zllvm);
     const temp = try common.TempDir.init(a, io, "byte_loops_diff");
     var success = false;
     defer if (success) temp.deinit(a, io) else {
@@ -35,14 +37,14 @@ pub fn run(init: std.process.Init) !void {
         if (std.mem.eql(u8, route, "direct")) {
             try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = input, .data = source });
         } else {
-            try runToFile(a, io, temp, &.{ "zig", "build", "run", "--", "--passes=release-o3", fixture }, "byte_loops optimize", input);
+            try runToFile(a, io, temp, &.{ zllvm, "--passes=release-o3", fixture }, "byte_loops optimize", input);
         }
         const verified = try runChecked(a, io, temp, &.{ "opt-22", "-passes=verify", "-disable-output", input }, "byte_loops IR verification");
         common.freeRunResult(a, verified);
         const object = try common.allocTempFile(a, temp, route, ".o");
         defer a.free(object);
-        try runToFile(a, io, temp, &.{ "zig", "build", "run", "--", "--target=x86_64-linux", "--generic-cfg-selector", "--emit=obj", input }, "byte_loops object", object);
-        const owners = try runChecked(a, io, temp, &.{ "zig", "build", "run", "--", "--target=x86_64-linux", "--generic-cfg-selector", "--emit=selection-owner-manifest", input }, "byte_loops ownership");
+        try runToFile(a, io, temp, &.{ zllvm, "--target=x86_64-linux", "--generic-cfg-selector", "--emit=obj", input }, "byte_loops object", object);
+        const owners = try runChecked(a, io, temp, &.{ zllvm, "--target=x86_64-linux", "--generic-cfg-selector", "--emit=selection-owner-manifest", input }, "byte_loops ownership");
         defer common.freeRunResult(a, owners);
         const owners_path = try common.allocTempFile(a, temp, route, ".owners");
         defer a.free(owners_path);

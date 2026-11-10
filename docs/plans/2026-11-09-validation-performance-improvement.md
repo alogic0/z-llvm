@@ -1,8 +1,14 @@
-# Draft project improvement plan for validation and compiler performance
+# Project improvement plan for validation and compiler performance
 
 Date: 2026-11-09
-Status: draft proposal; implementation has not started.
+Status: measured delivery implemented and validated; conditional native caching
+and scheduling/report-journal changes deferred by the measurements.
 Review baseline: `ee1b8317767eb6de5443fd9850f8a0d6098b6aeb`.
+
+Implementation results and remaining limits are recorded in
+[validation performance evidence](../evidence/validation_performance.md).
+All 17 integration gates and the three-mode fresh/cache comparison pass.
+The compiler-selection goal remains paused, with accepted counters unchanged.
 
 ## Objective and scope
 
@@ -11,10 +17,10 @@ Improve compiler selection, harness reuse, compiler throughput and report
 handling while preserving independent references, negative controls and
 reproducible evidence.
 
-This is a proposed follow-up to the completed
+This is a follow-up to the completed
 [project improvement plan](../roadmap/project_improvement_plan.md).
 [Active direction](../next_steps.md) continues to govern implementation and the
-complete-selection milestone. This draft does not change accepted counters or
+complete-selection milestone. This work does not change accepted counters or
 replace that work.
 
 The proposed order is compiler-selection propagation and bounded profiling,
@@ -311,19 +317,23 @@ AIR payloads, shared object bundles, independent references and all existing
 execution populations. Follow the [retention policy](../retention_headroom_policy.md).
 No cleanup or accepted-counter change is part of drafting this plan.
 
-## Proposed delivery checklist
+## Delivery checklist
 
-- [ ] Adopt a bounded first implementation slice in active direction.
-- [ ] Establish comparable baselines and record validation-reuse decisions.
-- [ ] Propagate compiler, emitter and Zig source selections; verify nondefault paths and pin rejection.
-- [ ] Validate the Debug/ReleaseSafe coverage and rebuild rules before adopting routine ReleaseFast suites.
-- [ ] Use existing profiles and hardware samples to investigate slow original-input work.
-- [ ] Prove harness reuse preserves all positive, reference and negative checks.
-- [ ] Remeasure duplication and implement artifact reuse only if still worthwhile.
-- [ ] Measure scheduling, command/telemetry publication and retention overhead; implement justified changes.
-- [ ] Complete the required integration and fresh/cache comparisons for adopted changes.
-- [ ] Publish measured outcomes and update active documentation after acceptance.
+- [x] Adopt a bounded first implementation slice in active direction.
+- [x] Establish comparable baselines and record validation-reuse decisions.
+- [x] Propagate compiler, emitter and Zig source selections; verify nondefault paths and pin rejection.
+- [x] Validate the Debug/ReleaseSafe coverage and rebuild rules before adopting routine ReleaseFast suites.
+- [x] Use existing profiles and hardware samples to investigate slow original-input work.
+- [x] Prove harness reuse preserves all positive, reference and negative checks.
+- [x] Remeasure duplication and implement artifact reuse only if still worthwhile.
+- [x] Measure scheduling, command/telemetry publication and retention overhead; implement justified changes.
+- [x] Complete the required integration and fresh/cache comparisons for adopted changes.
+- [x] Publish measured outcomes and update active documentation after acceptance.
 
-The first implementation proposal should cover complete toolchain propagation
-and a bounded profiling investigation. Removing the extra cached Debug
-installation is low priority: the review observed less than a second there.
+The remaining native duplicate-call budget is 20.09 seconds within the
+ReleaseFast compiler subtotal, so no new native result cache is introduced.
+Harness reuse and incremental command serialization have measured benefits;
+durable integrated output avoids the temporary-report watcher. Existing
+concurrency and telemetry sampling remain unchanged. The bounded compiler
+investigation identifies allocation-plan scans and dependency validation; no
+compiler algorithm change or complete-input acceptance is claimed.

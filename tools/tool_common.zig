@@ -1,6 +1,15 @@
 const std = @import("std");
 const regex = @import("vendor/regex/src/root.zig");
 
+/// Explicit compiler selections must never be overwritten by a nested default
+/// installation. Standalone canaries retain their ordinary Debug build.
+pub fn resolveZllvm(init: std.process.Init) ![]const u8 {
+    if (init.environ_map.get("ZLLVM_EXE")) |path| return init.gpa.dupe(u8, path);
+    const result = try runCapture(init.gpa, init.io, &.{ "zig", "build" }, "zig build (Debug compiler)");
+    freeRunResult(init.gpa, result);
+    return init.gpa.dupe(u8, "zig-out/bin/z_llvm");
+}
+
 pub const TempDir = struct {
     path: []const u8,
 

@@ -13,6 +13,127 @@ const expect = std.testing.expect;
 const equal = std.testing.expectEqualStrings;
 const io = std.testing.io;
 const zero_hash = &@as([64]u8, @splat('0'));
+test "nested validation propagates each independent toolchain selection without unsupported options" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const toolchain = @import("validation/toolchain.zig");
+    for ([_]u3{ 0, 1, 2, 4, 7 }) |mask| {
+        const selected: toolchain.Selection = .{
+            .zllvm = if (mask & 1 != 0) "/selected compiler/bin/z_llvm" else "zig-out/bin/z_llvm",
+            .emitter = if (mask & 2 != 0) "/selected emitter/zig" else "../ziglang/build/stage4/bin/zig",
+            .source = if (mask & 4 != 0) "/selected source/ziglang" else "../ziglang",
+        };
+        for ([_]toolchain.Consumer{ .program, .upstream_c, .input_program }) |consumer| {
+            const command = try selected.command(f.c.a, consumer, "/evidence with spaces", &.{});
+            const args = try u.Args.parse(f.c.a, command[4..], if (consumer == .input_program) &.{ "output-root", "zllvm", "zig-emitter" } else &.{ "output-root", "zllvm", "zig-emitter", "zig-source" }, &.{});
+            try equal(selected.zllvm, try args.require("zllvm"));
+            try equal(selected.emitter, try args.require("zig-emitter"));
+            try equal("/evidence with spaces", try args.require("output-root"));
+            if (consumer == .input_program) try expect(args.get("zig-source") == null) else try equal(selected.source, try args.require("zig-source"));
+        }
+    }
+}
+test "compiler receipts cannot attribute a different or replaced compiler binary" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const toolchain = @import("validation/toolchain.zig");
+    const compiler = try f.write("compiler", "original compiler");
+    try equal("unrecorded", try u.str(try toolchain.compilerBuild(&f.c, compiler), "status"));
+    const receipt = try f.c.fmt("{s}.build.json", .{compiler});
+    try f.c.writeJson(receipt, .{ .schema = "zllvm-compiler-build-v1", .compiler_sha256 = try f.c.digest(compiler), .build_mode = "ReleaseFast" });
+    const recorded = try toolchain.compilerBuild(&f.c, compiler);
+    try equal("recorded", try u.str(recorded, "status"));
+    try equal("ReleaseFast", try u.str(try u.get(recorded, "identity"), "build_mode"));
+    const alias = try f.path("compiler-alias");
+    _ = try f.c.capture(&.{ "ln", "-s", compiler, alias });
+    try expect(u.json.eql(recorded, try toolchain.compilerBuild(&f.c, alias)));
+    try f.c.write(compiler, "replacement compiler");
+    try std.testing.expectError(error.CompilerBuildReceiptMismatch, toolchain.compilerBuild(&f.c, compiler));
+    try f.c.write(receipt, "{truncated");
+    if (toolchain.compilerBuild(&f.c, compiler)) |_| return error.AcceptedCorruptReceipt else |_| {}
+}
+test "toolchain provenance detects selected binary changes and retains requested paths" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const toolchain = @import("validation/toolchain.zig");
+    const compiler = try f.write("compiler", "compiler");
+    const emitter = try f.write("emitter", "emitter");
+    const before = try toolchain.record(&f.c, compiler, emitter, f.c.root);
+    try equal(compiler, try u.str(before, "zllvm"));
+    try equal(emitter, try u.str(before, "zig_emitter"));
+    try equal(f.c.root, try u.str(before, "zig_source"));
+    try toolchain.verify(&f.c, before);
+    try f.c.write(emitter, "changed emitter");
+    try std.testing.expectError(error.SelectedToolchainChanged, toolchain.verify(&f.c, before));
+}
+test "command publications match legacy bytes after success failure timeout and launch failure" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    var runner = Runner.init(&f.c, f.directory);
+    const commands = [_][]const []const u8{
+        &.{ "/bin/sh", "-c", "printf 'a\\000b'; printf warning >&2" },
+        &.{ "/bin/sh", "-c", "exit 7" },
+        &.{ "/bin/sleep", "30" },
+        &.{try f.path("missing-command")},
+    };
+    for (commands, [_]i64{ 0, 7, 124, 127 }, 0..) |command, expected, index| {
+        const result = try runner.run(command, try f.path(try f.c.fmt("command-{d}", .{index})), &f.c.env, .{ .timeout_ms = if (index == 2) 20 else 5000 });
+        try std.testing.expectEqual(expected, result.code);
+        const legacy = try std.json.Stringify.valueAlloc(f.c.a, runner.commands, .{ .whitespace = .indent_2 });
+        try equal(try f.c.fmt("{s}\n", .{legacy}), try f.c.read(try f.path("commands.json")));
+    }
+}
+test "compiled harness reuse rejects missing corrupt and changed source artifacts" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const harnesses = @import("validation/linked_harness.zig");
+    const source = try f.write("harness.zig", "unchanged harness source");
+    const object = try f.write("harness.o", "compiled harness object");
+    const emitter = try u.toValue(f.c.a, .{ .path = "/pinned/emitter", .target = "x86_64-linux-gnu" });
+    const harness: harnesses.Compiled = .{
+        .source = source,
+        .source_sha256 = try f.c.digest(source),
+        .object = object,
+        .object_sha256 = try f.c.digest(object),
+        .mode = "ReleaseSafe",
+        .emitter = emitter,
+        .producer_commands = .{ 0, 1 },
+    };
+    const command = try harness.linkCommand(&f.c, "/subject.o", "/executable");
+    try equal("/pinned/emitter", command[0]);
+    try expect(u.contains(command, "-fno-lld") and u.contains(command, "-fcompiler-rt") and u.contains(command, "-fno-lto") and u.contains(command, "-OReleaseSafe"));
+    try expect(u.contains(command, object) and !u.contains(command, source));
+    try f.c.write(object, "corrupt object");
+    try std.testing.expectError(error.HarnessArtifactChanged, harness.linkCommand(&f.c, "/subject.o", "/executable"));
+    try f.c.write(object, "compiled harness object");
+    try f.c.write(source, "different harness source");
+    try std.testing.expectError(error.HarnessSourceChanged, harness.linkCommand(&f.c, "/subject.o", "/executable"));
+    try f.c.write(source, "unchanged harness source");
+    try std.Io.Dir.cwd().deleteFile(io, object);
+    try std.testing.expectError(error.FileNotFound, harness.linkCommand(&f.c, "/subject.o", "/executable"));
+}
+test "library identity includes content additions removals and rejects untracked symlink dependencies" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const toolchain = @import("validation/toolchain.zig");
+    const file = try f.write("dependency", "first");
+    const first = try toolchain.libraryIdentity(&f.c, f.directory);
+    try f.c.write(file, "other");
+    try expect(!u.json.eql(first, try toolchain.libraryIdentity(&f.c, f.directory)));
+    try f.c.write(file, "first");
+    _ = try f.write("added", "new dependency");
+    try expect(!u.json.eql(first, try toolchain.libraryIdentity(&f.c, f.directory)));
+    try std.Io.Dir.cwd().deleteFile(io, try f.path("added"));
+    try expect(u.json.eql(first, try toolchain.libraryIdentity(&f.c, f.directory)));
+    _ = try f.c.capture(&.{ "ln", "-s", file, try f.path("linked") });
+    try std.testing.expectError(error.UnsupportedZigLibraryFileType, toolchain.libraryIdentity(&f.c, f.directory));
+}
 test "file corpus isolates working directories and checks files and error observations" {
     var f: Fixture = undefined;
     try f.init();

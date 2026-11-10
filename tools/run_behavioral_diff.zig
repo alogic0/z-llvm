@@ -20,6 +20,8 @@ pub fn run(init: std.process.Init) !void {
 fn runFiltered(init: std.process.Init, filter: ?[]const u8) !void {
     const a = init.gpa;
     const io = init.io;
+    const zllvm = try common.resolveZllvm(init);
+    defer a.free(zllvm);
     const temp = try common.TempDir.init(a, io, "behavioral_diff");
     // Failures retain the exact small fixtures, objects, and process streams.
     var success = false;
@@ -35,7 +37,7 @@ fn runFiltered(init: std.process.Init, filter: ?[]const u8) !void {
         if (filter) |wanted| if (!std.mem.eql(u8, id, wanted)) continue;
         const fixture = try std.fmt.allocPrint(a, "test/behavioral/{s}.ll", .{id});
         defer a.free(fixture);
-        function_count += try compare(init, temp, id, fixture, &out.interface);
+        function_count += try compare(init, zllvm, temp, id, fixture, &out.interface);
         case_count += 1;
     }
     // Generated interactions cover wrapping integer arithmetic, signed division,
@@ -64,7 +66,7 @@ fn runFiltered(init: std.process.Init, filter: ?[]const u8) !void {
         , .{ @as(i32, @bitCast(seed)), @as(u32, 1) << @as(u5, @intCast(2 + seed % 5)) });
         defer a.free(source);
         try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = fixture, .data = source });
-        function_count += try compare(init, temp, id, fixture, &out.interface);
+        function_count += try compare(init, zllvm, temp, id, fixture, &out.interface);
         case_count += 1;
     }
     if (case_count == 0) return error.UnknownCase;
@@ -73,7 +75,7 @@ fn runFiltered(init: std.process.Init, filter: ?[]const u8) !void {
     success = true;
 }
 
-fn compare(init: std.process.Init, temp: common.TempDir, id: []const u8, fixture: []const u8, out: *std.Io.Writer) !usize {
+fn compare(init: std.process.Init, zllvm: []const u8, temp: common.TempDir, id: []const u8, fixture: []const u8, out: *std.Io.Writer) !usize {
     const a = init.gpa;
     const io = init.io;
     const source = try std.Io.Dir.cwd().readFileAlloc(io, fixture, a, .limited(1024 * 1024));
@@ -83,10 +85,10 @@ fn compare(init: std.process.Init, temp: common.TempDir, id: []const u8, fixture
     const source_hash = std.fmt.bytesToHex(digest, .lower);
     const object = try common.allocTempFile(a, temp, id, ".o");
     defer a.free(object);
-    try runToFile(a, io, temp, &.{ "zig", "build", "run", "--", "--target=x86_64-unknown-linux-gnu", "--generic-cfg-selector", "--emit=obj", fixture }, "z_llvm behavioral object", object);
+    try runToFile(a, io, temp, &.{ zllvm, "--target=x86_64-unknown-linux-gnu", "--generic-cfg-selector", "--emit=obj", fixture }, "z_llvm behavioral object", object);
     const owners = try common.allocTempFile(a, temp, id, ".owners");
     defer a.free(owners);
-    try runToFile(a, io, temp, &.{ "zig", "build", "run", "--", "--target=x86_64-unknown-linux-gnu", "--generic-cfg-selector", "--emit=selection-owner-manifest", fixture }, "behavioral selection owners", owners);
+    try runToFile(a, io, temp, &.{ zllvm, "--target=x86_64-unknown-linux-gnu", "--generic-cfg-selector", "--emit=selection-owner-manifest", fixture }, "behavioral selection owners", owners);
     const ownership = try std.Io.Dir.cwd().readFileAlloc(io, owners, a, .limited(1024 * 1024));
     defer a.free(ownership);
     var lines = std.mem.splitScalar(u8, ownership, '\n');

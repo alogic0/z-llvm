@@ -29,11 +29,12 @@ remain in this repository.
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
 | Final selection rejection types, attributes and locations | `src/selection_census.zig` |
-| Upstream C program and 45 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
+| Upstream C program and 76 native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
 | Permanent unchanged Fibonacci regression in three modes | `tools/run_real_program.zig` / `fibonacci-regression` |
 | Unchanged Zig tool with runtime document inputs and exact file outputs | `tools/run_real_program.zig` / `zig-input-program` |
 | Fibonacci, four fixed programs and the document-input tool in three modes | `tools/run_distribution_zig_integrated_exe.zig` / `distribution-all` |
-| Added compiler-core execution and 27 negative controls | `src/distribution_execution_breadth_gate.zig` / `execution-breadth-controls` |
+| Added compiler-core execution and 54 negative controls | `src/distribution_execution_breadth_gate.zig` / `execution-breadth-controls` |
+| Selected compiler build and retained build receipt | `tools/build_validation_compiler.zig` / `validation-compiler` |
 | Fixed candidate selector | `tools/build_real_candidates_v3.zig` / `real-candidates-v3` |
 | Checked semantic facts | `tools/validation/candidate_facts.zig` library |
 | Fact freezing and replay proof | `tools/freeze_real_candidate_facts.zig` / `freeze-real-candidate-facts` |
@@ -137,10 +138,70 @@ command records include the budget.
 
 The [compiler throughput comparison](evidence/execution_breadth.md) measures Debug
 and ReleaseFast compiler builds separately from generated-code performance.
-`ZLLVM_EXE` selects the compiler for integrated object/executable routes and their
-large unchanged programs; ordinary build commands and native-population tools
-keep their own compiler selection. A separate ReleaseFast build prefix permits
-faster development runs while retaining the Debug installation and unit tests.
+The [validation performance delivery](evidence/validation_performance.md) extends
+explicit selection to nested programs/native consumers and records their actual
+build identities. Separate prefixes retain each requested compiler build mode
+and the required Debug/ReleaseSafe coverage.
+
+## Selecting and retaining validation compilers
+
+Prepare one required compiler mode with a separate install prefix:
+
+```sh
+zig build validation-compiler -- \
+  --output-root local-state/validation-compilers --mode ReleaseFast
+```
+
+This installs `local-state/validation-compilers/ReleaseFast/bin/z_llvm` and an
+adjacent `.build.json` receipt. `--mode Debug` and `--mode ReleaseSafe` use
+separate directories. Optional `--zig`, `--target` and `--cpu` select build
+inputs; the defaults are the project-pinned Zig, `x86_64-linux-gnu` and baseline
+CPU. Symbols and frame pointers are retained. Zig validates its dependency cache
+on every invocation; missing or corrupt installed binaries are rebuilt/reinstalled.
+The receipt binds source/dependency and Zig library hashes, target, CPU, mode,
+effective options, producer command and binary hash. An unchanged cached build
+preserves the original receipt; its latest command remains in `commands.json`.
+
+`ZLLVM_EXE` selects the compiler used throughout the integrated-executable gate,
+including imported behavioral canaries, `hello_libc` and the C/native suite.
+`ZIG_EMITTER` and `ZIG_SOURCE_DIR` reach nested consumers that support them.
+Standalone program and C tools accept `--zllvm`, `--zig-emitter` and `--zig-source`;
+the input-program tool accepts the first two. Selected paths, hashes and build
+receipts are retained and checked again at completion. A caller-supplied binary
+without a receipt is labelled unrecorded. Existing source, fixture, emitter
+version and emitter-hash checks still apply. Compiler build mode is recorded
+separately from the three generated-code input modes under test.
+
+For a full run with a prepared ReleaseFast compiler and durable nested reports:
+
+```sh
+validation_emitter="$(realpath ../ziglang/build/stage4/bin/zig)"
+ZLLVM_EXE="$PWD/local-state/validation-compilers/ReleaseFast/bin/z_llvm" \
+ZIG_EMITTER="$validation_emitter" \
+ZIG_SOURCE_DIR="$PWD/../ziglang" \
+ZLLVM_INTEGRATED_OUTPUT_ROOT=local-state/validations/my-validation/integrated \
+zig build distribution-all -- --serial --fresh-real-rows \
+  --zig-emitter="$validation_emitter" \
+  --real-rows-validation-root=local-state/validations/my-validation/air/my-validation \
+  --real-rows-cache-root=local-state/caches/my-validation \
+  --serial-root=local-state/validations/my-validation/serial
+```
+
+Use new evidence paths. The real-row CLI requires the emitter's canonical
+absolute path; nested program consumers can record valid aliases. The optional
+integrated output directory is created exclusively inside the project and retained
+on success or failure; an existing root is rejected. Without it, the runner uses
+its ordinary temporary-directory lifecycle. Build artifact reuse and passing-gate
+reuse follow separate rules in [validation tiers](validation_tiers.md).
+
+The execution-control gate reuses a freshly compiled harness within each
+function/mode, preserving separate independent references and all 54 controls.
+`--fresh-harness` selects the earlier source-compilation route for comparison;
+`--mode ReleaseFast|ReleaseSafe|ReleaseSmall` restricts a diagnostic. Acceptance
+still requires the default complete three-mode population. Command histories
+remain complete atomically published JSON after every command. The
+[performance evidence](evidence/validation_performance.md) records the measured
+benefit and retained Debug/ReleaseSafe coverage.
 
 Unchanged Zig programs now obtain ownership and a phase profile from the captured
 object-emission run. `run_real_program --replay-owners` additionally selects the

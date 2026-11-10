@@ -1,0 +1,969 @@
+{
+  "schema": "validation-performance-v1",
+  "date": "2026-11-09",
+  "status": "validated",
+  "evidence_root": "local-state/validations/validation-performance-20261109",
+  "source": {
+    "base_head": "4d6ee5e46c9b75b5d89e8bb74b37d4fbb776ec83",
+    "baseline_snapshot": "source-snapshot.json",
+    "validated_snapshot": "source-final-snapshot-v2.json",
+    "validated_files": 3144,
+    "validated_patch": "source-final-v2.patch",
+    "retained_new_sources": "retained-new-sources",
+    "documentation_delta": "final-documentation-delta.json",
+    "reuse": "compiler backend dependencies unchanged; standalone gate and validation tools receive fresh coverage; final compiler binaries match baseline hashes"
+  },
+  "builds": {
+    "Debug": {
+      "compiler_sha256": "a158e11b03d8a6bf3dac53b8e86e94329b8c9d39f34b5e2d95aa0b589502f2ea",
+      "baseline_receipt": "compilers/Debug/bin/z_llvm.build.json",
+      "final_receipt": "compilers-final/Debug/bin/z_llvm.build.json",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false,
+      "binary_unchanged": true
+    },
+    "ReleaseFast": {
+      "compiler_sha256": "23bbad0f9992c16c88fe01b1e363237bcece130c092c9621b04f605332dec509",
+      "baseline_receipt": "compilers/ReleaseFast/bin/z_llvm.build.json",
+      "final_receipt": "compilers-final/ReleaseFast/bin/z_llvm.build.json",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false,
+      "binary_unchanged": true
+    }
+  },
+  "project_zig": {
+    "path": "/home/oleg/.zig/0.17.0/files/zig",
+    "sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+    "version": "0.17.0",
+    "host_target": "x86_64-linux.7.0...7.0-gnu.2.39",
+    "library": {
+      "path": "/home/oleg/.zig/0.17.0/files/lib",
+      "files": 19501,
+      "sha256": "da12ef3b9d8d4a6120652a8b53e18a905dace8a7eeb10a260c3db619a10f4a99"
+    }
+  },
+  "frontend": {
+    "revision": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+    "version": "0.17.0-dev.11+1c08b09d1",
+    "sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+    "selected_source": "local-state/validations/validation-performance-20261109/alternate-source",
+    "selected_emitter": "local-state/validations/validation-performance-20261109/alternate-emitter",
+    "canonical_emitter": "/home/oleg/prog/ziglang/build/stage4/bin/zig"
+  },
+  "coverage": {
+    "Debug": {
+      "compiler_units": 2043,
+      "structural_checks": 24,
+      "policy_tests": 36,
+      "profile_interruption_tests": 2
+    },
+    "ReleaseSafe": {
+      "compiler_units": 2043,
+      "structural_checks": 24,
+      "policy_tests": 36,
+      "profile_interruption_tests": 2
+    },
+    "native": {
+      "compiler_modes": [
+        "Debug",
+        "ReleaseFast"
+      ],
+      "input_modes": [
+        "ReleaseFast",
+        "ReleaseSafe",
+        "ReleaseSmall"
+      ],
+      "populations": 76,
+      "local_observations": 2200836,
+      "reference_observations": 1100418,
+      "commands_per_suite": 2837,
+      "compiler_executions_per_suite": 1191,
+      "object_comparison": "456 identical; nine reviewed differences confined to unused upper halves of i32 RSI all-ones materializations; all oracles match",
+      "optimizer_outputs_identical": 237,
+      "ownership_outputs_identical": 459,
+      "final_releasefast_artifacts_identical": 1161,
+      "debug_population_reduced": false
+    },
+    "harness": {
+      "status": "passed",
+      "function_modes": 21,
+      "observations": 22788,
+      "negative_controls": 54,
+      "harness_compilations": 21,
+      "harness_assemblies": 21,
+      "commands": 267,
+      "child_wall_seconds": 368.13933634,
+      "report": "local-state/validations/validation-performance-20261109/integrated-fresh-v2/execution-breadth-controls/report.json"
+    },
+    "harness_fresh_reuse": {
+      "status": "passed",
+      "function_modes": 7,
+      "observations": 7596,
+      "negative_controls": 18,
+      "subject_objects": "byte-identical",
+      "fresh_report": "harness-fresh-fast/report.json",
+      "reuse_report": "harness-reuse-fast/report.json"
+    },
+    "nondefault_selection_and_provenance_controls": "passed; independent and combined selections, eight provenance rejections, corrupt/missing compiler repair, existing durable-root rejection and retained failure",
+    "full": {
+      "status": "passed",
+      "subgates": 17,
+      "wall_seconds": 2964.682425679,
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "exit_status": 0,
+          "duration_ms": 62933
+        },
+        {
+          "id": "selected-object-inspection",
+          "exit_status": 0,
+          "duration_ms": 1954
+        },
+        {
+          "id": "selected-native-link",
+          "exit_status": 0,
+          "duration_ms": 3376
+        },
+        {
+          "id": "selected-native-probe",
+          "exit_status": 0,
+          "duration_ms": 3376
+        },
+        {
+          "id": "zig-source-native-link",
+          "exit_status": 0,
+          "duration_ms": 19716
+        },
+        {
+          "id": "integrated-object-postopt",
+          "exit_status": 0,
+          "duration_ms": 77133
+        },
+        {
+          "id": "integrated-object-preopt",
+          "exit_status": 0,
+          "duration_ms": 34524
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "exit_status": 0,
+          "duration_ms": 16171
+        },
+        {
+          "id": "integrated-object-release",
+          "exit_status": 0,
+          "duration_ms": 11014
+        },
+        {
+          "id": "real-rows-release-fast",
+          "exit_status": 0,
+          "duration_ms": 919050
+        },
+        {
+          "id": "real-rows-release-safe",
+          "exit_status": 0,
+          "duration_ms": 891037
+        },
+        {
+          "id": "real-rows-release-small",
+          "exit_status": 0,
+          "duration_ms": 548858
+        },
+        {
+          "id": "integrated-executable",
+          "exit_status": 0,
+          "duration_ms": 1692492
+        },
+        {
+          "id": "release-object-inspection",
+          "exit_status": 0,
+          "duration_ms": 485
+        },
+        {
+          "id": "release-native-link",
+          "exit_status": 0,
+          "duration_ms": 1122
+        },
+        {
+          "id": "release-native-probe",
+          "exit_status": 0,
+          "duration_ms": 1035
+        },
+        {
+          "id": "boundary-gates",
+          "exit_status": 0,
+          "duration_ms": 9981
+        }
+      ],
+      "headroom": {
+        "schema_version": "1",
+        "run_id": "decfd0371b1d209eef7038f2a19cebe2",
+        "scratch_path": "local-state/validations/validation-performance-20261109/full-fresh-v2-scratch",
+        "bundle_path": "local-state/validations/validation-performance-20261109/full-fresh-v2-scratch/release_source_object_bundle",
+        "target": "x86_64-unknown-linux-gnu",
+        "mode": "serial",
+        "real_rows_concurrency": "3",
+        "subgates": "17",
+        "wall_ms": "2964485",
+        "starting_free_bytes": "72425967616",
+        "minimum_observed_free_bytes": "59200307200",
+        "final_free_bytes": "59200307200",
+        "observed_peak_bytes": "13225660416",
+        "reserve_bytes": "11410065408",
+        "required_start_bytes": "20000000000",
+        "local_fail": "0"
+      },
+      "integrated_reports": "integrated-fresh-v2",
+      "native_coverage_comparison": "final-native-coverage-comparison.json"
+    },
+    "fresh_cache": {
+      "modes": 3,
+      "canonical_records": 45,
+      "semantic_match": true,
+      "comparator_unchanged": true,
+      "fresh_raw_blocks": "full-fresh-v2-real-rows.log",
+      "cached_log": "rows-cached-v2.log",
+      "comparison": "fresh-cache-comparison-v2.log"
+    }
+  },
+  "measurements": {
+    "native": {
+      "repetitions_per_compiler": 1,
+      "debug": {
+        "wall_seconds": 1051.97,
+        "user_seconds": 980.74,
+        "system_seconds": 59.95,
+        "max_rss_kib": 520832
+      },
+      "releasefast": {
+        "wall_seconds": 179.12,
+        "user_seconds": 130.11,
+        "system_seconds": 36.4,
+        "max_rss_kib": 527396
+      },
+      "timing_and_duplication": [
+        {
+          "compiler_executions": 1191,
+          "compiler_wall_ns": 950210809588,
+          "extra_identical_argument_calls": 315,
+          "extra_identical_argument_wall_ns": 191706385074
+        },
+        {
+          "compiler_executions": 1191,
+          "compiler_wall_ns": 80087425670,
+          "extra_identical_argument_calls": 315,
+          "extra_identical_argument_wall_ns": 20092992615
+        }
+      ],
+      "scope": "identical arguments within each frozen run; candidates only, not a cache key or additive savings estimate"
+    },
+    "harness": {
+      "repetitions_per_route": 1,
+      "fresh_wall_seconds": 353.259939916,
+      "reuse_wall_seconds": 169.134389436,
+      "scope": "seven-function ReleaseFast complete gate, all reference and fault controls; separately recorded source/build identity"
+    },
+    "command_publication": {
+      "status": "passed",
+      "records": 2801,
+      "baseline_seconds": [
+        24.870701588,
+        24.705891412,
+        24.06175204
+      ],
+      "candidate_seconds": [
+        1.241320013,
+        1.188897357,
+        1.21759482
+      ],
+      "baseline_median_seconds": 24.705891412,
+      "candidate_median_seconds": 1.21759482,
+      "final_bytes_identical": true,
+      "bytes_written_per_replay": 2844179099,
+      "atomic_publication": "unchanged; complete JSON after each record",
+      "scope": "serialization and atomic publication, no child command execution"
+    },
+    "scheduling": {
+      "isolated": {
+        "group_wall_seconds": [
+          5.904347552,
+          6.005796557,
+          6.104703941
+        ],
+        "group_median_seconds": 6.005796557,
+        "child_user_seconds": 13.52,
+        "child_system_seconds": 4.18,
+        "max_child_rss_kb": 507844.0,
+        "processes_per_group": 3,
+        "groups": 3,
+        "timeouts": 0,
+        "objects_byte_identical": true
+      },
+      "concurrent": {
+        "group_wall_seconds": [
+          2.1319981,
+          2.168620437,
+          2.118739893
+        ],
+        "group_median_seconds": 2.1319981,
+        "child_user_seconds": 14.39,
+        "child_system_seconds": 4.43,
+        "max_child_rss_kb": 507848.0,
+        "processes_per_group": 3,
+        "groups": 3,
+        "timeouts": 0,
+        "objects_byte_identical": true
+      },
+      "scope": "bounded large-CFG native object compilation only; does not select concurrency for whole compiler or long AIR exports",
+      "decision": "retain existing three-mode concurrency; no general scheduler change"
+    },
+    "profile": {
+      "scope": "reduced original-function diagnostic; no acceptance credit",
+      "timeout_seconds": 90,
+      "compiler_returncode": 124,
+      "samples": 17917,
+      "reported_lost_samples": 0,
+      "unknown_leaf_sample_percent": 1.05,
+      "decoded_caller_stacks": true,
+      "function": "codegen.loongarch.Assemble.parseInstruction",
+      "blocks": 20976,
+      "instructions": 133719,
+      "complete_events": 486,
+      "event_sequence_valid": true,
+      "completed_phase_intervals_ns": {
+        "other": 4112832,
+        "input": 4823283,
+        "parse": 686992080,
+        "verify": 689636003,
+        "select": 22897769768,
+        "normalize": 567703546,
+        "legalize": 2442262114
+      },
+      "last_event": {
+        "schema": "compilation-events-v1",
+        "sequence": 485,
+        "elapsed_ns": 27293301730,
+        "event": "retry_begin",
+        "function": "codegen.loongarch.Assemble.parseInstruction",
+        "phase": "select",
+        "details": []
+      },
+      "active_phase_at_interrupt": "select",
+      "final_profile_written": false,
+      "object_complete": false,
+      "hotspots_self_percent": {
+        "allocation_plan": 35.71,
+        "boundary_liveness": 9.85,
+        "dependency_query": 8.37,
+        "dependency_validation": 6.5
+      },
+      "next_bounded_investigation": "count interval/site scans and repeated dependency validation, preserving identical frame plans and ownership guards"
+    },
+    "telemetry_and_retention": {
+      "collection_samples_per_probe": 100,
+      "telemetry_publication_repetitions": 3,
+      "full_samples_per_replay": 2396,
+      "cadence_changed": false,
+      "headroom_fields_changed": false,
+      "scope": "instrumented replay and concurrent watcher diagnostics; no isolated total-speedup claim"
+    }
+  },
+  "decisions": {
+    "adopted": [
+      "explicit toolchain propagation",
+      "separate compiler prefixes and build receipts",
+      "compiled harness reuse within function/mode/run",
+      "incremental serialization with complete atomic command JSON",
+      "optional exclusive durable integrated output"
+    ],
+    "native_result_cache": "deferred; 315 duplicate calls cost 20.09 seconds inside 80.09-second ReleaseFast compiler subtotal",
+    "scheduling": "retain existing three-mode concurrency; bounded evidence does not authorize whole-compiler scheduling changes",
+    "telemetry_journal_or_sampling_change": "deferred; preserve current cadence, headroom observations and process contracts",
+    "compiler_algorithm_change": false,
+    "complete_input_acceptance": false,
+    "next_bounded_investigation": "allocation-plan interval/site scans and repeated dependency validation with identical frame/ownership guards"
+  },
+  "process_records": {
+    "units-debug": {
+      "argv": [
+        "zig",
+        "build",
+        "test-unit",
+        "structural-smoke",
+        "test-profile-events",
+        "real-program-policy-tests",
+        "-Doptimize=Debug",
+        "--summary",
+        "all"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 224920679073
+    },
+    "units-safe": {
+      "argv": [
+        "zig",
+        "build",
+        "test-unit",
+        "structural-smoke",
+        "test-profile-events",
+        "real-program-policy-tests",
+        "-Doptimize=ReleaseSafe",
+        "--summary",
+        "all"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 202631011384
+    },
+    "final-policy-profile-debug": {
+      "argv": [
+        "zig",
+        "build",
+        "real-program-policy-tests",
+        "test-profile-events",
+        "-Doptimize=Debug",
+        "--summary",
+        "all"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 3895245641
+    },
+    "final-policy-profile-safe": {
+      "argv": [
+        "zig",
+        "build",
+        "real-program-policy-tests",
+        "test-profile-events",
+        "-Doptimize=ReleaseSafe",
+        "--summary",
+        "all"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 2644124007
+    },
+    "final-whole-compiler-analysis": {
+      "argv": [
+        "zig",
+        "build-exe",
+        "tools/run_whole_compiler.zig",
+        "-fno-emit-bin"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 437179123
+    },
+    "full-fresh-v2": {
+      "argv": [
+        "env",
+        "ZLLVM_EXE=/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/compilers-final/ReleaseFast/bin/z_llvm",
+        "ZIG_EMITTER=/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/alternate-emitter",
+        "ZIG_SOURCE_DIR=/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/alternate-source",
+        "ZLLVM_INTEGRATED_OUTPUT_ROOT=/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/integrated-fresh-v2",
+        "zig",
+        "build",
+        "distribution-all",
+        "--",
+        "--serial",
+        "--fresh-real-rows",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig",
+        "--real-rows-validation-root=local-state/validations/validation-performance-20261109/air/validation-performance-20261109",
+        "--real-rows-cache-root=local-state/caches/validation-performance-20261109",
+        "--serial-root=local-state/validations/validation-performance-20261109/full-fresh-v2-scratch"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 2964682425679
+    },
+    "rows-cached-v2": {
+      "argv": [
+        "zig",
+        "run",
+        "tools/run_distribution_real_rows_parallel.zig",
+        "--",
+        "--scratch-root=local-state/validations/validation-performance-20261109/air/validation-performance-20261109",
+        "--export-cache-root=local-state/caches/validation-performance-20261109",
+        "--zig-emitter=/home/oleg/prog/ziglang/build/stage4/bin/zig"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 885545156159
+    },
+    "harness-fresh-fast": {
+      "argv": [
+        "/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/execution-controls-final",
+        "--output-root",
+        "/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/harness-fresh-fast",
+        "--zig-emitter",
+        "/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/alternate-emitter",
+        "--mode",
+        "ReleaseFast",
+        "--fresh-harness"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 353259939916
+    },
+    "harness-reuse-fast-v2": {
+      "argv": [
+        "local-state/validations/validation-performance-20261109/execution-controls",
+        "--output-root",
+        "local-state/validations/validation-performance-20261109/harness-reuse-fast",
+        "--zig-emitter",
+        "local-state/validations/validation-performance-20261109/alternate-emitter",
+        "--mode",
+        "ReleaseFast"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 169134389436
+    },
+    "c-debug": {
+      "argv": [
+        "/usr/bin/time",
+        "-f",
+        "wall_seconds=%e\\nuser_seconds=%U\\nsystem_seconds=%S\\nmax_rss_kb=%M\\nexit_status=%x",
+        "-o",
+        "local-state/validations/validation-performance-20261109/c-debug.time",
+        "--",
+        "local-state/validations/validation-performance-20261109/run-upstream-c",
+        "--output-root",
+        "local-state/validations/validation-performance-20261109/c-debug",
+        "--zllvm",
+        "local-state/validations/validation-performance-20261109/compilers/Debug/bin/z_llvm",
+        "--zig-emitter",
+        "local-state/validations/validation-performance-20261109/alternate-emitter",
+        "--zig-source",
+        "local-state/validations/validation-performance-20261109/alternate-source"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 1052141389595
+    },
+    "c-fast": {
+      "argv": [
+        "/usr/bin/time",
+        "-f",
+        "wall_seconds=%e\\nuser_seconds=%U\\nsystem_seconds=%S\\nmax_rss_kb=%M\\nexit_status=%x",
+        "-o",
+        "local-state/validations/validation-performance-20261109/c-fast.time",
+        "--",
+        "local-state/validations/validation-performance-20261109/run-upstream-c",
+        "--output-root",
+        "local-state/validations/validation-performance-20261109/c-fast",
+        "--zllvm",
+        "local-state/validations/validation-performance-20261109/compilers/ReleaseFast/bin/z_llvm",
+        "--zig-emitter",
+        "local-state/validations/validation-performance-20261109/alternate-emitter",
+        "--zig-source",
+        "local-state/validations/validation-performance-20261109/alternate-source"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 179289156052
+    },
+    "scheduling-comparison": {
+      "argv": [
+        "python3",
+        "/home/oleg/prog/z_llvm/local-state/validations/validation-performance-20261109/measure-scheduling.py"
+      ],
+      "returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 24658705794
+    }
+  },
+  "retention": {
+    "artifact_manifest": "local-state/validations/validation-performance-20261109/artifact-manifest.json",
+    "admission_bytes": 20000000000,
+    "reserve_bytes": 11410065408,
+    "full_run_final_free_bytes": 59200307200,
+    "cleanup": false,
+    "archives_created": false,
+    "prior_inputs_evidence_air_bundles_and_scratch_preserved": true
+  },
+  "accepted_selection": {
+    "compiler": [
+      8664,
+      8928
+    ],
+    "runtime": [
+      285,
+      455
+    ],
+    "changed": false,
+    "goal": "paused"
+  },
+  "bindings": {
+    "local-state/validations/validation-performance-20261109/baseline-and-candidate-identities.json": {
+      "sha256": "9ee93bed0fcb0633e293d72a13e668cdef37c70bd42a53701dbd60c5963ee57b",
+      "bytes": 1176
+    },
+    "local-state/validations/validation-performance-20261109/c-debug.json": {
+      "sha256": "d9ef7eff3b2862b609dde60974fda75319120423e713b84ee34b3e9afe8e1323",
+      "bytes": 47437
+    },
+    "local-state/validations/validation-performance-20261109/c-debug.log": {
+      "sha256": "553e140642a879037a4dd2ea3476dafe60257d3236213989f044a0654ac18d1a",
+      "bytes": 14857
+    },
+    "local-state/validations/validation-performance-20261109/c-debug.time": {
+      "sha256": "a056427248ce3bd846a406543836fdc2385cc00e94858b0db74f34b02e667bb9",
+      "bytes": 94
+    },
+    "local-state/validations/validation-performance-20261109/c-debug/commands.json": {
+      "sha256": "8a38579d52cc624c385315c4908e26f7b58fa4887b99cb6252fa78c97c3c54fd",
+      "bytes": 2239763
+    },
+    "local-state/validations/validation-performance-20261109/c-debug/report.json": {
+      "sha256": "63b5caf8c63e670cee8ce203f6e27dbfcfcf30bebdceb60b3fbf18354c7e33d0",
+      "bytes": 125412
+    },
+    "local-state/validations/validation-performance-20261109/c-fast.json": {
+      "sha256": "a87601d6339e7072a9185ff6bb4e6ec02bf66f47f0fdbb3f66997fd0592fc24a",
+      "bytes": 9159
+    },
+    "local-state/validations/validation-performance-20261109/c-fast.log": {
+      "sha256": "281083cecaddb4ffea25f1bf24c55b8fc78d4bbcd17b9df33d2cdc11b004b892",
+      "bytes": 14856
+    },
+    "local-state/validations/validation-performance-20261109/c-fast.time": {
+      "sha256": "607ddc023e453600dec24881e1f494ba1a7cd45218dfc08ec00c246912c17552",
+      "bytes": 93
+    },
+    "local-state/validations/validation-performance-20261109/c-fast/commands.json": {
+      "sha256": "7e104c4d00dd6c31f112b138f9d55b70a29cf2d47b71715a11a596fce40db862",
+      "bytes": 2237437
+    },
+    "local-state/validations/validation-performance-20261109/c-fast/report.json": {
+      "sha256": "a415c1ea5bfb5d61cc2dcc04a376d81e52c819c4a77cc3f3670b3d86fda24a32",
+      "bytes": 125480
+    },
+    "local-state/validations/validation-performance-20261109/check-selections.sh": {
+      "sha256": "c0ac8912328d8adfd888ed866b62a431eaf4bb285adb843f6acfe2d77bf34912",
+      "bytes": 4160
+    },
+    "local-state/validations/validation-performance-20261109/compiler-cached-debug.json": {
+      "sha256": "c49fecee7a3906855fdbe52f8b6bb332d0a364db8370c15efe6d64869b1075d0",
+      "bytes": 1301
+    },
+    "local-state/validations/validation-performance-20261109/compiler-cached-debug.log": {
+      "sha256": "b85f8199c8e8480a10d1d07416712aa6754c7782f7561b64d8339552e66eacbd",
+      "bytes": 246
+    },
+    "local-state/validations/validation-performance-20261109/compilers-final/Debug/bin/z_llvm.build.json": {
+      "sha256": "4529d7cd23d8996d6220ef66a657798e766373aab49ac096f5ab2ebdb051dc50",
+      "bytes": 73312
+    },
+    "local-state/validations/validation-performance-20261109/compilers-final/ReleaseFast/bin/z_llvm.build.json": {
+      "sha256": "c62e485883fa5f6c271ef80f864abb4cc95a410dac9961dd10914f774639895b",
+      "bytes": 73360
+    },
+    "local-state/validations/validation-performance-20261109/compilers/Debug/bin/z_llvm.build.json": {
+      "sha256": "b0df528d337602eff6eb8bfbde54cc1c53cd810a15b5221a6fa9bc1cbebd7f49",
+      "bytes": 73284
+    },
+    "local-state/validations/validation-performance-20261109/compilers/ReleaseFast/bin/z_llvm.build.json": {
+      "sha256": "df56f043dfb2fb56582546677d76875c4fe9a55c00e80cdca685ba85a0d8c4c2",
+      "bytes": 73334
+    },
+    "local-state/validations/validation-performance-20261109/final-native-coverage-comparison.json": {
+      "sha256": "e455a524dbe3a189bab4885c4a2a2517eaa82d44959d5eef9e29f47412692df3",
+      "bytes": 354
+    },
+    "local-state/validations/validation-performance-20261109/final-policy-profile-debug.json": {
+      "sha256": "f0cc92ae7049037d1d9150a8d6f530f285dd1ede143d72cfeb3e1183edec9f82",
+      "bytes": 867
+    },
+    "local-state/validations/validation-performance-20261109/final-policy-profile-debug.log": {
+      "sha256": "8002942dcb0d49bd187f3af7380437070d22875b0e6d1409ea3a82eca6b777c0",
+      "bytes": 794
+    },
+    "local-state/validations/validation-performance-20261109/final-policy-profile-safe.json": {
+      "sha256": "d2c942da7da05e45598384ac72f9c6e3a77a8a118522c806f859f3d9c50152fe",
+      "bytes": 872
+    },
+    "local-state/validations/validation-performance-20261109/final-policy-profile-safe.log": {
+      "sha256": "9404197a91e1949592536a9581ed58d5284856b0d22c431c54179b7db5b9e159",
+      "bytes": 786
+    },
+    "local-state/validations/validation-performance-20261109/final-whole-compiler-analysis.json": {
+      "sha256": "00447dbfbc70200128f200cfddbab7100d6857adab0f5044c76655916258669d",
+      "bytes": 730
+    },
+    "local-state/validations/validation-performance-20261109/final-whole-compiler-analysis.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "local-state/validations/validation-performance-20261109/finalize-full-evidence.sh": {
+      "sha256": "fe31047ffa6700b6ecf08c5291c760199b9b8e0a3564963582af569e00d21352",
+      "bytes": 1402
+    },
+    "local-state/validations/validation-performance-20261109/fresh-cache-comparison-v2.log": {
+      "sha256": "bef8490d53a2fcca5cdb641db511a3ef6b08c57f3bb3d93e78fdbb6d48e33d4f",
+      "bytes": 284
+    },
+    "local-state/validations/validation-performance-20261109/fresh-cache-comparison-v2.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "local-state/validations/validation-performance-20261109/full-fresh-v2-real-rows.log": {
+      "sha256": "0916bfc7fb73201aeed27edb66a529940f1aa23878e90094f14bb669db535a81",
+      "bytes": 28979
+    },
+    "local-state/validations/validation-performance-20261109/full-fresh-v2.json": {
+      "sha256": "72ab01d125f68a1a9ac3343db68361bb181e61352d337744227704354c13cd19",
+      "bytes": 2014468
+    },
+    "local-state/validations/validation-performance-20261109/full-fresh-v2.log": {
+      "sha256": "cc32c6262bf7d7fcf386a3e5bc974559c77d698dfc10c5644ed951340305a4ed",
+      "bytes": 571459
+    },
+    "local-state/validations/validation-performance-20261109/full-integration-summary.json": {
+      "sha256": "4a85c5602c071958299fb63680fd65bbada1734fe807a95468c7dec6711f1e93",
+      "bytes": 2696
+    },
+    "local-state/validations/validation-performance-20261109/harness-complete-summary.json": {
+      "sha256": "7a98aed138775540d32c8e926ccff2b8d6f454c3cc8bc323a27c6d4d43d9e00d",
+      "bytes": 346
+    },
+    "local-state/validations/validation-performance-20261109/harness-fresh-fast.json": {
+      "sha256": "39f5ca862f725013c86e3af2ac1a3a6373afe92f2c831965427ceb0c94ef36ed",
+      "bytes": 16543
+    },
+    "local-state/validations/validation-performance-20261109/harness-fresh-fast.log": {
+      "sha256": "a474438fbd51d39eddc4933233eedc5dde507d858e7e85aa31a7a90ea9b8219f",
+      "bytes": 96
+    },
+    "local-state/validations/validation-performance-20261109/harness-fresh-fast/commands.json": {
+      "sha256": "f154bac048e480cc3f03e601521093153c8092218f732ef934ea7ab08753acec",
+      "bytes": 68555
+    },
+    "local-state/validations/validation-performance-20261109/harness-fresh-fast/report.json": {
+      "sha256": "05e4db898dca325c43c3d382e3daa82013f588aea1f584e2581024464a8d1d2b",
+      "bytes": 2515
+    },
+    "local-state/validations/validation-performance-20261109/harness-fresh-reuse-comparison.json": {
+      "sha256": "a64438fbd6df2bc93b8f9c461ccdd7c58805f19e5d3b3cf9cebb144e707c7238",
+      "bytes": 242
+    },
+    "local-state/validations/validation-performance-20261109/harness-reuse-fast-v2.json": {
+      "sha256": "5075ba7927ada2c1b0715db4b0ab323f913c1639c381b75fdde62e3af57b8124",
+      "bytes": 8352
+    },
+    "local-state/validations/validation-performance-20261109/harness-reuse-fast-v2.log": {
+      "sha256": "a474438fbd51d39eddc4933233eedc5dde507d858e7e85aa31a7a90ea9b8219f",
+      "bytes": 96
+    },
+    "local-state/validations/validation-performance-20261109/harness-reuse-fast/commands.json": {
+      "sha256": "72e41275bc243d22be3fe3d957128e960c5a2ac38805fd3abcca4da2432241d5",
+      "bytes": 86837
+    },
+    "local-state/validations/validation-performance-20261109/harness-reuse-fast/report.json": {
+      "sha256": "8cbf50621e4d859720717a90b7092c36dda73db78f9bc975865670cd0441888f",
+      "bytes": 12215
+    },
+    "local-state/validations/validation-performance-20261109/integrated-fresh-v2/execution-breadth-controls/commands.json": {
+      "sha256": "9ed02df1b9388304f86d754c7131a11a5cb450dfb3861664f4afb8aae63120fe",
+      "bytes": 291264
+    },
+    "local-state/validations/validation-performance-20261109/integrated-fresh-v2/execution-breadth-controls/report.json": {
+      "sha256": "76cbabb45b42d900131259dbde8ca14127daf628adf21b7e265d999f627bc496",
+      "bytes": 36351
+    },
+    "local-state/validations/validation-performance-20261109/integrated-fresh-v2/toolchain.json": {
+      "sha256": "e73696751fc53a3b79bdea1e83de42b4072fd9c366193e4d2600d758c38af7c3",
+      "bytes": 77245
+    },
+    "local-state/validations/validation-performance-20261109/integrated-fresh-v2/unchanged-upstream-c/commands.json": {
+      "sha256": "121b08f2e518d9fd38edeb75b6fe00f176ecf4e671a77e714952d8c53fa6ed74",
+      "bytes": 2534439
+    },
+    "local-state/validations/validation-performance-20261109/integrated-fresh-v2/unchanged-upstream-c/report.json": {
+      "sha256": "4ee5e8ab1feae1b53527f6cef3fb1b900451f7093d25c65687ce9755a0defbb0",
+      "bytes": 125637
+    },
+    "local-state/validations/validation-performance-20261109/loongarch-parse-instruction.ll": {
+      "sha256": "33c7a916e543c2500b040896d022ddf6bea69bac4197753a19e3ba60620c59fd",
+      "bytes": 9955953
+    },
+    "local-state/validations/validation-performance-20261109/native-comparison-summary.json": {
+      "sha256": "f1ac147d56cb03ff3c5714b738483adbe5bbd0ae798eb5b92823cacd4e0f34e2",
+      "bytes": 9863
+    },
+    "local-state/validations/validation-performance-20261109/native-comparison.json": {
+      "sha256": "56c38e94c9df4407212ba97681dff77c030a114f872e84173cc53aed08927a80",
+      "bytes": 17928
+    },
+    "local-state/validations/validation-performance-20261109/post-validation.sh": {
+      "sha256": "9b601945aa5c5ba5757b18d9d0a9cbf05e01d75c91343029789470c5255ed5de",
+      "bytes": 2074
+    },
+    "local-state/validations/validation-performance-20261109/probe-harness.sh": {
+      "sha256": "14092a7d6d362351e839b2acf0a50ea1d249ff7d6622561603b62e5cc88deb5d",
+      "bytes": 3019
+    },
+    "local-state/validations/validation-performance-20261109/profile-attribution.json": {
+      "sha256": "5f3646d86538b6fb9800b8a989a2b9369a349cbad449f00413b87540d84e1dbf",
+      "bytes": 1291
+    },
+    "local-state/validations/validation-performance-20261109/publication-comparison.json": {
+      "sha256": "606ec964c18a0a77719b49affb12b9fa80e0b7b28637e3c9d6f2c2bf52311657",
+      "bytes": 513
+    },
+    "local-state/validations/validation-performance-20261109/repair-corrupt-compiler.json": {
+      "sha256": "b91e274c2a8b1b5d7d096e86794722e5e2ea2f1f5e4126e7069cf7c4a3bb8c15",
+      "bytes": 1294
+    },
+    "local-state/validations/validation-performance-20261109/repair-corrupt-compiler.log": {
+      "sha256": "8bb4baec74808f1a4cc9012069a26264f6b88ce1bfe23ccf1c9e61472c69b68f",
+      "bytes": 243
+    },
+    "local-state/validations/validation-performance-20261109/repair-missing-compiler.json": {
+      "sha256": "73de5f23b18463d28697f9d2d62efb0f46d927b7eca736a151eea521bdc21347",
+      "bytes": 1211
+    },
+    "local-state/validations/validation-performance-20261109/repair-missing-compiler.log": {
+      "sha256": "8bb4baec74808f1a4cc9012069a26264f6b88ce1bfe23ccf1c9e61472c69b68f",
+      "bytes": 243
+    },
+    "local-state/validations/validation-performance-20261109/replay-history.zig": {
+      "sha256": "1d0a59c57ce1cba4fd22cf35c7e67860a4884447611189a03471b7f41f316220",
+      "bytes": 1185
+    },
+    "local-state/validations/validation-performance-20261109/report-overhead.zig": {
+      "sha256": "95fc826e6cf52b3fb5af1acadc7dbbb552bd064bb3affa62bdf7d929ed50591e",
+      "bytes": 2325
+    },
+    "local-state/validations/validation-performance-20261109/retention-overhead-v2/producer.time": {
+      "sha256": "3b64b6dbdb534b755409238bf1ab765adf915d820d1a50524c434846f455eadd",
+      "bytes": 78
+    },
+    "local-state/validations/validation-performance-20261109/retention-overhead-v2/watcher.time": {
+      "sha256": "b301df62481ca66c35ccdd67b0986596fd838ac2f6b50ceb0d97d15ee857a515",
+      "bytes": 77
+    },
+    "local-state/validations/validation-performance-20261109/rows-cached-v2.json": {
+      "sha256": "54b34d0dc0298c2d32d373c6485424452a2de807bb7baca10a25e1c29a5a912f",
+      "bytes": 39784
+    },
+    "local-state/validations/validation-performance-20261109/rows-cached-v2.log": {
+      "sha256": "c4daa172d00eaad6d897e3ddd6183dc9ddff24934699402778fa975466a5701e",
+      "bytes": 32026
+    },
+    "local-state/validations/validation-performance-20261109/run-full.sh": {
+      "sha256": "ed9389ba45e9674c77511cc6295c6c8d06b158afcce5f7ed1e4ea16cf510775d",
+      "bytes": 1776
+    },
+    "local-state/validations/validation-performance-20261109/scheduling-comparison.json": {
+      "sha256": "0a2c4ce94a0c21c0b79ea2fa010a228921db15f0e981f16917c0bc828d27a16a",
+      "bytes": 1818
+    },
+    "local-state/validations/validation-performance-20261109/scheduling-comparison.log": {
+      "sha256": "cf4471f9887a12ae4205183fbe885ca1ee8f8f605ef207d08f6e1739b35c55f1",
+      "bytes": 89
+    },
+    "local-state/validations/validation-performance-20261109/scheduling-summary.json": {
+      "sha256": "7f374df7845641c7a9f86c73d10949e8eea8a61a6b66a7be9c233a6919adef8d",
+      "bytes": 927
+    },
+    "local-state/validations/validation-performance-20261109/scheduling/measurements.json": {
+      "sha256": "ea9f20be72d8287d36d6ef041ca5bda5cc6e3e7111c6eec96e3e53dccd6e7f8c",
+      "bytes": 17610
+    },
+    "local-state/validations/validation-performance-20261109/scheduling/metadata.json": {
+      "sha256": "caf38c0375fcd3c116766d6ff8bd1ca358fb6fb82031414005bc506cb8933fe5",
+      "bytes": 787
+    },
+    "local-state/validations/validation-performance-20261109/selection-controls.json": {
+      "sha256": "e40abb2de4ef70af2c1644992ed5697135fc0992b65714d673daf4896fca7c6c",
+      "bytes": 7156
+    },
+    "local-state/validations/validation-performance-20261109/selection-controls.log": {
+      "sha256": "54834b6a4e93e9cddca5b03729ff35b016e437812f235e375afdc1c3c3bd1ede",
+      "bytes": 31139
+    },
+    "local-state/validations/validation-performance-20261109/slow-function-profile/events.jsonl": {
+      "sha256": "f58c4ba7b3e288c32bd5a0c75345adccfb65b2a9bee522ad759adac3bd2ff346",
+      "bytes": 141392
+    },
+    "local-state/validations/validation-performance-20261109/slow-function-profile/identities.sha256": {
+      "sha256": "db7750d5d0c5f89e9e9f7b908a489666fd8bc8a7ccc4fb4f1d13ed2f7b9501fc",
+      "bytes": 529
+    },
+    "local-state/validations/validation-performance-20261109/slow-function-profile/perf.data": {
+      "sha256": "5aad2787f09635dadc9cf32a47bd71f53a1a7c8d9fea06ec35928c0799b8a6ad",
+      "bytes": 2562888
+    },
+    "local-state/validations/validation-performance-20261109/slow-function-profile/time.txt": {
+      "sha256": "e58d9c8c626832aad47c5f85b364725638fae179419d662c6a2694696252724d",
+      "bytes": 134
+    },
+    "local-state/validations/validation-performance-20261109/source-delta-v2.json": {
+      "sha256": "727f0f32d3a2c3e6d35a5254f75f2263777414e0aee7e17f88789db5128afc14",
+      "bytes": 327
+    },
+    "local-state/validations/validation-performance-20261109/source-final-snapshot-v2.json": {
+      "sha256": "4ec375bcc90410985ac887b2d5a1ad57c2390b1fed6ed7712fc73c3e824cb418",
+      "bytes": 399358
+    },
+    "local-state/validations/validation-performance-20261109/source-final-v2.patch": {
+      "sha256": "da38d88f029971b613389ff8e7609e0d7f0750890a00ac80a67ef2854ab555a7",
+      "bytes": 56173
+    },
+    "local-state/validations/validation-performance-20261109/source-final-verified-post-comparisons.log": {
+      "sha256": "b4f025df1f43ab2dff82de9ae3138daa9db9223250e3af2a0b06fb3221a557b7",
+      "bytes": 112
+    },
+    "local-state/validations/validation-performance-20261109/source-final-verified-post-tests.log": {
+      "sha256": "b4f025df1f43ab2dff82de9ae3138daa9db9223250e3af2a0b06fb3221a557b7",
+      "bytes": 112
+    },
+    "local-state/validations/validation-performance-20261109/source-final-verified-v2.log": {
+      "sha256": "b4f025df1f43ab2dff82de9ae3138daa9db9223250e3af2a0b06fb3221a557b7",
+      "bytes": 112
+    },
+    "local-state/validations/validation-performance-20261109/source-snapshot.json": {
+      "sha256": "14b9c29c859e4fd6c556208f75ba6dc0318c8b5f50d45c233b8ded73877ced94",
+      "bytes": 399247
+    },
+    "local-state/validations/validation-performance-20261109/telemetry-air-collection/measurements.json": {
+      "sha256": "4c73afab220615c99ab695ef21372fc418222728e4a096e4a8ba1c1c02171bd5",
+      "bytes": 1350
+    },
+    "local-state/validations/validation-performance-20261109/telemetry-collection/measurements.json": {
+      "sha256": "c0663382c2baaff7bef3c21782becdd485335cdde17f44afb6503bd21e7ebfc1",
+      "bytes": 1350
+    },
+    "local-state/validations/validation-performance-20261109/telemetry-overhead.zig": {
+      "sha256": "e454481ff568826abe703c804b4748a8702f294f7f54700a2160c903bb76f0da",
+      "bytes": 1213
+    },
+    "local-state/validations/validation-performance-20261109/telemetry-publication/measurements.json": {
+      "sha256": "bf40705191c9d03e34bc88d573cd3547803482b5b03d75ab970a83f6ceff160a",
+      "bytes": 1564
+    },
+    "local-state/validations/validation-performance-20261109/units-debug.json": {
+      "sha256": "59e74ffa56ee319c2a0c68e68c813f515a9058c02c6ed4965916870cc178cf46",
+      "bytes": 10663
+    },
+    "local-state/validations/validation-performance-20261109/units-debug.log": {
+      "sha256": "d8a3d5ef7a3f5758d2546c6adc997f6191de3f3a8a1bba6365fcb5624e73518f",
+      "bytes": 1881
+    },
+    "local-state/validations/validation-performance-20261109/units-safe.json": {
+      "sha256": "32586f33daf626c18b936502e690c0b2c51ae009cf6cb818ed2b35d2d6adcd1a",
+      "bytes": 9612
+    },
+    "local-state/validations/validation-performance-20261109/units-safe.log": {
+      "sha256": "5c595a68433640dea58270e771f702c6a3dec530ee2f7e976f227d69aac4bfae",
+      "bytes": 1863
+    }
+  }
+}

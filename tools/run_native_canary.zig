@@ -24,6 +24,8 @@ pub fn main(init: std.process.Init) !void {
     try u.put(c.a, &report, "schema", u.s("native-canary-v1"));
     try u.put(c.a, &report, "population", u.s(population));
     try u.put(c.a, &report, "compiler_sha256", u.s(try c.digest(compiler)));
+    try u.put(c.a, &report, "compiler", u.s(compiler));
+    try u.put(c.a, &report, "compiler_build", try @import("validation/toolchain.zig").compilerBuild(&c, compiler));
     try u.put(c.a, &report, "registry_sha256", u.s(try c.digest(try c.join(&.{"test/real_programs/native_canaries.json"}))));
     for ([_][]const u8{ ".ll", "_driver.c" }) |suffix| {
         const path = try c.join(&.{ "test/real_programs", try c.fmt("{s}{s}", .{ try u.str(canary, "fixture"), suffix }) });

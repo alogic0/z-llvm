@@ -3,6 +3,7 @@ const u = @import("common.zig");
 const Runner = @import("runner.zig").Runner;
 const elf = @import("object_contract.zig");
 const provenance = @import("provenance.zig");
+const toolchain = @import("toolchain.zig");
 const cases = @import("program_cases.zig");
 
 pub fn identity(c: *u.Context) !std.StringHashMap([]const u8) {
@@ -186,11 +187,14 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
     const source_root = try c.join(&.{args.get("zig-source") orelse "../ziglang"});
     const zig = try c.join(&.{args.get("zig-emitter") orelse try c.join(&.{ source_root, "build/stage4/bin/zig" })});
     const zllvm = try c.join(&.{args.get("zllvm") orelse "zig-out/bin/z_llvm"});
+    const selected_toolchain = try toolchain.record(c, zllvm, zig, source_root);
+    try u.put(c.a, report, "toolchain", selected_toolchain);
     const pin = u.trim(try c.read(try c.join(&.{"docs/evidence/ziglang_pin.txt"})));
     const contract = try identity(c);
     if (!std.mem.eql(u8, contract.get("ABI_DIFF_SOURCE_REVISION") orelse return error.MissingReferenceIdentity, pin)) return c.fail("reference identity contract differs from the tracked Zig pin", .{});
     if (!std.mem.eql(u8, u.trim(try c.capture(&.{ "git", "-C", source_root, "rev-parse", "HEAD" })), pin)) return c.fail("Zig source revision differs from the tracked pin", .{});
     if (!std.mem.eql(u8, u.trim(try c.capture(&.{ zig, "version" })), contract.get("ABI_DIFF_REFERENCE_VERSION") orelse return error.MissingReferenceIdentity)) return c.fail("Zig emitter identity differs from the reference contract", .{});
+    if (!std.mem.eql(u8, try c.digest(zig), contract.get("ABI_DIFF_REFERENCE_SHA256") orelse return error.MissingReferenceIdentity)) return c.fail("Zig emitter binary hash differs from the reference contract", .{});
     const source = try c.join(&.{ source_root, try u.str(manifest, "source") });
     if (!std.mem.eql(u8, try c.digest(source), try u.str(manifest, "source_sha256"))) return c.fail("upstream program source hash changed; audit the manifest before running", .{});
     if (!std.mem.eql(u8, try c.read(source), try c.capture(&.{ "git", "-C", source_root, "show", try c.fmt("{s}:{s}", .{ pin, try u.str(manifest, "source") }) }))) return c.fail("upstream program has local modifications", .{});
@@ -228,6 +232,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
         try runMode(c, args, directory, mode, source, zig, zllvm, proxy, global_cache, manifest, &base_env, runner, report, &rows.array.items[rows.array.items.len - 1]);
     }
     try provenance.verifyTools(c, procedure);
+    try toolchain.verify(c, selected_toolchain);
     if (!std.mem.eql(u8, manifest_hash, try c.digest(try c.join(&.{manifest_path})))) return error.InputCorpusChanged;
     if (!std.mem.eql(u8, try c.digest(source), try u.str(manifest, "source_sha256"))) return error.UpstreamSourceChanged;
     if (!std.mem.eql(u8, try c.digest(zig), try u.str(report.*, "zig_emitter_sha256")) or !std.mem.eql(u8, try c.digest(zllvm), try u.str(report.*, "zllvm_sha256"))) return error.CompilerBinaryChanged;

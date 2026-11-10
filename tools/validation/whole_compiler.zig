@@ -88,7 +88,9 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     const compiler = try c.join(&.{try args.require("zllvm")});
     const compiler_hash = try c.digest(compiler);
     try u.put(c.a, report, "backend", try fileIdentity(c, compiler));
-    try u.put(c.a, report, "backend_build_mode", u.s("caller-selected; use retained ReleaseFast compiler"));
+    const compiler_build = try @import("toolchain.zig").compilerBuild(c, compiler);
+    try u.put(c.a, report, "backend_build", compiler_build);
+    try u.put(c.a, report, "backend_build_mode", if (u.json.is(try u.get(compiler_build, "status"), "recorded")) try u.get(try u.get(compiler_build, "identity"), "build_mode") else u.s("unrecorded caller-selected compiler"));
     try u.put(c.a, report, "project_revision", u.s(u.trim(try c.capture(&.{ "git", "rev-parse", "HEAD" }))));
     const source_scope = &.{ "src", "tools", "test/whole_compiler", "build.zig", "build.zig.zon" };
     const source_snapshot = try provenance.files(c, source_scope);

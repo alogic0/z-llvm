@@ -52,6 +52,8 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .strip = b.option(bool, "strip", "Strip compiler debug information"),
+            .omit_frame_pointer = b.option(bool, "omit-frame-pointer", "Omit compiler frame pointers"),
         }),
     });
     b.installArtifact(exe);
@@ -180,6 +182,7 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "run-checked", "Capture a command with durable logs and disk telemetry", "tools/run_checked.zig");
     addToolStepWithArgs(b, "validation-progress", "Read a validation command's durable progress", "tools/validation_progress.zig");
     addToolStepWithArgs(b, "validation-snapshot", "Freeze or verify source membership and hashes", "tools/validation_snapshot.zig");
+    addToolStepWithArgs(b, "validation-compiler", "Prepare one compiler mode in a separate prefix with a build receipt", "tools/build_validation_compiler.zig");
     const process_module = b.createModule(.{ .root_source_file = b.path("tools/vendor/process/src/root.zig"), .target = b.graph.host, .optimize = optimize });
     const process_fixture = b.addExecutable(.{ .name = "validation-process-fixture", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/vendor/process/tests/fixture.zig"),

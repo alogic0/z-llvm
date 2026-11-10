@@ -5,6 +5,7 @@ pub const Runner = struct {
     context: *u.Context,
     output: []const u8,
     commands: u.Value,
+    command_json: std.ArrayList(u8) = .empty,
 
     pub fn init(context: *u.Context, output: []const u8) Runner {
         return .{ .context = context, .output = output, .commands = u.array(context.a) };
@@ -18,6 +19,26 @@ pub const Runner = struct {
         group: u.process.Group = .owned,
     };
     pub const Result = struct { code: i64, wall_ns: u64, completed: bool };
+
+    /// Encode each immutable command once. Keep the same complete, indented
+    /// commands.json publication after every command, including interruptions.
+    /// Only serialization is incremental; atomic publication stays unchanged.
+    pub fn publishCommand(r: *Runner, command: u.Value) !void {
+        const c = r.context;
+        try u.add(&r.commands, command);
+        const bytes = try std.json.Stringify.valueAlloc(c.gpa, command, .{ .whitespace = .indent_2 });
+        defer c.gpa.free(bytes);
+        try r.command_json.appendSlice(c.a, if (r.command_json.items.len == 0) "[\n" else ",\n");
+        var lines = std.mem.splitScalar(u8, bytes, '\n');
+        var first = true;
+        while (lines.next()) |line| {
+            if (!first) try r.command_json.append(c.a, '\n');
+            first = false;
+            try r.command_json.appendSlice(c.a, "  ");
+            try r.command_json.appendSlice(c.a, line);
+        }
+        try u.files.writeAtomic(c.io, .{ .path = try c.join(&.{ r.output, "commands.json" }), .replace = true }, &.{ r.command_json.items, "\n]\n" });
+    }
 
     pub fn run(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Options) !Result {
         const c = r.context;
@@ -82,8 +103,7 @@ pub const Runner = struct {
         if (failure) |name| try u.put(c.a, &record, "failure", u.s(name));
         if (report.cleanup_failure) |cleanup| try u.put(c.a, &record, "cleanup_failure", u.s(@errorName(cleanup)));
         if (report.term) |term| try u.put(c.a, &record, "actual_returncode", u.n(u.returnCode(term)));
-        try u.add(&r.commands, record);
-        try c.writeJson(try c.join(&.{ r.output, "commands.json" }), r.commands);
+        try r.publishCommand(record);
         return .{ .code = code, .wall_ns = report.wall_ns, .completed = report.outcome == .completed and report.term.? == .exited };
     }
 

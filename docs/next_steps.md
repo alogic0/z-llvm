@@ -1,4 +1,22 @@
-# Paused after the integer intrinsic slice
+# Validation performance delivery complete; compiler selection remains paused
+
+The [validation performance plan](plans/2026-11-09-validation-performance-improvement.md)
+is implemented with explicit nested toolchain selection, compiler build receipts,
+compiled harness reuse and incremental command-report serialization. All 17
+integration gates pass, and fresh/cached real-row results match in all three
+modes. Complete Debug native coverage and Debug/ReleaseSafe unit, structural,
+policy and profiling checks are retained. See the
+[measured outcomes](evidence/validation_performance.md) and
+[tool usage](validation_tools.md#selecting-and-retaining-validation-compilers).
+
+The remaining duplicate native calls cost 20.09 seconds with ReleaseFast, so a
+new native result cache is deferred. Bounded scheduling measurements support
+keeping existing concurrency. A 90-second original-function profile identifies
+allocation-plan scans and dependency validation for a bounded next investigation;
+it establishes no complete-input acceptance or compiler algorithm improvement.
+This delivery preserves accepted counters and does not resume the paused goal.
+
+## Paused after the integer intrinsic slice
 
 The user requested **finish the current slice and stop**. The integer intrinsic
 slice at `f955509f` is complete, and the

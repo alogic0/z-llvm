@@ -1,6 +1,8 @@
 const std = @import("std");
 const canaries = @import("codegen_canary_shared.zig");
 const common = @import("tool_common.zig");
+const toolchain = @import("validation/toolchain.zig");
+const u = @import("validation/common.zig");
 
 const Case = struct {
     id: []const u8,
@@ -112,6 +114,7 @@ comptime {
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
+    var context = try u.Context.init(init);
 
     var mode_filter: ?[]const u8 = null;
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
@@ -132,23 +135,20 @@ pub fn main(init: std.process.Init) !void {
     defer if (zig_source_env) |value| allocator.free(value);
     const zig_emitter_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZIG_EMITTER");
     defer if (zig_emitter_env) |value| allocator.free(value);
-    const zllvm_env = try common.getEnvOwnedOrNull(allocator, init.minimal.environ, "ZLLVM_EXE");
-    defer if (zllvm_env) |value| allocator.free(value);
 
     const target = normalizeTargetQuery(target_env orelse "x86_64-linux-gnu");
     const zig_source_dir = zig_source_env orelse "../ziglang";
     const default_zig_emitter = try std.fs.path.join(allocator, &.{ zig_source_dir, "build/stage4/bin/zig" });
     defer allocator.free(default_zig_emitter);
     const zig_emitter = zig_emitter_env orelse default_zig_emitter;
-    const zllvm_exe = zllvm_env orelse "zig-out/bin/z_llvm";
 
     const check_argv = [_][]const u8{ "zig", "run", "tools/check_zig_stage4_emitter.zig" };
     const check_result = try common.runCapture(allocator, io, &check_argv, "tools/check_zig_stage4_emitter.zig");
     common.freeRunResult(allocator, check_result);
 
-    const build_argv = [_][]const u8{ "zig", "build" };
-    const build_result = try common.runCapture(allocator, io, &build_argv, "zig build");
-    common.freeRunResult(allocator, build_result);
+    const zllvm_exe = try common.resolveZllvm(init);
+    defer allocator.free(zllvm_exe);
+    const selection: toolchain.Selection = .{ .zllvm = zllvm_exe, .emitter = zig_emitter, .source = zig_source_dir };
 
     var env_map = std.process.Environ.Map.init(allocator);
     defer env_map.deinit();
@@ -157,8 +157,16 @@ pub fn main(init: std.process.Init) !void {
     try env_map.put("ZLLVM_PIPELINE", "postopt");
     try env_map.put("ZLLVM_EXE", zllvm_exe);
 
-    const temp = try common.TempDir.init(allocator, io, "zig_integrated_exe");
-    defer temp.deinit(allocator, io);
+    const retained_root = init.environ_map.get("ZLLVM_INTEGRATED_OUTPUT_ROOT");
+    const temp: common.TempDir = if (retained_root) |path|
+        .{ .path = try allocator.dupe(u8, try context.newOutput(path)) }
+    else
+        try common.TempDir.init(allocator, io, "zig_integrated_exe");
+    defer if (retained_root != null) allocator.free(temp.path) else temp.deinit(allocator, io);
+    const selected_toolchain = try toolchain.record(&context, zllvm_exe, zig_emitter, zig_source_dir);
+    const identity_path = try temp.join(allocator, "toolchain.json");
+    defer allocator.free(identity_path);
+    try context.writeJson(identity_path, selected_toolchain);
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
@@ -306,9 +314,9 @@ pub fn main(init: std.process.Init) !void {
     try stdout_writer.interface.flush();
     const program_root = try temp.join(allocator, "unchanged-hello-libc");
     defer allocator.free(program_root);
-    const program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{program_root});
-    defer allocator.free(program_arg);
-    const program_result = try common.runCapture(allocator, io, &.{ "zig", "run", "tools/run_real_program.zig", "--", program_arg }, "unchanged upstream hello libc");
+    const program_command = try selection.command(allocator, .program, program_root, &.{});
+    defer allocator.free(program_command);
+    const program_result = try common.runCapture(allocator, io, program_command, "unchanged upstream hello libc");
     defer common.freeRunResult(allocator, program_result);
     try stdout_writer.interface.writeAll(program_result.stdout);
     try stdout_writer.interface.flush();
@@ -322,12 +330,9 @@ pub fn main(init: std.process.Init) !void {
         defer allocator.free(root);
         const manifest = try std.fmt.allocPrint(allocator, "test/real_programs/{s}.json", .{program});
         defer allocator.free(manifest);
-        const command = try std.mem.concat(allocator, []const u8, &.{ &.{
-            "zig",           "run",       "tools/run_real_program.zig", "--",
-            "--output-root", root,        "--manifest",                 manifest,
-            "--zig-emitter", zig_emitter, "--zig-source",               zig_source_dir,
-            "--zllvm",       zllvm_exe,   "--codegen-reachable",
-        }, if (std.mem.eql(u8, program, "migrate_langref")) &.{"--replay-owners"} else &.{} });
+        const extra = try std.mem.concat(allocator, []const u8, &.{ &.{ "--manifest", manifest, "--codegen-reachable" }, if (std.mem.eql(u8, program, "migrate_langref")) &.{"--replay-owners"} else &.{} });
+        defer allocator.free(extra);
+        const command = try selection.command(allocator, .program, root, extra);
         defer allocator.free(command);
         const unchanged_result = try common.runCapture(allocator, io, command, label);
         defer common.freeRunResult(allocator, unchanged_result);
@@ -337,23 +342,23 @@ pub fn main(init: std.process.Init) !void {
     }
     const input_program_root = try temp.join(allocator, "input-program");
     defer allocator.free(input_program_root);
-    const input_program_result = try common.runCapture(allocator, io, &.{
-        "zig",     "run",     "tools/run_input_program.zig", "--",        "--output-root", input_program_root,
-        "--zllvm", zllvm_exe, "--zig-emitter",               zig_emitter,
-    }, "unchanged input-driven JSON-dump");
+    const input_program_command = try selection.command(allocator, .input_program, input_program_root, &.{});
+    defer allocator.free(input_program_command);
+    const input_program_result = try common.runCapture(allocator, io, input_program_command, "unchanged input-driven JSON-dump");
     defer common.freeRunResult(allocator, input_program_result);
     try stdout_writer.interface.writeAll(input_program_result.stdout);
     try stdout_writer.interface.flush();
     if (!common.termOk(input_program_result.term)) try common.forwardCommandFailure(io, "unchanged input-driven JSON-dump", input_program_result);
     const c_program_root = try temp.join(allocator, "unchanged-upstream-c");
     defer allocator.free(c_program_root);
-    const c_program_arg = try std.fmt.allocPrint(allocator, "--output-root={s}", .{c_program_root});
-    defer allocator.free(c_program_arg);
-    const c_program_result = try common.runCapture(allocator, io, &.{ "zig", "run", "tools/run_upstream_c_program.zig", "--", c_program_arg }, "unchanged upstream C fixture");
+    const c_program_command = try selection.command(allocator, .upstream_c, c_program_root, &.{});
+    defer allocator.free(c_program_command);
+    const c_program_result = try common.runCapture(allocator, io, c_program_command, "unchanged upstream C fixture");
     defer common.freeRunResult(allocator, c_program_result);
     try stdout_writer.interface.writeAll(c_program_result.stdout);
     try stdout_writer.interface.flush();
     if (!common.termOk(c_program_result.term)) try common.forwardCommandFailure(io, "unchanged upstream C fixture", c_program_result);
+    try toolchain.verify(&context, selected_toolchain);
 }
 
 fn emitAggregateSseSemanticObject(
