@@ -178,9 +178,11 @@ space policy; the runner cancels its process group on a reserve violation.
 libraries. The closed child environment receives a retained copy through
 `ZIG_LIBC`; original/effective configuration and CRT/library hashes verify after
 the run. This keeps the GNU target and baseline CPU while avoiding a mix of
-Zig's default glibc stubs and newer host LLVM/C++ dependencies. Warmup, initial
-build and self-rebuild use separate global cache roots; local caches and install
-roots are also separate between generations.
+Zig's default glibc stubs and newer host LLVM/C++ dependencies. Initial build and
+self-rebuild use separate global/local cache and install roots. Each generation
+warms its own build-runner tool cache without the local hook, then builds the
+requested baseline compiler through the hook. That LLVM-built frontend tool is
+outside the local compiler/runtime object claim.
 
 `--reuse-captured-objects ROOT` permits the initial build or captured-IR replay
 to reuse completed local objects from a preceding runner root, including a run

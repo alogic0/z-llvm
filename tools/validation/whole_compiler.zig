@@ -187,10 +187,10 @@ fn timed(c: *u.Context, runner: *Runner, command: []const []const u8, stem: []co
 }
 
 fn warmupEnvironment(c: *u.Context, output: []const u8, env: *const std.process.Environ.Map) !std.process.Environ.Map {
-    var warm = try env.clone(c.a);
-    const cache = try c.join(&.{ output, "warmup-global-cache" });
-    try c.mkdir(cache);
-    try warm.put("ZIG_GLOBAL_CACHE_DIR", cache);
+    // Populate this generation's build-runner tool cache without the object
+    // hook. Switching global roots afterward would rebuild that host tool
+    // under the hook instead of starting the requested baseline compiler.
+    const warm = try env.clone(c.a);
     try saveEnvironment(c, &warm, try c.join(&.{ output, "warmup-environment.json" }));
     return warm;
 }
