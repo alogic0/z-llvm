@@ -10,9 +10,10 @@ lists below are historical context, not proof of current general capability.
 For compiler performance investigations, follow [compiler profiling](compiler_profiling.md)
 for the verified hardware-sampling setup, recording commands and evidence checks.
 
-The [draft validation and compiler performance improvement plan](plans/2026-11-09-validation-performance-improvement.md)
-proposes toolchain propagation fixes, profiling and validation reuse. It is a
-proposal for review; [next steps](next_steps.md) remains the active direction.
+The [validation and compiler performance improvement plan](plans/2026-11-09-validation-performance-improvement.md)
+records the toolchain, profiling, and validation-reuse work. See
+[next steps](next_steps.md) for the active direction and
+[contributing](../CONTRIBUTING.md) for the checks used in GitHub CI.
 
 This document is the main roadmap entrypoint for replacing the LLVM library
 dependency that Zig uses in its distribution. The local replacement is scoped

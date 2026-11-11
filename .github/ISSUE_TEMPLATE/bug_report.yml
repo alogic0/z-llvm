@@ -1,0 +1,25 @@
+name: Bug report
+description: Report an incorrect result, crash, or reproducible build failure.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the z_llvm commit, zig version, OS, and architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the exact command and the smallest input that reproduces the problem.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+      description: Include the error message or incorrect output.
+    validations:
+      required: true

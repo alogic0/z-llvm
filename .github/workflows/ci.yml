@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Linux x86-64 / ${{ matrix.optimize }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        optimize: [Debug, ReleaseSafe]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Zig
+        shell: bash
+        run: |
+          set -euo pipefail
+          zig_version="$(tr -d '\r\n' < .zigversion)"
+          if [[ "$zig_version" != "0.17.0" ]]; then
+            echo "Update the CI archive checksum when changing .zigversion." >&2
+            exit 1
+          fi
+          archive="$RUNNER_TEMP/zig.tar.xz"
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://ziglang.org/download/$zig_version/zig-x86_64-linux-$zig_version.tar.xz" \
+            --output "$archive"
+          printf '%s  %s\n' \
+            '1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026' \
+            "$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/zig"
+          tar -xJf "$archive" -C "$RUNNER_TEMP/zig" --strip-components=1
+          test "$("$RUNNER_TEMP/zig/zig" version)" = "$zig_version"
+          echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
+
+      - name: Build compiler
+        run: zig build -Doptimize=${{ matrix.optimize }} -j2
+
+      - name: Check compiler, storage, and profiling
+        run: >-
+          zig build test-unit structural-smoke artifact-store-test test-profile-events
+          -Doptimize=${{ matrix.optimize }} -j2 --summary all
+
+      - name: Check validation tools and vendored sources
+        run: >-
+          zig build test-tool-regex real-program-policy-tests verify-source-audit
+          -Doptimize=${{ matrix.optimize }} -j2 --summary all
+
+      - name: Check documentation
+        if: matrix.optimize == 'Debug'
+        run: zig build check-docs

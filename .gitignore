@@ -35,7 +35,11 @@ docs/worker_inbox.md
 
 /local-state/
 __pycache__/
-/.claude/settings.local.json
+# Local assistant settings and credentials.
+/.claude/
+/.env
+/.env.*
+!/.env.example
 
 # Durable improvement-plan acceptance logs.
 !docs/evidence/project_improvement/*.log

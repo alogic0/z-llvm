@@ -1,8 +1,26 @@
 # Current state
 
-The accepted record is [accepted_status.json](accepted_status.json). The block
-below is generated and checked by `zig build check-docs`; regenerate it with
-`zig build check-docs -- --write` after an explicitly accepted evidence update.
+The whole-compiler selection objective is complete at accepted code
+`efa62fa2`: **8,928/8,928 original compiler definitions** and **387/455 runtime
+definitions**. Complete census, independent production, and event audits agree.
+Debug and ReleaseSafe each pass 2,157 unit tests, 63 structural checks, and two
+profiling checks. All eight readiness procedures, seventeen integration gates,
+and both 112-population native suites pass.
+
+Production still reports `UnsupportedGlobalData` during object writing after
+selection completes. Full compiler-object emission, linking, startup, self-rebuild,
+and the remaining 68 runtime definitions require further work. See the
+[completion evidence](evidence/compiler_selection_completion.md),
+[acceptance record](evidence/compiler_selection_completion_acceptance_20261111.json),
+and [active plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
+
+## Fixed compiler-core execution cohort
+
+[accepted_status.json](accepted_status.json) records the separate fixed
+100-row compiler-core object/execution gate. The block below is generated and
+checked by `zig build check-docs`; regenerate it with
+`zig build check-docs -- --write` after an explicitly accepted update to that
+cohort. Whole-compiler selection progress does not change these counters.
 
 <!-- accepted-status:start -->
 
@@ -30,6 +48,11 @@ Keeping the existing 8 GiB working allowance sets the execution reserve to
 11,410,065,408 bytes (about 11.41 GB). The serial suite, compiler-core workers
 and whole-compiler runner share these limits. Historical results below retain
 their original thresholds. See the [current policy](retention_headroom_policy.md#headroom).
+
+## Previous checkpoints
+
+The entries below preserve the status and scope recorded at earlier checkpoints.
+The completed selection result and current direction are described above.
 
 The user requested that work stop after the current integer intrinsic slice.
 That slice is complete at `f955509f`; the

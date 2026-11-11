@@ -1,16 +1,32 @@
 # z_llvm
 
-An experimental Zig implementation of the LLVM IR, optimization, and x86_64
-code-generation behavior needed by the Zig compiler. Selected fixtures and
-compiler-core rows are supported; this is not a complete LLVM replacement or a
-self-hosting Zig backend.
+An experimental LLVM IR parser, optimizer, and x86-64 code generator written in
+Zig. The project implements the compiler behavior needed by Zig's LLVM backend,
+with explicit validation against LLVM and native execution.
 
 See the [current architecture](docs/architecture.md) for input routes, optimizer
 invocation, selector ownership, and the scope of validation evidence.
 
+## Status
+
+The accepted 2026-11-11 checkpoint selects **8,928/8,928 definitions** from the
+original Zig compiler input and **387/455 runtime definitions**. It passes
+2,157 unit tests in both Debug and ReleaseSafe, structural and profiling checks,
+and 112 native validation populations.
+
+Selection is one stage of compilation. Whole-compiler production still reaches
+`UnsupportedGlobalData` during object writing. Complete compiler-object
+emission, linking, startup, self-rebuild, and the remaining 68 runtime definitions
+are ongoing work. This is not yet a complete LLVM replacement.
+
+See the [completion evidence](docs/evidence/compiler_selection_completion.md),
+[current state](docs/current_state.md), and [next steps](docs/next_steps.md).
+
 ## Build and isolated tests
 
-Use **Zig 0.17.0**, pinned in `.zigversion`. If PATH selects another compiler,
+The tested development platform is **Linux x86-64**, with Ubuntu 24.04 used in CI.
+Use [**Zig 0.17.0**](https://ziglang.org/download/0.17.0/), pinned in
+[`.zigversion`](.zigversion). If PATH selects another compiler,
 invoke the 0.17.0 executable explicitly. Build-tool subprocesses inherit that
 same compiler; the patched integration emitter is selected separately.
 
@@ -24,6 +40,16 @@ zig build test-tool-regex -Doptimize=ReleaseSafe
 zig build check-docs
 zig build run -- --help
 ```
+
+For a small optimization example, build and run:
+
+```sh
+zig build -Doptimize=ReleaseSafe
+./zig-out/bin/z_llvm --emit=ir --passes=instcombine test/opt/inputs/instcombine.ll
+```
+
+This folds the redundant add and multiply into a direct return of the argument.
+Use `./zig-out/bin/z_llvm --help` to inspect the available input and output modes.
 
 Native tool regex assertions use the public `zig-regex` package source, pinned
 with per-file digests. See [tool dependency provenance](tools/vendor/README.md).
@@ -53,6 +79,10 @@ record the independent source owner and digests.
 Unit tests and storage tests do not require the patched sibling compiler,
 historical worktrees, or LLVM utilities. `zig build test` additionally runs the
 ABI integration gate and retains its external requirements.
+
+[GitHub Actions](.github/workflows/ci.yml) builds and runs the isolated checks
+in Debug and ReleaseSafe. See [CONTRIBUTING.md](CONTRIBUTING.md) for the same
+commands and guidance on additional integration validation.
 
 ## Local experiments
 
@@ -123,7 +153,20 @@ there is no separate control Git repository or fixed workstation topology.
 See [storage](docs/zllvm_artifact_retention_contract.md) and
 [retention](docs/retention_headroom_policy.md) for publication and cleanup.
 
+The Git repository contains source, fixtures, and acceptance summaries.
+Large raw validation runs, build caches, installed binaries, and scratch
+experiments stay in ignored local directories. Historical evidence may refer
+to those original artifact paths; the isolated checks above run from a fresh
+checkout without them.
+
 [Current state](docs/current_state.md) distinguishes accepted evidence from
 pending development. The [improvement plan](docs/roadmap/project_improvement_plan.md)
 records implementation progress; [documentation](docs/README.md) contains the
 compiler architecture and historical roadmap.
+
+For the initial repository upload, see [publishing on GitHub](docs/github.md).
+
+## License
+
+[MIT](LICENSE). Included dependencies and upstream fixtures retain their
+[third-party notices](THIRD_PARTY_NOTICES.md).
