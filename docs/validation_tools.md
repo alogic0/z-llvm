@@ -180,9 +180,11 @@ libraries. The closed child environment receives a retained copy through
 the run. This keeps the GNU target and baseline CPU while avoiding a mix of
 Zig's default glibc stubs and newer host LLVM/C++ dependencies. Initial build and
 self-rebuild use separate global/local cache and install roots. Each generation
-warms its own build-runner tool cache without the local hook, then builds the
-requested baseline compiler through the hook. That LLVM-built frontend tool is
-outside the local compiler/runtime object claim.
+warms its own host-tool cache with the pinned emitter and without the local
+hook, then builds the requested baseline compiler through the hook. The
+self-rebuild command uses the new candidate as its frontend. Host-tool setup
+commands and emitter identity are retained separately and remain outside the
+local compiler/runtime object claim.
 
 `--reuse-captured-objects ROOT` permits the initial build or captured-IR replay
 to reuse completed local objects from a preceding runner root, including a run

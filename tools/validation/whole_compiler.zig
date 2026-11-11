@@ -187,9 +187,10 @@ fn timed(c: *u.Context, runner: *Runner, command: []const []const u8, stem: []co
 }
 
 fn warmupEnvironment(c: *u.Context, output: []const u8, env: *const std.process.Environ.Map) !std.process.Environ.Map {
-    // Populate this generation's build-runner tool cache without the object
-    // hook. Switching global roots afterward would rebuild that host tool
-    // under the hook instead of starting the requested baseline compiler.
+    // Populate this generation's host-tool cache without the object hook.
+    // Both generations use the pinned emitter for setup. Switching global
+    // roots afterward would rebuild the host tool under the hook instead of
+    // starting the requested baseline compiler.
     const warm = try env.clone(c.a);
     try saveEnvironment(c, &warm, try c.join(&.{ output, "warmup-environment.json" }));
     return warm;
@@ -239,6 +240,8 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     const zig_hash = try c.digest(zig);
     try u.put(c.a, report, "zig_source_revision", u.s(revision));
     try u.put(c.a, report, "zig_emitter", try fileIdentity(c, zig));
+    try u.put(c.a, report, "host_tool_warmup_emitter", try fileIdentity(c, zig));
+    try u.put(c.a, report, "host_tool_scope", u.s("pinned-emitter setup outside compiler/runtime object captures"));
     try u.put(c.a, report, "zig_version", u.s(u.trim(try c.capture(&.{ zig, "version" }))));
     try u.put(c.a, report, "target", u.s("x86_64-linux-gnu"));
     try u.put(c.a, report, "cpu", u.s("baseline"));
@@ -328,7 +331,10 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try saveEnvironment(c, &rebuild_env, try c.join(&.{ rebuild, "base-environment.json" }));
     const rebuild_warm_env = try warmupEnvironment(c, rebuild, &rebuild_env);
     const rebuild_command = try buildArgs(c, candidate, source, config, rebuild);
-    if ((try timed(c, runner, try program.argv(c, rebuild_command, &.{"--help"}), try c.join(&.{ output, "self-warmup" }), &rebuild_warm_env, .{ .timeout_ms = try timeout(args) })).code != 0) return;
+    const rebuild_warm_command = try buildArgs(c, zig, source, config, rebuild);
+    try c.writeJson(try c.join(&.{ rebuild, "build-command.json" }), rebuild_command);
+    try c.writeJson(try c.join(&.{ rebuild, "warmup-command.json" }), try program.argv(c, rebuild_warm_command, &.{"--help"}));
+    if ((try timed(c, runner, try program.argv(c, rebuild_warm_command, &.{"--help"}), try c.join(&.{ output, "self-warmup" }), &rebuild_warm_env, .{ .timeout_ms = try timeout(args) })).code != 0) return;
     const rebuild_captures = try c.join(&.{ rebuild, "captures" });
     try c.mkdir(rebuild_captures);
     try local_env.put("ZLLVM_WHOLE_CAPTURE_ROOT", rebuild_captures);
