@@ -123,6 +123,15 @@ pub const Shape = enum {
     }
 };
 
+pub fn sourceStrideMatches(source_ty: ir.Type, shape: Shape) bool {
+    const expected = switch (shape) {
+        .i16_128 => "[2 x i8]",
+        .f64_16, .f64_512_pairs => "[8 x i8]",
+        .f64_pair_128 => "[16 x i8]",
+    };
+    return source_ty == .aggregate and std.mem.eql(u8, std.mem.trim(u8, source_ty.aggregate, " \t"), expected);
+}
+
 pub const Decoded = struct {
     symbol: []const u8,
     linkage: ir.FunctionLinkage,

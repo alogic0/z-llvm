@@ -141,10 +141,11 @@ fn legalizeImpl(mode: Mode, allocator: std.mem.Allocator, function: ir.Function)
                 if (!wide(mode, x.ty)) return null;
                 for (x.incoming.items) |incoming| if (!operand(incoming.value)) return null;
             },
-            .cast => |x| if (x.from_ty != .int or x.to_ty != .int or x.from_ty.int == 0 or x.to_ty.int == 0 or x.from_ty.int > 128 or x.to_ty.int > 128 or
-                (x.from_ty.int > 64 and !wide(mode, x.from_ty) and !x.from_ty.eql(pair)) or
-                (x.to_ty.int > 64 and !wide(mode, x.to_ty) and !x.to_ty.eql(pair)) or
-                (x.op != .zext and x.op != .sext and x.op != .trunc) or !operand(x.value)) return null,
+            .cast => |x| if (!(wide(mode, x.from_ty) and @import("inspection.zig").isSupportedIntToFpCast(x)) and
+                (x.from_ty != .int or x.to_ty != .int or x.from_ty.int == 0 or x.to_ty.int == 0 or x.from_ty.int > 128 or x.to_ty.int > 128 or
+                    (x.from_ty.int > 64 and !wide(mode, x.from_ty) and !x.from_ty.eql(pair)) or
+                    (x.to_ty.int > 64 and !wide(mode, x.to_ty) and !x.to_ty.eql(pair)) or
+                    (x.op != .zext and x.op != .sext and x.op != .trunc) or !operand(x.value))) return null,
             .call => |x| if (!callForm(mode, x)) return null,
             // Do not widen a memory access along with its register carrier.
             // Loads and stores of these widths remain outside this form.
@@ -211,6 +212,12 @@ fn legalizeImpl(mode: Mode, allocator: std.mem.Allocator, function: ir.Function)
                     continue;
                 },
                 .cast => |x| {
+                    if (x.op == .sitofp or x.op == .uitofp) {
+                        copy.kind.cast.from_ty = pair;
+                        copy.kind.cast.value = if (x.op == .sitofp) try b.signed(x.value, x.from_ty.int) else normalized(x.value, x.from_ty.int);
+                        try block.instructions.append(allocator, copy);
+                        continue;
+                    }
                     var value: ir.Value = x.value;
                     if (wide(mode, x.from_ty)) {
                         value = if (x.op == .sext) try b.signed(value, x.from_ty.int) else normalized(value, x.from_ty.int);

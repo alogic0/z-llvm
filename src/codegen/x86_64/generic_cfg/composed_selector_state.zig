@@ -2525,6 +2525,14 @@ pub fn choosePairScratchForClobber(selector: *const ComposedBlockSelector, src: 
         if (try livePairNameContainingReg(selector, pair.hi) != null) continue;
         return pair;
     }
+    // A live pair is spillable through the same checked clobber authority as
+    // scalar aliases. Keep the old free-pair preference, then admit a disjoint
+    // destination; clobberArgReg preserves its live words in their typed homes.
+    // Never overlap the source whose physical pair the caller still holds.
+    for (selector_allocatable_pairs) |pair| {
+        if (src) |source| if (pair.contains(source.lo) or pair.contains(source.hi)) continue;
+        return pair;
+    }
     return null;
 }
 

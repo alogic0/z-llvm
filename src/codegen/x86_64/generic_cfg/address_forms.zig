@@ -20,6 +20,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         for (original.instructions.items) |inst| {
             if (!inst.removed and inst.result != null and inst.kind == .gep) {
                 const gep = inst.kind.gep;
+                // A recognized table owns element scaling and its range proof.
+                if (try tableOwnsStride(allocator, context, gep)) {
+                    try block.instructions.append(allocator, inst);
+                    continue;
+                }
                 if (gep.ptr_addrspace == null and gep.indices.items.len >= 2 and
                     gep.indices.items[0].ty == .int and gep.indices.items[0].ty.int <= 64 and
                     (gep.indices.items[0].value.eql(.{ .int = 0 }) or
@@ -105,6 +110,18 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         try result.blocks.append(allocator, block);
     }
     return if (changed) result else null;
+}
+
+fn tableOwnsStride(allocator: std.mem.Allocator, context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) !bool {
+    const ctx = context orelse return false;
+    if (gep.ptr_addrspace != null or gep.ptr != .named or !std.mem.startsWith(u8, gep.ptr.named, "@") or gep.indices.items.len != 1) return false;
+    const tables = @import("../constant_table.zig");
+    var decoded = (tables.decodeSymbol(allocator, ctx.*, gep.ptr.named) catch |err| {
+        if (err == error.OutOfMemory) return err;
+        return false;
+    }) orelse return false;
+    defer decoded.deinit(allocator);
+    return tables.sourceStrideMatches(gep.source_ty, decoded.shape);
 }
 
 fn structureOffset(context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) ?u32 {

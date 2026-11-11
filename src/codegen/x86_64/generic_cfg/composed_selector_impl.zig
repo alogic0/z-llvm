@@ -197,6 +197,9 @@ pub fn tryLowerComposedCfgObserved(
 pub const ComposedBlockSelector = selector_state.ComposedBlockSelector;
 
 fn bindPhysicalParams(selector: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
+    // Supported x87 byval parameters have already become private stack
+    // carriers. Never reinterpret an unlowered byval pointer as a GPR input.
+    if (@import("incoming_byval80.zig").hasParameters(function)) return .{ .no_emitter = "unsupported-byval80-parameter" };
     const layout = stack_arguments.parameters(function) orelse return bindParams(selector, function);
     if (layout.stack_words == 0) return bindParams(selector, function);
     var registers: [stack_arguments.max_arguments]ir.Param = undefined;

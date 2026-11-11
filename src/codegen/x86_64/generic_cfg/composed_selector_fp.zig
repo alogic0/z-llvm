@@ -40,7 +40,17 @@ pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, bina
         });
     }
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
-    if (binary.ty == .half) return lowerHalfFadd(selector, result_name, binary);
+    if (binary.ty == .half) {
+        // Snapshotting a spilled RHS uses XMM0. Keep the simultaneous LHS
+        // available through its final use when it currently occupies XMM0.
+        const lhs = fpValueReg(selector, binary.lhs, 16);
+        const rhs = fpValueReg(selector, binary.rhs, 16);
+        const previous = selector.preserve_current_position_values;
+        if (lhs == .xmm0 and binary.rhs == .named and rhs == null)
+            selector.preserve_current_position_values = true;
+        defer selector.preserve_current_position_values = previous;
+        return lowerHalfFadd(selector, result_name, binary);
+    }
     const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };
     return switch (binary.op) {
         .fadd, .fmul, .fsub, .fdiv => lowerFpRegisterBinary(selector, result_name, binary, bits),

@@ -62,6 +62,11 @@ comptime {
     _ = @import("air_export_cache.zig");
     _ = @import("codegen/x86_64/symbol_address.zig");
     _ = @import("mc/global_data.zig");
+    _ = @import("codegen/x86_64/generic_cfg/runtime_pair_pressure_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/floating_vectors_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/incoming_byval80.zig");
+    _ = @import("codegen/x86_64/scalar_compare_wrappers.zig");
+    _ = @import("codegen/x86_64/generic_cfg/composed_selector_memory.zig");
     _ = @import("codegen/x86_64/generic_cfg/word_pair_memory_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/padded_frame_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/aggregate_storage_tests.zig");

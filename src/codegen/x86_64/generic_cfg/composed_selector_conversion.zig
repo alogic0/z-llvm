@@ -19,10 +19,7 @@ pub fn lowerIntToFpCast(selector: *ComposedBlockSelector, result: ?[]const u8, c
     const from_bits = intBits(cast.from_ty) orelse return .{ .no_emitter = "composed-int-fp-from-type" };
     const to_half = cast.to_ty == .half;
     const to_bits: u16 = if (cast.to_ty == .half or cast.to_ty == .float) 32 else if (cast.to_ty == .double) 64 else return .{ .no_emitter = "composed-int-fp-to-type" };
-    const exact_ei_half_narrow = if (selector.function) |function|
-        stage2_planning.isExactEiScalarFamily(function.*) and (from_bits == 13 or from_bits == 14)
-    else
-        false;
+    const exact_ei_half_narrow = from_bits == 13 or from_bits == 14;
     if (to_half and from_bits != 32 and from_bits != 64 and from_bits != 96 and from_bits != 128 and !exact_ei_half_narrow)
         return .{ .no_emitter = "composed-int-fp-half-width" };
     if ((from_bits < 8 or from_bits > 64) and from_bits != 96 and from_bits != 128)

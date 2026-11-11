@@ -16,14 +16,19 @@ All 4,492,466 compiler event records audit successfully, and source/binary
 bindings and retained pins verify.
 
 Follow the [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
-Milestone 1 is in progress. The unchanged compiler inventory identifies 258
-global decoder failures, beginning with `__anon_4971` and LLVM's double-backslash
-string escape. Shared repairs and LLVM/native proofs are next, followed by the
-complete compiler-object replay. Subsequent milestones close the remaining
-**68 runtime definitions**.
-Complete compiler-object emission, unchanged whole-compiler linking, startup
-and self-rebuild require their own proofs. The selection milestone grants no
-credit for these stages. Preserve the original inputs, accepted evidence,
+Implementation checkpoint `97a248ee` emits the complete original compiler object:
+8,928 selections, actual backend zero and independently audited ELF/owners/events.
+The outer runner exposed a quoted-name comparison bug after emission; its failed
+receipt remains retained, with a separate successful object audit. Both 113-population
+native suites, all 17 gates and 594 retained fault controls passed that source.
+
+Runtime development now selects 455/455 and its original complete object passes
+1,205 linked checks against LLVM's reference. The added frontier has 852 checks
+for pair pressure, intrinsics, floating vectors, half preservation, aliases and
+x87 byval caller/callee ABI. These gains await cumulative acceptance; see the
+[runtime contracts](codegen/runtime_completion.md). Fresh compiler/runtime replays,
+full validation and unchanged-build linking/startup/self-rebuild follow the plan.
+Preserve the original inputs, accepted evidence,
 fixed prefix/cohort, ratchet 130 and frozen interfaces. Revisit performance
 when a required replay cannot finish.
 

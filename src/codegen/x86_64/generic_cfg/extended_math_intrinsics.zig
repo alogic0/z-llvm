@@ -27,6 +27,14 @@ fn format(ty: ir.Type) ?usize {
 fn advisory(attrs: ?[]const u8) bool {
     return attrs == null or std.mem.eql(u8, std.mem.trim(u8, attrs.?, " \t"), "noundef");
 }
+fn maximumLibrary(call: ir.CallInst) ?[]const u8 {
+    const symbol: []const u8 = if (call.ret_ty == .x86_fp80 and ir.identifiers.eql(call.callee, "llvm.maxnum.f80")) "fmaxl" else if (call.ret_ty == .fp128 and ir.identifiers.eql(call.callee, "llvm.maxnum.f128")) "fmaxf128" else return null;
+    if (call.args.items.len != 2 or call.callee_value != null or call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null or !advisory(call.ret_attrs)) return null;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return null;
+    for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or !advisory(arg.attrs) or
+        (arg.value != .named and arg.value != .fp and arg.value != .undef and arg.value != .poison and arg.value != .zero_initializer)) return null;
+    return symbol;
+}
 fn operation(call: ir.CallInst) ?usize {
     const format_index = format(call.ret_ty) orelse return null;
     return ordinaryOperation(call, call.ret_ty, widths[format_index], format_index == 1);
@@ -98,9 +106,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
-            if (!inst.removed and inst.result != null and inst.kind == .call) if (operation(inst.kind.call)) |index| {
+            if (!inst.removed and inst.result != null and inst.kind == .call) {
+                const index = operation(inst.kind.call);
                 // Machine relocations outlive the selector's private arena.
-                const callee = library_names[format(inst.kind.call.ret_ty).?][index];
+                const callee = maximumLibrary(inst.kind.call) orelse if (index) |i| library_names[format(inst.kind.call.ret_ty).?][i] else {
+                    try candidate.keep(&block, inst);
+                    continue;
+                };
                 if (!recursive(function, callee, context) and resultUsed(function, inst.result.?)) {
                     try candidate.begin(&block, block_index, instruction_index);
                     var copy = inst;
@@ -114,7 +126,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     try block.instructions.append(allocator, copy);
                     continue;
                 }
-            };
+            }
             try candidate.keep(&block, inst);
         }
         try candidate.finishBlock(block);

@@ -8,7 +8,7 @@ const provenance = @import("provenance.zig");
 const elf = @import("object_contract.zig");
 const policy = @import("../distribution_headroom_policy.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
-const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--timeout-ms N] [--input-ir FILE] [--profile-events]\n";
+const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -22,7 +22,8 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(code);
     }
     if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("{s}", .{usage});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "timeout-ms", "input-ir" }, &.{"profile-events"});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "timeout-ms", "input-ir" }, &.{ "profile-events", "runtime-checks" });
+    if (args.flag("runtime-checks") and args.get("input-ir") == null) return error.RuntimeChecksRequireCapturedInput;
     const output = try c.newOutput(try args.require("output-root"));
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("whole-compiler-diagnostic-v1"));
@@ -129,6 +130,14 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
         try u.put(c.a, report, "invocation", result);
         try u.put(c.a, report, "failure_stage", try u.get(result, "failure_stage"));
         try u.put(c.a, report, "status", u.s(if ((try u.get(result, "object_complete")).bool) "passed" else "blocked"));
+        if (args.flag("runtime-checks") and (try u.get(result, "object_complete")).bool) {
+            try u.put(c.a, report, "failure_stage", u.s("runtime-execution"));
+            try u.put(c.a, report, "status", u.s("incomplete"));
+            try c.writeJson(try c.join(&.{ output, "report.json" }), report.*);
+            try u.put(c.a, report, "runtime_object_checks", try runtimeObjectChecks(c, output, result, &env, runner));
+            try u.put(c.a, report, "failure_stage", u.s("none"));
+            try u.put(c.a, report, "status", u.s("passed"));
+        }
     } else {
         try wholeBuild(c, args, output, compiler, &env, runner, report);
     }
@@ -430,13 +439,53 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     if (result.code == 0 and completed) {
         try reports.validateSuccess(c.a, analysis, profile orelse return error.MissingProfile, try c.read(owners_path));
         const object_path = try c.join(&.{ directory, "local.o" });
-        try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), try elf.parse(c.a, try c.read(object_path)));
+        const contract = try elf.parse(c.a, try c.read(object_path));
+        reports.validateObject(c.a, contract, profile.?) catch |err| {
+            try u.put(c.a, &report, "failure_stage", u.s("object-contract"));
+            try u.put(c.a, &report, "object_error", u.s(@errorName(err)));
+            try c.writeJson(try c.join(&.{ directory, "report.json" }), report);
+            return report;
+        };
+        try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), contract);
         try u.put(c.a, &report, "object", try fileIdentity(c, object_path));
         try u.put(c.a, &report, "object_complete", u.b(true));
         try u.put(c.a, &report, "failure_stage", u.s("none"));
     }
     try c.writeJson(try c.join(&.{ directory, "report.json" }), report);
     return report;
+}
+
+fn runtimeObjectChecks(c: *u.Context, output: []const u8, invocation: u.Value, env: *const std.process.Environ.Map, runner: *Runner) !u.Value {
+    const input = try u.get(invocation, "input");
+    if (!std.mem.eql(u8, try u.str(input, "sha256"), "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af")) return error.RuntimeChecksRequireOriginalRuntime;
+    const directory = try c.newOutput(try c.join(&.{ output, "runtime-execution" }));
+    const driver = try c.join(&.{"test/whole_compiler/runtime_completion_driver.c"});
+    const reference = try c.join(&.{ directory, "reference.o" });
+    try runner.require(&.{ "clang-22", "-O2", "-c", try u.str(input, "path"), "-o", reference }, try c.join(&.{ directory, "reference-object" }), env);
+    const expected = "runtime-completion observations=1280 complex=conversion=sqrt=integer=preserved\n";
+    var result = u.object(c.a);
+    for ([_][]const u8{ "local", "reference" }) |route| {
+        const object = if (std.mem.eql(u8, route, "local")) try u.str(try u.get(invocation, "object"), "path") else reference;
+        const exe = try c.join(&.{ directory, route });
+        try runner.require(&.{ "cc", "-O2", "-fno-builtin", "-no-pie", "-Wl,-z,noexecstack", driver, object, "-lm", "-o", exe }, try c.fmt("{s}-link", .{exe}), env);
+        try runner.observe(exe, &.{}, 0, expected, try c.fmt("{s}-run", .{exe}), env);
+        for (1..4) |fault| {
+            const stem = try c.fmt("{s}-fault-{d}", .{ exe, fault });
+            const observed = try runner.run(&.{ exe, try c.fmt("{d}", .{fault}) }, stem, env, .{ .timeout_ms = 5000 });
+            const diagnostic = try c.read(try c.fmt("{s}.stderr", .{stem}));
+            if (!observed.completed or observed.code != 1 or (try c.read(try c.fmt("{s}.stdout", .{stem}))).len != 0 or
+                !std.mem.startsWith(u8, diagnostic, "runtime-completion line=") or std.mem.indexOf(u8, diagnostic, try c.fmt("fault={d}\n", .{fault})) == null)
+                return error.RuntimeFaultControlDidNotFail;
+        }
+        try u.put(c.a, &result, route, try fileIdentity(c, exe));
+    }
+    try u.put(c.a, &result, "status", u.s("passed"));
+    try u.put(c.a, &result, "driver", try fileIdentity(c, driver));
+    try u.put(c.a, &result, "reference_object", try fileIdentity(c, reference));
+    try u.put(c.a, &result, "local_observations", u.n(1280));
+    try u.put(c.a, &result, "reference_observations", u.n(1280));
+    try u.put(c.a, &result, "fault_controls", u.n(6));
+    return result;
 }
 
 fn collect(c: *u.Context, root: []const u8) !u.Value {

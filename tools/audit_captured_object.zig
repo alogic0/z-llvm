@@ -50,6 +50,7 @@ pub fn main(init: std.process.Init) !void {
     try reports.validateSuccess(c.a, analysis, profile, try c.read(try c.join(&.{ directory, "owners.tsv" })));
     const object_path = try c.join(&.{ directory, "local.o" });
     const contract = try elf.parse(c.a, try c.read(object_path));
+    try reports.validateObject(c.a, contract, profile);
     var symbols = std.StringHashMap(u.Value).init(c.a);
     for ((try u.get(contract, "symbols")).array.items) |symbol| {
         if ((try symbols.getOrPut(symbol.array.items[0].string)).found_existing) return error.DuplicateElfSymbol;
@@ -81,6 +82,7 @@ pub fn main(init: std.process.Init) !void {
     try c.writeJson(try c.join(&.{ output, "report.json" }), .{
         .schema = "retained-object-audit-v1",
         .status = "passed",
+        .failure_stage = "none",
         .object_complete = true,
         .scope = "Completed backend command, input, profile, ownership, census and ELF; no startup credit",
         .capture_root = root,

@@ -600,6 +600,23 @@ fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
 }
 
 fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, operation: @import("../inline_asm.zig").Operation) !?Diagnostic {
+    if (operation == .unsigned_divide) {
+        const name = result orelse return .{ .unsupported_value = "inline-asm-result" };
+        if (!call.ret_ty.eql(.{ .int = 128 })) return .{ .no_emitter = "inline-asm-divide-carrier" };
+        if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+        if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+        var inputs = try ValueUseTransaction.begin(selector);
+        defer inputs.deinit();
+        for (call.args.items, [_]ValueUseTransaction.Destination{ .{ .gpr64 = .rcx }, .rax, .{ .gpr64 = .rdx } }) |arg, destination|
+            _ = try inputs.register(.{ .source = arg.value, .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 }, .form = .gpr64, .destination = destination });
+        try inputs.seal();
+        try inputs.prepare();
+        try inputs.materializeAll();
+        try inputs.commit();
+        try selector_state.emitEflagsInstruction(selector, .{ .div_arg64 = .rcx }, .clobber);
+        try selector_state.bindFixedProductResult(selector, name);
+        return null;
+    }
     if (operation == .register_snapshot and result != null) return .{ .unsupported_value = "inline-asm-result" };
     if (operation == .linux_syscall and result == null) return .{ .unsupported_value = "inline-asm-result" };
     var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (result != null)
@@ -612,6 +629,7 @@ fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, ca
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
     switch (operation) {
+        .unsigned_divide => unreachable,
         .linux_syscall => |count| {
             for (call.args.items[1..], 0..) |arg, index| {
                 if (try lowerDirectCallArg(selector, arg, try ArgReg.fromIndex(index))) |diagnostic| return diagnostic;
@@ -638,8 +656,11 @@ fn lowerFpBarrier(selector: *ComposedBlockSelector, result: ?[]const u8, call: i
         call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr)
     {
         const loc = selector_state.resolveValue(selector, call.args.items[0].value) orelse return .{ .unsupported_value = "composed-block-inline-asm-value" };
-        return switch (loc) {
-            .stack_scalar => |stack| if (stack.bits == 64 and stack.kind == .integer) null else .{ .unsupported_value = "composed-block-inline-asm-value" },
+        // The empty template emits no memory access or hardware fence. Keep
+        // the IR side-effect/memory ordering, accepting its already-verified
+        // pointer through ordinary typed address and object representations.
+        return switch (selector_state.virtualRegMetadata(loc).class) {
+            .gpr64, .stack_object, .stack_pointer => null,
             else => .{ .unsupported_value = "composed-block-inline-asm-value" },
         };
     }
@@ -1503,12 +1524,21 @@ fn lowerI128Compare(selector: *ComposedBlockSelector, result: ?[]const u8, call:
         return .{ .no_emitter = "composed-block-i128-compare-signature" };
     }
 
-    const lhs = selector_state.resolvePairValue(selector, call.args.items[0].value) orelse
-        return .{ .unsupported_value = "composed-block-i128-compare-lhs" };
-    const rhs = selector_state.resolvePairValue(selector, call.args.items[1].value) orelse
-        return .{ .unsupported_value = "composed-block-i128-compare-rhs" };
-    if (!lhs.eql(.{ .lo = .rdi, .hi = .rsi }) or !rhs.eql(.{ .lo = .rdx, .hi = .rcx })) {
-        return .{ .no_emitter = "composed-block-i128-compare-location" };
+    const left: RegPair = .{ .lo = .rdi, .hi = .rsi };
+    const right: RegPair = .{ .lo = .rdx, .hi = .rcx };
+    const lhs = selector_state.resolvePairValue(selector, call.args.items[0].value);
+    const rhs = selector_state.resolvePairValue(selector, call.args.items[1].value);
+    if (lhs == null or rhs == null or !lhs.?.eql(left) or !rhs.?.eql(right)) {
+        // Save both inputs before either fixed pair is written. The ordinary
+        // typed spill/materialization authority preserves aliases and scalars.
+        var inputs = try ValueUseTransaction.begin(selector);
+        defer inputs.deinit();
+        for (call.args.items, [_]RegPair{ left, right }) |arg, pair|
+            _ = try inputs.register(.{ .source = arg.value, .expected = .{ .ty = .{ .int = 128 }, .register_class = .gpr128 }, .form = .pair_low_high, .destination = .{ .pair = pair } });
+        try inputs.seal();
+        try inputs.prepare();
+        try inputs.materializeAll();
+        try inputs.commit();
     }
 
     const high_diff = try selector_state.allocateEdgeLabel(selector);

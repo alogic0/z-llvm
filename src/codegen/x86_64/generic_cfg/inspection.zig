@@ -268,13 +268,17 @@ fn inspectCast(cast: ir.CastInst) ?Diagnostic {
         .trunc, .zext, .sext, .bitcast, .ptrtoint, .inttoptr => null,
         .fpext => if ((cast.from_ty == .half and (cast.to_ty == .float or cast.to_ty == .double)) or (cast.from_ty == .float and cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .fptrunc => if ((cast.from_ty == .float and cast.to_ty == .half) or (cast.from_ty == .double and cast.to_ty == .float)) null else .{ .unsupported_instruction = @tagName(cast.op) },
-        .sitofp, .uitofp => switch (cast.from_ty) {
-            .int => |bits| if (bits >= 8 and bits <= 64 and (cast.to_ty == .float or cast.to_ty == .double)) null else .{ .unsupported_instruction = @tagName(cast.op) },
-            else => .{ .unsupported_instruction = @tagName(cast.op) },
-        },
+        .sitofp, .uitofp => if (isSupportedIntToFpCast(cast)) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .fptosi => if ((cast.from_ty == .float or cast.from_ty == .double) and cast.to_ty.eql(.{ .int = 32 })) null else .{ .unsupported_instruction = @tagName(cast.op) },
         .fptoui => .{ .unsupported_instruction = @tagName(cast.op) },
     };
+}
+
+pub fn isSupportedIntToFpCast(cast: ir.CastInst) bool {
+    if ((cast.op != .sitofp and cast.op != .uitofp) or cast.from_ty != .int) return false;
+    const bits = cast.from_ty.int;
+    if (cast.to_ty == .half) return bits == 13 or bits == 14 or bits == 32 or bits == 64 or bits == 96 or bits == 128;
+    return (cast.to_ty == .float or cast.to_ty == .double) and ((bits >= 8 and bits <= 64) or bits == 96 or bits == 128);
 }
 
 pub fn isPackedFpWidthCast(cast: ir.CastInst) bool {

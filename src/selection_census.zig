@@ -44,6 +44,11 @@ const Capture = struct {
             .origin = origin(rejection.function, operand.argument.value),
         };
         capture.payload = try std.json.Stringify.valueAlloc(a, .{
+            .operand_traces = trace: {
+                const traces = try a.alloc([]const u8, rejection.operands.len);
+                for (rejection.operands, traces) |operand, *out| out.* = try indexTrace(a, rejection.function, operand.argument.value, 0);
+                break :trace traces;
+            },
             .position = rejection.position,
             .pressure = rejection.pressure,
             .selector_tag = rejection.tag,
@@ -90,6 +95,7 @@ const Capture = struct {
                 .property_failure = address.property_failure,
             } else null,
             .readonly_table = if (rejection.readonly_table) |table| .{
+                .index_trace = if (table.gep.indices.items.len == 1) try indexTrace(a, rejection.function, table.gep.indices.items[0].value, 0) else "multiple indices",
                 .result = rejection.result,
                 .source_type = try std.fmt.allocPrint(a, "{f}", .{table.gep.source_ty}),
                 .pointer = try std.fmt.allocPrint(a, "{f}", .{table.gep.ptr}),
@@ -123,6 +129,22 @@ const Capture = struct {
         }, .{});
         capture.tag = rejection.tag;
         capture.detail = rejection.detail;
+    }
+
+    fn indexTrace(a: std.mem.Allocator, function: ir.Function, value: ir.Value, depth: u8) anyerror![]const u8 {
+        if (value == .int) return std.fmt.allocPrint(a, "{d}", .{value.int});
+        if (value != .named) return @tagName(value);
+        const name = value.named[0..@min(value.named.len, 160)];
+        if (depth >= 8) return name;
+        for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+            if (inst.removed or inst.result == null or !ir.identifiers.eql(inst.result.?, value.named)) continue;
+            return switch (inst.kind) {
+                .cast => |cast| std.fmt.allocPrint(a, "{s}={s}({s})", .{ name, @tagName(cast.op), try indexTrace(a, function, cast.value, depth + 1) }),
+                .binary => |binary| std.fmt.allocPrint(a, "{s}={s}({s},{s})", .{ name, @tagName(binary.op), try indexTrace(a, function, binary.lhs, depth + 1), try indexTrace(a, function, binary.rhs, depth + 1) }),
+                else => std.fmt.allocPrint(a, "{s}={s}", .{ name, @tagName(inst.kind) }),
+            };
+        };
+        return name;
     }
 
     fn matches(capture: Capture, tag: ?[]const u8, detail: ?[]const u8) bool {

@@ -4,6 +4,16 @@ const ir = @import("../../../ir.zig");
 const Candidate = @import("rewrite_candidate.zig").Candidate;
 const forms = @import("scalar_forms.zig");
 const math = @import("extended_math_intrinsics.zig");
+
+fn binaryOperation(call: ir.CallInst) ?bool {
+    const copy_sign = std.mem.eql(u8, call.callee, "llvm.copysign.f16");
+    if (!copy_sign and !std.mem.eql(u8, call.callee, "llvm.maxnum.f16")) return null;
+    if (call.ret_ty != .half or call.args.items.len != 2 or call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
+    if (call.tail_kind) |tail| if (std.mem.eql(u8, tail, "musttail")) return null;
+    for (call.args.items) |arg| if (arg.ty != .half or arg.attrs != null or
+        (arg.value != .named and arg.value != .fp and arg.value != .undef and arg.value != .poison and arg.value != .zero_initializer)) return null;
+    return copy_sign;
+}
 const callees: [math.operations.len][]const u8 = names: {
     @setEvalBranchQuota(10000);
     var result: [math.operations.len][]const u8 = undefined;
@@ -37,6 +47,29 @@ const Builder = struct {
         const value = try b.emit(.{ .call = call });
         try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .cast = .{ .op = .fptrunc, .from_ty = ty, .value = value, .to_ty = .half } } });
     }
+
+    fn binary(b: Builder, original: ir.Instruction, copy_sign: bool) !void {
+        var inputs: [2]ir.Value = undefined;
+        for (original.kind.call.args.items, &inputs) |arg, *input| {
+            const stable: ir.Value = if (arg.value == .undef or arg.value == .poison or arg.value == .zero_initializer) .{ .fp = "0xH0000" } else arg.value;
+            input.* = if (copy_sign)
+                try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = .half, .value = stable, .to_ty = .{ .int = 16 } } })
+            else
+                try @import("binary128_arithmetic.zig").materializeHalfArgument(b.allocator, b.function, b.block, b.names, stable);
+        }
+        if (copy_sign) {
+            const word: ir.Type = .{ .int = 16 };
+            const magnitude = try b.emit(.{ .binary = .{ .op = .@"and", .ty = word, .lhs = inputs[0], .rhs = .{ .int = 32767 } } });
+            const sign = try b.emit(.{ .binary = .{ .op = .@"and", .ty = word, .lhs = inputs[1], .rhs = .{ .int = 32768 } } });
+            const bits = try b.emit(.{ .binary = .{ .op = .@"or", .ty = word, .lhs = magnitude, .rhs = sign } });
+            try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .cast = .{ .op = .bitcast, .from_ty = word, .value = bits, .to_ty = .half } } });
+        } else {
+            var call: ir.CallInst = .{ .callee = "llvm.maxnum.f32", .ret_ty = .float, .args = .empty };
+            for (inputs) |input| try call.args.append(b.allocator, .{ .ty = .float, .value = input });
+            const result = try b.emit(.{ .call = call });
+            try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .cast = .{ .op = .fptrunc, .from_ty = .float, .value = result, .to_ty = .half } } });
+        }
+    }
 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
@@ -48,6 +81,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .names = &names };
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .call) if (binaryOperation(inst.kind.call)) |copy_sign| {
+                try candidate.begin(&block, block_index, instruction_index);
+                try builder.binary(inst, copy_sign);
+                continue;
+            };
             if (!inst.removed and inst.result != null and inst.kind == .call) if (math.ordinaryOperation(inst.kind.call, .half, 16, true)) |index| {
                 if (math.resultUsed(function, inst.result.?)) {
                     try candidate.begin(&block, block_index, instruction_index);

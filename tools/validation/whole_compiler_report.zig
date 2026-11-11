@@ -163,6 +163,61 @@ pub fn ownershipName(name: []const u8) []const u8 {
     return if (name.len >= 2 and name[0] == '"' and name[name.len - 1] == '"') name[1 .. name.len - 1] else name;
 }
 
+pub fn objectSymbolName(a: std.mem.Allocator, spelling: []const u8) ![]const u8 {
+    const name = ownershipName(spelling);
+    var bytes: std.ArrayList(u8) = .empty;
+    var i: usize = 0;
+    while (i < name.len) : (i += 1) {
+        if (name[i] == '\\') {
+            if (name.len - i < 3 or !std.ascii.isHex(name[i + 1]) or !std.ascii.isHex(name[i + 2])) return error.InvalidSymbolName;
+            const byte = try std.fmt.parseInt(u8, name[i + 1 ..][0..2], 16);
+            if (byte == 0) return error.InvalidSymbolName;
+            try bytes.append(a, byte);
+            i += 2;
+        } else try bytes.append(a, name[i]);
+    }
+    return bytes.toOwnedSlice(a);
+}
+
+/// A selected LLVM intrinsic cannot be delegated as an unresolved ELF call.
+/// Every selected function must own nonempty text; all symbol and relocation
+/// extents must fit their declared sections before object completion is claimed.
+pub fn validateObject(a: std.mem.Allocator, contract: u.Value, profile: u.Value) !void {
+    var sizes = std.StringHashMap(i64).init(a);
+    defer sizes.deinit();
+    for ((try u.get(contract, "allocated_sections")).array.items) |section| try sizes.put(section.array.items[0].string, section.array.items[3].integer);
+    var symbols = std.StringHashMap(u.Value).init(a);
+    defer symbols.deinit();
+    for ((try u.get(contract, "symbols")).array.items) |symbol| {
+        const fields = symbol.array.items;
+        const name = fields[0].string;
+        if ((try symbols.getOrPut(name)).found_existing) return error.DuplicateElfSymbol;
+        try symbols.put(name, symbol);
+        if (fields[3] == .string and fields[3].string.len == 0) {
+            if (std.mem.startsWith(u8, name, "llvm.")) return error.UnresolvedLlvmIntrinsic;
+        } else if (fields[3] == .string) {
+            const size = sizes.get(fields[3].string) orelse return error.UnknownSymbolSection;
+            if (fields[4].integer < 0 or fields[5].integer < 0 or fields[4].integer > size or fields[5].integer > size - fields[4].integer) return error.InvalidSymbolBounds;
+        } else return error.UnsupportedSymbolSection;
+    }
+    for ((try u.get(profile, "functions")).array.items) |function| {
+        const symbol = symbols.get(try objectSymbolName(a, try u.str(function, "name"))) orelse return error.MissingFunctionSymbol;
+        const fields = symbol.array.items;
+        if (fields[1].integer & 15 != 2 or !u.json.is(fields[3], ".text") or fields[5].integer <= 0) return error.InvalidFunctionSymbol;
+    }
+    for ((try u.get(contract, "relocations")).array.items) |relocation| {
+        const fields = relocation.array.items;
+        const size = sizes.get(fields[0].string) orelse return error.UnknownRelocationSection;
+        const width: i64 = switch (fields[2].integer) {
+            1 => 8,
+            2, 4, 10, 11, 19, 23 => 4,
+            else => return error.UnsupportedRelocationKind,
+        };
+        if (fields[1].integer < 0 or fields[1].integer > size or width > size - fields[1].integer) return error.InvalidRelocationBounds;
+        if (!symbols.contains(fields[3].string)) return error.MissingRelocationSymbol;
+    }
+}
+
 pub fn validateSuccess(a: std.mem.Allocator, analysis: u.Value, profile: u.Value, owners: []const u8) !void {
     if (!(try u.get(analysis, "selection_completed")).bool or (try u.get(analysis, "dependency_coverage")) == .null) return error.MissingCompleteSelection;
     const n = try u.get(analysis, "counts");
@@ -247,4 +302,24 @@ test "whole compiler matches quoted profiles with legacy machine owners without 
     try std.testing.expectError(error.OwnershipNameMismatch, validateSuccess(a, result, profile, "row_identity\tselection_owner\nhelper(a, b)\tcomposed_cfg\ntype.union\tcomposed_block\n"));
     (try u.get(profile, "functions")).array.items[1] = (try u.get(profile, "functions")).array.items[0];
     try std.testing.expectError(error.DuplicateProfileFunction, validateSuccess(a, result, profile, "row_identity\tselection_owner\nhelper(a, b)\tcomposed_cfg\ntype.\\22union\\22\tcomposed_block\n"));
+}
+
+test "whole compiler object audit rejects intrinsic providers missing definitions and invalid extents" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const contract = (try u.json.parse(a, "{\"allocated_sections\":[[\".text\",1,6,8,\"hash\"]],\"symbols\":[[\"helper\",18,0,\".text\",0,8],[\"provider\",16,0,\"\",0,0]],\"relocations\":[[\".text\",4,4,\"provider\",-4]]}")).value;
+    const profile = (try u.json.parse(a, "{\"functions\":[{\"name\":\"\\\"hel\\\\70er\\\"\"}]}")).value;
+    try validateObject(a, contract, profile);
+    const symbols = (try u.get(contract, "symbols")).array.items;
+    symbols[1].array.items[0] = u.s("llvm.ucmp.i32.i64");
+    try std.testing.expectError(error.UnresolvedLlvmIntrinsic, validateObject(a, contract, profile));
+    symbols[1].array.items[0] = u.s("provider");
+    symbols[0].array.items[5] = u.n(9);
+    try std.testing.expectError(error.InvalidSymbolBounds, validateObject(a, contract, profile));
+    symbols[0].array.items[5] = u.n(0);
+    try std.testing.expectError(error.InvalidFunctionSymbol, validateObject(a, contract, profile));
+    symbols[0].array.items[5] = u.n(8);
+    (try u.get(contract, "relocations")).array.items[0].array.items[1] = u.n(5);
+    try std.testing.expectError(error.InvalidRelocationBounds, validateObject(a, contract, profile));
 }

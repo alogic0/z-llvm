@@ -50,6 +50,38 @@ fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     return memory;
 }
 
+test "runtime wide count and minmax intrinsics preserve full pair values" {
+    const values = [_]u128{ 0, 1, 0x8000000000000000, 0x10000000000000000, 0x80000000000000000000000000000000, 0x0123456789abcdeffedcba9876543210, std.math.maxInt(u128) };
+    for ([_][]const u8{ "umin", "umax", "cttz" }) |op| {
+        const count = std.mem.eql(u8, op, "cttz");
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i128 @llvm.{s}.i128(i128,{s})\ndefine i128 @probe(i128 %a,i128 %b) {{\nentry:\n %v = call i128 @llvm.{s}.i128(i128 %a,{s})\n ret i128 %v\n}}\n", .{ op, if (count) "i1" else "i128", op, if (count) "i1 false" else "i128 %b" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128, u128) callconv(.c) u128 = @ptrCast(code.ptr);
+        for (values) |a| for (values) |b| try std.testing.expectEqual(if (count) @as(u128, @ctz(a)) else if (std.mem.eql(u8, op, "umin")) @min(a, b) else @max(a, b), run(a, b));
+    }
+}
+
+test "runtime wide constant funnels retain both sources across word boundaries" {
+    const values = [_]u128{ 0, 1, 0x8000000000000000, 0x10000000000000000, 0x0123456789abcdeffedcba9876543210, std.math.maxInt(u128) };
+    for ([_]i128{ 0, 1, 63, 64, 65, 127, 128, 129, -1 }) |amount| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i128 @llvm.fshl.i128(i128,i128,i128)\ndefine i128 @probe(i128 %a,i128 %b) {{\nentry:\n %v = call i128 @llvm.fshl.i128(i128 %a,i128 %b,i128 {d})\n ret i128 %v\n}}\n", .{amount});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128, u128) callconv(.c) u128 = @ptrCast(code.ptr);
+        const shift: u7 = @truncate(@as(u128, @bitCast(amount)));
+        for (values) |a| for (values) |b| try std.testing.expectEqual(if (shift == 0) a else (a << shift) | (b >> @as(u7, @intCast(128 - @as(u8, shift)))), run(a, b));
+    }
+}
+
 test "integer frontier native matrix checks saturation comparison wide counts poison abs and live carriers" {
     const declarations =
         \\declare i8 @llvm.ssub.sat.i8(i8, i8)
@@ -213,7 +245,7 @@ test "integer frontier rejects unimplemented widths flags and semantic envelopes
         "call fastcc i8 @llvm.ssub.sat.i8(i8 1, i8 2)",
         "musttail call i32 @llvm.scmp.i32.i32(i32 1, i32 2)",
         "call i16 @llvm.scmp.i16.i32(i32 1, i32 2)",
-        "call i32 @llvm.scmp.i32.i64(i64 1, i64 2)",
+        "call i32 @llvm.scmp.i32.i48(i48 1, i48 2)",
         "call zeroext i32 @llvm.scmp.i32.i32(i32 1, i32 2)",
         "call i8 @llvm.ssub.sat.i8(i8 inreg 1, i8 2)",
         "call i8 @llvm.ssub.sat.i8(i8 256, i8 2)",

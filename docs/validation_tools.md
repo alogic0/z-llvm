@@ -28,6 +28,9 @@ remain in this repository.
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
+| Audit a retained completed object against its command, owners, census and ELF | `tools/audit_captured_object.zig` |
+| Inventory global decoding and shared ELF placement without object credit | `tools/inspect_global_data.zig` / `inspect-global-data` |
+| Generate compiler global and runtime completion fixtures | `tools/generate_global_objects_canary.zig`, `tools/generate_runtime_frontier_canary.zig` |
 | Final selection rejection types, attributes and locations | `src/selection_census.zig` |
 | Upstream C program and registered native populations | `tools/run_upstream_c_program.zig` / `upstream-c-program` |
 | One native population, optionally with injected failures | `tools/run_native_canary.zig` |
@@ -170,6 +173,22 @@ build/backend command. `--input-ir FILE` runs a separately labelled captured-IR
 diagnostic without claiming a compiler build. All runs require new output
 directories. Admission and sampled runtime reserve use the existing serial
 space policy; the runner cancels its process group on a reserve violation.
+
+For the original 455-definition runtime input, add `--runtime-checks` to a
+captured-IR replay. The runner links the delivered local object and a separately
+compiled LLVM reference to `test/whole_compiler/runtime_completion_driver.c`,
+runs 1,280 observations on each and detects three numbered failures per route.
+The input hash is fixed; another module cannot silently replace this population.
+These observations cover the exercised exports, not execution of every definition.
+All object deliveries additionally require nonempty selected function symbols,
+in-bounds symbols/relocations and no unresolved `llvm.*` intrinsic provider.
+
+`audit_captured_object.zig --capture-root DIR --census FILE --output-root NEW`
+can inspect retained output after runner postprocessing failed. It checks the
+recorded actual-zero backend command, exact arguments, unchanged original/copied
+input and binary hashes, profile, owners, census and object contract. It writes
+a separate audit and leaves the failed original runner receipt unchanged. Source
+and build-receipt binding remains a separate requirement.
 
 Exit zero means the requested route passed; a reproducible compiler rejection
 still returns nonzero and is recorded as a blocked diagnostic, without changing

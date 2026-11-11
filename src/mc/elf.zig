@@ -785,7 +785,7 @@ fn appendLocalFunctionAliases(
             var progress = false;
             for (aliases) |alias| {
                 switch (alias.linkage) {
-                    .default, .external, .internal, .private => {},
+                    .default, .external, .internal, .private, .weak_odr => {},
                     else => return error.UnsupportedAliasLinkage,
                 }
                 if (symbol_indices.contains(alias.name)) continue;
@@ -795,12 +795,15 @@ fn appendLocalFunctionAliases(
                 };
                 const target_symbol = symbols.items[target_index - 1];
                 if (target_symbol.section_index == 0) return error.UnresolvedAliasTarget;
+                // ODR aliases in compiler-rt name both functions and ordinary
+                // initialized data (notably __stack_chk_guard). TLS stays closed.
+                if (alias.linkage == .weak_odr and target_symbol.info & 0x0f != 2 and target_symbol.info & 0x0f != 1) return error.UnsupportedAliasLinkage;
                 try symbols.append(allocator, .{
                     .name = alias.name,
                     .value = target_symbol.value,
                     .size = target_symbol.size,
                     .section_index = target_symbol.section_index,
-                    .info = (if (alias.linkage == .private or alias.linkage == .internal) @as(u8, 0) else @as(u8, 0x10)) | (target_symbol.info & 0x0f),
+                    .info = (if (alias.linkage == .weak_odr) @as(u8, 0x20) else if (alias.linkage == .private or alias.linkage == .internal) @as(u8, 0) else @as(u8, 0x10)) | (target_symbol.info & 0x0f),
                     .other = symbolOtherForVisibility(alias.visibility),
                 });
                 try symbol_indices.put(alias.name, @intCast(symbols.items.len));

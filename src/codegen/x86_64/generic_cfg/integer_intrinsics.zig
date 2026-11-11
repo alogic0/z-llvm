@@ -7,7 +7,7 @@ const forms = @import("scalar_forms.zig");
 const intrinsic_attrs = @import("intrinsic_attrs.zig");
 const bit_intrinsics = @import("integer_bit_intrinsics.zig");
 
-const Operation = enum { uadd_sat, usub_sat, ushl_one, sadd_sat, ssub_sat, scmp, reverse, umin, umax, smin, smax };
+const Operation = enum { uadd_sat, usub_sat, ushl_one, sadd_sat, ssub_sat, scmp, ucmp, reverse, umin, umax, smin, smax };
 
 fn minimumMaximum(op: Operation) bool {
     return op == .umin or op == .umax or op == .smin or op == .smax;
@@ -58,19 +58,37 @@ fn fixedMultiply(call: ir.CallInst) bool {
 
 fn operation(call: ir.CallInst) ?Operation {
     if (!std.mem.startsWith(u8, call.callee, "llvm.") or
-        !intrinsic_attrs.scalarIntegerCallSupported(call) or (call.ret_ty.int > 64 and call.ret_ty.int != 96)) return null;
+        !intrinsic_attrs.scalarIntegerCallSupported(call) or (call.ret_ty.int > 64 and call.ret_ty.int != 96 and call.ret_ty.int != 128)) return null;
     const bits = call.ret_ty.int;
+    // Comparison intrinsics overload the result and operand widths separately.
+    // These scalar forms return -1, 0 or 1 in i32, irrespective of input width.
+    if (bits == 32 and call.args.items.len == 2 and call.args.items[0].ty == .int and
+        (call.args.items[0].ty.int == 32 or call.args.items[0].ty.int == 64) and call.args.items[1].ty.eql(call.args.items[0].ty))
+    {
+        const operand_bits = call.args.items[0].ty.int;
+        var spelling_buffer: [64]u8 = undefined;
+        for ([_][]const u8{ "scmp", "ucmp" }, [_]Operation{ .scmp, .ucmp }) |name, op| {
+            const spelling = std.fmt.bufPrint(&spelling_buffer, "llvm.{s}.i32.i{d}", .{ name, operand_bits }) catch return null;
+            if (!std.mem.eql(u8, call.callee, spelling)) continue;
+            for (call.args.items) |arg| {
+                if (arg.value != .named and arg.value != .int) return null;
+                if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
+                if (arg.value == .int and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(operand_bits - 1))) or arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(operand_bits))))) return null;
+            }
+            return op;
+        }
+    }
     for (call.args.items) |arg| {
         if (!arg.ty.eql(call.ret_ty) or (arg.value != .named and arg.value != .int)) return null;
         if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
-        if (arg.value == .int and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(bits - 1))) or
+        if (arg.value == .int and bits < 128 and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(bits - 1))) or
             arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(bits))))) return null;
     }
     var buffer: [64]u8 = undefined;
     for ([_][]const u8{ "uadd.sat", "usub.sat", "ushl.sat", "sadd.sat", "ssub.sat", "scmp.i32", "bitreverse", "umin", "umax", "smin", "smax" }, [_]Operation{ .uadd_sat, .usub_sat, .ushl_one, .sadd_sat, .ssub_sat, .scmp, .reverse, .umin, .umax, .smin, .smax }) |name, op| {
         const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ name, bits }) catch return null;
         if (!std.mem.eql(u8, call.callee, spelling)) continue;
-        if (bits > 64 and op != .sadd_sat and op != .ssub_sat) return null;
+        if (bits > 64 and op != .sadd_sat and op != .ssub_sat and !(bits == 128 and (op == .umin or op == .umax))) return null;
         if (op == .reverse) {
             if (bits == 32 or bits == 64 or call.args.items.len != 1) return null;
         } else if (op == .ushl_one) {
@@ -128,7 +146,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 const call = inst.kind.call;
                 const bits = call.ret_ty.int;
                 if (minimumMaximum(op)) {
-                    const wide: ir.Type = .{ .int = if (bits < 32) 32 else 64 };
+                    const wide: ir.Type = .{ .int = if (bits < 32) 32 else if (bits == 128) 128 else 64 };
                     const lhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);
                     const rhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[1].value);
                     var compare_lhs = lhs;
@@ -170,11 +188,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     const above = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = .sgt, .operand_ty = wide, .lhs = lower, .rhs = maximum } });
                     const clamped = try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = above, .ty = wide, .true_value = maximum, .false_value = lower } });
                     try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = clamped, .to_ty = call.ret_ty } } });
-                } else if (op == .scmp) {
-                    const lhs = try extend(allocator, function, &block, &serial, call.ret_ty, call.ret_ty, call.args.items[0].value);
-                    const rhs = try extend(allocator, function, &block, &serial, call.ret_ty, call.ret_ty, call.args.items[1].value);
-                    const less = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = .slt, .operand_ty = call.ret_ty, .lhs = lhs, .rhs = rhs } });
-                    const greater = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = .sgt, .operand_ty = call.ret_ty, .lhs = lhs, .rhs = rhs } });
+                } else if (op == .scmp or op == .ucmp) {
+                    const operand_ty = call.args.items[0].ty;
+                    const lhs = try extend(allocator, function, &block, &serial, operand_ty, operand_ty, call.args.items[0].value);
+                    const rhs = try extend(allocator, function, &block, &serial, operand_ty, operand_ty, call.args.items[1].value);
+                    const less = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = if (op == .scmp) .slt else .ult, .operand_ty = operand_ty, .lhs = lhs, .rhs = rhs } });
+                    const greater = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = if (op == .scmp) .sgt else .ugt, .operand_ty = operand_ty, .lhs = lhs, .rhs = rhs } });
                     const nonnegative = try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = greater, .ty = call.ret_ty, .true_value = .{ .int = 1 }, .false_value = .{ .int = 0 } } });
                     try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = less, .ty = call.ret_ty, .true_value = .{ .int = -1 }, .false_value = nonnegative } } });
                 } else if (op == .reverse) {

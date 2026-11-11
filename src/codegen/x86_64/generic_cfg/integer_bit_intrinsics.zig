@@ -16,7 +16,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
     inline for (std.meta.tags(Operation)) |op| {
         const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
         if (std.mem.eql(u8, call.callee, name)) {
-            if (bits > 64 and op != .bswap and !(bits == 128 and op == .ctlz) and
+            if (bits > 64 and op != .bswap and !(bits == 128 and (op == .ctlz or op == .cttz or op == .fshl)) and
                 !(bits < 128 and (op == .abs or op == .ctlz or op == .ctpop or op == .cttz))) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
@@ -29,6 +29,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
                     (arg.value.int >= 0 and @as(u128, @intCast(arg.value.int)) >= (@as(u128, 1) << @as(u7, @intCast(expected.int)))))) return null;
                 if (flag and index == 1 and (arg.value != .int or (arg.value.int != 0 and arg.value.int != 1))) return null;
             }
+            if (bits == 128 and op == .fshl and call.args.items[2].value != .int) return null;
             // Keep existing native instruction paths. The general expansion
             // handles missing widths and variable funnel counts.
             if (op == .ctpop and bits == 64) return null;
@@ -165,8 +166,31 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
             .{ .cast = .{ .op = .trunc, .from_ty = pair, .value = shifted, .to_ty = call.ret_ty } } });
         return;
     }
+    if (bits == 128 and op == .fshl) {
+        const pair: ir.Type = .{ .int = 128 };
+        const shift: u7 = @truncate(@as(u128, @bitCast(call.args.items[2].value.int)));
+        const lhs = call.args.items[0].value;
+        const rhs = call.args.items[1].value;
+        const al = try wordPart(b, lhs, false);
+        const ah = try wordPart(b, lhs, true);
+        const bl = try wordPart(b, rhs, false);
+        const bh = try wordPart(b, rhs, true);
+        const low = if (shift == 0) al else if (shift == 64) bh else if (shift < 64)
+            try b.binary(.@"or", try b.binary(.shl, al, .{ .int = shift }), try b.binary(.lshr, bh, .{ .int = 64 - @as(u8, shift) }))
+        else
+            try b.binary(.@"or", try b.binary(.shl, bh, .{ .int = shift - 64 }), try b.binary(.lshr, bl, .{ .int = 128 - @as(u8, shift) }));
+        const high = if (shift == 0) ah else if (shift == 64) al else if (shift < 64)
+            try b.binary(.@"or", try b.binary(.shl, ah, .{ .int = shift }), try b.binary(.lshr, al, .{ .int = 64 - @as(u8, shift) }))
+        else
+            try b.binary(.@"or", try b.binary(.shl, al, .{ .int = shift - 64 }), try b.binary(.lshr, bh, .{ .int = 128 - @as(u8, shift) }));
+        const lower = try b.emit(.{ .cast = .{ .op = .zext, .from_ty = b.wide, .value = low, .to_ty = pair } });
+        const upper = try b.emit(.{ .cast = .{ .op = .zext, .from_ty = b.wide, .value = high, .to_ty = pair } });
+        const shifted = try b.emit(.{ .binary = .{ .op = .shl, .ty = pair, .lhs = upper, .rhs = .{ .int = 64 } } });
+        try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .binary = .{ .op = .@"or", .ty = pair, .lhs = lower, .rhs = shifted } } });
+        return;
+    }
     if (bits == 128) {
-        std.debug.assert(op == .ctlz);
+        std.debug.assert(op == .ctlz or op == .cttz);
         const word: ir.Type = .{ .int = 64 };
         const pair: ir.Type = .{ .int = 128 };
         const input = call.args.items[0].value;
@@ -180,9 +204,12 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
             try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = try b.emit(.{ .binary = .{ .op = .lshr, .ty = pair, .lhs = input, .rhs = .{ .int = 64 } } }), .to_ty = word } });
         // Both speculative counts are defined at zero. A zero high word
         // contributes64 plus the low count, yielding128 for an all-zero pair.
-        const high_count = try b.call(.ctlz, hi, true);
-        const low_count = try b.call(.ctlz, lo, true);
-        const value = try b.select(try b.compare(.ne, hi, .{ .int = 0 }), high_count, try b.binary(.add, low_count, .{ .int = 64 }));
+        const high_count = try b.call(op, hi, true);
+        const low_count = try b.call(op, lo, true);
+        const value = if (op == .ctlz)
+            try b.select(try b.compare(.ne, hi, .{ .int = 0 }), high_count, try b.binary(.add, low_count, .{ .int = 64 }))
+        else
+            try b.select(try b.compare(.ne, lo, .{ .int = 0 }), low_count, try b.binary(.add, high_count, .{ .int = 64 }));
         try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .zext, .from_ty = word, .value = value, .to_ty = pair } } });
         return;
     }
@@ -216,6 +243,16 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
         .{ .binary = .{ .op = .add, .ty = b.wide, .lhs = value, .rhs = .{ .int = 0 } } }
     else
         .{ .cast = .{ .op = .trunc, .from_ty = b.wide, .value = value, .to_ty = call.ret_ty } } });
+}
+
+fn wordPart(b: Builder, value: ir.Value, high: bool) !ir.Value {
+    if (value == .int) {
+        const raw: u128 = @bitCast(value.int);
+        return b.binary(.add, .{ .int = @as(u64, @truncate(raw >> @as(u7, if (high) 64 else 0))) }, .{ .int = 0 });
+    }
+    const pair: ir.Type = .{ .int = 128 };
+    const source = if (high) try b.emit(.{ .binary = .{ .op = .lshr, .ty = pair, .lhs = value, .rhs = .{ .int = 64 } } }) else value;
+    return b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = source, .to_ty = b.wide } });
 }
 
 test "integer bit intrinsic admission rejects unsupported signatures and semantic envelopes" {

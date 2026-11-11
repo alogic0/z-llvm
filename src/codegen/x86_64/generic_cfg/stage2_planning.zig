@@ -463,6 +463,11 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
     var simple_loop_backedge_values = NameSet.init(allocator);
     defer simple_loop_backedge_values.deinit();
     const admit_simple_loop_forward_values = isExactEiScalarFamily(function);
+    var incoming_integer_words: usize = 0;
+    for (function.params.items) |param| {
+        if (param.ty == .ptr) incoming_integer_words += 1;
+        if (param.ty == .int) incoming_integer_words += if (param.ty.int > 64) @as(usize, 2) else 1;
+    }
 
     var position: usize = 0;
     for (function.params.items) |param| {
@@ -512,6 +517,11 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
             if (instruction.kind == .gep and arrayStrideRequiresPreservationFrame(instruction.kind.gep)) {
                 try preservation_barrier_positions.append(allocator, position);
             }
+            // A widening writes a fixed pair which can still hold incoming
+            // words. Let the existing frame allocator own the required homes.
+            if (incoming_integer_words >= 4 and instruction.kind == .cast and
+                instruction.kind.cast.op == .zext and instruction.kind.cast.from_ty.eql(.{ .int = 64 }) and instruction.kind.cast.to_ty.eql(.{ .int = 128 }))
+                try preservation_barrier_positions.append(allocator, position);
             // Word compares and remainders use fixed scratch registers even
             // when their virtual intervals fit in the register budget. Keep
             // room for inputs that survive those physical register writes.
@@ -671,7 +681,9 @@ fn callRequiresPreservationFrame(call: ir.CallInst) bool {
         std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i32") or
         std.mem.eql(u8, call.callee, "llvm.abs.i64") or
-        std.mem.eql(u8, call.callee, "llvm.abs.i128");
+        std.mem.eql(u8, call.callee, "llvm.abs.i128") or
+        std.mem.eql(u8, call.callee, "llvm.bswap.i32") or
+        std.mem.eql(u8, call.callee, "llvm.bswap.i64");
 }
 
 fn arrayStrideRequiresPreservationFrame(gep: ir.GepInst) bool {

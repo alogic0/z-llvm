@@ -1361,8 +1361,16 @@ fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const 
         return global_failure;
     };
     defer decoded.deinit(selector.allocator);
-    if (!sourceStrideMatchesShape(gep.source_ty, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-source" };
-    if (!hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) return .{ .no_emitter = "composed-block-gep-readonly-table-range" };
+    if (!sourceStrideMatchesShape(gep.source_ty, decoded.shape)) {
+        const diagnostic: Diagnostic = .{ .no_emitter = "composed-block-gep-readonly-table-source" };
+        try selector_state.observeRejectedTableGep(selector, result_name, gep, diagnostic, null);
+        return diagnostic;
+    }
+    if (!hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) {
+        const diagnostic: Diagnostic = .{ .no_emitter = "composed-block-gep-readonly-table-range" };
+        try selector_state.observeRejectedTableGep(selector, result_name, gep, diagnostic, null);
+        return diagnostic;
+    }
     const index_class = selector_state.valueRegisterClass(selector, index.value) orelse
         return .{ .unsupported_value = "composed-block-gep-readonly-table-index" };
     if (index_class != .gpr64)
@@ -1473,19 +1481,17 @@ fn readOnlyTableLoadValueUseDiagnostic(
 }
 
 fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Shape) bool {
-    const expected = switch (shape) {
-        .i16_128 => "[2 x i8]",
-        .f64_16, .f64_512_pairs => "[8 x i8]",
-        .f64_pair_128 => "[16 x i8]",
-    };
-    return switch (source_ty) {
-        .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " \t"), expected),
-        else => false,
-    };
+    return constant_table.sourceStrideMatches(source_ty, shape);
 }
 
 fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Shape) bool {
     const function = selector.function orelse return false;
+    const allowed: u64 = switch (shape) {
+        .i16_128, .f64_pair_128 => 127,
+        .f64_16 => 15,
+        .f64_512_pairs => 510,
+    };
+    if (maskedIndex(function.*, .{ .named = name }, allowed, 0)) return true;
     const source_name = stripZext(function.*, name) orelse name;
     const mask: i128 = switch (shape) {
         .i16_128, .f64_pair_128 => 127,
@@ -1504,6 +1510,60 @@ fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u
         .binary => |value| value.op == .shl and intOperand(value.lhs, value.rhs, 1),
         else => false,
     };
+}
+
+// Width normalization can add masks and casts around the original table mask.
+// Every admitted path still proves all bits outside the address envelope zero;
+// the 512-word paired table additionally requires its low index bit zero.
+fn maskedIndex(function: ir.Function, value: ir.Value, allowed: u64, depth: u8) bool {
+    if (depth >= 16) return false;
+    if (value == .int) return value.int >= 0 and value.int <= std.math.maxInt(u64) and @as(u64, @intCast(value.int)) & ~allowed == 0;
+    if (value != .named) return false;
+    const inst = findInstruction(function, value.named) orelse return false;
+    return switch (inst.kind) {
+        .cast => |cast| (cast.op == .zext or cast.op == .trunc) and cast.from_ty == .int and cast.to_ty == .int and
+            cast.from_ty.int <= 64 and cast.to_ty.int <= 64 and maskedIndex(function, cast.value, allowed, depth + 1),
+        .binary => |binary| switch (binary.op) {
+            .@"and" => maskedIndex(function, binary.lhs, allowed, depth + 1) or maskedIndex(function, binary.rhs, allowed, depth + 1),
+            .@"or" => maskedIndex(function, binary.lhs, allowed, depth + 1) and maskedIndex(function, binary.rhs, allowed, depth + 1),
+            .add => if (binary.rhs == .int and binary.rhs.int == 0) maskedIndex(function, binary.lhs, allowed, depth + 1) else if (binary.lhs == .int and binary.lhs.int == 0) maskedIndex(function, binary.rhs, allowed, depth + 1) else false,
+            .lshr => blk: {
+                if (binary.ty != .int or binary.ty.int == 0 or binary.ty.int > 64 or binary.rhs != .int or binary.rhs.int < 0 or binary.rhs.int >= binary.ty.int) break :blk false;
+                const mask = (@as(u64, std.math.maxInt(u64)) >> @as(u6, @intCast(64 - binary.ty.int))) >> @as(u6, @intCast(binary.rhs.int));
+                break :blk mask & ~allowed == 0;
+            },
+            else => false,
+        },
+        .select => |select| select.cond_ty.eql(.{ .int = 1 }) and maskedIndex(function, select.true_value, allowed, depth + 1) and maskedIndex(function, select.false_value, allowed, depth + 1),
+        else => false,
+    };
+}
+
+test "readonly table masks prove normalized casts and keep range and parity neighbors closed" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i64 @indices(i64 %input,i1 %condition) {
+        \\entry:
+        \\ %masked = and i64 %input,127
+        \\ %narrow = trunc i64 %masked to i16
+        \\ %wide = zext i16 %narrow to i64
+        \\ %outside = or i64 %wide,128
+        \\ %even = and i64 %input,510
+        \\ %odd = or i64 %even,1
+        \\ %choice = select i1 %condition,i64 %wide,i64 0
+        \\ %badchoice = select i1 %condition,i64 %wide,i64 %input
+        \\ ret i64 %choice
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+    try std.testing.expect(maskedIndex(function, .{ .named = "wide" }, 127, 0));
+    try std.testing.expect(maskedIndex(function, .{ .named = "choice" }, 127, 0));
+    try std.testing.expect(maskedIndex(function, .{ .named = "even" }, 510, 0));
+    try std.testing.expect(!maskedIndex(function, .{ .named = "outside" }, 127, 0));
+    try std.testing.expect(!maskedIndex(function, .{ .named = "odd" }, 510, 0));
+    try std.testing.expect(!maskedIndex(function, .{ .named = "badchoice" }, 127, 0));
+    try std.testing.expect(!maskedIndex(function, .{ .named = "wide" }, 127, 16));
 }
 
 fn stripZext(function: ir.Function, name: []const u8) ?[]const u8 {

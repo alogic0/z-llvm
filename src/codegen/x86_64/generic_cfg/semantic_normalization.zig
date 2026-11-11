@@ -51,7 +51,9 @@ pub fn normalizeProfiled(allocator: std.mem.Allocator, source: ir.Function, cont
     {
         const activity = profiling.activity(profile, "recognize-legacy-envelope");
         defer activity.end();
-        if (legacy.recognize(function)) |form| return .{ .ir_function = function, .whole_function = form };
+        if (!@import("incoming_byval80.zig").hasParameters(function)) {
+            if (legacy.recognize(function)) |form| return .{ .ir_function = function, .whole_function = form };
+        }
     }
     {
         const activity = profiling.activity(profile, "normalize-narrow-comparisons");

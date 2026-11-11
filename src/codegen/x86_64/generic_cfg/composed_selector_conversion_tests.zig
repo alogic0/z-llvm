@@ -351,9 +351,9 @@ test "generic cfg selector keeps unsupported integer to FP shapes fail closed" {
         \\}
         , .tag = .unsupported_instruction, .detail = "uitofp" },
         .{ .ir_text =
-        \\define float @bad(i128 %x) {
+        \\define float @bad(i95 %x) {
         \\entry:
-        \\  %r = sitofp i128 %x to float
+        \\  %r = sitofp i95 %x to float
         \\  ret float %r
         \\}
         , .tag = .unsupported_instruction, .detail = "sitofp" },

@@ -3129,6 +3129,47 @@
       ],
       "observations": 12460,
       "stdout": "global-objects observations=12460 escapes=poison=floats=relative=capacity=neighbors=preserved\n"
+    },
+    {
+      "population": "runtime_frontier",
+      "prefix": "runtime-frontier",
+      "fixture": "runtime_frontier",
+      "functions": [
+        "runtime_frontier_body",
+        "runtime_frontier_cttz",
+        "runtime_frontier_min",
+        "runtime_frontier_max",
+        "runtime_frontier_pairs",
+        "runtime_frontier_div",
+        "runtime_frontier_ucmp",
+        "runtime_frontier_scmp",
+        "runtime_frontier_ucmp32",
+        "runtime_frontier_half",
+        "runtime_frontier_sign",
+        "runtime_frontier_halfmax",
+        "runtime_frontier_shuffle",
+        "runtime_frontier_packed",
+        "runtime_frontier_packed_call",
+        "runtime_frontier_quad",
+        "runtime_frontier_max80",
+        "runtime_frontier_max128",
+        "runtime_frontier_byval",
+        "runtime_frontier_byval_call",
+        "runtime_frontier_funnel_0",
+        "runtime_frontier_funnel_1",
+        "runtime_frontier_funnel_63",
+        "runtime_frontier_funnel_64",
+        "runtime_frontier_funnel_65",
+        "runtime_frontier_funnel_127"
+      ],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
+      "libraries": [
+        "m"
+      ],
+      "observations": 852,
+      "stdout": "runtime-frontier observations=852 pairs=intrinsics=vectors=half=aliases=preserved\n"
     }
   ]
 }

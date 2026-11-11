@@ -265,6 +265,9 @@ pub fn lowerFunctionWithOptions(
     machine.entry_xmm_defined_bits = sysv_abi.entryXmmDefinedBits(function);
     errdefer machine.deinit(allocator);
 
+    if (try @import("scalar_compare_wrappers.zig").lower(allocator, &machine, function))
+        return try finishStructuralFallback(&machine);
+
     if (options.generic_cfg_selector) {
         switch (try x86_64_generic_cfg_selector.tryLowerObserved(allocator, &machine, function, options.module_context, options.profile, options.rejection_observer)) {
             .selected => {
@@ -279,6 +282,10 @@ pub fn lowerFunctionWithOptions(
             },
         }
     }
+
+    // A byval80 pointer has a memory-only ABI. Only the checked private carrier
+    // path above may select it; pointer-based structural fallbacks cannot.
+    if (@import("generic_cfg/incoming_byval80.zig").hasParameters(function)) return error.UnsupportedSretByvalAbi;
 
     // Variadic calls are admitted only by the composed caller, which supplies AL.
     if (sysv_abi.functionHasVariadicCall(function)) return error.UnsupportedVarargsAbi;

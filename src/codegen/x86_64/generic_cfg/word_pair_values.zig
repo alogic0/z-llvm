@@ -137,11 +137,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         switch (inst.kind) {
             .load => |load| if (!memory(load.attrs, load.ty_addrspace, load.ptr_addrspace)) return null,
             .call => |call| {
-                if (call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or
+                const division = @import("../inline_asm.zig").unsignedDivide(call);
+                if ((!division and call.inline_asm != null) or call.raw_args != null or call.operand_bundle != null or
                     call.callee_function_ty != null or call.ret_attrs != null or !helpers.isDefaultOrFastcc(call.calling_conv) or
                     std.mem.startsWith(u8, call.callee, "llvm.")) return null;
                 if (call.callee_value) |callee| if (callee != .named or callee.named.len == 0 or callee.named[0] == '@') return null;
-                sysv.rejectUnsupportedCallEnvelope(call) catch return null;
+                if (!division) sysv.rejectUnsupportedCallEnvelope(call) catch return null;
             },
             .phi, .select, .freeze => {},
             .insertvalue => |insert| {
