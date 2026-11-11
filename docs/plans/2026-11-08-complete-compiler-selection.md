@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `08616a11`,
-selecting 8,792/8,928 compiler definitions and 318/455 runtime definitions.
-Continue through all 136 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `2eb2fc9b`,
+selecting 8,807/8,928 compiler definitions and 318/455 runtime definitions.
+Continue through all 121 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -228,3 +228,18 @@ Production still stops at the remaining 136 selection failures. Continue with
 the measured scalar shift and call-attribute boundaries, then every remaining
 original rejection. See the
 [accepted address-operand evidence](../evidence/address_value_operands.md).
+
+Batch 13 is accepted at `2eb2fc9b`: private word/pair shifts and bounded narrow
+or nullable call attributes add fifteen compiler selections, retaining every
+previous success and owner. Complete original-input census and independent
+production agree on 8,807 compiler selections; runtime retains 318. All
+4,366,614 compiler events balance. Debug/ReleaseSafe each pass 2,106 units,
+25 structural and two profiling checks; all nine readiness procedures and
+seventeen integration gates pass. Both complete 86-population native suites
+retain all prior entries and 3,125 outcomes. Twelve intentional native object
+differences and nine core object differences retain their strict failures and
+explicit function-byte/ablation reviews. All 162 fault controls are detected.
+All 3,218 frozen source hashes bind to the accepted code tree. Continue through
+full-width integer division, typed i52 truncation and two-word record freezes,
+then every remaining original rejection. See the
+[accepted shift and call evidence](../evidence/shift_and_call_operands.md).

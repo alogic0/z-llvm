@@ -1,0 +1,1572 @@
+{
+  "schema": "compiler-selection-batch13-acceptance-v1",
+  "status": "passed",
+  "recorded_date": "2026-11-10",
+  "accepted_revision": "2eb2fc9bcd75a0cf9682567ad2a13b01936d9653",
+  "accepted_tree": "735bf1b7f3ec713caf842a01ca1a1ced91190cb6",
+  "baseline_accepted_revision": "08616a11136b9d0170d5297112f51745aa3ebc38",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "evidence_root": "local-state/validations/compiler-selection-completion-20261108/batch-13",
+  "active_objective": {
+    "definitions": 8928,
+    "selected": 8807,
+    "remaining": 121,
+    "complete": false
+  },
+  "compiler": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "definitions": 8928,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 8928,
+        "selected": 8792,
+        "failed": 136
+      },
+      "after": {
+        "event": "complete",
+        "examined": 8928,
+        "selected": 8807,
+        "failed": 121
+      },
+      "lost_selections": [],
+      "gained_selections": [
+        "\"crypto.siphash.SipHash(u128,1,3).final\"",
+        "Io.Threaded.async",
+        "Io.Threaded.concurrent",
+        "Io.Threaded.groupAsync",
+        "Io.Threaded.groupConcurrent",
+        "Io.Writer.printValue__func_8794",
+        "Thread.spawn__func_1421",
+        "Type.minIntScalar",
+        "codegen.llvm.FuncGen.minIntConst",
+        "codegen.llvm.Object.emit",
+        "codegen.x86_64.CodeGen.Select.Operand.adjustedImm__func_11302",
+        "codegen.x86_64.CodeGen.Select.Operand.lower",
+        "link.File.flush",
+        "link.resolvePathInputLib",
+        "main.lldMain"
+      ],
+      "owner_changes": []
+    },
+    "census_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 4720655879802
+    },
+    "production_audit": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "input_bytes": 443624107,
+      "definitions": 8928,
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 8807,
+        "failed": 121
+      },
+      "profile_function_count": 8928,
+      "all_function_outcomes_match": true,
+      "selected_identities_match": true,
+      "failure_tuples_match": true,
+      "prior_successes_preserved": true,
+      "gained_selections": [
+        "\"crypto.siphash.SipHash(u128,1,3).final\"",
+        "Io.Threaded.async",
+        "Io.Threaded.concurrent",
+        "Io.Threaded.groupAsync",
+        "Io.Threaded.groupConcurrent",
+        "Io.Writer.printValue__func_8794",
+        "Thread.spawn__func_1421",
+        "Type.minIntScalar",
+        "codegen.llvm.FuncGen.minIntConst",
+        "codegen.llvm.Object.emit",
+        "codegen.x86_64.CodeGen.Select.Operand.adjustedImm__func_11302",
+        "codegen.x86_64.CodeGen.Select.Operand.lower",
+        "link.File.flush",
+        "link.resolvePathInputLib",
+        "main.lldMain"
+      ],
+      "source_and_backend_verified": true,
+      "process_completed": true,
+      "actual_returncode": 1,
+      "object_complete": false
+    },
+    "production_process": {
+      "status": "finished",
+      "actual_returncode": 1,
+      "outcome": "completed",
+      "wall_ns": 5138739504069
+    },
+    "production_events": {
+      "sequence": 4366614,
+      "elapsed_ns": 5108640114148,
+      "begins": 8928,
+      "ends": 8928,
+      "selected": 8807,
+      "failed": 121,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 8807,
+        "failed_functions": 121,
+        "normalization_runs": 66456,
+        "legalizer_attempts": 1500805,
+        "legalizer_rewrites": 64724,
+        "original_form_retries": 33309,
+        "original_form_selected": 7196,
+        "selection_iterations": 66456,
+        "max_selection_iterations": 32,
+        "emitted_instructions": 20483273,
+        "emitted_spill_instructions": 4893660
+      },
+      "unique_functions": 8928
+    },
+    "object_complete": false
+  },
+  "runtime": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "definitions": 455,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 318,
+        "failed": 137
+      },
+      "after": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 318,
+        "failed": 137
+      },
+      "lost_selections": [],
+      "gained_selections": [],
+      "owner_changes": []
+    },
+    "production_audit": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "input_bytes": 1856543,
+      "definitions": 455,
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 318,
+        "failed": 137
+      },
+      "profile_function_count": 455,
+      "all_function_outcomes_match": true,
+      "selected_identities_match": true,
+      "failure_tuples_match": true,
+      "prior_successes_preserved": true,
+      "gained_selections": [],
+      "source_and_backend_verified": true,
+      "process_completed": true,
+      "actual_returncode": 1,
+      "object_complete": false
+    },
+    "production_events": {
+      "sequence": 95591,
+      "elapsed_ns": 2525129533,
+      "begins": 455,
+      "ends": 455,
+      "selected": 318,
+      "failed": 137,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 318,
+        "failed_functions": 137,
+        "normalization_runs": 1559,
+        "legalizer_attempts": 31271,
+        "legalizer_rewrites": 1281,
+        "original_form_retries": 799,
+        "original_form_selected": 177,
+        "selection_iterations": 1559,
+        "max_selection_iterations": 13,
+        "emitted_instructions": 76755,
+        "emitted_spill_instructions": 15399
+      },
+      "unique_functions": 455
+    },
+    "object_complete": false
+  },
+  "validation": {
+    "units": {
+      "Debug": 2106,
+      "ReleaseSafe": 2106
+    },
+    "structural": {
+      "Debug": 25,
+      "ReleaseSafe": 25
+    },
+    "profile": {
+      "Debug": 2,
+      "ReleaseSafe": 2
+    },
+    "debug_unit_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 241661008727
+    },
+    "safe_unit_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 234384539906
+    },
+    "readiness_procedures": 9,
+    "readiness_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 542288483553
+    },
+    "abi_differential": {
+      "matched_cases": 60,
+      "function_mode_matches": 30
+    },
+    "native_populations": 86,
+    "Debug": {
+      "local": 2697042,
+      "reference": 1348521
+    },
+    "ReleaseFast": {
+      "local": 2697042,
+      "reference": 1348521
+    },
+    "debug_native_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 1167791551930
+    },
+    "debug_native_comparison": {
+      "status": "failed",
+      "registry": {
+        "prior_populations": 84,
+        "current_populations": 86,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3125,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 261,
+        "--emit=selection-owner-manifest": 507,
+        "--emit=obj": 501
+      },
+      "new_population_commands": 72,
+      "artifact_differences": [
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#0",
+          "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+          "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-graphs-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-graphs-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-graphs-optimized.ll\"]#0",
+          "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+          "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-graphs-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-graphs-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-masks-optimized.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-masks-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-masks-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-masks-optimized.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-masks-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-masks-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-graphs-optimized.ll\"]#0",
+          "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+          "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-graphs-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-graphs-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-masks-optimized.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-masks-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-masks-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#2",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-masks-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-masks-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-graphs-optimized.ll\"]#0",
+          "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+          "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-graphs-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-graphs-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#2",
+          "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+          "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-graphs-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-graphs-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#1",
+          "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+          "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-graphs-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-graphs-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#1",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-masks-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-masks-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-masks-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-masks-direct-object.stdout"
+        }
+      ]
+    },
+    "fast_native_comparison": {
+      "status": "failed",
+      "registry": {
+        "prior_populations": 84,
+        "current_populations": 86,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3125,
+      "byte_identical_prior_artifacts": {
+        "optimizer": 261,
+        "--emit=selection-owner-manifest": 507,
+        "--emit=obj": 501
+      },
+      "new_population_commands": 72,
+      "artifact_differences": [
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#0",
+          "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+          "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-graphs-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-graphs-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-graphs-optimized.ll\"]#0",
+          "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+          "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-graphs-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-graphs-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-masks-optimized.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-masks-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-masks-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-masks-optimized.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-masks-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-masks-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-graphs-optimized.ll\"]#0",
+          "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+          "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-graphs-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-graphs-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-masks-optimized.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-masks-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-masks-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#2",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-masks-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-masks-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-graphs-optimized.ll\"]#0",
+          "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+          "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-graphs-release-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-graphs-release-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#2",
+          "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+          "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-graphs-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-graphs-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#1",
+          "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+          "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-graphs-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-graphs-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#1",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-masks-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-masks-direct-object.stdout"
+        },
+        {
+          "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#0",
+          "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+          "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+          "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-masks-direct-object.stdout",
+          "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-masks-direct-object.stdout"
+        }
+      ]
+    },
+    "integer_shift_operands": {
+      "functions": 36,
+      "Debug": {
+        "status": "passed",
+        "compiler_sha256": "15735cf7dd2d62bbf59c37036bf1288e53123554c6197e4d1ec01eaffde5bf68",
+        "local_observations": 135216,
+        "reference_observations": 67608,
+        "controls": 36,
+        "detected": 36,
+        "fault_status": "passed"
+      },
+      "ReleaseFast": {
+        "status": "passed",
+        "compiler_sha256": "ff22c454effe221a05ac023de4df7bab29dde8ef85b4f4fac89708c80bafeee8",
+        "local_observations": 135216,
+        "reference_observations": 67608,
+        "controls": 36,
+        "detected": 36,
+        "fault_status": "passed"
+      }
+    },
+    "call_return_attributes": {
+      "functions": 15,
+      "Debug": {
+        "status": "passed",
+        "compiler_sha256": "15735cf7dd2d62bbf59c37036bf1288e53123554c6197e4d1ec01eaffde5bf68",
+        "local_observations": 3120,
+        "reference_observations": 1560,
+        "controls": 45,
+        "detected": 45,
+        "fault_status": "passed"
+      },
+      "ReleaseFast": {
+        "status": "passed",
+        "compiler_sha256": "ff22c454effe221a05ac023de4df7bab29dde8ef85b4f4fac89708c80bafeee8",
+        "local_observations": 3120,
+        "reference_observations": 1560,
+        "controls": 45,
+        "detected": 45,
+        "fault_status": "passed"
+      }
+    },
+    "fault_audit": {
+      "schema": 1,
+      "status": "passed",
+      "reports": 4,
+      "controls": 162,
+      "detected": 162,
+      "all_reports_passed": true,
+      "current_binary_bindings": true
+    },
+    "registry_audit": {
+      "status": "passed",
+      "previous_populations": 84,
+      "current_populations": 86,
+      "previous_entries_unchanged": true,
+      "new_entries_match_generators": true,
+      "new_function_counts": [
+        36,
+        15
+      ],
+      "ir_and_driver_files_byte_identical": true
+    },
+    "native_object_review": {
+      "schema": "batch13-native-object-review-v1",
+      "status": "reviewed",
+      "Debug": {
+        "status": "failed",
+        "registry": {
+          "prior_populations": 84,
+          "current_populations": 86,
+          "prior_entries_unchanged": true
+        },
+        "retained_command_outcomes": 3125,
+        "byte_identical_prior_artifacts": {
+          "optimizer": 261,
+          "--emit=selection-owner-manifest": 507,
+          "--emit=obj": 501
+        },
+        "new_population_commands": 72,
+        "artifact_differences": [
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#0",
+            "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+            "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-graphs-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-graphs-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-graphs-optimized.ll\"]#0",
+            "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+            "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-graphs-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-graphs-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-masks-optimized.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-masks-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-masks-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-masks-optimized.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-masks-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-masks-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-graphs-optimized.ll\"]#0",
+            "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+            "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-graphs-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-graphs-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-masks-optimized.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-masks-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-masks-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#2",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-masks-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-masks-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-graphs-optimized.ll\"]#0",
+            "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+            "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-graphs-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-graphs-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#2",
+            "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+            "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSmall/vector-graphs-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSmall/vector-graphs-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#1",
+            "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+            "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-graphs-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-graphs-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#1",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseSafe/vector-masks-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseSafe/vector-masks-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result/ReleaseFast/vector-masks-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result/ReleaseFast/vector-masks-direct-object.stdout"
+          }
+        ]
+      },
+      "ReleaseFast": {
+        "status": "failed",
+        "registry": {
+          "prior_populations": 84,
+          "current_populations": 86,
+          "prior_entries_unchanged": true
+        },
+        "retained_command_outcomes": 3125,
+        "byte_identical_prior_artifacts": {
+          "optimizer": 261,
+          "--emit=selection-owner-manifest": 507,
+          "--emit=obj": 501
+        },
+        "new_population_commands": 72,
+        "artifact_differences": [
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#0",
+            "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+            "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-graphs-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-graphs-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-graphs-optimized.ll\"]#0",
+            "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+            "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-graphs-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-graphs-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-masks-optimized.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-masks-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-masks-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-masks-optimized.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-masks-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-masks-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSafe/vector-graphs-optimized.ll\"]#0",
+            "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+            "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-graphs-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-graphs-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseSmall/vector-masks-optimized.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-masks-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-masks-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#2",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-masks-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-masks-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"OUTPUT/ReleaseFast/vector-graphs-optimized.ll\"]#0",
+            "baseline_sha256": "144352f59f0aa1fd9872550670b50c8a39473393f3cd95efc7c175ddbe616b53",
+            "candidate_sha256": "c5bc014e3c064563a28aa004c59c94f43717f9d5657b99b394f01fc6db4b887d",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-graphs-release-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-graphs-release-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#2",
+            "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+            "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSmall/vector-graphs-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSmall/vector-graphs-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_graphs.ll\"]#1",
+            "baseline_sha256": "56c1213d336371771a6a6c58699002a7dba59c754d4c33a2a979cda35625d5b1",
+            "candidate_sha256": "b263dc249a7256f6ec903557da605db76b86180218ced830bfb19c8c61a9ad87",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-graphs-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-graphs-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#1",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseSafe/vector-masks-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseSafe/vector-masks-direct-object.stdout"
+          },
+          {
+            "command": "[\"COMPILER\",\"--emit=obj\",\"--generic-cfg-selector\",\"--target=x86_64-unknown-linux-gnu\",\"/home/oleg/prog/z_llvm/test/real_programs/vector_masks.ll\"]#0",
+            "baseline_sha256": "6812270551e1da6ff2843d42fa1a9eeb3ca71a4935921ec08042798a63eb6ad8",
+            "candidate_sha256": "ddad293b6bee39579ba1c74336d91bfb3a286c8a07e9eddd839be26c3aa89aad",
+            "baseline_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c/ReleaseFast/vector-masks-direct-object.stdout",
+            "candidate_stdout": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c/ReleaseFast/vector-masks-direct-object.stdout"
+          }
+        ]
+      },
+      "strict_processes": [
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/compare_native_runs.zig",
+            "--",
+            "--baseline-root",
+            "local-state/validations/compiler-selection-completion-20261108/batch-12/native-all-debug-v12-result",
+            "--candidate-root",
+            "local-state/validations/compiler-selection-completion-20261108/batch-13/native-all-debug-v15-result",
+            "--output-root",
+            "local-state/validations/compiler-selection-completion-20261108/batch-13/native-compare-debug-v15",
+            "--added-populations",
+            "integer_shift_operands,call_return_attributes",
+            "--baseline-registry",
+            "local-state/validations/compiler-selection-completion-20261108/batch-13/original-native-registry.json"
+          ],
+          "status": "finished",
+          "started_ns": 1794351665038352050,
+          "samples": [
+            {
+              "time_ns": 1794351665188714933,
+              "available_bytes": 29027856384
+            },
+            {
+              "time_ns": 1794351666093709892,
+              "available_bytes": 29027807232
+            }
+          ],
+          "log": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-comparison-debug-v15.log",
+          "runner_binary_sha256": "b3b5f0ae3d88cb7f1cf7b67de05914830f03a20e1c1f1eaadfd112f263cbd38c",
+          "pid": 1221993,
+          "returncode": 1,
+          "outcome": "completed",
+          "actual_returncode": 1,
+          "wall_ns": 1055420143,
+          "finished_ns": 1794351666093757084
+        },
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/compare_native_runs.zig",
+            "--",
+            "--baseline-root",
+            "local-state/validations/compiler-selection-completion-20261108/batch-12/integrated-v12/unchanged-upstream-c",
+            "--candidate-root",
+            "local-state/validations/compiler-selection-completion-20261108/batch-13/integrated-v16/unchanged-upstream-c",
+            "--output-root",
+            "local-state/validations/compiler-selection-completion-20261108/batch-13/native-compare-fast-v16",
+            "--added-populations",
+            "integer_shift_operands,call_return_attributes",
+            "--baseline-registry",
+            "local-state/validations/compiler-selection-completion-20261108/batch-13/original-native-registry.json"
+          ],
+          "status": "finished",
+          "started_ns": 1794354936040812944,
+          "samples": [
+            {
+              "time_ns": 1794354936198036451,
+              "available_bytes": 27108016128
+            },
+            {
+              "time_ns": 1794354937205231194,
+              "available_bytes": 27107942400
+            }
+          ],
+          "log": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/native-comparison-fast-v16.log",
+          "runner_binary_sha256": "b3b5f0ae3d88cb7f1cf7b67de05914830f03a20e1c1f1eaadfd112f263cbd38c",
+          "pid": 1303382,
+          "returncode": 1,
+          "outcome": "completed",
+          "actual_returncode": 1,
+          "wall_ns": 1164504128,
+          "finished_ns": 1794354937205292294
+        }
+      ],
+      "same_reviewed_differences_both_builds": true,
+      "read_only_function_audits": [
+        {
+          "schema": 1,
+          "read_only": true,
+          "function_count": 8,
+          "same": [
+            "vector_graph_pointers",
+            "vector_graph_phi8",
+            "vector_graph_parallel",
+            "vector_graph_freeze",
+            "vector_graph_wide",
+            "vector_graph_ctpop6",
+            "vector_graph_intrinsics"
+          ],
+          "changed": [
+            {
+              "function": "vector_graph_repack",
+              "before": {
+                "offset": 3443,
+                "bytes": 5163,
+                "sha256": "f857d331be34ec0081327d085a479a27bbbf26df6fdef5f12469df9afbb17f13"
+              },
+              "after": {
+                "offset": 3443,
+                "bytes": 5546,
+                "sha256": "face46fc64f3f2ff5eff4be7424a386beca7370c3e7f108ed53604429b268b30"
+              }
+            }
+          ]
+        },
+        {
+          "schema": 1,
+          "read_only": true,
+          "function_count": 8,
+          "same": [
+            "vector_graph_pointers",
+            "vector_graph_phi8",
+            "vector_graph_parallel",
+            "vector_graph_freeze",
+            "vector_graph_wide",
+            "vector_graph_ctpop6",
+            "vector_graph_intrinsics"
+          ],
+          "changed": [
+            {
+              "function": "vector_graph_repack",
+              "before": {
+                "offset": 3443,
+                "bytes": 5163,
+                "sha256": "f857d331be34ec0081327d085a479a27bbbf26df6fdef5f12469df9afbb17f13"
+              },
+              "after": {
+                "offset": 3443,
+                "bytes": 5546,
+                "sha256": "face46fc64f3f2ff5eff4be7424a386beca7370c3e7f108ed53604429b268b30"
+              }
+            }
+          ]
+        },
+        {
+          "schema": 1,
+          "read_only": true,
+          "function_count": 9,
+          "same": [
+            "vector_mask_compare16",
+            "vector_mask_live",
+            "vector_mask_unpack16",
+            "vector_mask_nibbles",
+            "vector_mask_compare8",
+            "vector_mask_three",
+            "vector_mask_returned8",
+            "vector_mask_reverse8"
+          ],
+          "changed": [
+            {
+              "function": "vector_mask_reverse128",
+              "before": {
+                "offset": 6778,
+                "bytes": 2122,
+                "sha256": "31ae6824d4a73a7b716563bff04503dba20879543bc6dc934bb1d3172077161b"
+              },
+              "after": {
+                "offset": 6778,
+                "bytes": 2528,
+                "sha256": "bb506ea52d9d50023107fed423d0cc01a35a8469ff3572e6c4b900bcd14beaca"
+              }
+            }
+          ]
+        }
+      ],
+      "ablation_process": {
+        "argv": [
+          "bash",
+          "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-14/integer-storage-worktree/local-state/integer-storage-probes/emit-ablation-v3.sh"
+        ],
+        "status": "finished",
+        "started_ns": 1794353035791343682,
+        "samples": [
+          {
+            "time_ns": 1794353035936492161,
+            "available_bytes": 30585446400
+          },
+          {
+            "time_ns": 1794353037192898311,
+            "available_bytes": 30585262080
+          }
+        ],
+        "log": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/pair-ablation-v4.log",
+        "runner_binary_sha256": "b3b5f0ae3d88cb7f1cf7b67de05914830f03a20e1c1f1eaadfd112f263cbd38c",
+        "pid": 1253735,
+        "returncode": 0,
+        "outcome": "completed",
+        "actual_returncode": 0,
+        "wall_ns": 1401613174,
+        "finished_ns": 1794353037192938159
+      },
+      "cause": "Admission of constant i128 lshr counts below64 selects the existing scalar-word expansion instead of primitive pair shifting in vector_graph_repack and vector_mask_reverse128. A one-predicate ablation restores every prior object byte for byte.",
+      "validation": "All prior optimizer artifacts, owner manifests and command outcomes are retained. Both complete86-population native suites pass unchanged LLVM/C oracles in all three modes and both local routes; new full-width shift tests and injected controls pass.",
+      "byte_equality_claimed": false
+    },
+    "core_cohort": {
+      "schema": "batch13-core-object-review-v1",
+      "status": "reviewed",
+      "records": 36,
+      "strict_comparison": {
+        "argv": [
+          "jq",
+          "-n",
+          "--slurpfile",
+          "before",
+          "local-state/validations/compiler-selection-completion-20261108/batch-12/core-cohort-v12.json",
+          "--slurpfile",
+          "after",
+          "local-state/validations/compiler-selection-completion-20261108/batch-13/core-cohort-v16.json",
+          "-f",
+          "local-state/validations/compiler-selection-completion-20261108/batch-09/audit-core-cohort.jq"
+        ],
+        "status": "finished",
+        "started_ns": 1794353867057949455,
+        "samples": [
+          {
+            "time_ns": 1794353867208063887,
+            "available_bytes": 29041344512
+          },
+          {
+            "time_ns": 1794353867262942746,
+            "available_bytes": 29041336320
+          }
+        ],
+        "log": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/core-strict-comparison-v17.log",
+        "runner_binary_sha256": "b3b5f0ae3d88cb7f1cf7b67de05914830f03a20e1c1f1eaadfd112f263cbd38c",
+        "pid": 1271973,
+        "returncode": 5,
+        "outcome": "completed",
+        "actual_returncode": 5,
+        "wall_ns": 205067697,
+        "finished_ns": 1794353867263005730
+      },
+      "strict_all_field_equality": false,
+      "identities_match": true,
+      "selected_descriptors_extents_and_observations_match": true,
+      "mode_counts": [
+        {
+          "mode": "ReleaseFast",
+          "records": 12
+        },
+        {
+          "mode": "ReleaseSafe",
+          "records": 12
+        },
+        {
+          "mode": "ReleaseSmall",
+          "records": 12
+        }
+      ],
+      "byte_identical_prior_objects": 27,
+      "reviewed_object_changes": [
+        {
+          "identity": [
+            "ReleaseFast",
+            "../ziglang/src/main.zig",
+            "ascii.isAscii"
+          ],
+          "before_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+          "after_sha256": "0327a4434675a016bcb93d3504eb38545e87ed9d5c833316a6138c923a840fbd"
+        },
+        {
+          "identity": [
+            "ReleaseFast",
+            "../ziglang/src/main.zig",
+            "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree"
+          ],
+          "before_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+          "after_sha256": "05c87d79cd83077656f31fce153a56dd88ae9971858401baa8f05113085399b1"
+        },
+        {
+          "identity": [
+            "ReleaseFast",
+            "../ziglang/src/main.zig",
+            "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone"
+          ],
+          "before_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+          "after_sha256": "8a22aa9d90d611c6867465933bfff40181234bca26bead61a3f5cb3f7ccd964a"
+        },
+        {
+          "identity": [
+            "ReleaseSafe",
+            "../ziglang/src/main.zig",
+            "ascii.isAscii"
+          ],
+          "before_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+          "after_sha256": "0327a4434675a016bcb93d3504eb38545e87ed9d5c833316a6138c923a840fbd"
+        },
+        {
+          "identity": [
+            "ReleaseSafe",
+            "../ziglang/src/main.zig",
+            "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree"
+          ],
+          "before_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+          "after_sha256": "05c87d79cd83077656f31fce153a56dd88ae9971858401baa8f05113085399b1"
+        },
+        {
+          "identity": [
+            "ReleaseSafe",
+            "../ziglang/src/main.zig",
+            "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone"
+          ],
+          "before_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+          "after_sha256": "8a22aa9d90d611c6867465933bfff40181234bca26bead61a3f5cb3f7ccd964a"
+        },
+        {
+          "identity": [
+            "ReleaseSmall",
+            "../ziglang/src/main.zig",
+            "ascii.isAscii"
+          ],
+          "before_sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+          "after_sha256": "0327a4434675a016bcb93d3504eb38545e87ed9d5c833316a6138c923a840fbd"
+        },
+        {
+          "identity": [
+            "ReleaseSmall",
+            "../ziglang/src/main.zig",
+            "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree"
+          ],
+          "before_sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+          "after_sha256": "05c87d79cd83077656f31fce153a56dd88ae9971858401baa8f05113085399b1"
+        },
+        {
+          "identity": [
+            "ReleaseSmall",
+            "../ziglang/src/main.zig",
+            "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone"
+          ],
+          "before_sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+          "after_sha256": "8a22aa9d90d611c6867465933bfff40181234bca26bead61a3f5cb3f7ccd964a"
+        }
+      ],
+      "wrapper_metadata": {
+        "reviewed_fields": [
+          "reference_bytes",
+          "reference_sha256",
+          "linked_bytes",
+          "linked_sha256"
+        ],
+        "differing_records": 33
+      },
+      "reproduction": {
+        "argv": [
+          "bash",
+          "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/reproduce-core-v3.sh"
+        ],
+        "status": "finished",
+        "started_ns": 1794353781560117180,
+        "samples": [
+          {
+            "time_ns": 1794353781709114755,
+            "available_bytes": 29194551296
+          },
+          {
+            "time_ns": 1794353781915938731,
+            "available_bytes": 29194416128
+          }
+        ],
+        "log": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/core-reproduction-v3.log",
+        "runner_binary_sha256": "b3b5f0ae3d88cb7f1cf7b67de05914830f03a20e1c1f1eaadfd112f263cbd38c",
+        "pid": 1269869,
+        "returncode": 0,
+        "outcome": "completed",
+        "actual_returncode": 0,
+        "wall_ns": 355963238,
+        "finished_ns": 1794353781916046351
+      },
+      "read_only_function_audits": [
+        {
+          "schema": 1,
+          "read_only": true,
+          "function_count": 1,
+          "same": [],
+          "changed": [
+            {
+              "function": "ascii.isAscii",
+              "before": {
+                "offset": 0,
+                "bytes": 50,
+                "sha256": "4c3168d90e65f738cd99870ffc44f7d8ff36e6a5bc25b5412069c91d72f25848"
+              },
+              "after": {
+                "offset": 0,
+                "bytes": 55,
+                "sha256": "40678fda42068a46ff3046b5d735cc262e5701e0ce943adda5e512d7b8ee2dbb"
+              },
+              "duplicated_incoming_byte_mask": true
+            }
+          ]
+        },
+        {
+          "schema": 1,
+          "read_only": true,
+          "function_count": 1,
+          "same": [],
+          "changed": [
+            {
+              "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree",
+              "before": {
+                "offset": 0,
+                "bytes": 50,
+                "sha256": "6190423f5467663533078905133bdf4187f8289308465bd658efcb53cd92c7a9"
+              },
+              "after": {
+                "offset": 0,
+                "bytes": 55,
+                "sha256": "3c979e10976591f9bd7f9898b3f3e38c2f4beae0c18e3d057479862022085ecb"
+              },
+              "duplicated_incoming_byte_mask": true
+            }
+          ]
+        },
+        {
+          "schema": 1,
+          "read_only": true,
+          "function_count": 1,
+          "same": [],
+          "changed": [
+            {
+              "function": "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone",
+              "before": {
+                "offset": 0,
+                "bytes": 50,
+                "sha256": "e53982772b6abdac7413b2a78b0f449c4dcbf299cd3716e3a2b47dfa303f076c"
+              },
+              "after": {
+                "offset": 0,
+                "bytes": 55,
+                "sha256": "447a1a0e9b01e7a1b13f13b46e5cc2b490efd776f5557babba99129ee6704867"
+              },
+              "duplicated_incoming_byte_mask": true
+            }
+          ]
+        }
+      ],
+      "authenticated_inputs_and_objects": [
+        {
+          "sha256": "fd907d6d039d664de42bb7be3b083790b052e2e4d5d8c2f63c05bfe8664f3158",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/ascii-fast-v3.air"
+        },
+        {
+          "sha256": "cec703a7cc929cf1399c85bb23682a3932ff2937c4aa17f4575f1e6a127da857",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/metadata-free-fast-v3.air"
+        },
+        {
+          "sha256": "05b7decf31bfa3f305b59b80c43f6f1203a14bcdba17aa78b789363ca6f4b334",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/metadata-tombstone-fast-v3.air"
+        },
+        {
+          "sha256": "0327a4434675a016bcb93d3504eb38545e87ed9d5c833316a6138c923a840fbd",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/ascii-after-v3.o"
+        },
+        {
+          "sha256": "ecbbb705bbf612433a11a8477198c023ffbb012031e21ede92162d70122d1f92",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/ascii-before-v3.o"
+        },
+        {
+          "sha256": "05c87d79cd83077656f31fce153a56dd88ae9971858401baa8f05113085399b1",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/metadata-free-after-v3.o"
+        },
+        {
+          "sha256": "627ca2f0443c6819b37580331de160b16aa9b81941f5f8131703aacbac8136cf",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/metadata-free-before-v3.o"
+        },
+        {
+          "sha256": "8a22aa9d90d611c6867465933bfff40181234bca26bead61a3f5cb3f7ccd964a",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/metadata-tombstone-after-v3.o"
+        },
+        {
+          "sha256": "c01c2085d5c677d0a7328b3053c8037acfeb40bcd4925add8d834544efe6a681",
+          "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/binary-review-v15/core/metadata-tombstone-before-v3.o"
+        }
+      ],
+      "cause": "Existing clean-32 ABI normalization now accepts zeroext i8 inputs. Each changed body inserts exactly one idempotent AND EAX,255 immediately after the prior identical mask; every other function byte is unchanged.",
+      "interpretation": "Strict object equality is false. All nine changes are explicitly reviewed against authenticated AIR descriptors, reproduced old/current cohort hashes, exact function-byte proofs and unchanged exhaustive execution observations."
+    },
+    "full_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 4024965434394
+    },
+    "full_run": {
+      "schema": 1,
+      "subgates": 17,
+      "unique_subgates": 17,
+      "all_gates_passed": true,
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "71586",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "2135",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "4057",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "3948",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "24579",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "101036",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "40915",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "20083",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "13253",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "873381",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "903111",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "481434",
+          "cache_status": "hit"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "2688155",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "721",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1635",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1429",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "11460",
+          "cache_status": "none"
+        }
+      ],
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "serial": [
+        {
+          "schema_version": "1",
+          "run_id": "3aa42a80a416d5150a34fd03a787cfe5",
+          "scratch_path": "local-state/validations/compiler-selection-completion-20261108/batch-13/serial-v16",
+          "bundle_path": "local-state/validations/compiler-selection-completion-20261108/batch-13/serial-v16/release_source_object_bundle",
+          "target": "x86_64-unknown-linux-gnu",
+          "mode": "serial",
+          "real_rows_concurrency": "3",
+          "subgates": "17",
+          "wall_ms": "4024777",
+          "starting_free_bytes": "32403693568",
+          "minimum_observed_free_bytes": "27448913920",
+          "final_free_bytes": "27448913920",
+          "observed_peak_bytes": "4954779648",
+          "reserve_bytes": "11410065408",
+          "required_start_bytes": "20000000000",
+          "local_fail": "0"
+        }
+      ],
+      "release_object_bundle": [
+        {
+          "schema_version": "1",
+          "produced": "1",
+          "consumers": "3",
+          "identity": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+          "executions_cached": "false",
+          "local_fail": "0"
+        }
+      ],
+      "inventory": [
+        {
+          "schema_version": "1",
+          "subgates": "17",
+          "runner": "zig-run",
+          "runner_input_scope": "command",
+          "target": "x86_64-unknown-linux-gnu",
+          "reported_cache_contracts": "3",
+          "unreported_cache_contracts": "14",
+          "release_source_object_bundle_contracts": "4",
+          "no_artifact_contracts": "13",
+          "local_fail": "0"
+        }
+      ],
+      "status": "passed"
+    },
+    "strict_log_comparisons": {
+      "full": {
+        "status": "finished",
+        "actual_returncode": 1,
+        "outcome": "completed",
+        "wall_ns": 766913832
+      },
+      "real_rows": {
+        "status": "finished",
+        "actual_returncode": 1,
+        "outcome": "completed",
+        "wall_ns": 761805327
+      },
+      "canonical_rows": {
+        "before": 1523,
+        "after": 1525
+      },
+      "equality_claimed": false
+    },
+    "execution_controls": {
+      "schema": "execution-breadth-controls-v2",
+      "harness_reuse": true,
+      "negative_controls": 54,
+      "function_modes": 21,
+      "observations": 22788,
+      "status": "passed"
+    }
+  },
+  "source_binding": {
+    "schema": 1,
+    "frozen_head": "aa2d6f0937488bc39ce32d9106e5b00216ae50de",
+    "committed_head": "2eb2fc9bcd75a0cf9682567ad2a13b01936d9653",
+    "committed_tree": "735bf1b7f3ec713caf842a01ca1a1ced91190cb6",
+    "files": 3218,
+    "compiler_source_files": 596,
+    "all_file_hashes_match": true,
+    "build_receipts_match": true,
+    "frozen_source_verified_after_all_runs": true,
+    "status": "passed"
+  },
+  "binary_binding": {
+    "schema": 1,
+    "status": "passed",
+    "frozen_source_unchanged_after_all_runs": true,
+    "compiler_source_files": 596,
+    "build_receipts_match": true,
+    "executed_binary_hashes_unchanged": true,
+    "checksums": "local-state/validations/compiler-selection-completion-20261108/batch-13/expected-binaries-v15.sha256",
+    "checksum_count": 3,
+    "checksum_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 334992486
+    },
+    "Debug": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/compiler-v15/Debug/bin/z_llvm",
+      "sha256": "15735cf7dd2d62bbf59c37036bf1288e53123554c6197e4d1ec01eaffde5bf68",
+      "source_head": "aa2d6f0937488bc39ce32d9106e5b00216ae50de"
+    },
+    "ReleaseFast": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/compiler-v15/ReleaseFast/bin/z_llvm",
+      "sha256": "ff22c454effe221a05ac023de4df7bab29dde8ef85b4f4fac89708c80bafeee8",
+      "source_head": "aa2d6f0937488bc39ce32d9106e5b00216ae50de"
+    },
+    "census": {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-13/census-v15",
+      "sha256": "6ded77b03c7ed19bb8a33c628b955f504f6eef3c7def38814a431014c01b042a"
+    },
+    "full_native_and_production_compiler_bindings_match": true
+  },
+  "compiler_builds": {
+    "Debug": {
+      "compiler": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/compiler-v15/Debug/bin/z_llvm",
+      "compiler_sha256": "15735cf7dd2d62bbf59c37036bf1288e53123554c6197e4d1ec01eaffde5bf68",
+      "build_mode": "Debug",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    },
+    "ReleaseFast": {
+      "compiler": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-13/compiler-v15/ReleaseFast/bin/z_llvm",
+      "compiler_sha256": "ff22c454effe221a05ac023de4df7bab29dde8ef85b4f4fac89708c80bafeee8",
+      "build_mode": "ReleaseFast",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    }
+  },
+  "fixed_contracts": {
+    "real_prefix": 100,
+    "core_execution_cohort": 12,
+    "compiler_rt_bypass_ratchet": 130,
+    "frozen_contracts": "passed",
+    "accepted_status_json_unchanged": true,
+    "scratch_pins_verified": 13,
+    "scratch_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 184782676
+    },
+    "air_process": {
+      "status": "finished",
+      "actual_returncode": 0,
+      "outcome": "completed",
+      "wall_ns": 3293503878
+    }
+  },
+  "limitations": [
+    "All 121 remaining original compiler rejections remain in scope for the all-8928 plan",
+    "Production completes selection and stops at remaining rejections; complete objects, compiler startup and self-rebuild are not established",
+    "Private shift expansion retains source opcodes and defined shift-count domains; primitive pair projections remain available",
+    "ABI attribute admission is bounded to clean sub-32-bit zero extension and typed nullable pointer promises; sign extension remains closed",
+    "Twelve prior native objects and nine core cohort objects intentionally differ; strict failures and explicit function-byte/ablation reviews are retained",
+    "Strict full-log equality is not claimed; two new mandatory summaries and explicit reference/linked wrapper metadata differences are retained",
+    "Earlier prototypes, fixture failures and bounded diagnostics remain retained without cumulative acceptance credit",
+    "Concurrent timings establish completion without a controlled performance ratio"
+  ]
+}

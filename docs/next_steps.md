@@ -1,11 +1,11 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [address-operand checkpoint](evidence/address_value_operands.md)
-at `08616a11`: **8,792/8,928** compiler definitions and **318/455** runtime
-definitions. All 136 remaining original compiler definitions stay in scope. The
-complete current census identifies remaining floating/structured values, scalar
-shifts, casts and call-attribute boundaries
+from the accepted [shift and call checkpoint](evidence/shift_and_call_operands.md)
+at `2eb2fc9b`: **8,807/8,928** compiler definitions and **318/455** runtime
+definitions. All 121 remaining original compiler definitions stay in scope. The
+complete current census identifies remaining floating/structured values, integer
+division, casts and record-freeze boundaries
 for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
@@ -76,6 +76,22 @@ binds 3,205 source hashes and unchanged executed binaries to the code commit.
 Continue through the measured constant-left scalar shifts, scratch-pair shift
 and narrow or nullable call-return attributes, then every remaining original
 compiler rejection. The all-8,928 plan remains active without renewed approval.
+
+Batch 13's word/pair shifts and narrow or nullable call attributes add fifteen
+compiler selections without lost successes or owner changes. Complete census
+and independent production agree on 8,807 compiler and 318 runtime selections;
+all 4,366,614 compiler events balance. Debug/ReleaseSafe each pass 2,106 units,
+25 structural and two profile checks; all nine readiness procedures and
+seventeen integration gates pass. Both complete 86-population native suites
+retain all prior entries and 3,125 outcomes. Twelve intentional native object
+differences and nine core object differences retain strict failures and explicit
+reviews. All 162 fault controls are detected. The
+[acceptance record](evidence/shift_and_call_operands_acceptance_20261110.json)
+binds 3,218 frozen source hashes and unchanged executed binaries to the code
+commit. The isolated successor has passing native and unit diagnostics for
+full-width integer division, typed i52 truncations and two-word record freezes;
+complete unchanged-input proofs must accept its cumulative total. Continue
+through every remaining original compiler rejection without renewed approval.
 
 ## Completed bounded compiler-throughput delivery
 
