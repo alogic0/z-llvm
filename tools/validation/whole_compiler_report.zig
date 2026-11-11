@@ -157,6 +157,12 @@ pub fn stage(profile: ?u.Value, analysis: u.Value, code: i64, completed: bool) !
     return "backend-unclassified";
 }
 
+// Legacy machine lowering removes the surrounding LLVM quotes. Both producers
+// retain hexadecimal escapes, so compare their spellings after that same step.
+pub fn ownershipName(name: []const u8) []const u8 {
+    return if (name.len >= 2 and name[0] == '"' and name[name.len - 1] == '"') name[1 .. name.len - 1] else name;
+}
+
 pub fn validateSuccess(a: std.mem.Allocator, analysis: u.Value, profile: u.Value, owners: []const u8) !void {
     if (!(try u.get(analysis, "selection_completed")).bool or (try u.get(analysis, "dependency_coverage")) == .null) return error.MissingCompleteSelection;
     const n = try u.get(analysis, "counts");
@@ -173,13 +179,19 @@ pub fn validateSuccess(a: std.mem.Allocator, analysis: u.Value, profile: u.Value
         const name = columns.next() orelse return error.InvalidOwnership;
         const owner = columns.next() orelse return error.InvalidOwnership;
         if (name.len == 0 or columns.next() != null or !u.contains(&.{ "legacy_envelope", "composed_block", "composed_cfg", "structural_fallback" }, owner)) return error.InvalidOwnership;
-        if ((try names.getOrPut(name)).found_existing) return error.DuplicateOwnership;
+        if ((try names.getOrPut(ownershipName(name))).found_existing) return error.DuplicateOwnership;
     }
     if (names.count() != selected) return error.IncompleteOwnership;
     // Match names as well as counts: a substituted manifest earns no success.
     const functions = (try u.get(profile, "functions")).array.items;
     if (functions.len != selected) return error.ProfileCountMismatch;
-    for (functions) |function| if (!names.contains(try u.str(function, "name"))) return error.OwnershipNameMismatch;
+    var observed = std.StringHashMap(void).init(a);
+    defer observed.deinit();
+    for (functions) |function| {
+        const name = ownershipName(try u.str(function, "name"));
+        if (!names.contains(name)) return error.OwnershipNameMismatch;
+        if ((try observed.getOrPut(name)).found_existing) return error.DuplicateProfileFunction;
+    }
 }
 
 test "whole compiler records early failures without claiming a selection census" {
@@ -223,4 +235,16 @@ test "whole compiler rejects substituted owners and apparent partial success" {
     try std.testing.expectError(error.IncompleteOwnership, validateSuccess(a, result, profile, "row_identity\tselection_owner\n"));
     try std.testing.expectError(error.DuplicateOwnership, validateSuccess(a, result, profile, "row_identity\tselection_owner\nfoo\tcomposed_cfg\nfoo\tcomposed_cfg\n"));
     try std.testing.expectError(error.MissingCompleteSelection, validateSuccess(a, try analyze(a, ""), profile, ""));
+}
+
+test "whole compiler matches quoted profiles with legacy machine owners without dropping escapes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const result = try analyze(a, "summary zllvm-codegen-selection coverage=conservative\nsummary zllvm-codegen-report-all selected_functions=2 emitted_functions=2 failed_functions=0 local_fail=0\n");
+    const profile = (try u.json.parse(a, "{\"succeeded\":true,\"counters\":{\"selected_functions\":2},\"functions\":[{\"name\":\"\\\"helper(a, b)\\\"\"},{\"name\":\"\\\"type.\\\\22union\\\\22\\\"\"}]}")).value;
+    try validateSuccess(a, result, profile, "row_identity\tselection_owner\nhelper(a, b)\tcomposed_cfg\ntype.\\22union\\22\tcomposed_block\n");
+    try std.testing.expectError(error.OwnershipNameMismatch, validateSuccess(a, result, profile, "row_identity\tselection_owner\nhelper(a, b)\tcomposed_cfg\ntype.union\tcomposed_block\n"));
+    (try u.get(profile, "functions")).array.items[1] = (try u.get(profile, "functions")).array.items[0];
+    try std.testing.expectError(error.DuplicateProfileFunction, validateSuccess(a, result, profile, "row_identity\tselection_owner\nhelper(a, b)\tcomposed_cfg\ntype.\\22union\\22\tcomposed_block\n"));
 }

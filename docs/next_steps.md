@@ -16,9 +16,11 @@ All 4,492,466 compiler event records audit successfully, and source/binary
 bindings and retained pins verify.
 
 Follow the [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
-Its first deliverable identifies the exact global and rejection reason behind
-the **`UnsupportedGlobalData` object-writing boundary** reported after all
-8,928 selections. Subsequent milestones close the remaining **68 runtime definitions**.
+Milestone 1 is in progress. The unchanged compiler inventory identifies 258
+global decoder failures, beginning with `__anon_4971` and LLVM's double-backslash
+string escape. Shared repairs and LLVM/native proofs are next, followed by the
+complete compiler-object replay. Subsequent milestones close the remaining
+**68 runtime definitions**.
 Complete compiler-object emission, unchanged whole-compiler linking, startup
 and self-rebuild require their own proofs. The selection milestone grants no
 credit for these stages. Preserve the original inputs, accepted evidence,

@@ -35,7 +35,13 @@ const Relocation = struct {
     addend: i64,
 };
 
-const DataFixup = struct { offset: u64, address: symbol_address.Address, block: ?[]const u8 = null };
+const DataFixup = struct {
+    offset: u64,
+    address: symbol_address.Address,
+    block: ?[]const u8 = null,
+    kind: global_data.Relocation.Kind = .absolute64,
+    bias: i64 = 0,
+};
 
 pub fn writeObject(allocator: std.mem.Allocator, functions: []const x86_64.MachineFunction, writer: anytype) !void {
     const object = try buildObject(allocator, functions);
@@ -169,7 +175,7 @@ fn buildObjectWithOptionalModuleContext(
     var data_relocations: std.ArrayList(Relocation) = .empty;
     defer data_relocations.deinit(allocator);
     for (data_fixups.items) |fixup| {
-        var addend: i64 = fixup.address.addend;
+        var addend = try std.math.add(i64, fixup.address.addend, fixup.bias);
         if (fixup.block) |block| {
             const function = for (functions) |candidate| {
                 if ((symbol_names.Context{}).eql(candidate.name, fixup.address.symbol)) break candidate;
@@ -189,7 +195,10 @@ fn buildObjectWithOptionalModuleContext(
         try data_relocations.append(allocator, .{
             .offset = fixup.offset,
             .symbol_index = try symbolIndexForCall(allocator, &symbols, &symbol_indices, fixup.address.symbol),
-            .kind = 1, // R_X86_64_64
+            .kind = switch (fixup.kind) {
+                .absolute64 => 1,
+                .relative32 => 2,
+            }, // R_X86_64_64 / R_X86_64_PC32
             .addend = addend,
         });
     }
@@ -314,6 +323,10 @@ fn appendReachableGlobals(
     module_context: ?x86_64.ReadOnlyModuleContext,
 ) !void {
     const context = module_context orelse return;
+    const symbol_budget = globalSymbolBudget(context.globals.len, context.aliases.len, context.functions.len, context.declarations.len) catch |err| {
+        globalPlacementFailure("<module>", "symbol_budget_overflow", context.globals.len, context.aliases.len, std.math.maxInt(u32) - 1);
+        return err;
+    };
     var queue: std.ArrayList([]const u8) = .empty;
     defer queue.deinit(allocator);
     var seen = std.HashMap([]const u8, void, symbol_names.Context, std.hash_map.default_max_load_percentage).init(allocator);
@@ -337,10 +350,16 @@ fn appendReachableGlobals(
         if (indices.contains(name)) continue;
         const entry = try seen.getOrPut(name);
         if (entry.found_existing) continue;
-        if (seen.count() > 4096) return error.UnsupportedGlobalData;
+        if (seen.count() > symbol_budget) {
+            globalPlacementFailure(name, "symbol_budget", seen.count(), seen.count(), symbol_budget);
+            return error.UnsupportedGlobalData;
+        }
         const global = context.findGlobal(name) orelse {
             for (aliases) |alias| if (ir.identifiers.eql(alias.name, name)) {
-                if (!context.require_resolved_aliases) return error.UnsupportedGlobalData;
+                if (!context.require_resolved_aliases) {
+                    std.debug.print("zllvm-global-placement symbol={s} reason=alias_requires_module_context target={s}\n", .{ name[0..@min(name.len, 160)], alias.target[0..@min(alias.target.len, 160)] });
+                    return error.UnsupportedGlobalData;
+                }
                 try queue.append(allocator, alias.target);
                 break;
             };
@@ -354,18 +373,43 @@ fn appendReachableGlobals(
             }
             continue;
         }
-        var decoded = try global_data.decode(allocator, context, global);
+        var diagnostic: global_data.Diagnostic = .{};
+        var decoded = global_data.decodeObserved(allocator, context, global, &diagnostic) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            var type_buffer: [256]u8 = undefined;
+            const ty = if (diagnostic.ty) |ty| switch (ty) {
+                .aggregate => |raw| raw[0..@min(raw.len, type_buffer.len)],
+                else => std.fmt.bufPrint(&type_buffer, "{f}", .{ty}) catch "<type>",
+            } else "<unknown>";
+            const flags = global.address_attrs orelse "";
+            const attrs = global.attrs orelse "";
+            const layout = context.target_datalayout orelse "";
+            std.debug.print("zllvm-global-data symbol={s} type={s} initializer={s} linkage={s} phase={s} reason={s} value={s} offset={any} requested={any} limit={any} flags={s} attrs={s} layout={s} error={s}\n", .{
+                global.name[0..@min(global.name.len, 160)], ty, @tagName(global.initializer), @tagName(global.linkage), @tagName(diagnostic.phase), @tagName(diagnostic.reason), if (diagnostic.value_kind) |kind| @tagName(kind) else "none", diagnostic.offset, diagnostic.requested, diagnostic.limit, flags[0..@min(flags.len, 160)], attrs[0..@min(attrs.len, 160)], layout[0..@min(layout.len, 256)], @errorName(err),
+            });
+            return err;
+        };
         defer decoded.deinit(allocator);
         const properties = try symbol_address.globalProperties(global);
         // Static initializer relocations in TLS need a separate relocation
         // section. Keep that representation closed until it is implemented.
-        if (properties.tls and decoded.relocations.len != 0) return error.UnsupportedTlsInitializer;
+        if (properties.tls and decoded.relocations.len != 0) {
+            globalPlacementFailure(name, "tls_relocations", 0, decoded.relocations.len, 0);
+            return error.UnsupportedTlsInitializer;
+        }
         const section = if (properties.tls) tdata else data;
         const section_alignment = if (properties.tls) tdata_alignment else data_alignment;
         // Zero-sized symbol placement depends on section/linkage conventions.
         // Keep it outside this ordinary, nonempty global-object envelope.
-        if (decoded.bytes.len == 0) return error.UnsupportedGlobalData;
-        if (section.items.len + decoded.bytes.len + decoded.alignment > 16 * 1024 * 1024) return error.UnsupportedGlobalData;
+        if (decoded.bytes.len == 0) {
+            globalPlacementFailure(name, "empty_object", section.items.len, 0, 0);
+            return error.UnsupportedGlobalData;
+        }
+        const required = try std.math.add(u64, std.mem.alignForward(u64, section.items.len, decoded.alignment), decoded.bytes.len);
+        if (required > 16 * 1024 * 1024) {
+            globalPlacementFailure(name, "section_bytes", section.items.len, required, 16 * 1024 * 1024);
+            return error.UnsupportedGlobalData;
+        }
         try alignArrayList(section, allocator, decoded.alignment);
         const start: u64 = section.items.len;
         try section.appendSlice(allocator, decoded.bytes);
@@ -380,10 +424,94 @@ fn appendReachableGlobals(
         });
         try indices.put(global.name, @intCast(symbols.items.len));
         for (decoded.relocations) |relocation| {
-            try fixups.append(allocator, .{ .offset = start + relocation.offset, .address = relocation.address, .block = relocation.block });
+            try fixups.append(allocator, .{ .offset = start + relocation.offset, .address = relocation.address, .block = relocation.block, .kind = relocation.kind, .bias = relocation.bias });
             try queue.append(allocator, relocation.address.symbol);
         }
     }
+}
+
+fn globalSymbolBudget(globals: usize, aliases: usize, functions: usize, declarations: usize) !usize {
+    const data = std.math.add(usize, globals, aliases) catch return error.UnsupportedGlobalData;
+    const code = std.math.add(usize, functions, declarations) catch return error.UnsupportedGlobalData;
+    const total = std.math.add(usize, data, code) catch return error.UnsupportedGlobalData;
+    // The hashmap and object symbol indices are u32. Keep the legacy floor
+    // for small/manual contexts, but bound complete modules by their inventory.
+    if (total >= std.math.maxInt(u32)) return error.UnsupportedGlobalData;
+    return @max(4096, total);
+}
+
+fn globalPlacementFailure(name: []const u8, reason: []const u8, current: u64, requested: u64, limit: u64) void {
+    std.debug.print("zllvm-global-placement symbol={s} reason={s} current={d} requested={d} limit={d}\n", .{ name[0..@min(name.len, 160)], reason, current, requested, limit });
+}
+
+pub const GlobalPlacement = struct {
+    data_bytes: usize,
+    data_alignment: u32,
+    tls_bytes: usize,
+    tls_alignment: u32,
+    symbols: usize,
+    relocations: usize,
+    symbol_budget: usize,
+};
+
+/// Exercise exactly the emitter's global placement with all parsed globals as
+/// roots. No MIR/function emission, block fixup resolution or ELF credit.
+pub fn inspectGlobalPlacement(allocator: std.mem.Allocator, context: x86_64.ReadOnlyModuleContext) !GlobalPlacement {
+    if (!context.emit_all_globals) return error.ExpectedAllGlobalRoots;
+    var data: std.ArrayList(u8) = .empty;
+    defer data.deinit(allocator);
+    var tls: std.ArrayList(u8) = .empty;
+    defer tls.deinit(allocator);
+    var fixups: std.ArrayList(DataFixup) = .empty;
+    defer fixups.deinit(allocator);
+    var symbols: std.ArrayList(Symbol) = .empty;
+    defer symbols.deinit(allocator);
+    var indices = symbol_names.Index.init(allocator);
+    defer indices.deinit();
+    var data_alignment: u32 = 16;
+    var tls_alignment: u32 = 4;
+    try appendReachableGlobals(allocator, &data, &data_alignment, &tls, &tls_alignment, &fixups, &symbols, &indices, &.{}, context.aliases, context);
+    return .{ .data_bytes = data.items.len, .data_alignment = data_alignment, .tls_bytes = tls.items.len, .tls_alignment = tls_alignment, .symbols = symbols.items.len, .relocations = fixups.items.len, .symbol_budget = try globalSymbolBudget(context.globals.len, context.aliases.len, context.functions.len, context.declarations.len) };
+}
+
+test "ELF global symbol budgets preserve a checked module envelope" {
+    try std.testing.expectEqual(@as(usize, 4096), try globalSymbolBudget(1, 2, 3, 4));
+    try std.testing.expectEqual(@as(usize, 5003), try globalSymbolBudget(5000, 1, 1, 1));
+    try std.testing.expectError(error.UnsupportedGlobalData, globalSymbolBudget(std.math.maxInt(usize), 1, 0, 0));
+    try std.testing.expectError(error.UnsupportedGlobalData, globalSymbolBudget(std.math.maxInt(u32), 0, 0, 0));
+}
+
+test "ELF global placement admits a complete module beyond the legacy symbol limit" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    const globals = try allocator.alloc(ir.Global, 4097);
+    for (globals, 0..) |*global, index| global.* = .{
+        .name = try std.fmt.allocPrint(allocator, "leaf_{d}", .{index}),
+        .kind = .global,
+        .ty = .{ .int = 8 },
+        .initializer = .{ .scalar = .{ .int = @intCast(index % 256) } },
+    };
+    const placement = try inspectGlobalPlacement(std.testing.allocator, .{ .globals = globals, .named_types = &.{}, .target_datalayout = null, .emit_all_globals = true });
+    try std.testing.expectEqual(globals.len, placement.symbols);
+    try std.testing.expectEqual(globals.len, placement.data_bytes);
+    try std.testing.expectEqual(globals.len, placement.symbol_budget);
+}
+
+test "ELF global placement retains the exact section byte boundary" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var globals: [17]ir.Global = undefined;
+    for (&globals, 0..) |*global, index| global.* = .{
+        .name = try std.fmt.allocPrint(allocator, "page_{d}", .{index}),
+        .kind = .global,
+        .ty = .{ .aggregate = "[1048576 x i8]" },
+        .initializer = .{ .scalar = .zero_initializer },
+    };
+    const placement = try inspectGlobalPlacement(std.testing.allocator, .{ .globals = globals[0..16], .named_types = &.{}, .target_datalayout = null, .emit_all_globals = true });
+    try std.testing.expectEqual(@as(usize, 16 * 1024 * 1024), placement.data_bytes);
+    try std.testing.expectError(error.UnsupportedGlobalData, inspectGlobalPlacement(std.testing.allocator, .{ .globals = &globals, .named_types = &.{}, .target_datalayout = null, .emit_all_globals = true }));
 }
 
 fn orderLocalSymbols(allocator: std.mem.Allocator, symbols: *std.ArrayList(Symbol), indices: *symbol_names.Index) !u32 {

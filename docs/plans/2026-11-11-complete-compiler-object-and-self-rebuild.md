@@ -1,7 +1,8 @@
 # Complete compiler objects, runtime and self-rebuild
 
 Date: 2026-11-11
-Status: planned; implementation has not started.
+Status: in progress; compiler object emitted and independently audited; runtime
+selection repair and cumulative acceptance are in progress.
 Baseline: accepted code `efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898`, documentation
 `5490de0b909757afb57cacd27cc2f3ce5e176f10`.
 
@@ -76,7 +77,12 @@ definition inventories. Do not silently substitute them for the fixed inputs.
    diagnostic path with explicit provenance. Avoid repeating the roughly
    eighty-minute compiler replay merely to identify another initializer.
 
-The cause is not yet known. Current candidate boundaries include unsupported
+The initial inventory found 258 compiler decoder rejections: 31 string escapes,
+200 poison scalar cells, 19 floating scalar layouts and eight relative-address
+table expressions. The runtime has 11 floating-table decoder rejections. The
+first compiler rejection is `__anon_4971`, whose 13-byte string contains LLVM's
+double-backslash escape. This inventory is diagnostic evidence, not object or
+required-closure credit. Subsequent candidate boundaries include unsupported
 scalar/aggregate initializers, aliases or relocations, zero-sized placement,
 the decoder's 1 MiB object bound, the 4,096-entry closure bound, and the 16 MiB
 section bound. Distinguish an unsupported representation from a capacity or
@@ -321,8 +327,8 @@ only when an observed required replay cannot finish, and retain its blocker.
 
 ## Delivery checklist
 
-- [ ] Identify the exact first global rejection and retain a focused reproducer.
-- [ ] Implement the required shared global/ELF forms with LLVM/native and negative proofs.
+- [x] Identify the exact first global rejection and retain a focused reproducer.
+- [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.
 - [ ] Emit and validate the complete original compiler object, retaining all 8,928 selections.
 - [ ] Complete all 455 original runtime selections and validate its complete object.
 - [ ] Build and link the unchanged pinned compiler with complete local hook provenance.

@@ -183,6 +183,19 @@ pub fn build(b: *std.Build) void {
     addToolStepWithArgs(b, "validation-progress", "Read a validation command's durable progress", "tools/validation_progress.zig");
     addToolStepWithArgs(b, "validation-snapshot", "Freeze or verify source membership and hashes", "tools/validation_snapshot.zig");
     addToolStepWithArgs(b, "validation-compiler", "Prepare one compiler mode in a separate prefix with a build receipt", "tools/build_validation_compiler.zig");
+    const global_probe_module = b.createModule(.{ .root_source_file = b.path("src/global_data_probe.zig"), .target = b.graph.host, .optimize = optimize });
+    const global_probe_exe = b.addExecutable(.{ .name = "inspect-global-data", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/inspect_global_data.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "global_probe", .module = global_probe_module }},
+    }) });
+    const global_probe_run = b.addRunArtifact(global_probe_exe);
+    global_probe_run.addPassthruArgs();
+    b.step(
+        "inspect-global-data",
+        "Inspect global decoder failures without function selection",
+    ).dependOn(&global_probe_run.step);
     const process_module = b.createModule(.{ .root_source_file = b.path("tools/vendor/process/src/root.zig"), .target = b.graph.host, .optimize = optimize });
     const process_fixture = b.addExecutable(.{ .name = "validation-process-fixture", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/vendor/process/tests/fixture.zig"),

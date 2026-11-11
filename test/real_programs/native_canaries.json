@@ -3111,6 +3111,24 @@
       ],
       "observations": 40960,
       "stdout": "hardware-queries observations=40960 cpuid=xcr0=live=rbx=stack=guards=preserved\n"
+    },
+    {
+      "population": "global_objects",
+      "prefix": "global-objects",
+      "fixture": "global_objects",
+      "functions": [
+        "global_objects_escape",
+        "global_objects_poison",
+        "global_objects_float",
+        "global_objects_half",
+        "global_objects_extended",
+        "global_objects_relative",
+        "global_objects_first",
+        "global_objects_second",
+        "global_objects_many"
+      ],
+      "observations": 12460,
+      "stdout": "global-objects observations=12460 escapes=poison=floats=relative=capacity=neighbors=preserved\n"
     }
   ]
 }
