@@ -113,10 +113,12 @@ const Builder = struct {
 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
-    return expand(allocator, function, context) catch |err| switch (err) {
+    const quad = expand(allocator, function, context) catch |err| switch (err) {
         error.UnsupportedFloatingPayload => null,
-        else => err,
+        else => return err,
     };
+    if (quad) |candidate| return candidate;
+    return @import("half_memory.zig").legalize(allocator, function, context);
 }
 
 fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {

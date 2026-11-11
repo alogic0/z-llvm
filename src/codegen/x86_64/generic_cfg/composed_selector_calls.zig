@@ -398,7 +398,9 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     var has_vector_abi = sysv_abi.isVector128AbiType(call.ret_ty);
     for (call.args.items) |arg| has_vector_abi = has_vector_abi or sysv_abi.isVector128AbiType(arg.ty);
-    if (has_vector_abi) if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+    var has_pair_argument = false;
+    for (call.args.items) |arg| has_pair_argument = has_pair_argument or arg.ty.eql(.{ .int = 128 });
+    if (has_vector_abi or has_pair_argument) if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         if (!sysv_abi.isScalarSseAbiType(arg.ty) and !sysv_abi.isVector128AbiType(arg.ty)) continue;
         const name = switch (arg.value) {
@@ -410,6 +412,7 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
 
     for (call.args.items, plan.assignments.items) |arg, assignment| switch (assignment) {
         .gpr => |target| if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic,
+        .gpr_pair => |first| if (try lowerDirectCallArg(selector, arg, first)) |diagnostic| return diagnostic,
         .sse => |target| {
             if (sysv_abi.isVector128AbiType(arg.ty)) {
                 if (try selector_vector.materializeAbiVector(selector, arg.value, arg.ty, target)) |diagnostic| return diagnostic;
@@ -442,6 +445,8 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
         } else if (call.ret_ty.eql(.{ .int = 64 }) or call.ret_ty == .ptr) {
             try transaction.?.define(result_name, .fullRax());
             try transaction.?.commit();
+        } else if (call.ret_ty.eql(.{ .int = 128 })) {
+            try selector_state.bindFixedProductResult(selector, result_name);
         } else if (call.ret_ty == .void) {
             return .{ .unsupported_value = "composed-block-void-call-result" };
         } else {

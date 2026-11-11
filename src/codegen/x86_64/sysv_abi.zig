@@ -308,6 +308,9 @@ pub const CallPlanCounts = struct {
 
 pub const CallArgAssignment = union(enum) {
     gpr: ArgReg,
+    // First of two consecutive integer registers. Whole stack pairs remain
+    // outside the composed scalar-SSE call envelope.
+    gpr_pair: ArgReg,
     sse: XmmReg,
     stack_i32_const: i32,
     stack_i32_param: []const u8,
@@ -388,6 +391,39 @@ pub fn planScalarCall(allocator: std.mem.Allocator, call: ir.CallInst) !CallPlan
     return planCallWithFunction(allocator, null, call);
 }
 
+test "scalar SSE calls keep integer pairs whole in consecutive registers" {
+    const source =
+        \\declare double @callee(i64, i128, double, i128, i64)
+        \\define double @caller(i64 %a, i128 %b, double %c, i128 %d, i64 %e) {
+        \\entry:
+        \\ %r = call double @callee(i64 %a, i128 %b, double %c, i128 %d, i64 %e)
+        \\ ret double %r
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const function = module.functions.items[0];
+    const call = function.blocks.items[0].instructions.items[0].kind.call;
+    var plan = try planScalarCall(std.testing.allocator, call);
+    defer plan.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 6), plan.counts.gpr_args);
+    try std.testing.expectEqual(@as(usize, 1), plan.counts.sse_args);
+    try std.testing.expectEqual(ArgReg.rsi, plan.assignments.items[1].gpr_pair);
+    try std.testing.expectEqual(ArgReg.rcx, plan.assignments.items[3].gpr_pair);
+    try std.testing.expectEqual(ArgReg.r9, plan.assignments.items[4].gpr);
+    // Structural call consumers retain their existing closed pair envelope.
+    try std.testing.expectError(error.UnsupportedCodegenType, planCall(std.testing.allocator, function, call));
+
+    var crowded = call;
+    crowded.args = try call.args.clone(std.testing.allocator);
+    defer crowded.args.deinit(std.testing.allocator);
+    crowded.args.clearRetainingCapacity();
+    for (0..5) |_| try crowded.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "a" } });
+    try crowded.args.append(std.testing.allocator, .{ .ty = .{ .int = 128 }, .value = .{ .named = "b" } });
+    try std.testing.expectError(error.UnsupportedCodegenType, planScalarCall(std.testing.allocator, crowded));
+}
+
 fn planCallWithFunction(allocator: std.mem.Allocator, function: ?ir.Function, call: ir.CallInst) !CallPlan {
     try rejectUnsupportedCallEnvelope(call);
     try rejectUnsupportedCallSignature(call);
@@ -395,7 +431,10 @@ fn planCallWithFunction(allocator: std.mem.Allocator, function: ?ir.Function, ca
 
     var plan: CallPlan = .{};
     errdefer plan.deinit(allocator);
-    plan.counts = try planReturn(call.ret_ty);
+    plan.counts = if (function == null and call.ret_ty.eql(.{ .int = 128 }))
+        .{ .gpr_returns = 2 }
+    else
+        try planReturn(call.ret_ty);
 
     var int_arg_index: usize = 0;
     var fp_arg_index: usize = 0;
@@ -421,6 +460,14 @@ fn planCallWithFunction(allocator: std.mem.Allocator, function: ?ir.Function, ca
         }
         try rejectUnsupportedCallArgAttrs(arg);
         try rejectUnsupportedAbiType(arg.ty);
+        if (arg.ty.eql(.{ .int = 128 })) {
+            if (function != null or int_arg_index > 4) return error.UnsupportedCodegenType;
+            try plan.assignments.append(allocator, .{ .gpr_pair = try ArgReg.fromIndex(int_arg_index) });
+            plan.has_non_i32_arg = true;
+            int_arg_index += 2;
+            plan.counts.gpr_args += 2;
+            continue;
+        }
         if (isGprScalarType(arg.ty)) {
             plan.has_non_i32_arg = plan.has_non_i32_arg or !arg.ty.eql(.{ .int = 32 });
             if (int_arg_index >= 6) {

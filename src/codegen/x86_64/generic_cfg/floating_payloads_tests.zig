@@ -108,7 +108,7 @@ test "floating payload executes frameless identity exact literals and undefined 
 test "floating payload arithmetic maps standard compiler-rt types without changing sources" {
     const arithmetic = @import("binary128_arithmetic.zig");
     const source =
-        \\define fp128 @f(float %f, double %d, i32 %i, i64 %j, fp128 %a) {
+        \\define fp128 @f(float %f, double %d, i32 %i, i64 %j, fp128 %a, half %h, i128 %k) {
         \\entry:
         \\ %fwide = fpext float %f to fp128
         \\ %dwide = fpext double %d to fp128
@@ -116,12 +116,18 @@ test "floating payload arithmetic maps standard compiler-rt types without changi
         \\ %u32 = uitofp i32 %i to fp128
         \\ %s64 = sitofp i64 %j to fp128
         \\ %u64 = uitofp i64 %j to fp128
+        \\ %hwide = fpext half %h to fp128
+        \\ %s128 = sitofp i128 %k to fp128
+        \\ %u128 = uitofp i128 %k to fp128
         \\ %narrowf = fptrunc fp128 %a to float
         \\ %narrowd = fptrunc fp128 %a to double
         \\ %si32 = fptosi fp128 %a to i32
         \\ %ui32 = fptoui fp128 %a to i32
         \\ %si64 = fptosi fp128 %a to i64
         \\ %ui64 = fptoui fp128 %a to i64
+        \\ %narrowh = fptrunc fp128 %a to half
+        \\ %si128 = fptosi fp128 %a to i128
+        \\ %ui128 = fptoui fp128 %a to i128
         \\ %sum = fadd fp128 %a, %fwide
         \\ %difference = fsub fp128 %sum, %dwide
         \\ %product = fmul fp128 %difference, %u32
@@ -136,7 +142,7 @@ test "floating payload arithmetic maps standard compiler-rt types without changi
     defer arena.deinit();
     const original = module.functions.items[0];
     const private = (try arithmetic.legalize(arena.allocator(), original)).?;
-    const names = [_][]const u8{ "__extendsftf2", "__extenddftf2", "__floatsitf", "__floatunsitf", "__floatditf", "__floatunditf", "__trunctfsf2", "__trunctfdf2", "__fixtfsi", "__fixunstfsi", "__fixtfdi", "__fixunstfdi", "__addtf3", "__subtf3", "__multf3", "__divtf3" };
+    const names = [_][]const u8{ "__extendsftf2", "__extenddftf2", "__floatsitf", "__floatunsitf", "__floatditf", "__floatunditf", "__extendhftf2", "__floattitf", "__floatuntitf", "__trunctfsf2", "__trunctfdf2", "__fixtfsi", "__fixunstfsi", "__fixtfdi", "__fixunstfdi", "__trunctfhf2", "__fixtfti", "__fixunstfti", "__addtf3", "__subtf3", "__multf3", "__divtf3" };
     for (private.blocks.items[0].instructions.items, names) |inst, name| try std.testing.expectEqualStrings(name, inst.kind.call.callee);
     try std.testing.expect(original.blocks.items[0].instructions.items[0].kind == .cast);
     try std.testing.expect((try arithmetic.legalize(arena.allocator(), private)) == null);
@@ -160,6 +166,53 @@ test "floating payload arithmetic leaves synthetic negation to its bitwise fallb
     @memcpy(code[0..bytes.len], bytes);
     const run: *const fn (f128) callconv(.c) f128 = @ptrCast(code.ptr);
     for (payload_cases) |bits| try std.testing.expectEqual(bits ^ (@as(u128, 1) << 127), @as(u128, @bitCast(run(@bitCast(bits)))));
+}
+
+test "floating payload extended conversions do not outline a runtime helper into itself" {
+    const cases = [_]struct { symbol: []const u8, from: []const u8, to: []const u8, op: []const u8 }{
+        .{ .symbol = "__extendhftf2", .from = "half", .to = "fp128", .op = "fpext" },
+        .{ .symbol = "__trunctfhf2", .from = "fp128", .to = "half", .op = "fptrunc" },
+        .{ .symbol = "__floattitf", .from = "i128", .to = "fp128", .op = "sitofp" },
+        .{ .symbol = "__floatuntitf", .from = "i128", .to = "fp128", .op = "uitofp" },
+        .{ .symbol = "__fixtfti", .from = "fp128", .to = "i128", .op = "fptosi" },
+        .{ .symbol = "__fixunstfti", .from = "fp128", .to = "i128", .op = "fptoui" },
+    };
+    for (cases) |case| for ([_]bool{ false, true }) |quoted| {
+        const name = if (quoted) try std.fmt.allocPrint(std.testing.allocator, "\"\\5F{s}\"", .{case.symbol[1..]}) else try std.testing.allocator.dupe(u8, case.symbol);
+        defer std.testing.allocator.free(name);
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define {s} @{s}({s} %input) {{\nentry:\n %r = {s} {s} %input to {s}\n ret {s} %r\n}}\n", .{ case.to, name, case.from, case.op, case.from, case.to, case.to });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try @import("binary128_arithmetic.zig").legalize(arena.allocator(), module.functions.items[0])) == null);
+    };
+}
+
+test "floating payload extended conversions pass native helper ABI verification" {
+    const cases = [_]struct { from: []const u8, to: []const u8, op: []const u8 }{
+        .{ .from = "half", .to = "fp128", .op = "fpext" },
+        .{ .from = "i128", .to = "fp128", .op = "sitofp" },
+        .{ .from = "i128", .to = "fp128", .op = "uitofp" },
+        .{ .from = "fp128", .to = "half", .op = "fptrunc" },
+        .{ .from = "fp128", .to = "i128", .op = "fptosi" },
+        .{ .from = "fp128", .to = "i128", .op = "fptoui" },
+    };
+    for (cases) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define {s} @convert({s} %input) {{\nentry:\n %r = {s} {s} %input to {s}\n ret {s} %r\n}}\n", .{ case.to, case.from, case.op, case.from, case.to, case.to });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var output = try @import("../../x86_64.zig").lowerFunctionWithOptions(std.testing.allocator, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+        defer output.deinit(std.testing.allocator);
+        try verify.verifyFunction(output);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, output);
+        defer std.testing.allocator.free(bytes);
+        try std.testing.expect(bytes.len > 0);
+    }
 }
 
 test "floating payload constant comparisons discharge mandatory width normalization" {

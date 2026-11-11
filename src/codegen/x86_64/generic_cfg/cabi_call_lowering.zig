@@ -155,7 +155,7 @@ pub fn appendI32CallArgs(
                 stack_args[stack_arg_count] = .{ .stack_disp = try scalarParamStackDisp8(function, name, .{ .int = 32 }) };
                 stack_arg_count += 1;
             },
-            .sse, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
+            .gpr_pair, .sse, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return error.UnsupportedCodegenType,
         }
     }
 
@@ -257,6 +257,7 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
         const assignment = plan.assignments.items[index];
         switch (assignment) {
             .gpr, .sse, .aggregate_register_passthrough => {},
+            .gpr_pair => return error.UnsupportedCodegenType,
             .stack_i32_const => |value| {
                 stack_args[stack_arg_count] = .{ .imm = value };
                 stack_arg_count += 1;
@@ -395,6 +396,7 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                     .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
                 }
             },
+            .gpr_pair => return error.UnsupportedCodegenType,
             .sse => |dst| {
                 if (!arg.ty.eql(.float) and !arg.ty.eql(.double)) return error.UnsupportedCodegenType;
                 switch (arg.value) {
@@ -410,7 +412,7 @@ fn appendSysVScalarCallArgsWithBlockAndAlignment(
                             error.UnsupportedCodegenAbi => null,
                             else => return err,
                         }) |src_index| {
-                            const dst_index: usize = @intFromEnum(dst);
+                            const dst_index: usize = @backingInt(dst);
                             if (src_index != dst_index) {
                                 if (xmm_copy_plan.parallel) {
                                     if (!xmmCopyPlanContains(xmm_copy_plan, dst, try XmmReg.fromIndex(src_index))) return error.UnsupportedCodegenAbi;
@@ -522,6 +524,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .gpr => |dst| dst,
+            .gpr_pair => return error.UnsupportedCodegenType,
             .sse, .stack_i32_const, .stack_i32_param, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
@@ -534,7 +537,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
                     else => return err,
                 };
                 if (src) |reg| {
-                    const src_index = @intFromEnum(reg);
+                    const src_index = @backingInt(reg);
                     if (overwritten[src_index]) needs_parallel = true;
                     if (reg != dst and (arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 }) or arg.ty == .ptr)) {
                         if (copy_plan.count >= copy_plan.copies.len) return error.UnsupportedCodegenAbi;
@@ -550,7 +553,7 @@ fn analyzeGprArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
             },
             .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => false,
         };
-        if (writes_dst) overwritten[@intFromEnum(dst)] = true;
+        if (writes_dst) overwritten[@backingInt(dst)] = true;
     }
     if (needs_parallel and copy_plan.count == 0) return error.UnsupportedCodegenAbi;
     copy_plan.parallel = needs_parallel;
@@ -598,6 +601,7 @@ fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
         const assignment = plan.assignments.items[index];
         const dst = switch (assignment) {
             .sse => |dst| dst,
+            .gpr_pair => return error.UnsupportedCodegenType,
             .gpr, .stack_i32_const, .stack_i32_param, .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param, .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => continue,
         };
 
@@ -629,7 +633,7 @@ fn analyzeXmmArgCopyPlan(function: ir.Function, call: ir.CallInst, plan: SysVCal
             },
             .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
         };
-        if (writes_dst) overwritten[@intFromEnum(dst)] = true;
+        if (writes_dst) overwritten[@backingInt(dst)] = true;
     }
     if (needs_parallel and copy_plan.count == 0) return error.UnsupportedCodegenAbi;
     copy_plan.parallel = needs_parallel;
