@@ -26,6 +26,27 @@ fn executable(source: []const u8) ![]align(std.heap.page_size_min) u8 {
 
 const payload_cases = [_]u128{ 0, 1, @as(u128, 1) << 127, @as(u128, 0x3fff) << 112, @as(u128, 0x7fff) << 112, (@as(u128, 0x7fff) << 112) | 1, (@as(u128, 0xffff800000000123) << 64) | 0xfeedface01234567, std.math.maxInt(u128) };
 
+test "floating payload scalar selects preserve whole quad representations and literal arms" {
+    for (0..3) |literal| {
+        const left = if (literal == 1) "0xL00000000000000017FFF000000000000" else "%a";
+        const right = if (literal == 2) "0xL00000000000000008000000000000000" else "%b";
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define void @choose(ptr %left,ptr %right,ptr %output,i64 %choice) {{\nentry:\n %a = load fp128,ptr %left,align 1\n %b = load fp128,ptr %right,align 1\n %condition = trunc i64 %choice to i1\n %selected = select i1 %condition,fp128 {s},fp128 {s}\n store fp128 %selected,ptr %output,align 1\n ret void\n}}\n", .{ left, right });
+        defer std.testing.allocator.free(text);
+        const code = try executable(text);
+        defer std.posix.munmap(code);
+        const run: *const fn (*const u128, *const u128, *u8, u64) callconv(.c) void = @ptrCast(code.ptr);
+        for (payload_cases) |a| for (payload_cases) |b| for ([_]u64{ 0, 1, 2, 3, std.math.maxInt(u64) }) |choice| {
+            var guarded: [24]u8 = @splat(0xa7);
+            run(&a, &b, &guarded[1], choice);
+            const lhs = if (literal == 1) (@as(u128, 0x7fff) << 112) | 1 else a;
+            const rhs = if (literal == 2) @as(u128, 1) << 127 else b;
+            try std.testing.expectEqual(if (choice & 1 != 0) lhs else rhs, std.mem.readInt(u128, guarded[1..17], .little));
+            try std.testing.expectEqual(@as(u8, 0xa7), guarded[0]);
+            for (guarded[17..]) |byte| try std.testing.expectEqual(@as(u8, 0xa7), byte);
+        };
+    }
+}
+
 test "floating payload verifier requires all 128 XMM return bits" {
     var output = machine.MachineFunction.init("quad_return", .fp128);
     defer output.deinit(std.testing.allocator);

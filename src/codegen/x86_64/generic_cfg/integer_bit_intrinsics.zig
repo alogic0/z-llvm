@@ -10,13 +10,13 @@ pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl };
 
 pub fn operation(call: ir.CallInst) ?Operation {
     if (!std.mem.startsWith(u8, call.callee, "llvm.") or call.ret_ty != .int or call.ret_ty.int == 0 or
-        (call.ret_ty.int > 64 and call.ret_ty.int != 128)) return null;
+        call.ret_ty.int > 128) return null;
     const bits = call.ret_ty.int;
     var buffer: [48]u8 = undefined;
     inline for (std.meta.tags(Operation)) |op| {
         const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
         if (std.mem.eql(u8, call.callee, name)) {
-            if (bits == 128 and op != .ctlz) return null;
+            if (bits > 64 and op != .bswap and !(bits == 128 and op == .ctlz)) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
             if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl) @as(usize, 3) else @as(usize, 1))) return null;
@@ -107,6 +107,31 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
         replacement.kind.call.ret_attrs = null;
         for (replacement.kind.call.args.items) |*arg| arg.attrs = null;
         try block.instructions.append(allocator, replacement);
+        return;
+    }
+    if (bits > 64 and op == .bswap) {
+        const word: ir.Type = .{ .int = 64 };
+        const pair: ir.Type = .{ .int = 128 };
+        const input = call.args.items[0].value;
+        var lo: ir.Value = undefined;
+        var hi: ir.Value = undefined;
+        if (input == .int) {
+            const raw = @as(u128, @bitCast(input.int)) & (if (bits == 128) std.math.maxInt(u128) else (@as(u128, 1) << @as(u7, @intCast(bits))) - 1);
+            lo = try b.binary(.add, .{ .int = @as(u64, @truncate(raw)) }, .{ .int = 0 });
+            hi = try b.binary(.add, .{ .int = @as(u64, @truncate(raw >> 64)) }, .{ .int = 0 });
+        } else {
+            const wide = if (bits == 128) input else try b.emit(.{ .cast = .{ .op = .zext, .from_ty = call.ret_ty, .value = input, .to_ty = pair } });
+            lo = try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = wide, .to_ty = word } });
+            hi = try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = try b.emit(.{ .binary = .{ .op = .lshr, .ty = pair, .lhs = wide, .rhs = .{ .int = 64 } } }), .to_ty = word } });
+        }
+        const lower = try b.emit(.{ .cast = .{ .op = .zext, .from_ty = word, .value = try b.call(.bswap, hi, false), .to_ty = pair } });
+        const upper = try b.emit(.{ .cast = .{ .op = .zext, .from_ty = word, .value = try b.call(.bswap, lo, false), .to_ty = pair } });
+        const joined = try b.emit(.{ .binary = .{ .op = .@"or", .ty = pair, .lhs = lower, .rhs = try b.emit(.{ .binary = .{ .op = .shl, .ty = pair, .lhs = upper, .rhs = .{ .int = 64 } } }) } });
+        const shifted = if (bits == 128) joined else try b.emit(.{ .binary = .{ .op = .lshr, .ty = pair, .lhs = joined, .rhs = .{ .int = 128 - bits } } });
+        try block.instructions.append(allocator, .{ .result = inst.result, .kind = if (bits == 128)
+            .{ .binary = .{ .op = .add, .ty = pair, .lhs = shifted, .rhs = .{ .int = 0 } } }
+        else
+            .{ .cast = .{ .op = .trunc, .from_ty = pair, .value = shifted, .to_ty = call.ret_ty } } });
         return;
     }
     if (bits == 128) {

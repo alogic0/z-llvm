@@ -37,6 +37,10 @@ pub const Stage = enum {
     @"pointer_values.zig.legalize",
     @"global_memory.zig.legalize",
     @"block_order.zig.legalize",
+    @"half_memory.zig.legalizeOrdinaryStores",
+    @"scalar_vector_select.zig.legalize",
+    @"scalar_integer_conversions.zig.legalize",
+    @"extended_math_intrinsics.zig.legalize",
 };
 
 pub const Rewrite = struct {
@@ -100,6 +104,10 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
         .@"pointer_values.zig.legalize" => @import("pointer_values.zig").legalize(measured, function, context),
         .@"global_memory.zig.legalize" => @import("global_memory.zig").legalize(measured, function, context),
         .@"block_order.zig.legalize" => @import("block_order.zig").legalize(measured, function),
+        .@"half_memory.zig.legalizeOrdinaryStores" => @import("half_memory.zig").legalizeOrdinaryStores(measured, function, context),
+        .@"scalar_vector_select.zig.legalize" => @import("scalar_vector_select.zig").legalize(measured, function),
+        .@"scalar_integer_conversions.zig.legalize" => @import("scalar_integer_conversions.zig").legalize(measured, function),
+        .@"extended_math_intrinsics.zig.legalize" => @import("extended_math_intrinsics.zig").legalize(measured, function, context),
     };
     attempt.outcome = if (candidate != null) .rewritten else .unchanged;
     return if (candidate) |rewritten| .{
@@ -114,6 +122,10 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
             .@"stack_addresses.zig.legalize",
             .@"pointer_values.zig.legalize",
             .@"block_order.zig.legalize",
+            .@"half_memory.zig.legalizeOrdinaryStores",
+            .@"scalar_vector_select.zig.legalize",
+            .@"scalar_integer_conversions.zig.legalize",
+            .@"extended_math_intrinsics.zig.legalize",
             => true,
             else => false,
         },
@@ -132,4 +144,20 @@ test "optional legalization budget fails closed instead of recursing indefinitel
     try budget.consume();
     try std.testing.expectError(error.OptionalLegalizationLimitExceeded, budget.consume());
     try std.testing.expectEqual(0, budget.remaining);
+}
+
+test "optional legalization profiling records every registered stage" {
+    var module = try ir.Module.parse(std.testing.allocator, "define void @observe() {\nentry:\n ret void\n}\n");
+    defer module.deinit();
+    var profile = profiling.Profile.init(std.testing.allocator, std.testing.io);
+    defer profile.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    try std.testing.expect((try next(arena.allocator(), module.functions.items[0], null, &profile)) == null);
+    try std.testing.expectEqual(std.enums.values(Stage).len, profile.legalizer_count);
+    for (std.enums.values(Stage), 0..) |stage, index| {
+        try std.testing.expectEqualStrings(@tagName(stage), profile.legalizers[index].stage);
+        try std.testing.expectEqual(@as(u64, 1), profile.legalizers[index].attempts);
+        try std.testing.expectEqual(@as(u64, 0), profile.legalizers[index].errors);
+    }
 }

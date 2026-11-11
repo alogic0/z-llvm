@@ -6,6 +6,35 @@ const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const intrinsics = @import("integer_intrinsics.zig");
 
+test "integer frontier wide byte swaps reverse every byte and retain literal bits" {
+    const values = [_]u128{ 0, 1, 0x8000000000000000, 0x80000000000000000000, 0x0123456789abcdeffedcba9876543210, 0xfedcba98765432100123456789abcdef, std.math.maxInt(u128) };
+    for ([_]u16{ 80, 96, 112, 128 }) |bits| for ([_]bool{ false, true }) |literal| {
+        const mask: u128 = if (bits == 128) std.math.maxInt(u128) else (@as(u128, 1) << @as(u7, @intCast(bits))) - 1;
+        const fixed = values[5] & mask;
+        const constant: i128 = @bitCast(fixed);
+        const operand = if (literal) try std.fmt.allocPrint(std.testing.allocator, "{d}", .{constant}) else try std.testing.allocator.dupe(u8, "%narrow");
+        defer std.testing.allocator.free(operand);
+        const start = if (bits == 128) " %narrow = add i128 %input,0\n" else try std.fmt.allocPrint(std.testing.allocator, " %narrow = trunc i128 %input to i{d}\n", .{bits});
+        defer if (bits != 128) std.testing.allocator.free(start);
+        const finish = if (bits == 128) " %answer = add i128 %swapped,0\n" else try std.fmt.allocPrint(std.testing.allocator, " %answer = zext i{d} %swapped to i128\n", .{bits});
+        defer if (bits != 128) std.testing.allocator.free(finish);
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{d} @llvm.bswap.i{d}(i{d})\ndefine i128 @swap(i128 %input) {{\nentry:\n{s} %swapped = call i{d} @llvm.bswap.i{d}(i{d} {s})\n{s} ret i128 %answer\n}}\n", .{ bits, bits, bits, start, bits, bits, bits, operand, finish });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128) callconv(.c) u128 = @ptrCast(code.ptr);
+        for (values) |input| {
+            const raw = if (literal) fixed else input & mask;
+            var expected: u128 = 0;
+            for (0..bits / 8) |byte| expected = (expected << 8) | ((raw >> @as(u7, @intCast(8 * byte))) & 255);
+            try std.testing.expectEqual(expected, run(input));
+        }
+    };
+}
+
 fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     const function = module.functions.items[0];
     var output = machine.MachineFunction.init(function.name, function.ret_ty);

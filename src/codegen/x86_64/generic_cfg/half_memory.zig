@@ -12,7 +12,7 @@ fn ordinary(attrs: ir.MemoryAttrs, ty_space: ?[]const u8, ptr_space: ?[]const u8
     return !attrs.isBarrier() and attrs.syncscope == null and ty_space == null and ptr_space == null;
 }
 
-fn eligible(function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) bool {
+fn eligible(function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, include_stores: bool) bool {
     const layout = target.DataLayout.parse(if (context) |ctx| ctx.target_datalayout orelse "" else "") catch return false;
     if ((layout.typeStoreSizeBytes(.half) catch return false) != 2 or
         (layout.typeStoreSizeBytes(bits) catch return false) != 2 or
@@ -34,6 +34,7 @@ fn eligible(function: ir.Function, context: ?*const machine.ReadOnlyModuleContex
                 .fp => |text| _ = fp.halfLiteralBits(text) catch return false,
                 else => return false,
             }
+            found = found or include_stores;
         }
     };
     return found;
@@ -46,7 +47,17 @@ fn emit(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlo
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
-    if (!eligible(function, context)) return null;
+    return expand(allocator, function, context, false);
+}
+
+/// The final optional stage tries the existing composed form first, retaining
+/// successful owners and object bytes before opening store-only memory graphs.
+pub fn legalizeOrdinaryStores(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    return expand(allocator, function, context, true);
+}
+
+fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, include_stores: bool) !?ir.Function {
+    if (!eligible(function, context, include_stores)) return null;
     var candidate = Candidate.init(allocator, function);
     var names: forms.TemporaryNames = .{};
     defer names.deinit(allocator);

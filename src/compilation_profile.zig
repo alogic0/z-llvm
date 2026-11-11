@@ -5,6 +5,7 @@ const std = @import("std");
 
 pub const Phase = enum { other, input, parse, air_lowering, verify, optimize, reachability, normalize, legalize, select, object_write, ownership_write };
 const phase_count = @typeInfo(Phase).@"enum".field_names.len;
+const legalizer_stage_count = @typeInfo(@import("codegen/x86_64/generic_cfg/optional_legalization.zig").Stage).@"enum".field_names.len;
 const PhaseRow = struct { phase: []const u8, exclusive_ns: u64 };
 
 pub const Counters = struct {
@@ -74,7 +75,7 @@ pub const Profile = struct {
     active: Phase = .other,
     elapsed: [phase_count]u64 = @splat(0),
     counters: Counters = .{},
-    legalizers: [32]Legalizer = @splat(.{}),
+    legalizers: [legalizer_stage_count]Legalizer = @splat(.{}),
     legalizer_count: usize = 0,
     legalizer_allocations: Allocations = .{},
     functions: std.ArrayList(Function) = .empty,

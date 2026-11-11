@@ -24,6 +24,9 @@ alignment. The private view maps direct allocations, GEPs, stores and loads
 together. Loaded i16 bits are reinterpreted as the original half SSA value.
 Volatile, atomic, synchronization-scope and address-space envelopes remain
 closed. Pointer provenance and access extents retain their existing contracts.
+Store-only graphs use the same view in the final optional stage. That stage
+tries the existing composed form first, retaining successful selection owners
+and object bytes before opening half stores into larger owned objects.
 
 The `half_product` native population covers multiplication, division and
 negation with 41 functions. Independent integer oracles implement exact

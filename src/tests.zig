@@ -1,6 +1,8 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/generic_cfg/extended_math_intrinsics.zig");
+    _ = @import("codegen/x86_64/generic_cfg/scalar_integer_conversions_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/floating_extended80_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/floating_arithmetic_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/stack_object_addresses_tests.zig");

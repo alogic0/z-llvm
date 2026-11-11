@@ -5,6 +5,66 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "floating storage captures store-only half bits in a larger owned object" {
+    const text =
+        \\define i64 @store_only(i16 %raw, ptr %output, i64 %keep) {
+        \\entry:
+        \\ %slab = alloca [32 x i8], align 16
+        \\ %at = getelementptr i8, ptr %slab, i64 3
+        \\ %value = bitcast i16 %raw to half
+        \\ store half %value, ptr %at, align 1
+        \\ %loaded = load i16, ptr %at, align 1
+        \\ store i16 %loaded, ptr %output, align 1
+        \\ %wide = zext i16 %loaded to i64
+        \\ %answer = xor i64 %wide, %keep
+        \\ ret i64 %answer
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var machine = machine_module.MachineFunction.init("store_only", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    const result = try selector.tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+    if (result == .unsupported) std.debug.print("store-only half: {s}\n", .{result.unsupported.detail()});
+    try std.testing.expectEqual(selector.SelectionResult.selected, result);
+    try verify.verifyFunction(machine);
+    try std.testing.expectEqual(ir.Type.half, module.functions.items[0].blocks.items[0].instructions.items[3].kind.store.ty);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const code = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(code);
+    @memcpy(code[0..bytes.len], bytes);
+    const run: *const fn (u16, *u8, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    for (0..65536) |raw| {
+        var guarded: [8]u8 = @splat(0xa7);
+        const keep: u64 = 0xface0123456789ab ^ raw;
+        try std.testing.expectEqual(keep ^ raw, run(@intCast(raw), &guarded[1], keep));
+        try std.testing.expectEqual(@as(u16, @intCast(raw)), std.mem.readInt(u16, guarded[1..3], .little));
+        try std.testing.expectEqual(@as(u8, 0xa7), guarded[0]);
+        for (guarded[3..]) |byte| try std.testing.expectEqual(@as(u8, 0xa7), byte);
+    }
+}
+
+test "floating storage store-only views reject effects and incompatible strides" {
+    const memory = @import("half_memory.zig");
+    for ([_][]const u8{ "store volatile half %value,ptr %output,align 2", "store half %value,ptr addrspace(1) %output,align 2", "store atomic half %value,ptr %output unordered,align 2" }) |store| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define void @closed(half %value,ptr %output) {{\nentry:\n {s}\n ret void\n}}\n", .{store});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try memory.legalizeOrdinaryStores(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+    var module = try ir.Module.parse(std.testing.allocator, "target datalayout = \"e-i16:32\"\ndefine void @closed(half %value,ptr %output) {\nentry:\n store half %value,ptr %output,align 2\n ret void\n}\n");
+    defer module.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const context: machine_module.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+    try std.testing.expect((try memory.legalizeOrdinaryStores(arena.allocator(), module.functions.items[0], &context)) == null);
+}
+
 fn extendHalf(value: f16) callconv(.c) f32 {
     return value;
 }

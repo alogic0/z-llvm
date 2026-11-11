@@ -130,7 +130,18 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     try finish(allocator, &block, inst, wide, value.ty, answer);
                     continue;
                 },
-                .cast => |cast| if (cast.op == .sext and integer(cast.from_ty) and integer(cast.to_ty) and cast.from_ty.int < cast.to_ty.int and operand(cast.value, cast.from_ty.int)) {
+                .cast => |cast| if (cast.op == .trunc and cast.from_ty.eql(.{ .int = 128 }) and cast.to_ty.eql(.{ .int = 52 }) and
+                    (cast.value == .int or (cast.value == .named and !std.mem.startsWith(u8, cast.value.named, "@"))))
+                {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const wide: ir.Type = .{ .int = 64 };
+                    const low = if (cast.value == .int)
+                        try binary(allocator, function, &block, &serial, wide, .add, .{ .int = @as(u64, @truncate(@as(u128, @bitCast(cast.value.int)))) }, .{ .int = 0 })
+                    else
+                        try emit(allocator, function, &block, &serial, .{ .cast = .{ .op = .trunc, .from_ty = cast.from_ty, .value = cast.value, .to_ty = wide } });
+                    try finish(allocator, &block, inst, wide, cast.to_ty, low);
+                    continue;
+                } else if (cast.op == .sext and integer(cast.from_ty) and integer(cast.to_ty) and cast.from_ty.int < cast.to_ty.int and operand(cast.value, cast.from_ty.int)) {
                     try candidate.begin(&block, block_index, instruction_index);
                     const wide: ir.Type = .{ .int = if (cast.to_ty.int <= 32) 32 else 64 };
                     const answer = try signed(allocator, function, &block, &serial, cast.from_ty, wide, cast.value);

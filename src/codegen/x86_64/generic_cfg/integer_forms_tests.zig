@@ -7,6 +7,36 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "integer forms bridge pair truncation to i52 with clean word bits" {
+    for ([_]bool{ false, true }) |literal| {
+        const fixed: u128 = 0xfedcba98765432100123456789abcdef;
+        const operand = if (literal) try std.fmt.allocPrint(std.testing.allocator, "{d}", .{@as(i128, @bitCast(fixed))}) else try std.testing.allocator.dupe(u8, "%input");
+        defer std.testing.allocator.free(operand);
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define i64 @bridge(i128 %input,i64 %seed) {{\nentry:\n %small = trunc i128 {s} to i52\n %wide = zext i52 %small to i64\n %answer = xor i64 %wide,%seed\n ret i64 %answer\n}}\n", .{operand});
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        var output = machine.MachineFunction.init("bridge", .{ .int = 64 });
+        defer output.deinit(std.testing.allocator);
+        const result = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
+        if (result == .unsupported) std.debug.print("pair to i52: {s}\n", .{result.unsupported.detail()});
+        try std.testing.expectEqual(selector.SelectionResult.selected, result);
+        try verify.verifyFunction(output);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, output);
+        defer std.testing.allocator.free(bytes);
+        const code = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(code);
+        @memcpy(code[0..bytes.len], bytes);
+        const run: *const fn (u128, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u128{ 0, 1, 0xfffffffffffff, 0x10000000000000, fixed, std.math.maxInt(u128) }) |raw| {
+            const seed: u64 = @truncate(raw >> 51);
+            const expected: u64 = @as(u64, @truncate(if (literal) fixed else raw)) & 0xfffffffffffff;
+            try std.testing.expectEqual(expected ^ seed, run(raw, seed));
+        }
+    }
+}
+
 test "integer forms zero-extended returns publish clean native carriers" {
     for ([_]u16{ 1, 7, 8, 16, 23, 31 }) |bits| {
         const text = try std.fmt.allocPrint(std.testing.allocator,

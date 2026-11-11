@@ -130,6 +130,10 @@ const Builder = struct {
     }
 };
 
+pub fn materializeIntegerArgument(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, cast: ir.CastInst) !ir.Value {
+    return (Builder{ .allocator = allocator, .function = function, .block = block, .serial = serial }).integerArgument(cast);
+}
+
 fn halfOperandSupported(value: ir.Value) bool {
     return switch (value) {
         .named => !std.mem.startsWith(u8, value.named, "@"),
