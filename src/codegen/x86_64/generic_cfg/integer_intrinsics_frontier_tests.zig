@@ -241,3 +241,29 @@ test "integer frontier rejects unimplemented widths flags and semantic envelopes
         try std.testing.expect(try intrinsics.legalize(arena.allocator(), module.functions.items[0]) == null);
     }
 }
+
+test "integer frontier wide counts and absolute values retain logical width bits" {
+    for ([_]u16{ 65, 80, 113, 127 }) |bits| for ([_][]const u8{ "abs", "ctlz", "cttz", "ctpop" }) |operation| for ([_]bool{ false, true }) |literal| {
+        const mask: u128 = (@as(u128, 1) << @as(u7, @intCast(bits))) - 1;
+        const fixed: u128 = 0xfedcba98765432100123456789abcdef & mask;
+        const input = if (literal) try std.fmt.allocPrint(std.testing.allocator, "{d}", .{fixed}) else try std.testing.allocator.dupe(u8, "%narrow");
+        defer std.testing.allocator.free(input);
+        const flagged = !std.mem.eql(u8, operation, "ctpop");
+        const source = try std.fmt.allocPrint(std.testing.allocator, "declare i{d} @llvm.{s}.i{d}(i{d}{s})\ndefine i128 @calculate(i128 %raw) {{\nentry:\n %narrow = trunc i128 %raw to i{d}\n %result = call i{d} @llvm.{s}.i{d}(i{d} {s}{s})\n %wide = zext i{d} %result to i128\n ret i128 %wide\n}}\n", .{ bits, operation, bits, bits, if (flagged) ",i1" else "", bits, bits, operation, bits, bits, input, if (flagged) ",i1 false" else "", bits });
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        const code = executable(module) catch |err| {
+            std.debug.print("wide intrinsic width={d} operation={s} literal={}\n", .{ bits, operation, literal });
+            return err;
+        };
+        defer std.posix.munmap(code);
+        const run: *const fn (u128) callconv(.c) u128 = @ptrCast(code.ptr);
+        for ([_]u128{ 0, 1, 2, @as(u128, 1) << 64, @as(u128, 1) << @as(u7, @intCast(bits - 1)), fixed, std.math.maxInt(u128) }) |raw| {
+            const value = if (literal) fixed else raw & mask;
+            const expected: u128 = if (std.mem.eql(u8, operation, "abs")) (if (value & (@as(u128, 1) << @as(u7, @intCast(bits - 1))) != 0) (~value +% 1) & mask else value) else if (std.mem.eql(u8, operation, "ctlz")) @as(u128, @clz(value)) - (128 - bits) else if (std.mem.eql(u8, operation, "cttz")) (if (value == 0) bits else @as(u128, @ctz(value))) else @popCount(value);
+            try std.testing.expectEqual(expected, run(raw));
+        }
+    };
+}

@@ -85,6 +85,13 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 }
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    if (call.native_query != null) return lowerNativeQuery(selector, result, call);
+    if (call.abi_x87_return and ir.identifiers.eql(call.callee, "llvm.sqrt.f80")) {
+        if (!call.ret_ty.eql(.{ .int = 128 }) or call.args.items.len != 1 or
+            !call.args.items[0].ty.eql(.{ .int = 128 }) or !call.args.items[0].abi_x87_memory)
+            return .{ .no_emitter = "extended80-sqrt-carrier" };
+        return @import("extended80_arithmetic.zig").lower(selector, result, call.args.items[0].value, null, .sqrt);
+    }
     if (call.isDebugVariableLocation()) return null;
     if (sysv_abi.isVariadicCall(call)) try sysv_abi.rejectUnsupportedCallSignature(call);
     if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
@@ -101,6 +108,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) return try lowerFpAbs(selector, result, call, 64);
+    if (std.mem.eql(u8, call.callee, "llvm.sqrt.f32")) return try selector_fp.lowerSqrt(selector, result, call, 32);
+    if (std.mem.eql(u8, call.callee, "llvm.sqrt.f64")) return try selector_fp.lowerSqrt(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "llvm.maxnum.f32")) return try selector_fp.lowerMaxNum(selector, result, call, 32);
     if (std.mem.eql(u8, call.callee, "llvm.maxnum.f64")) return try selector_fp.lowerMaxNum(selector, result, call, 64);
     if (std.mem.eql(u8, call.callee, "llvm.copysign.f32")) return try selector_fp.lowerCopySignF32(selector, result, call);
@@ -110,7 +119,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) return try selector_vector.lowerFabsV2F32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v4f32")) return try selector_vector.lowerFabsV4F32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f64")) return try selector_vector.lowerFabsV2F64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize")) return try lowerIntByteSizeCall(selector, result, call);
+    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and call.args.items.len != 2) return try lowerIntByteSizeCall(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try lowerAbsI32(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try lowerAbsI64(selector, result, call);
     if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try lowerAbsI128(selector, result, call);
@@ -394,6 +403,37 @@ pub fn lowerUsubSat(selector: *ComposedBlockSelector, result: ?[]const u8, call:
 
 pub const lowerUsubSatI64 = lowerUsubSat;
 
+fn lowerNativeQuery(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    if (!@import("hardware_queries.zig").validCarrier(call)) return .{ .no_emitter = "native-query-carrier" };
+    const name = result orelse return .{ .unsupported_value = "native-query-result" };
+    if (call.native_query.? == .cpuid) {
+        if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+        if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+        try selector_state.clobberArgReg(selector, .rdx);
+        var inputs = try ValueUseTransaction.begin(selector);
+        defer inputs.deinit();
+        _ = try inputs.register(.{ .source = call.args.items[0].value, .expected = .{ .ty = .{ .int = 32 }, .register_class = .gpr32 }, .form = .gpr32, .destination = .eax });
+        _ = try inputs.register(.{ .source = call.args.items[1].value, .expected = .{ .ty = .{ .int = 32 }, .register_class = .gpr32 }, .form = .gpr32, .destination = .{ .gpr32 = .rcx } });
+        try inputs.seal();
+        try inputs.prepare();
+        try inputs.materializeAll();
+        try inputs.commit();
+        try selector_state.emitEflagsInstruction(selector, .cpuid_packed, .clobber);
+        try selector_state.bindFixedProductResult(selector, name);
+    } else {
+        var result_transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer result_transaction.deinit();
+        if (try result_transaction.prepareCallBeforeArguments(.clobber)) |diagnostic| return diagnostic;
+        try selector_state.clobberArgReg(selector, .rcx);
+        try selector_state.clobberArgReg(selector, .rdx);
+        try result_transaction.finishCallPreparationAfterArguments();
+        try selector_state.emitEflagsInstruction(selector, .xgetbv_eax, .clobber);
+        try result_transaction.define(name, .zeroExtending(32));
+        try result_transaction.commit();
+    }
+    return null;
+}
+
 fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     var register_args: std.ArrayList(ir.CallArg) = .empty;
     defer register_args.deinit(selector.allocator);
@@ -444,11 +484,33 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     const stack_count = if (memory_layout) |layout| layout.stack_words else 0;
     var stack_sources: [stack_arguments.max_stack_words]?FrameIndex = @splat(null);
     if (memory_layout) |layout| if (try stageStackArguments(selector, call, layout, &stack_sources)) |diagnostic| return diagnostic;
+    // A vector literal can use XMM0 as an assembly scratch. Capture later
+    // literals before loading earlier ABI operands into that register.
+    const staging_base = selector.next_spill_slot;
+    var staging_snapshot = try selector_state.captureSpillSlots(selector);
+    defer staging_snapshot.deinit(selector.allocator);
+    var staging_pairs: usize = 0;
+    var staged_vectors: [8]?FrameIndex = @splat(null);
+    for (register_call.args.items, plan.assignments.items) |arg, assignment| {
+        if (assignment != .sse or assignment.sse == .xmm0 or !sysv_abi.isVector128AbiType(arg.ty) or arg.value == .named) continue;
+        const name = try selector_state.allocateEdgeLabel(selector);
+        const home = selector_state.allocatePairSpillSlots(selector, name) orelse return .{ .no_spill_envelope = "composed-block-vector-literal-home" };
+        staging_pairs += 1;
+        if (try selector_vector.materializeAbiVector(selector, arg.value, arg.ty, .xmm0)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .spill_xmm128_rsp = .{ .reg = .xmm0, .frame_index = home.lo } });
+        staged_vectors[@backingInt(assignment.sse)] = home.lo;
+    }
+    const staging_end = selector.next_spill_slot;
     for (register_call.args.items, plan.assignments.items) |arg, assignment| switch (assignment) {
         .gpr => |target| if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic,
         .gpr_pair => |first| if (try lowerDirectCallArg(selector, arg, first)) |diagnostic| return diagnostic,
         .sse => |target| {
             if (sysv_abi.isVector128AbiType(arg.ty)) {
+                if (staged_vectors[@backingInt(target)]) |home| {
+                    try selector_state.clobberXmmReg(selector, target);
+                    try selector.machine.instructions.append(selector.allocator, .{ .reload_xmm128_rsp = .{ .reg = target, .frame_index = home } });
+                    continue;
+                }
                 if (try selector_vector.materializeAbiVector(selector, arg.value, arg.ty, target)) |diagnostic| return diagnostic;
                 continue;
             }
@@ -459,6 +521,15 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
         .stack_f32_const, .stack_f32_param, .stack_f64_const, .stack_f64_param => return .{ .unsupported_value = "composed-block-call-stack-fp-arg" },
         .byval_stack_copy, .aggregate_register_passthrough, .aggregate_stack_passthrough => return .{ .no_emitter = "composed-block-call-aggregate-arg" },
     };
+    // Staging homes die once their complete payloads occupy the ABI registers.
+    // Rewind only an allocation suffix containing exactly those private homes;
+    // any durable allocation made by materialization keeps the suffix intact.
+    if (staging_pairs != 0 and staging_end - staging_base == staging_pairs * 2 and
+        selector.next_spill_slot == staging_end)
+    {
+        selector_state.restoreSpillSlots(selector, staging_snapshot);
+        selector.next_spill_slot = staging_base;
+    }
     if (transaction) |*active| try active.finishCallPreparationAfterArguments();
 
     if (stack_count != 0 and selector.stack_frame_bytes == 0) return .{ .no_spill_envelope = "composed-block-mixed-x87-frame" };
@@ -790,7 +861,7 @@ fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.C
     // Use the same validated advisory facts as ordinary pointer calls. The
     // byte loop does not need the promises, and never widens the memory access.
     if ((if (dst.attrs) |attrs| !sysv_abi.pointerCallAttrsAreAdvisory(attrs) else false) or
-        fill.attrs != null or len.attrs != null or vol.attrs != null)
+        !integerAdvisoryAttributes(fill) or !integerAdvisoryAttributes(len) or vol.attrs != null)
         return .{ .no_emitter = "composed-block-memset-attrs" };
     // Undef permits any concrete byte; select zero. Poison and all memory/ABI
     // envelope restrictions retain their existing fail-closed behavior.

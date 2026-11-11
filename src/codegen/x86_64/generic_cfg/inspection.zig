@@ -161,6 +161,9 @@ fn valueIsHalfZeroLiteral(value: ir.Value) bool {
 }
 
 fn inspectBinary(binary: ir.BinaryInst) ?Diagnostic {
+    if (binary.abi_x87_operands) return if (binary.ty.eql(.{ .int = 128 }) and
+        valueIsNamed(binary.lhs) and valueIsNamed(binary.rhs) and
+        (binary.op == .fadd or binary.op == .fsub or binary.op == .fmul or binary.op == .fdiv)) null else .{ .unsupported_type = "extended80-arithmetic-carrier" };
     if (isPackedFp2(binary.ty) or isPackedF32x4(binary.ty)) return switch (binary.op) {
         .fadd, .fsub, .fmul => null,
         else => .{ .unsupported_instruction = @tagName(binary.op) },
@@ -323,6 +326,7 @@ fn inspectSelect(select: ir.SelectInst) ?Diagnostic {
 }
 
 fn inspectCall(call: ir.CallInst) ?Diagnostic {
+    if (call.native_query != null) return if (@import("hardware_queries.zig").validCarrier(call)) null else .{ .unsupported_instruction = "native-query-carrier" };
     if (call.inline_asm) |inline_asm| {
         if (@import("../inline_asm.zig").classify(call) != null) return null;
         const stack_memory_barrier = inline_asm.sideeffect and inline_asm.template.len == 0 and

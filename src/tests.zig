@@ -1,6 +1,10 @@
 const std = @import("std");
 
 comptime {
+    _ = @import("codegen/x86_64/generic_cfg/half_classification.zig");
+    _ = @import("codegen/x86_64/generic_cfg/floating_remainders.zig");
+    _ = @import("codegen/x86_64/generic_cfg/extended80_arithmetic.zig");
+    _ = @import("codegen/x86_64/generic_cfg/half_math_intrinsics.zig");
     _ = @import("codegen/x86_64/generic_cfg/extended_math_intrinsics.zig");
     _ = @import("codegen/x86_64/generic_cfg/scalar_integer_conversions_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/floating_extended80_tests.zig");
@@ -106,4 +110,5 @@ comptime {
     _ = @import("tests/global_dependencies.zig");
     _ = @import("tests/adce_operands.zig");
     _ = @import("tests/verifier_allocation.zig");
+    _ = @import("codegen/x86_64/generic_cfg/hardware_queries_tests.zig");
 }

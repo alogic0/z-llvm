@@ -45,6 +45,7 @@ pub const InsertValueInst = core.InsertValueInst;
 pub const CallArg = core.CallArg;
 pub const InlineAsm = core.InlineAsm;
 pub const CallInst = core.CallInst;
+pub const NativeQuery = core.NativeQuery;
 pub const Instruction = core.Instruction;
 pub const SwitchCase = core.SwitchCase;
 pub const SwitchTerminator = core.SwitchTerminator;

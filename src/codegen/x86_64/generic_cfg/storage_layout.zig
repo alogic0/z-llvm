@@ -10,7 +10,10 @@ const pairs = @import("word_pair_memory.zig");
 const Fields = @import("../../../ir/structure.zig").Fields;
 
 pub const Layout = struct { bytes: u32, alignment: u32 };
-pub const max_bytes: u32 = @import("selector_types.zig").max_stack_object_bytes;
+// Larger source objects still enter the existing large-frame address authority,
+// which checks their complete extent against the allocated frame. Its separate
+// legacy small-object threshold must not grow along with this layout envelope.
+pub const max_bytes: u32 = 4 * 1024 * 1024;
 
 /// Exact field displacement, with the same complete-layout admission as frame
 /// storage and pointer strides. Resolve names only from the current module.

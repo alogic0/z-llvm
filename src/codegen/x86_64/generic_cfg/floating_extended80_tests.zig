@@ -501,7 +501,7 @@ test "extended80 payload views preserve sources and reject unsupported effects a
     try std.testing.expectEqual(ir.Type.x86_fp80, source.blocks.items[3].instructions.items[0].kind.phi.ty);
     for ([_][]const u8{
         "define void @boundary(ptr %p) {\nentry:\n %x = load volatile x86_fp80, ptr %p\n store x86_fp80 %x, ptr %p\n ret void\n}\n",
-        "define void @boundary(ptr %p) {\nentry:\n %x = load x86_fp80, ptr %p\n %r = fadd x86_fp80 %x, %x\n store x86_fp80 %r, ptr %p\n ret void\n}\n",
+        "define void @boundary(ptr %p) {\nentry:\n %x = load x86_fp80, ptr %p\n %r = frem x86_fp80 %x, %x\n store x86_fp80 %r, ptr %p\n ret void\n}\n",
         "define void @boundary(ptr %p, ptr %callee) {\nentry:\n %x = load x86_fp80, ptr %p\n %r = call x86_fp80 %callee(x86_fp80 %x)\n store x86_fp80 %r, ptr %p\n ret void\n}\n",
         "declare x86_fp80 @callee(x86_fp80)\ndefine x86_fp80 @boundary(x86_fp80 %x) {\nentry:\n %r = musttail call x86_fp80 @callee(x86_fp80 %x)\n ret x86_fp80 %r\n}\n",
     }) |text| {

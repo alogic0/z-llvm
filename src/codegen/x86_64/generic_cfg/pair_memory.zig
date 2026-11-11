@@ -187,6 +187,43 @@ fn supported(access: anytype) bool {
         !access.attrs.isBarrier() and access.attrs.syncscope == null;
 }
 
+/// Last-resort scalar memory transport after the existing symbolic and stack
+/// owners decline the function. Keep the source access width and all access
+/// attributes while interpreting its captured bits through an integer load.
+pub fn legalizeScalarPointers(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    if (!addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null)) return null;
+    var candidate = Candidate.init(allocator, function);
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
+    for (function.blocks.items, 0..) |original, block_index| {
+        var block = original;
+        block.instructions = .empty;
+        const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
+        for (original.instructions.items, 0..) |inst, instruction_index| {
+            const access = switch (inst.kind) {
+                .load => |load| if (inst.result != null) load else null,
+                else => null,
+            };
+            if (!inst.removed) if (access) |load| {
+                if ((load.ty == .float or load.ty == .double) and load.ty_addrspace == null and
+                    load.ptr_addrspace == null and !load.attrs.isBarrier() and load.attrs.syncscope == null)
+                {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    // Load metadata describes floating values and must not be
+                    // attached to the private integer interpretation.
+                    var copy = inst;
+                    copy.metadata = null;
+                    try b.floatScalar(copy);
+                    continue;
+                }
+            };
+            try candidate.keep(&block, inst);
+        }
+        try candidate.finishBlock(block);
+    }
+    return candidate.finish();
+}
+
 fn finalStackRead(function: ir.Function, block: ir.BasicBlock, index: usize, ptr: ir.Value) bool {
     if (ptr != .named or block.terminator == null or block.terminator.? != .ret) return false;
     var local_slot = false;

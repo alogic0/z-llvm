@@ -25,7 +25,7 @@ fn parameter(param: ir.Param) bool {
 
 fn callForm(call: ir.CallInst) bool {
     if (std.mem.startsWith(u8, call.callee, "llvm.") or
-        std.mem.eql(u8, call.callee, "zig.target.intByteSize") or
+        (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and call.args.items.len != 2) or
         call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or
         call.callee_function_ty != null or !helpers.isDefaultOrFastcc(call.calling_conv)) return false;
     if (call.callee_value) |callee| if (callee != .named or callee.named.len == 0 or callee.named[0] == '@') return false;

@@ -20,6 +20,7 @@ fn payloadType(ty: ir.Type) ?ir.Type {
         .ptr => .ptr,
         .half, .float => .{ .int = 32 },
         .double => .{ .int = 64 },
+        .vector => if (ty.vector.len == 2 and ty.vector.elem_ty == .double) ty else null,
         else => null,
     };
 }
@@ -51,7 +52,15 @@ const Builder = struct {
     }
     fn storeValue(b: Builder, slot: Slot, original: ir.Value) !ir.Value {
         if (original == .undef or original == .poison or original == .zero_initializer)
-            return if (slot.payload_ty == .ptr) .null_value else .{ .int = 0 };
+            return if (slot.payload_ty == .ptr) .null_value else if (slot.payload_ty == .vector) .zero_initializer else .{ .int = 0 };
+        // Native packed payload stores capture the complete SSA value before
+        // the edge. They do not alias or reread the source slot after a write.
+        if (slot.payload_ty == .vector) return original;
+        if (slot.source_ty == .int and original == .int) {
+            const semantics = @import("../../../analysis/integer_semantics.zig").Integer.init(slot.source_ty).?;
+            const carrier = @import("../../../analysis/integer_semantics.zig").Integer.init(slot.payload_ty).?;
+            return .{ .int = carrier.normalize(@bitCast(semantics.unsigned(original.int))) };
+        }
         var value = original;
         if (fpBits(slot.source_ty)) |bits| {
             const integer: ir.Type = .{ .int = bits };
@@ -98,13 +107,23 @@ const Builder = struct {
 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    return legalizeImpl(allocator, function, false);
+}
+
+/// Final fallback for otherwise unsupported scalar/packed PHI transports. The
+/// same owned slots and eager parallel snapshots also cover direct edges.
+pub fn legalizeAll(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    return legalizeImpl(allocator, function, true);
+}
+
+fn legalizeImpl(allocator: std.mem.Allocator, function: ir.Function, comptime all: bool) !?ir.Function {
     var indirect = false;
     var any_phi = false;
     for (function.blocks.items) |block| {
         any_phi = any_phi or hasPhi(block);
         if (block.terminator) |term| indirect = indirect or term == .indirectbr;
     }
-    if (!indirect or !any_phi or function.blocks.items.len == 0) return null;
+    if ((!all and !indirect) or !any_phi or function.blocks.items.len == 0) return null;
     var graph = cfg.Graph.build(allocator, function) catch |err| {
         if (err == error.UnknownBlock or err == error.DuplicateBlock) return null;
         return err;
@@ -114,6 +133,12 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
     defer allocator.free(targets);
     @memset(targets, false);
     var count: usize = 0;
+    if (all) for (function.blocks.items, 0..) |block, index| {
+        if (hasPhi(block)) {
+            targets[index] = true;
+            count += 1;
+        }
+    };
     for (function.blocks.items, 0..) |block, index| if (block.terminator) |term| {
         if (term != .indirectbr) continue;
         for (graph.successors(index)) |target| if (!targets[target] and hasPhi(function.blocks.items[target])) {
@@ -179,7 +204,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
         if (block_index == 0) for (slots.items) |slot| {
-            const bytes: u16 = if (slot.payload_ty == .ptr) 8 else slot.payload_ty.int / 8;
+            const bytes: u16 = if (slot.payload_ty == .ptr) 8 else if (slot.payload_ty == .vector) 16 else slot.payload_ty.int / 8;
             const words = (bytes + 3) / 4;
             try block.instructions.append(allocator, .{ .result = slot.storage, .kind = .{ .alloca = .{
                 .allocated_ty = .{ .aggregate = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{words}) },

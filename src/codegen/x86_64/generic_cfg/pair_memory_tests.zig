@@ -2,6 +2,41 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const forms = @import("pair_memory.zig");
 
+test "scalar pointer fallback preserves widths metadata boundaries and source" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\@table = external global [8 x i8]
+        \\define double @f(i64 %index) {
+        \\entry:
+        \\ %p = getelementptr [8 x i8], ptr @table, i64 %index
+        \\ %v = load double, ptr %p, align 1
+        \\ ret double %v
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const original = module.functions.items[0];
+    try std.testing.expect((try forms.legalize(arena.allocator(), original, null)) == null);
+    const expanded = (try forms.legalizeScalarPointers(arena.allocator(), original, null)).?;
+    try std.testing.expectEqual(ir.Type.double, original.blocks.items[0].instructions.items[1].kind.load.ty);
+    const load = expanded.blocks.items[0].instructions.items[1].kind.load;
+    try std.testing.expectEqual(ir.Type{ .int = 64 }, load.ty);
+    try std.testing.expectEqual(@as(u64, 1), load.attrs.@"align".?);
+    try std.testing.expect((try forms.legalizeScalarPointers(arena.allocator(), expanded, null)) == null);
+    for ([_][]const u8{
+        "load volatile double, ptr %p, align 8",
+        "load atomic double, ptr %p seq_cst, align 8",
+        "load double, ptr addrspace(1) %p, align 8",
+    }) |access| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define double @closed(ptr %p) {{\nentry:\n %v = {s}\n ret double %v\n}}\n", .{access});
+        defer std.testing.allocator.free(source);
+        var closed = try ir.Module.parse(std.testing.allocator, source);
+        defer closed.deinit();
+        try std.testing.expect((try forms.legalizeScalarPointers(arena.allocator(), closed.functions.items[0], null)) == null);
+    }
+}
+
 test "pair memory expansion preserves access extent alignment and source IR" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\define i128 @copy(ptr %in, ptr %out) {

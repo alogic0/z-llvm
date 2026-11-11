@@ -36,6 +36,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .push_arg => |reg| try writer.print("\tpushq {s}\n", .{reg.name64()}),
             .pop_arg => |reg| try writer.print("\tpopq {s}\n", .{reg.name64()}),
             .push_rax => try writer.writeAll("\tpushq %rax\n"),
+            .cpuid_packed => try writer.writeAll("\tpushq %rbx\n\tcpuid\n\tshlq $32, %rbx\n\torq %rbx, %rax\n\tshlq $32, %rdx\n\torq %rcx, %rdx\n\tpopq %rbx\n"),
+            .xgetbv_eax => try writer.writeAll("\txorl %ecx, %ecx\n\txgetbv\n"),
             .linux_syscall => |count| {
                 if (count > 6) return error.UnsupportedCodegenInstruction;
                 if (count >= 4) try writer.writeAll("\tmovq %rcx, %r10\n");
@@ -1432,6 +1434,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .cvttsd2si_xmm0_eax => try writer.writeAll("\tcvttsd2si %xmm0, %eax\n"),
             .cvtsd2ss_xmm0_xmm0 => try writer.writeAll("\tcvtsd2ss %xmm0, %xmm0\n"),
             .cvtss2sd_xmm0_xmm0 => try writer.writeAll("\tcvtss2sd %xmm0, %xmm0\n"),
+            .sqrtss_xmm0 => try writer.writeAll("\tsqrtss %xmm0, %xmm0\n"),
+            .sqrtsd_xmm0 => try writer.writeAll("\tsqrtsd %xmm0, %xmm0\n"),
             .cvtsd2ss_xmm => |cvt| try writer.print("\tcvtsd2ss {s}, {s}\n", .{ cvt.src.name(), cvt.dst.name() }),
             .cvtss2sd_xmm => |cvt| try writer.print("\tcvtss2sd {s}, {s}\n", .{ cvt.src.name(), cvt.dst.name() }),
             .mov_edi_edi => try writer.writeAll("\tmovl %edi, %edi\n"),
@@ -1451,6 +1455,13 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .fneg_x86_fp80_stack8_st0 => try writer.writeAll("\tfldt 8(%rsp)\n\tfchs\n"),
             .i80_rax_rdx_st0 => try writer.writeAll("\tpushq %rdx\n\tpushq %rax\n\tfldt (%rsp)\n\taddq $16, %rsp\n"),
             .x87_st0_i80_rax_rdx => try writer.writeAll("\tpushq $0\n\tpushq $0\n\tfstpt (%rsp)\n\tpopq %rax\n\tpopq %rdx\n"),
+            .x87_binary_pop => |op| try writer.print("\t{s} %st, %st(1)\n", .{switch (op) {
+                .add => "faddp",
+                .sub => "fsubrp",
+                .mul => "fmulp",
+                .div => "fdivrp",
+            }}),
+            .x87_sqrt_st0 => try writer.writeAll("\tfsqrt\n"),
             .fneg_fp128_xmm0 => try writer.writeAll("\tmovabsq $0x8000000000000000, %rax\n\tmovq %rax, %xmm1\n\tpslldq $8, %xmm1\n\txorps %xmm1, %xmm0\n"),
             .addsd_xmm1_xmm0 => try writer.writeAll("\taddsd %xmm1, %xmm0\n"),
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),

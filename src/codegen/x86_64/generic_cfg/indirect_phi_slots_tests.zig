@@ -18,6 +18,23 @@ const loop_source =
     \\}
 ;
 
+test "owned PHI fallback preserves direct loop snapshots and original control flow" {
+    const source = try std.mem.replaceOwned(u8, std.testing.allocator, loop_source, "indirectbr ptr %address, [label %loop, label %exit]", "br i1 %again, label %loop, label %exit");
+    defer std.testing.allocator.free(source);
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0])) == null);
+    const rewritten = (try forms.legalizeAll(arena.allocator(), module.functions.items[0])).?;
+    try verifyPrivate(arena.allocator(), module, rewritten);
+    try std.testing.expectEqual(module.functions.items[0].blocks.items.len, rewritten.blocks.items.len);
+    for (rewritten.blocks.items) |block| for (block.instructions.items) |inst| if (!inst.removed) try std.testing.expect(inst.kind != .phi);
+    try std.testing.expect((try forms.legalizeAll(arena.allocator(), rewritten)) == null);
+    try module.verify();
+}
+
 fn verifyPrivate(allocator: std.mem.Allocator, source: ir.Module, function: ir.Function) !void {
     var private = source;
     private.functions = try source.functions.clone(allocator);
@@ -61,7 +78,7 @@ test "indirect PHI slots preserve original targets source ownership and parallel
 }
 
 test "indirect PHI slots use native carriers and restore every scalar source type" {
-    for ([_][]const u8{ "i1", "i2", "i8", "i16", "i24", "i32", "i40", "i56", "i64", "i65", "i96", "i128", "ptr", "half", "float", "double" }) |ty| {
+    for ([_][]const u8{ "i1", "i2", "i8", "i16", "i24", "i32", "i40", "i56", "i64", "i65", "i96", "i128", "ptr", "half", "float", "double", "<2 x double>" }) |ty| {
         const text = try std.fmt.allocPrint(
             std.testing.allocator,
             "define {s} @carrier(ptr %address, {s} %input) {{\nentry:\n indirectbr ptr %address, [label %target]\ntarget:\n %value = phi {s} [ %input, %entry ]\n ret {s} %value\n}}\n",
@@ -80,7 +97,8 @@ test "indirect PHI slots use native carriers and restore every scalar source typ
         try std.testing.expectEqual(original.params.items.ptr, rewritten.params.items.ptr);
         for (rewritten.blocks.items) |block| for (block.instructions.items) |inst| if (inst.kind == .load or inst.kind == .store) {
             const memory_ty = if (inst.kind == .load) inst.kind.load.ty else inst.kind.store.ty;
-            try std.testing.expect(memory_ty == .ptr or (memory_ty == .int and (memory_ty.int == 32 or memory_ty.int == 64 or memory_ty.int == 128)));
+            try std.testing.expect(memory_ty == .ptr or (memory_ty == .int and (memory_ty.int == 32 or memory_ty.int == 64 or memory_ty.int == 128)) or
+                memory_ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .double } }));
         };
         try std.testing.expect((try forms.legalize(arena.allocator(), rewritten)) == null);
         try module.verify();

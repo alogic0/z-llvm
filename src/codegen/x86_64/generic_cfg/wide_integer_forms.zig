@@ -53,9 +53,12 @@ fn touches(mode: Mode, inst: *const ir.Instruction) bool {
     return found;
 }
 fn callForm(mode: Mode, call: ir.CallInst) bool {
+    const native_x87_sqrt = mode == .physical_abi and call.abi_x87_return and
+        ir.identifiers.eql(call.callee, "llvm.sqrt.f80") and call.ret_ty.eql(.{ .int = 80 }) and
+        call.args.items.len == 1 and call.args.items[0].ty.eql(.{ .int = 80 }) and call.args.items[0].abi_x87_memory;
     if (!helpers.isDefaultOrFastcc(call.calling_conv) or call.inline_asm != null or
         call.raw_args != null or call.operand_bundle != null or call.callee_function_ty != null or
-        std.mem.startsWith(u8, call.callee, "llvm.")) return false;
+        (std.mem.startsWith(u8, call.callee, "llvm.") and !native_x87_sqrt)) return false;
     if (wide(mode, call.ret_ty) and !advisory(mode, call.ret_ty, call.ret_attrs)) return false;
     if (mode == .legacy_registers and wide(mode, call.ret_ty) and call.ret_attrs != null) return false;
     sysv.rejectUnsupportedCallEnvelope(call) catch return false;

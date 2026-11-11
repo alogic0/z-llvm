@@ -58,6 +58,8 @@ fn advisory(attrs: ?[]const u8) bool {
 }
 
 fn callForm(call: ir.CallInst) bool {
+    if (ir.identifiers.eql(call.callee, "llvm.sqrt.f80"))
+        return @import("extended_math_intrinsics.zig").ordinaryOperation(call, .x86_fp80, 80, true) != null;
     if (!helpers.isDefaultOrFastcc(call.calling_conv) or call.callee_value != null or
         call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or
         call.operand_bundle != null or std.mem.startsWith(u8, call.callee, "llvm.")) return false;
@@ -96,6 +98,11 @@ fn touches(inst: ir.Instruction) bool {
 
 fn eligible(function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) bool {
     if (!helpers.isDefaultOrFastcc(function.calling_conv)) return false;
+    if (function.ret_ty == .x86_fp80 and function.blocks.items.len == 1) {
+        const block = function.blocks.items[0];
+        if (block.terminator) |term| if (term == .ret and
+            (@import("../air_patterns_fp.zig").matchesExtendedNegReturn(function, block, term.ret, .x86_fp80) catch return false)) return false;
+    }
     var found = function.ret_ty == .x86_fp80;
     if (found) if (function.ret_attrs) |attrs| if (!std.mem.eql(u8, std.mem.trim(u8, attrs, " \t"), "noundef")) return false;
     for (function.params.items) |param| if (param.ty == .x86_fp80) {
@@ -119,6 +126,12 @@ fn eligible(function: ir.Function, context: ?*const machine.ReadOnlyModuleContex
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed) continue;
         switch (inst.kind) {
+            .binary => |binary| if (binary.ty == .x86_fp80) {
+                if (binary.op != .fadd and binary.op != .fsub and binary.op != .fmul and binary.op != .fdiv) return false;
+                _ = value(binary.lhs) catch return false;
+                _ = value(binary.rhs) catch return false;
+                found = true;
+            },
             .alloca => |a| {
                 if (a.allocated_ty == .x86_fp80) found = true;
             },
@@ -192,6 +205,18 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.kind == .binary and inst.kind.binary.ty == .x86_fp80) {
+                try candidate.begin(&block, block_index, instruction_index);
+                const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
+                var copy = inst;
+                copy.kind.binary.ty = home;
+                copy.kind.binary.abi_x87_operands = true;
+                copy.kind.binary.lhs = try b.returnValue(inst.kind.binary.lhs);
+                copy.kind.binary.rhs = try b.returnValue(inst.kind.binary.rhs);
+                copy.metadata = null;
+                try block.instructions.append(allocator, copy);
+                continue;
+            }
             if (!inst.removed and inst.kind == .fcmp and inst.kind.fcmp.operand_ty == .x86_fp80) {
                 try candidate.begin(&block, block_index, instruction_index);
                 const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
@@ -242,10 +267,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     changed = true;
                 },
                 .call => |call| if (touches(inst)) {
+                    const native_sqrt = ir.identifiers.eql(call.callee, "llvm.sqrt.f80");
+                    if (native_sqrt) try candidate.begin(&block, block_index, instruction_index);
+                    const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
                     copy.kind.call.args = try call.args.clone(allocator);
                     for (copy.kind.call.args.items) |*arg| if (arg.ty == .x86_fp80) {
                         arg.ty = carrier;
-                        arg.value = try value(arg.value);
+                        arg.value = if (native_sqrt) try b.returnValue(arg.value) else try value(arg.value);
                         arg.abi_x87_memory = true;
                     };
                     if (call.ret_ty == .x86_fp80) {

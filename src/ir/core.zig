@@ -501,6 +501,9 @@ pub const FunctionDecl = struct {
 };
 
 pub const BinaryInst = struct {
+    /// Private selector view: low80 bits of i128 operands use x87 arithmetic.
+    /// The parser never constructs this physical representation marker.
+    abi_x87_operands: bool = false,
     op: BinaryOp,
     flags: BinaryFlags = .{},
     fp_flags: FastMathFlags = .{},
@@ -780,7 +783,11 @@ pub const InlineAsm = struct {
     may_store: bool = false,
 };
 
+pub const NativeQuery = enum { cpuid, xgetbv };
+
 pub const CallInst = struct {
+    /// Private exact instruction contract; the parser never creates this flag.
+    native_query: ?NativeQuery = null,
     ret_ty: Type,
     // Private integer payload view; the physical result still occupies ST0.
     abi_x87_return: bool = false,
@@ -795,6 +802,19 @@ pub const CallInst = struct {
     operand_bundle: ?[]const u8 = null,
     raw_args: ?[]const u8 = null,
     args: std.ArrayList(CallArg),
+
+    pub fn nativeQuerySignatureSupported(call: CallInst) bool {
+        const query = call.native_query orelse return false;
+        if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+            call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or call.attrs != null or
+            call.raw_args != null or call.operand_bundle != null or call.abi_x87_return) return false;
+        if (query == .xgetbv) return std.mem.eql(u8, call.callee, "__zllvm_native_xgetbv") and
+            call.ret_ty.eql(.{ .int = 32 }) and call.args.items.len == 0;
+        if (!std.mem.eql(u8, call.callee, "__zllvm_native_cpuid") or !call.ret_ty.eql(.{ .int = 128 }) or call.args.items.len != 2) return false;
+        for (call.args.items) |arg| if (!arg.ty.eql(.{ .int = 32 }) or arg.attrs != null or arg.abi_x87_memory or arg.abi_split_integer or
+            (arg.value != .int and arg.value != .named)) return false;
+        return true;
+    }
 
     pub fn deinit(call: *CallInst, allocator: std.mem.Allocator) void {
         call.args.deinit(allocator);

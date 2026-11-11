@@ -19,6 +19,11 @@ pub const Instruction = union(enum) {
     // Reads all GPRs, writes 17 words through RDI (DWARF register order),
     // and defines RAX with the captured instruction pointer.
     register_snapshot_rdi,
+    /// EAX/ECX inputs; packed EAX:EBX in RAX and ECX:EDX in RDX.
+    /// Preserves RBX and RSP; the packing operations clobber flags.
+    cpuid_packed,
+    /// Query XCR0; EAX result, ECX/EDX clobbered, net stack change zero.
+    xgetbv_eax,
     mov_imm_eax: i32,
     mov_imm_rax: i64,
     mov_imm_rdi: i64,
@@ -503,6 +508,10 @@ pub const Instruction = union(enum) {
     /// Pop ST0 into a zero-padded private16-byte temporary, then RAX/RDX.
     /// Net RSP delta0; upper48 RDX bits are zero; flags are preserved.
     x87_st0_i80_rax_rdx,
+    x87_binary_pop: enum { add, sub, mul, div },
+    x87_sqrt_st0,
+    sqrtss_xmm0,
+    sqrtsd_xmm0,
     fneg_fp128_xmm0,
     sub_rsp_8,
     add_rsp_8,

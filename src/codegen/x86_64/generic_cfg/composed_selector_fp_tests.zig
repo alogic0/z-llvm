@@ -1417,10 +1417,10 @@ test "generic cfg selector keeps scalar minnum fail closed" {
 
 test "generic cfg selector rejects unknown llvm intrinsics before direct calls" {
     const input =
-        \\declare double @llvm.sqrt.f64(double)
+        \\declare double @llvm.canonicalize.f64(double)
         \\define double @bad(double %value) {
         \\entry:
-        \\  %result = call double @llvm.sqrt.f64(double %value)
+        \\  %result = call double @llvm.canonicalize.f64(double %value)
         \\  ret double %result
         \\}
         \\

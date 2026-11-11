@@ -41,6 +41,14 @@ pub const Stage = enum {
     @"scalar_vector_select.zig.legalize",
     @"scalar_integer_conversions.zig.legalize",
     @"extended_math_intrinsics.zig.legalize",
+    @"half_math_intrinsics.zig.legalize",
+    @"floating_remainders.zig.legalize",
+    @"half_classification.zig.legalize",
+    @"integer_call_literals.zig.legalize",
+    @"pair_memory.zig.legalizeScalarPointers",
+    @"indirect_phi_slots.zig.legalizeAll",
+    @"stack_addresses.zig.legalizeEscapingOffsets",
+    @"hardware_queries.zig.legalize",
 };
 
 pub const Rewrite = struct {
@@ -81,7 +89,7 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
         .@"pair_memory.zig.legalize" => @import("pair_memory.zig").legalize(measured, function, context),
         .@"wide_integer_forms.zig.legalizeForPhysicalAbi" => @import("wide_integer_forms.zig").legalizeForPhysicalAbi(measured, function),
         .@"flag_pair_values.zig.legalize" => @import("flag_pair_values.zig").legalize(measured, function),
-        .@"overflow_values.zig.legalize" => @import("overflow_values.zig").legalize(measured, function),
+        .@"overflow_values.zig.legalize" => @import("overflow_values.zig").legalizeWithContext(measured, function, context),
         .@"comparison_forms.zig.legalize" => @import("comparison_forms.zig").legalize(measured, function, context),
         .@"word_arithmetic.zig.legalize" => @import("word_arithmetic.zig").legalize(measured, function),
         .@"integer_forms.zig.legalize" => @import("integer_forms.zig").legalize(measured, function),
@@ -108,6 +116,14 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
         .@"scalar_vector_select.zig.legalize" => @import("scalar_vector_select.zig").legalize(measured, function),
         .@"scalar_integer_conversions.zig.legalize" => @import("scalar_integer_conversions.zig").legalize(measured, function),
         .@"extended_math_intrinsics.zig.legalize" => @import("extended_math_intrinsics.zig").legalize(measured, function, context),
+        .@"half_math_intrinsics.zig.legalize" => @import("half_math_intrinsics.zig").legalize(measured, function),
+        .@"floating_remainders.zig.legalize" => @import("floating_remainders.zig").legalize(measured, function, context),
+        .@"half_classification.zig.legalize" => @import("half_classification.zig").legalize(measured, function),
+        .@"integer_call_literals.zig.legalize" => @import("integer_call_literals.zig").legalize(measured, function),
+        .@"pair_memory.zig.legalizeScalarPointers" => @import("pair_memory.zig").legalizeScalarPointers(measured, function, context),
+        .@"indirect_phi_slots.zig.legalizeAll" => @import("indirect_phi_slots.zig").legalizeAll(measured, function),
+        .@"stack_addresses.zig.legalizeEscapingOffsets" => @import("stack_addresses.zig").legalizeEscapingOffsets(measured, function, context),
+        .@"hardware_queries.zig.legalize" => @import("hardware_queries.zig").legalize(measured, function, context),
     };
     attempt.outcome = if (candidate != null) .rewritten else .unchanged;
     return if (candidate) |rewritten| .{
@@ -126,6 +142,14 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
             .@"scalar_vector_select.zig.legalize",
             .@"scalar_integer_conversions.zig.legalize",
             .@"extended_math_intrinsics.zig.legalize",
+            .@"half_math_intrinsics.zig.legalize",
+            .@"floating_remainders.zig.legalize",
+            .@"half_classification.zig.legalize",
+            .@"integer_call_literals.zig.legalize",
+            .@"pair_memory.zig.legalizeScalarPointers",
+            .@"indirect_phi_slots.zig.legalizeAll",
+            .@"stack_addresses.zig.legalizeEscapingOffsets",
+            .@"hardware_queries.zig.legalize",
             => true,
             else => false,
         },

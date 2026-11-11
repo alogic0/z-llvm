@@ -1001,6 +1001,11 @@ fn isGlobalValueName(name: []const u8) bool {
 }
 
 fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, block_index: usize, instruction_index: usize) !void {
+    if (call.native_query != null) {
+        if (!call.nativeQuerySignatureSupported()) return error.InvalidNativeQuery;
+        for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
+        return;
+    }
     if (call.calling_conv) |calling_conv| {
         if (!core.isSupportedCallingConvention(calling_conv)) return error.UnsupportedCallingConvention;
     }

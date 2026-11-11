@@ -16,7 +16,8 @@ pub fn operation(call: ir.CallInst) ?Operation {
     inline for (std.meta.tags(Operation)) |op| {
         const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
         if (std.mem.eql(u8, call.callee, name)) {
-            if (bits > 64 and op != .bswap and !(bits == 128 and op == .ctlz)) return null;
+            if (bits > 64 and op != .bswap and !(bits == 128 and op == .ctlz) and
+                !(bits < 128 and (op == .abs or op == .ctlz or op == .ctpop or op == .cttz))) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
             if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl) @as(usize, 3) else @as(usize, 1))) return null;
@@ -25,7 +26,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
                 if (!arg.ty.eql(expected) or (arg.value != .named and arg.value != .int)) return null;
                 if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
                 if (arg.value == .int and expected.int < 128 and (arg.value.int < -(@as(i128, 1) << @as(u7, @intCast(expected.int - 1))) or
-                    arg.value.int >= (@as(i128, 1) << @as(u7, @intCast(expected.int))))) return null;
+                    (arg.value.int >= 0 and @as(u128, @intCast(arg.value.int)) >= (@as(u128, 1) << @as(u7, @intCast(expected.int)))))) return null;
                 if (flag and index == 1 and (arg.value != .int or (arg.value.int != 0 and arg.value.int != 1))) return null;
             }
             // Keep existing native instruction paths. The general expansion
@@ -64,7 +65,7 @@ const Builder = struct {
     }
 
     fn widen(b: Builder, bits: u16, value: ir.Value) !ir.Value {
-        if (value == .int) return b.binary(.add, .{ .int = value.int & ((@as(i128, 1) << @as(u7, @intCast(bits))) - 1) }, .{ .int = 0 });
+        if (value == .int) return b.binary(.add, .{ .int = value.int & @as(i128, @intCast((@as(u128, 1) << @as(u7, @intCast(bits))) - 1)) }, .{ .int = 0 });
         if (bits == b.wide.int) return value;
         return b.emit(.{ .cast = .{ .op = .zext, .from_ty = .{ .int = bits }, .value = value, .to_ty = b.wide } });
     }
@@ -89,6 +90,36 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
     const call = inst.kind.call;
     const bits = call.ret_ty.int;
     const b: Builder = .{ .allocator = allocator, .function = function, .block = block, .serial = serial, .wide = .{ .int = if (op == .ctpop or bits >= 32) 64 else 32 } };
+    if (bits > 64 and bits < 128 and op != .bswap) {
+        const pair: ir.Type = .{ .int = 128 };
+        const word: ir.Type = .{ .int = 64 };
+        var p = b;
+        p.wide = pair;
+        const input = if (call.args.items[0].value == .int)
+            try @import("binary128_arithmetic.zig").materializeIntegerArgument(allocator, function, block, serial, .{ .op = .uitofp, .from_ty = pair, .value = .{ .int = call.args.items[0].value.int & @as(i128, @intCast((@as(u128, 1) << @as(u7, @intCast(bits))) - 1)) }, .to_ty = .fp128 })
+        else
+            try p.widen(bits, call.args.items[0].value);
+        const answer = switch (op) {
+            .abs => blk: {
+                const sign = try p.binary(.ashr, try p.binary(.shl, input, .{ .int = 128 - bits }), .{ .int = 127 });
+                break :blk try p.binary(.sub, try p.binary(.xor, input, sign), sign);
+            },
+            .ctlz => try p.binary(.sub, try p.call(.ctlz, input, true), .{ .int = 128 - bits }),
+            .ctpop => try p.call(.ctpop, input, false),
+            .cttz => blk: {
+                const low = try p.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = input, .to_ty = word } });
+                const high = try p.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = try p.binary(.lshr, input, .{ .int = 64 }), .to_ty = word } });
+                const low_count = try b.call(.cttz, low, true);
+                const high_count = try b.binary(.add, try b.call(.cttz, high, true), .{ .int = 64 });
+                const count = try b.select(try b.compare(.eq, low, .{ .int = 0 }), high_count, low_count);
+                const wide = try p.emit(.{ .cast = .{ .op = .zext, .from_ty = word, .value = count, .to_ty = pair } });
+                break :blk try p.select(try p.compare(.eq, input, .{ .int = 0 }), .{ .int = bits }, wide);
+            },
+            else => unreachable,
+        };
+        try block.instructions.append(allocator, .{ .result = inst.result, .kind = .{ .cast = .{ .op = .trunc, .from_ty = pair, .value = answer, .to_ty = call.ret_ty } } });
+        return;
+    }
     if (op == .abs and (bits == 32 or bits == 64)) {
         // A fixed result for INT_MIN refines the true-flag poison case. Keep
         // the existing native abs path; do not mutate borrowed argument lists.

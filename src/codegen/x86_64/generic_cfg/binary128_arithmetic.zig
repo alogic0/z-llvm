@@ -134,6 +134,10 @@ pub fn materializeIntegerArgument(allocator: std.mem.Allocator, function: ir.Fun
     return (Builder{ .allocator = allocator, .function = function, .block = block, .serial = serial }).integerArgument(cast);
 }
 
+pub fn materializeHalfArgument(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, value: ir.Value) !ir.Value {
+    return (Builder{ .allocator = allocator, .function = function, .block = block, .serial = serial }).halfOperand(value);
+}
+
 fn halfOperandSupported(value: ir.Value) bool {
     return switch (value) {
         .named => !std.mem.startsWith(u8, value.named, "@"),
@@ -281,7 +285,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 continue;
             }
             if (!inst.removed and inst.result != null and inst.kind == .binary and inst.kind.binary.ty == .half and
-                (inst.kind.binary.op == .fmul or inst.kind.binary.op == .fdiv) and
+                (inst.kind.binary.op == .fmul or inst.kind.binary.op == .fdiv or inst.kind.binary.op == .fsub) and
                 halfOperandSupported(inst.kind.binary.lhs) and halfOperandSupported(inst.kind.binary.rhs))
             {
                 try candidate.begin(&block, block_index, instruction_index);
@@ -294,6 +298,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 // contributes at most1/16384 half ULP. Thus double rounding
                 // cannot cross a half midpoint. All finite nonzero quotients
                 // lie within binary32's normal exponent range.
+                // Half subtraction uses LLVM's binary32 promotion too. Nearby
+                // operands cancel exactly; distant operands cannot straddle a
+                // half midpoint through the intermediate binary32 rounding.
                 const product = try b.emit(.{ .binary = .{
                     .op = inst.kind.binary.op,
                     .ty = .float,

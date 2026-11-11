@@ -8,12 +8,42 @@ const planning = @import("stage2_planning.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+fn productHelper(a: u128, b: u128) callconv(.c) u128 {
+    return a *% b;
+}
+fn quotientHelper(a: u128, b: u128) callconv(.c) u128 {
+    return a / b;
+}
+
 fn executable(function: machine.MachineFunction) ![]align(std.heap.page_size_min) u8 {
     try verify.verifyFunction(function);
     const bytes = try encoding.encodeFunction(std.testing.allocator, function);
     defer std.testing.allocator.free(bytes);
-    const code = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    const providers = [_]struct { name: []const u8, address: usize }{
+        .{ .name = "__multi3", .address = @intFromPtr(&productHelper) },
+        .{ .name = "__udivti3", .address = @intFromPtr(&quotientHelper) },
+    };
+    const code = try std.posix.mmap(null, bytes.len + 12 * providers.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    errdefer std.posix.munmap(code);
     @memcpy(code[0..bytes.len], bytes);
+    for (providers, 0..) |provider, index| {
+        const stub = code[bytes.len + 12 * index ..][0..12];
+        stub[0] = 0x48;
+        stub[1] = 0xb8;
+        std.mem.writeInt(u64, stub[2..10], provider.address, .little);
+        stub[10] = 0xff;
+        stub[11] = 0xe0;
+    }
+    var offset: usize = 0;
+    for (function.instructions.items) |instruction| {
+        if (instruction == .direct_call) {
+            const index = for (providers, 0..) |provider, index| {
+                if (std.mem.eql(u8, provider.name, instruction.direct_call.symbol)) break index;
+            } else return error.UnexpectedProductHelper;
+            std.mem.writeInt(i32, code[offset + 1 ..][0..4], @intCast(bytes.len + 12 * index - offset - 5), .little);
+        }
+        offset += encoding.instructionSize(instruction);
+    }
     return code;
 }
 
@@ -160,4 +190,28 @@ test "checked multiply late rejection rolls back speculative emission and labels
         try std.testing.expectEqual(machine.SelectionOwner.unassigned, output.selection_owner);
         try std.testing.expectEqualStrings("original-name", output.name);
     }
+}
+
+test "integer boundary unsigned pair multiply retains low words and every overflow carry" {
+    const text = "declare { i128, i1 } @llvm.umul.with.overflow.i128(i128,i128)\ndefine i128 @multiply(i128 %a,i128 %b,ptr %flag) {\nentry:\n %pair = call { i128, i1 } @llvm.umul.with.overflow.i128(i128 %a,i128 %b)\n %value = extractvalue { i128, i1 } %pair,0\n %overflow = extractvalue { i128, i1 } %pair,1\n %byte = zext i1 %overflow to i8\n store i8 %byte,ptr %flag,align 1\n ret i128 %value\n}\n";
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var output = machine.MachineFunction.init("multiply", .{ .int = 128 });
+    defer output.deinit(std.testing.allocator);
+    const selected = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
+    if (selected == .unsupported) std.debug.print("unsigned128: {s}\n", .{selected.unsupported.detail()});
+    try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+    const code = try executable(output);
+    defer std.posix.munmap(code);
+    const run: *const fn (u128, u128, *u8) callconv(.c) u128 = @ptrCast(code.ptr);
+    const values = [_]u128{ 0, 1, 2, 0xffffffffffffffff, @as(u128, 1) << 64, (@as(u128, 1) << 64) + 1, @as(u128, 1) << 127, std.math.maxInt(u128) - 1, std.math.maxInt(u128) };
+    for (values) |a| for (values) |b| {
+        var guarded: [8]u8 = @splat(0xa7);
+        const expected = @mulWithOverflow(a, b);
+        try std.testing.expectEqual(expected[0], run(a, b, &guarded[1]));
+        try std.testing.expectEqual(@as(u8, expected[1]), guarded[1]);
+        try std.testing.expectEqual(@as(u8, 0xa7), guarded[0]);
+        for (guarded[2..]) |byte| try std.testing.expectEqual(@as(u8, 0xa7), byte);
+    };
 }

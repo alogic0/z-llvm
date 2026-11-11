@@ -517,7 +517,7 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
         .load => |load| selector_memory.lowerLoad(selector, instruction.result, load) catch |err| return instructionValueError(selector, err, "stage2-load-value"),
         .atomicrmw => |rmw| selector_atomic.lowerRmw(selector, instruction.result, rmw) catch |err| return instructionValueError(selector, err, "stage2-atomic-rmw-value"),
         .cmpxchg => |cmp| selector_atomic.lowerCmpxchg(selector, instruction.result, cmp) catch |err| return instructionValueError(selector, err, "stage2-atomic-cmpxchg-value"),
-        .store => |store| selector_memory.lowerStore(selector, store) catch |err| return instructionValueError(selector, err, "stage2-store-value"),
+        .store => lowerObservedStore(selector, instruction),
         .gep => |gep| selector_memory.lowerGep(selector, instruction.result, gep) catch |err| return instructionValueError(selector, err, "stage2-gep-value"),
         .call => |call| lowerObservedCall(selector, instruction.result, call) catch |err| return instructionValueError(selector, err, "stage2-call-value"),
         .extractvalue => |extract| selector_calls.lowerExtractValue(selector, instruction.result, extract) catch |err| return instructionValueError(selector, err, "stage2-extractvalue-value"),
@@ -536,6 +536,13 @@ pub fn lowerInstruction(selector: *ComposedBlockSelector, instruction: ir.Instru
 fn lowerObservedCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
     const diagnostic = try selector_calls.lowerCall(selector, result, call);
     if (diagnostic) |failure| try selector_state.observeRejectedCall(selector, result, call, failure);
+    return diagnostic;
+}
+
+fn lowerObservedStore(selector: *ComposedBlockSelector, instruction: ir.Instruction) !?Diagnostic {
+    const diagnostic = try (selector_memory.lowerStore(selector, instruction.kind.store) catch |err|
+        instructionValueError(selector, err, "stage2-store-value"));
+    if (diagnostic) |failure| try selector_state.observeRejectedInstruction(selector, instruction, failure);
     return diagnostic;
 }
 

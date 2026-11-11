@@ -2867,6 +2867,250 @@
       ],
       "observations": 217088,
       "stdout": "extended-math observations=217088 libm=llvm=payloads=errno=x87=live=guards=preserved\n"
+    },
+    {
+      "population": "half_math",
+      "prefix": "half-math",
+      "fixture": "half_math",
+      "functions": [
+        "half_math_trunc",
+        "half_math_round",
+        "half_math_ceil",
+        "half_math_floor",
+        "half_math_log10",
+        "half_math_log2",
+        "half_math_log",
+        "half_math_exp2",
+        "half_math_exp",
+        "half_math_tan",
+        "half_math_cos",
+        "half_math_sin",
+        "half_math_sqrt",
+        "half_math_fma"
+      ],
+      "libraries": [
+        "m"
+      ],
+      "observations": 917504,
+      "stdout": "half-math observations=917504 exhaustive=promotion=fma=rounding=errno=live=guards=preserved\n"
+    },
+    {
+      "population": "scalar_sqrt",
+      "prefix": "scalar-sqrt",
+      "fixture": "scalar_sqrt",
+      "functions": [
+        "scalar_sqrt_32_sqrt",
+        "scalar_sqrt_64_sqrt"
+      ],
+      "libraries": [
+        "m"
+      ],
+      "observations": 8192,
+      "stdout": "scalar-sqrt observations=8192 native=llvm=payloads=errno=x87=live=guards=preserved\n"
+    },
+    {
+      "population": "extended80_arithmetic",
+      "prefix": "extended80-arithmetic",
+      "fixture": "extended80_arithmetic",
+      "functions": [
+        "extended80_arithmetic_add_0",
+        "extended80_arithmetic_add_1",
+        "extended80_arithmetic_add_2",
+        "extended80_arithmetic_sub_0",
+        "extended80_arithmetic_sub_1",
+        "extended80_arithmetic_sub_2",
+        "extended80_arithmetic_mul_0",
+        "extended80_arithmetic_mul_1",
+        "extended80_arithmetic_mul_2",
+        "extended80_arithmetic_div_0",
+        "extended80_arithmetic_div_1",
+        "extended80_arithmetic_div_2",
+        "extended80_arithmetic_sqrt_0",
+        "extended80_arithmetic_sqrt_1",
+        "extended80_arithmetic_sqrt_2"
+      ],
+      "libraries": [
+        "m"
+      ],
+      "observations": 61440,
+      "stdout": "extended80-arithmetic observations=61440 native=llvm=literal=payloads=errno=x87=live=guards=preserved\n"
+    },
+    {
+      "population": "floating_remainder",
+      "prefix": "floating-remainder",
+      "fixture": "floating_remainder",
+      "functions": [
+        "floating_remainder_0_0",
+        "floating_remainder_0_1",
+        "floating_remainder_0_2",
+        "floating_remainder_1_0",
+        "floating_remainder_1_1",
+        "floating_remainder_1_2",
+        "floating_remainder_2_0",
+        "floating_remainder_2_1",
+        "floating_remainder_2_2",
+        "floating_remainder_3_0",
+        "floating_remainder_3_1",
+        "floating_remainder_3_2",
+        "floating_remainder_4_0",
+        "floating_remainder_4_1",
+        "floating_remainder_4_2",
+        "floating_remainder_5_0",
+        "floating_remainder_5_1",
+        "floating_remainder_5_2"
+      ],
+      "libraries": [
+        "m"
+      ],
+      "observations": 442368,
+      "stdout": "floating-remainder observations=442368 libm=llvm=half-sub=literal=payloads=errno=x87=live=guards=preserved\n"
+    },
+    {
+      "population": "integer_boundaries",
+      "prefix": "integer-boundaries",
+      "fixture": "integer_boundaries",
+      "functions": [
+        "integer_boundaries_umul",
+        "integer_boundaries_smul",
+        "integer_boundaries_target",
+        "integer_boundaries_memset",
+        "integer_boundaries_memset_constant"
+      ],
+      "observations": 40960,
+      "stdout": "integer-boundaries observations=40960 product=overflow=target=range=live=guards=preserved\n"
+    },
+    {
+      "population": "half_classification",
+      "prefix": "half-classification",
+      "fixture": "half_classification",
+      "functions": [
+        "half_classification_0",
+        "half_classification_1",
+        "half_classification_2",
+        "half_classification_4",
+        "half_classification_8",
+        "half_classification_16",
+        "half_classification_32",
+        "half_classification_64",
+        "half_classification_128",
+        "half_classification_256",
+        "half_classification_512",
+        "half_classification_3",
+        "half_classification_1020",
+        "half_classification_448",
+        "half_classification_60",
+        "half_classification_1023"
+      ],
+      "observations": 1048576,
+      "stdout": "half-classification observations=1048576 exhaustive=classes=masks=live=guards=preserved\n"
+    },
+    {
+      "population": "vector_counts",
+      "prefix": "vector-counts",
+      "fixture": "vector_counts",
+      "functions": [
+        "vector_counts_range",
+        "vector_counts_mask",
+        "vector_counts_min",
+        "vector_counts_shuffle"
+      ],
+      "observations": 32768,
+      "stdout": "vector-counts observations=32768 range=popcount=masks=reduction=shuffle=live=guards=preserved\n"
+    },
+    {
+      "population": "wide_values",
+      "prefix": "wide-values",
+      "fixture": "wide_values",
+      "functions": [
+        "wide_values_65_abs_0",
+        "wide_values_65_abs_1",
+        "wide_values_65_ctlz_0",
+        "wide_values_65_ctlz_1",
+        "wide_values_65_cttz_0",
+        "wide_values_65_cttz_1",
+        "wide_values_65_ctpop_0",
+        "wide_values_65_ctpop_1",
+        "wide_values_80_abs_0",
+        "wide_values_80_abs_1",
+        "wide_values_80_ctlz_0",
+        "wide_values_80_ctlz_1",
+        "wide_values_80_cttz_0",
+        "wide_values_80_cttz_1",
+        "wide_values_80_ctpop_0",
+        "wide_values_80_ctpop_1",
+        "wide_values_113_abs_0",
+        "wide_values_113_abs_1",
+        "wide_values_113_ctlz_0",
+        "wide_values_113_ctlz_1",
+        "wide_values_113_cttz_0",
+        "wide_values_113_cttz_1",
+        "wide_values_113_ctpop_0",
+        "wide_values_113_ctpop_1",
+        "wide_values_127_abs_0",
+        "wide_values_127_abs_1",
+        "wide_values_127_ctlz_0",
+        "wide_values_127_ctlz_1",
+        "wide_values_127_cttz_0",
+        "wide_values_127_cttz_1",
+        "wide_values_127_ctpop_0",
+        "wide_values_127_ctpop_1",
+        "wide_values_call_0",
+        "wide_values_call_1",
+        "wide_values_call_2"
+      ],
+      "observations": 286720,
+      "stdout": "wide-values observations=286720 widths=counts=abs=literals=call=live=guards=preserved\n"
+    },
+    {
+      "population": "storage_boundaries",
+      "prefix": "storage-boundaries",
+      "fixture": "storage_boundaries",
+      "functions": [
+        "storage_boundaries_fp32_0",
+        "storage_boundaries_fp32_1",
+        "storage_boundaries_fp64_0",
+        "storage_boundaries_fp64_1",
+        "storage_boundaries_object131072",
+        "storage_boundaries_object2300000",
+        "storage_boundaries_object4194304"
+      ],
+      "observations": 57344,
+      "stdout": "storage-boundaries observations=57344 tables=merged=payloads=objects=pages=guards=live=preserved\n"
+    },
+    {
+      "population": "vector_transport",
+      "prefix": "vector-transport",
+      "fixture": "vector_transport",
+      "functions": [
+        "vector_transport_wide80_body",
+        "vector_transport_wide80",
+        "vector_transport_wide113_body",
+        "vector_transport_wide113",
+        "vector_transport_wide127_body",
+        "vector_transport_wide127",
+        "vector_transport_gep0",
+        "vector_transport_gep1",
+        "vector_transport_phi0",
+        "vector_transport_phi1",
+        "vector_transport_literal_chain",
+        "vector_transport_stack_sentinel"
+      ],
+      "observations": 73728,
+      "stdout": "vector-transport observations=73728 wide=gep=phi=payloads=staging=guards=live=preserved\n"
+    },
+    {
+      "population": "hardware_queries",
+      "prefix": "hardware-queries",
+      "fixture": "hardware_queries",
+      "functions": [
+        "hardware_queries_named",
+        "hardware_queries_leaf0",
+        "hardware_queries_leaf7",
+        "hardware_queries_xcr0",
+        "hardware_queries_delayed"
+      ],
+      "observations": 40960,
+      "stdout": "hardware-queries observations=40960 cpuid=xcr0=live=rbx=stack=guards=preserved\n"
     }
   ]
 }

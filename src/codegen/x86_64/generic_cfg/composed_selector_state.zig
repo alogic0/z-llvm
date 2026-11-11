@@ -130,6 +130,11 @@ pub fn observeRejectedInstruction(selector: *const ComposedBlockSelector, instru
             arguments[0] = .{ .ty = cast.from_ty, .value = cast.value };
             break :count 1;
         },
+        .store => |store| count: {
+            arguments[0] = .{ .ty = store.ty, .value = store.value };
+            arguments[1] = .{ .ty = .ptr, .value = store.ptr };
+            break :count 2;
+        },
         else => return,
     };
     var operands: [2]@import("rejection_observer.zig").Operand = undefined;

@@ -8,10 +8,70 @@ const helpers = @import("composed_helpers.zig");
 const forms = @import("scalar_forms.zig");
 const selector_types = @import("selector_types.zig");
 
+/// A constant GEP may form a loop sentinel outside an object's extent without
+/// accessing it. Materialize the owned base first, using the established
+/// pointer/integer bridge, then retain the original pointer arithmetic.
+pub fn legalizeEscapingOffsets(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    const Candidate = @import("rewrite_candidate.zig").Candidate;
+    var allocations = std.HashMap([]const u8, u32, ir.identifiers.Context, std.hash_map.default_max_load_percentage).init(allocator);
+    defer allocations.deinit();
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.result == null or inst.kind != .alloca or
+            !inst.kind.alloca.isSingleObject() or inst.kind.alloca.allocated_ty_addrspace != null) continue;
+        const layout = slotLayout(context, inst.kind.alloca.allocated_ty) orelse continue;
+        if (layout.bytes != 8) continue;
+        try allocations.put(inst.result.?, layout.bytes);
+    };
+    if (allocations.count() == 0) return null;
+    var candidate = Candidate.init(allocator, function);
+    var serial: forms.TemporaryNames = .{ .prefix = "__zllvm_frame_offset_" };
+    defer serial.deinit(allocator);
+    for (function.blocks.items, 0..) |original, block_index| {
+        var block = original;
+        block.instructions = .empty;
+        for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.kind == .gep) {
+                const gep = inst.kind.gep;
+                if (gep.source_ty.eql(.{ .int = 8 }) and gep.ptr_addrspace == null and gep.ptr == .named and
+                    gep.indices.items.len == 1 and gep.indices.items[0].ty.eql(.{ .int = 64 }) and gep.indices.items[0].value == .int)
+                {
+                    const offset = gep.indices.items[0].value.int;
+                    if (allocations.get(gep.ptr.named)) |bytes| if ((offset < 0 or offset > bytes) and std.math.cast(i32, offset) != null) {
+                        try candidate.begin(&block, block_index, instruction_index);
+                        const address_name = try forms.temporary(allocator, function, &serial);
+                        const bits_name = try forms.temporary(allocator, function, &serial);
+                        const pointer_name = try forms.temporary(allocator, function, &serial);
+                        var indices: std.ArrayList(ir.GepIndex) = .empty;
+                        try indices.append(allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+                        try block.instructions.appendSlice(allocator, &.{
+                            .{ .result = address_name, .kind = .{ .gep = .{ .source_ty = .{ .int = 8 }, .ptr = gep.ptr, .indices = indices } } },
+                            .{ .result = bits_name, .kind = .{ .cast = .{ .op = .ptrtoint, .from_ty = .ptr, .value = .{ .named = address_name }, .to_ty = .{ .int = 64 } } } },
+                            .{ .result = pointer_name, .kind = .{ .cast = .{ .op = .inttoptr, .from_ty = .{ .int = 64 }, .value = .{ .named = bits_name }, .to_ty = .ptr } } },
+                        });
+                        var copy = inst;
+                        copy.kind.gep.ptr = .{ .named = pointer_name };
+                        try block.instructions.append(allocator, copy);
+                        continue;
+                    };
+                }
+            }
+            try candidate.keep(&block, inst);
+        }
+        try candidate.finishBlock(block);
+    }
+    return candidate.finish();
+}
+
 // Native i32 array carriers already have exact frame ownership. Permit their
 // scalar address views up to the total frame bound, without broadening the
 // general aggregate layout contract. Non-native i32 layouts remain closed.
 fn slotLayout(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) ?storage.Layout {
+    // The general layout envelope can include non-native i32 allocation
+    // widths. This concrete carrier always owns four bytes per element.
+    if (helpers.parseI32ArrayType(ty) != null) {
+        const word = storage.query(context, .{ .int = 32 }) orelse return null;
+        if (word.bytes != 4 or word.alignment != 4) return null;
+    }
     if (storage.query(context, ty)) |layout| return layout;
     const count = helpers.parseI32ArrayType(ty) orelse return null;
     const word = storage.query(context, .{ .int = 32 }) orelse return null;

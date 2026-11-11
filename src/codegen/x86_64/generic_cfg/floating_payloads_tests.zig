@@ -302,3 +302,57 @@ test "floating payload does not reinterpret arithmetic conversions barriers or m
         try std.testing.expect((try payloads.legalize(arena.allocator(), module.functions.items[0], null)) == null);
     }
 }
+
+fn quadLiteralProbe(a: f128, b: f128) callconv(.c) f128 {
+    return @bitCast(@as(u128, @bitCast(a)) ^ @as(u128, @bitCast(b)));
+}
+
+test "floating payload later literal call arguments preserve the first XMM operand" {
+    for ([_]usize{ 1, 97 }) |call_count| {
+        var source_writer: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        defer source_writer.deinit();
+        try source_writer.writer.writeAll("declare fp128 @quad_probe(fp128,fp128)\ndefine void @probe(ptr %input,ptr %output) {\nentry:\n %a = load fp128,ptr %input,align 1\n");
+        for (0..call_count) |index| {
+            if (index == 0) {
+                try source_writer.writer.writeAll(" %r0 = call fp128 @quad_probe(fp128 %a,fp128 0xL00000000000000004000400000000000)\n");
+            } else try source_writer.writer.print(" %r{d} = call fp128 @quad_probe(fp128 %r{d},fp128 0xL00000000000000004000400000000000)\n", .{ index, index - 1 });
+        }
+        try source_writer.writer.print(" store fp128 %r{d},ptr %output,align 1\n ret void\n}}\n", .{call_count - 1});
+        const source = source_writer.written();
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        try module.verify();
+        var output = machine.MachineFunction.init("probe", .void);
+        defer output.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]));
+        try verify.verifyFunction(output);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, output);
+        defer std.testing.allocator.free(bytes);
+        const code = try std.posix.mmap(null, bytes.len + 12, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(code);
+        @memcpy(code[0..bytes.len], bytes);
+        const stub = code[bytes.len..][0..12];
+        stub[0] = 0x48;
+        stub[1] = 0xb8;
+        std.mem.writeInt(u64, stub[2..10], @intFromPtr(&quadLiteralProbe), .little);
+        stub[10] = 0xff;
+        stub[11] = 0xe0;
+        var offset: usize = 0;
+        for (output.instructions.items) |instruction| {
+            if (instruction == .direct_call) {
+                try std.testing.expectEqualStrings("quad_probe", instruction.direct_call.symbol);
+                const displacement: i32 = @intCast(bytes.len - (offset + 5));
+                std.mem.writeInt(i32, code[offset + 1 ..][0..4], displacement, .little);
+            }
+            offset += encoding.instructionSize(instruction);
+        }
+        const run: *const fn (*const u128, *u8) callconv(.c) void = @ptrCast(code.ptr);
+        for (payload_cases) |raw| {
+            var guarded: [24]u8 = @splat(0xa7);
+            run(&raw, &guarded[1]);
+            try std.testing.expectEqual(raw ^ (@as(u128, 0x4000400000000000) << 64), std.mem.readInt(u128, guarded[1..17], .little));
+            try std.testing.expectEqual(@as(u8, 0xa7), guarded[0]);
+            for (guarded[17..]) |byte| try std.testing.expectEqual(@as(u8, 0xa7), byte);
+        }
+    }
+}

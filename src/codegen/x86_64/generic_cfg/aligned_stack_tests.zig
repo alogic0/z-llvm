@@ -26,7 +26,7 @@ test "aligned stack expansion preserves source and verifies bounded private stor
 test "aligned stack expansion leaves dynamic huge and address space objects closed" {
     for ([_][]const u8{
         "alloca [4 x i8], align 8192",
-        "alloca [65536 x i8], align 32",
+        "alloca [4194304 x i8], align 32",
         "alloca [4 x i8], i64 %count, align 32",
         "alloca [4 x i8], align 32, addrspace(1)",
     }) |alloca| {

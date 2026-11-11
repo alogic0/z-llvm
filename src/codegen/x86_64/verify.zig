@@ -12,7 +12,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             for (jump.targets) |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget;
         },
         .linux_syscall => |count| if (count > 6) return error.UnsupportedCodegenInstruction,
-        .register_snapshot_rdi => {},
+        .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax => {},
         .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
         .push_byval_tail_arg_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
         .push_byval_tail_stack_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
@@ -310,6 +310,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .cvttsd2si_xmm0_eax,
         .cvtsd2ss_xmm0_xmm0,
         .cvtss2sd_xmm0_xmm0,
+        .sqrtss_xmm0,
+        .sqrtsd_xmm0,
         .cvtsd2ss_xmm,
         .cvtss2sd_xmm,
         .mov_edi_edi,
@@ -329,6 +331,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .fneg_x86_fp80_stack8_st0,
         .i80_rax_rdx_st0,
         .x87_st0_i80_rax_rdx,
+        .x87_binary_pop,
+        .x87_sqrt_st0,
         .fneg_fp128_xmm0,
         .sub_rsp_8,
         .add_rsp_8,
@@ -500,7 +504,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         switch (instruction) {
             .i80_rax_rdx_st0 => {},
             .x87_st0_i80_rax_rdx => eax_defined = true,
-            .linux_syscall, .register_snapshot_rdi => eax_defined = true,
+            .x87_binary_pop, .x87_sqrt_st0 => {},
+            .linux_syscall, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax => eax_defined = true,
             .indirect_jump => saw_terminator = true,
             .label => |label| {
                 eax_defined_before_label = eax_defined;
@@ -540,7 +545,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 eax_defined = true;
                 xmm0_defined = true;
             },
-            .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .binary_arg_rax, .sbb_arg64_rax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .shr_eax_imm5, .sar_eax_imm5, .shr_eax_cl, .sar_eax_cl, .fshl_eax_arg32_imm5, .or_eax_imm32, .imul_eax_arg32, .imul_eax_imm32, .imul_rax_arg64, .imul_rax_rsp, .mul_rax_arg64_full, .imul_rax_arg64_full, .and_eax_imm32, .abs_i32_edi_eax, .abs_i64_rdi_rax, .clz_i128_rdi_rsi_eax, .clz_i64_rdi_eax, .clz_i32_edi_eax, .ctz_i32_edi_eax, .popcount_i32_edi_eax, .bit_reverse_i32_edi_eax, .ushl_sat_i32_edi_imm_eax, .bswap_eax, .bswap_rax, .rol_ax_imm8, .shr_rax_imm6, .shl_rax_imm6, .or_rdx_rax, .neg_rax, .neg_i128_rdi_rsi_rdx_rax, .abs_limb64_rdi_rsi_dx_rcx_rax, .ctz_i128_rdi_rsi_eax, .ctz_i64_rdi_eax, .ffs_i128_rdi_rsi_eax, .ffs_i64_rdi_eax, .ffs_i32_edi_eax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .bcmp_rdi_rsi_rdx_eax, .memcmp_rdi_rsi_rdx_eax, .memcpy_rdi_rsi_rdx_rax, .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax, .cmpxchg_ptr_expected_desired_i8_eax, .cmpxchg_ptr_expected_desired_i16_eax, .cmpxchg_ptr_expected_desired_i32_eax, .cmpxchg_ptr_expected_desired_i64_eax, .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax, .xchg_ptr_value_i8_eax, .xchg_ptr_value_i16_eax, .xchg_ptr_value_i32_eax, .xchg_ptr_value_i64_rax, .atomic_xchg_rdi_disp8_rax, .spinlocked_xchg_i128_rdi_rsi_rdx_rax, .spinlocked_load_i128_rdi_rax_rdx, .spinlocked_fetch_umin_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_nand_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_xor_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_or_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_and_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_sub_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_add_i128_rdi_rsi_rdx_rax_rdx, .memmove_rdi_rsi_rdx_rax, .guarded_memset_rdi_sil_rdx_rcx_rax, .guarded_memcpy_rdi_rsi_rdx_rcx_rax, .guarded_strncat_rdi_rsi_rdx_rcx_rax, .guarded_strcat_rdi_rsi_rdx_rax, .guarded_strncpy_rdi_rsi_rdx_rcx_rax, .guarded_strcpy_rdi_rsi_rdx_rax, .memset_rdi_sil_rdx_rax, .strlen_rdi_rax, .strnlen_rdi_rsi_rax, .atomic_try_lock_rdi_al, .load_rdi_ptr_u8_eax, .load_rdi_ptr_u16_eax, .load_rdi_ptr_eax, .load_rdi_ptr_rax, .atomic_fetch_umin_i8_rdi_sil_eax, .atomic_fetch_umin_i16_rdi_si_eax, .atomic_fetch_umin_i32_rdi_esi_eax, .atomic_fetch_umin_i64_rdi_rsi_rax, .atomic_fetch_umax_i8_rdi_sil_eax, .atomic_fetch_umax_i16_rdi_si_eax, .atomic_fetch_umax_i32_rdi_esi_eax, .atomic_fetch_umax_i64_rdi_rsi_rax, .atomic_fetch_nand_i8_rdi_sil_eax, .atomic_fetch_nand_i16_rdi_si_eax, .atomic_fetch_nand_i32_rdi_esi_eax, .atomic_fetch_nand_i64_rdi_rsi_rax, .atomic_fetch_xor_i8_rdi_sil_eax, .atomic_fetch_xor_i16_rdi_si_eax, .atomic_fetch_xor_i32_rdi_esi_eax, .atomic_fetch_xor_i64_rdi_rsi_rax, .atomic_fetch_or_i8_rdi_sil_eax, .atomic_fetch_or_i16_rdi_si_eax, .atomic_fetch_or_i32_rdi_esi_eax, .atomic_fetch_or_i64_rdi_rsi_rax, .atomic_fetch_and_i8_rdi_sil_eax, .atomic_fetch_and_i16_rdi_si_eax, .atomic_fetch_and_i32_rdi_esi_eax, .atomic_fetch_and_i64_rdi_rsi_rax, .atomic_fetch_sub_i8_rdi_sil_eax, .atomic_fetch_sub_i16_rdi_si_eax, .atomic_fetch_sub_i32_rdi_esi_eax, .atomic_fetch_sub_i64_rdi_rsi_rax, .atomic_fetch_add_i8_rdi_sil_eax, .atomic_fetch_add_i16_rdi_si_eax, .atomic_fetch_add_i32_rdi_esi_eax, .atomic_fetch_add_i64_rdi_rsi_rax, .load_rcx_ptr_u8_eax, .load_rcx_ptr_u16_eax, .load_rcx_ptr_eax, .load_rcx_ptr_rax, .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .ult_i8_dil_imm8_al, .cmp_ult_u32_edi_esi_al, .ascii_range_u8_dil_imm8_imm8_al, .range_u32_edi_imm32_imm32_al, .ascii_alphabetic_dil_al, .ascii_alphanumeric_dil_al, .ascii_whitespace_dil_al, .ascii_control_dil_al, .grow_capacity_u64_rdi_imm32_rax, .xor_eax_imm32, .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .load_stack_disp8_eax, .load_stack_disp32_eax, .load_stack_rcx4_disp8_eax, .load_stack_rcx4_disp32_eax, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_stack_disp8_u8_eax, .load_stack_disp32_u8_eax, .load_stack_disp8_u16_eax, .load_stack_disp32_u16_eax, .load_rax_ptr_disp8_rax, .load_rax_ptr_disp32_rax, .load_rax_ptr_disp8_u8_eax, .load_rax_ptr_disp8_u16_eax, .load_rax_ptr_disp8_eax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp32_rax, .load_arg_ptr_disp8_eax, .load_arg_ptr_disp8_u8_eax, .load_arg_ptr_disp8_u16_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .lea_global_offset_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .mulss_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .xorps_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .unpcklps_xmm, .shufps_high_f32_to_low, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al, .fneg_x86_fp80_stack8_st0, .fneg_fp128_xmm0 => eax_defined = true,
+            .mov_imm_eax, .mov_imm_rax, .mov_arg_rax, .movq_xmm_rax, .mov_arg_eax, .binary_arg_eax, .binary_arg_rax, .sbb_arg64_rax, .add_arg64_rax, .add_arg_high32_eax, .add_stack_disp8_eax, .add_stack_disp8_rax, .add_stack_disp32_eax, .add_stack_disp32_rax, .add_eax_imm32, .shl_eax_imm5, .shr_eax_imm5, .sar_eax_imm5, .shr_eax_cl, .sar_eax_cl, .fshl_eax_arg32_imm5, .or_eax_imm32, .imul_eax_arg32, .imul_eax_imm32, .imul_rax_arg64, .imul_rax_rsp, .mul_rax_arg64_full, .imul_rax_arg64_full, .and_eax_imm32, .abs_i32_edi_eax, .abs_i64_rdi_rax, .clz_i128_rdi_rsi_eax, .clz_i64_rdi_eax, .clz_i32_edi_eax, .ctz_i32_edi_eax, .popcount_i32_edi_eax, .bit_reverse_i32_edi_eax, .ushl_sat_i32_edi_imm_eax, .bswap_eax, .bswap_rax, .rol_ax_imm8, .shr_rax_imm6, .shl_rax_imm6, .or_rdx_rax, .neg_rax, .neg_i128_rdi_rsi_rdx_rax, .abs_limb64_rdi_rsi_dx_rcx_rax, .ctz_i128_rdi_rsi_eax, .ctz_i64_rdi_eax, .ffs_i128_rdi_rsi_eax, .ffs_i64_rdi_eax, .ffs_i32_edi_eax, .add_rax_imm8, .add_ecx_eax, .add_rdi_rcx4_ptr_eax, .add_r8d_eax, .load_rax_rdi_u8_eax, .bcmp_rdi_rsi_rdx_eax, .memcmp_rdi_rsi_rdx_eax, .memcpy_rdi_rsi_rdx_rax, .spinlocked_var_cmpxchg_edi_rsi_rdx_rcx_eax, .cmpxchg_ptr_expected_desired_i8_eax, .cmpxchg_ptr_expected_desired_i16_eax, .cmpxchg_ptr_expected_desired_i32_eax, .cmpxchg_ptr_expected_desired_i64_eax, .spinlocked_cmpxchg_i128_rdi_rsi_rdx_rcx_eax, .xchg_ptr_value_i8_eax, .xchg_ptr_value_i16_eax, .xchg_ptr_value_i32_eax, .xchg_ptr_value_i64_rax, .atomic_xchg_rdi_disp8_rax, .spinlocked_xchg_i128_rdi_rsi_rdx_rax, .spinlocked_load_i128_rdi_rax_rdx, .spinlocked_fetch_umin_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_umax_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_nand_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_xor_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_or_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_and_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_sub_i128_rdi_rsi_rdx_rax_rdx, .spinlocked_fetch_add_i128_rdi_rsi_rdx_rax_rdx, .memmove_rdi_rsi_rdx_rax, .guarded_memset_rdi_sil_rdx_rcx_rax, .guarded_memcpy_rdi_rsi_rdx_rcx_rax, .guarded_strncat_rdi_rsi_rdx_rcx_rax, .guarded_strcat_rdi_rsi_rdx_rax, .guarded_strncpy_rdi_rsi_rdx_rcx_rax, .guarded_strcpy_rdi_rsi_rdx_rax, .memset_rdi_sil_rdx_rax, .strlen_rdi_rax, .strnlen_rdi_rsi_rax, .atomic_try_lock_rdi_al, .load_rdi_ptr_u8_eax, .load_rdi_ptr_u16_eax, .load_rdi_ptr_eax, .load_rdi_ptr_rax, .atomic_fetch_umin_i8_rdi_sil_eax, .atomic_fetch_umin_i16_rdi_si_eax, .atomic_fetch_umin_i32_rdi_esi_eax, .atomic_fetch_umin_i64_rdi_rsi_rax, .atomic_fetch_umax_i8_rdi_sil_eax, .atomic_fetch_umax_i16_rdi_si_eax, .atomic_fetch_umax_i32_rdi_esi_eax, .atomic_fetch_umax_i64_rdi_rsi_rax, .atomic_fetch_nand_i8_rdi_sil_eax, .atomic_fetch_nand_i16_rdi_si_eax, .atomic_fetch_nand_i32_rdi_esi_eax, .atomic_fetch_nand_i64_rdi_rsi_rax, .atomic_fetch_xor_i8_rdi_sil_eax, .atomic_fetch_xor_i16_rdi_si_eax, .atomic_fetch_xor_i32_rdi_esi_eax, .atomic_fetch_xor_i64_rdi_rsi_rax, .atomic_fetch_or_i8_rdi_sil_eax, .atomic_fetch_or_i16_rdi_si_eax, .atomic_fetch_or_i32_rdi_esi_eax, .atomic_fetch_or_i64_rdi_rsi_rax, .atomic_fetch_and_i8_rdi_sil_eax, .atomic_fetch_and_i16_rdi_si_eax, .atomic_fetch_and_i32_rdi_esi_eax, .atomic_fetch_and_i64_rdi_rsi_rax, .atomic_fetch_sub_i8_rdi_sil_eax, .atomic_fetch_sub_i16_rdi_si_eax, .atomic_fetch_sub_i32_rdi_esi_eax, .atomic_fetch_sub_i64_rdi_rsi_rax, .atomic_fetch_add_i8_rdi_sil_eax, .atomic_fetch_add_i16_rdi_si_eax, .atomic_fetch_add_i32_rdi_esi_eax, .atomic_fetch_add_i64_rdi_rsi_rax, .load_rcx_ptr_u8_eax, .load_rcx_ptr_u16_eax, .load_rcx_ptr_eax, .load_rcx_ptr_rax, .smin_i32_edi_esi_eax, .umin_i32_edi_esi_eax, .smax_i32_edi_esi_eax, .umax_i32_edi_esi_eax, .shift_mix_i32_edi_esi_eax, .replace_low_i8_dil_sil_al, .read_flag_i8_dil_al, .ult_i8_dil_imm8_al, .cmp_ult_u32_edi_esi_al, .ascii_range_u8_dil_imm8_imm8_al, .range_u32_edi_imm32_imm32_al, .ascii_alphabetic_dil_al, .ascii_alphanumeric_dil_al, .ascii_whitespace_dil_al, .ascii_control_dil_al, .grow_capacity_u64_rdi_imm32_rax, .xor_eax_imm32, .setb_eax, .seta_eax, .sete_eax, .setg_eax, .setl_eax, .load_stack_disp8_eax, .load_stack_disp32_eax, .load_stack_rcx4_disp8_eax, .load_stack_rcx4_disp32_eax, .load_stack_disp8_rax, .load_stack_disp32_rax, .load_stack_disp8_u8_eax, .load_stack_disp32_u8_eax, .load_stack_disp8_u16_eax, .load_stack_disp32_u16_eax, .load_rax_ptr_disp8_rax, .load_rax_ptr_disp32_rax, .load_rax_ptr_disp8_u8_eax, .load_rax_ptr_disp8_u16_eax, .load_rax_ptr_disp8_eax, .load_rax_ptr_eax, .load_arg_ptr_eax, .load_arg_ptr_disp8_rax, .load_arg_ptr_disp32_rax, .load_arg_ptr_disp8_eax, .load_arg_ptr_disp8_u8_eax, .load_arg_ptr_disp8_u16_eax, .add_arg_ptr_disp4_eax, .volatile_roundtrip_rdi_esi_eax, .load_global_i32_eax, .load_global_ptr_rax, .lea_global_rax, .lea_global_offset_rax, .load_tls_i32_eax, .add_tls_i32_eax, .atomic_xadd_global_eax, .mulsd_xmm1_xmm0, .mulss_xmm1_xmm0, .addsd_xmm1_xmm0, .addss_xmm1_xmm0, .subss_xmm1_xmm0, .divsd_xmm1_xmm0, .xorps_xmm1_xmm0, .movapd_xmm1_xmm0, .movapd_xmm, .unpcklps_xmm, .shufps_high_f32_to_low, .cvtsi2ss_edi_xmm0, .cvtsi2sd_edi_xmm0, .cvtsi2ss_rdi_xmm0, .cvtsi2sd_rdi_xmm0, .cvttss2si_xmm0_eax, .cvttsd2si_xmm0_eax, .cvtsd2ss_xmm0_xmm0, .cvtss2sd_xmm0_xmm0, .sqrtss_xmm0, .sqrtsd_xmm0, .mov_imm64_xmm0, .mov_imm32_xmm0, .load_stack_disp8_xmm0, .load_stack_disp32_xmm0, .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32, .load_f128_const_xmm0, .oltss_xmm0_xmm1_al, .fneg_x86_fp80_stack8_st0, .fneg_fp128_xmm0 => eax_defined = true,
             .mov_imm64_xmm => |load| {
                 if (load.reg == .xmm0) eax_defined = true;
             },
@@ -799,6 +804,8 @@ const ReturnDefinitions = struct {
 
 fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u16) void {
     switch (instruction) {
+        .sqrtss_xmm0 => defined_bits[0] = if (defined_bits[0] >= 32) 32 else 0,
+        .sqrtsd_xmm0 => defined_bits[0] = if (defined_bits[0] >= 64) 64 else 0,
         .direct_call => |call| if (sysv_abi.isVector128AbiType(call.ret_ty)) {
             defined_bits[0] = 128;
         },
@@ -807,66 +814,66 @@ fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u
         .mov_imm32_xmm1 => defined_bits[1] = 32,
         .mov_imm64_xmm0 => defined_bits[0] = 64,
         .mov_imm64_xmm1 => defined_bits[1] = 64,
-        .mov_imm32_xmm => |move| defined_bits[@intFromEnum(move.reg)] = 32,
-        .mov_imm64_xmm => |move| defined_bits[@intFromEnum(move.reg)] = 64,
+        .mov_imm32_xmm => |move| defined_bits[@backingInt(move.reg)] = 32,
+        .mov_imm64_xmm => |move| defined_bits[@backingInt(move.reg)] = 64,
         .movapd_xmm1_xmm0 => defined_bits[0] = defined_bits[1],
-        .movapd_xmm => |move| defined_bits[@intFromEnum(move.dst)] = defined_bits[@intFromEnum(move.src)],
+        .movapd_xmm => |move| defined_bits[@backingInt(move.dst)] = defined_bits[@backingInt(move.src)],
         .unpcklps_xmm => |unpack| {
-            const dst = @intFromEnum(unpack.dst);
-            const src = @intFromEnum(unpack.src);
+            const dst = @backingInt(unpack.dst);
+            const src = @backingInt(unpack.src);
             defined_bits[dst] = if (defined_bits[dst] >= 32 and defined_bits[src] >= 32) 64 else 0;
         },
         .unpcklpd_xmm => |unpack| {
-            const dst = @intFromEnum(unpack.dst);
-            const src = @intFromEnum(unpack.src);
+            const dst = @backingInt(unpack.dst);
+            const src = @backingInt(unpack.src);
             defined_bits[dst] = if (defined_bits[dst] >= 64 and defined_bits[src] >= 64) 128 else 0;
         },
         .unpckhpd_xmm => |unpack| {
-            const dst = @intFromEnum(unpack.dst);
-            const src = @intFromEnum(unpack.src);
+            const dst = @backingInt(unpack.dst);
+            const src = @backingInt(unpack.src);
             defined_bits[dst] = if (defined_bits[dst] >= 128 and defined_bits[src] >= 128) 128 else 0;
         },
         .load_f128_arg_ptr_xmm0, .load_f128_const_xmm0 => defined_bits[0] = 128,
         .load_f128_const_xmm1 => defined_bits[1] = 128,
-        .reload_xmm32_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 32,
-        .reload_xmm64_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 64,
-        .reload_xmm128_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
-        .reload_xmm128ps_rsp => |reload| defined_bits[@intFromEnum(reload.reg)] = 128,
+        .reload_xmm32_rsp => |reload| defined_bits[@backingInt(reload.reg)] = 32,
+        .reload_xmm64_rsp => |reload| defined_bits[@backingInt(reload.reg)] = 64,
+        .reload_xmm128_rsp => |reload| defined_bits[@backingInt(reload.reg)] = 128,
+        .reload_xmm128ps_rsp => |reload| defined_bits[@backingInt(reload.reg)] = 128,
         .load_stack_disp8_xmm0, .load_stack_disp32_xmm0 => defined_bits[0] = 64,
         .load_stack_disp8_xmm0_f32, .load_stack_disp32_xmm0_f32 => defined_bits[0] = 32,
-        .load_stack_disp8_xmm => |load| defined_bits[@intFromEnum(load.reg)] = 64,
-        .load_stack_disp32_xmm => |load| defined_bits[@intFromEnum(load.reg)] = 64,
-        .load_stack_disp8_xmm_f32 => |load| defined_bits[@intFromEnum(load.reg)] = 32,
-        .load_stack_disp32_xmm_f32 => |load| defined_bits[@intFromEnum(load.reg)] = 32,
-        .load_arg_ptr_disp8_xmm => |load| defined_bits[@intFromEnum(load.dst)] = 64,
-        .movd_eax_xmm => |reg| defined_bits[@intFromEnum(reg)] = 32,
-        .movq_rax_xmm => |reg| defined_bits[@intFromEnum(reg)] = 64,
+        .load_stack_disp8_xmm => |load| defined_bits[@backingInt(load.reg)] = 64,
+        .load_stack_disp32_xmm => |load| defined_bits[@backingInt(load.reg)] = 64,
+        .load_stack_disp8_xmm_f32 => |load| defined_bits[@backingInt(load.reg)] = 32,
+        .load_stack_disp32_xmm_f32 => |load| defined_bits[@backingInt(load.reg)] = 32,
+        .load_arg_ptr_disp8_xmm => |load| defined_bits[@backingInt(load.dst)] = 64,
+        .movd_eax_xmm => |reg| defined_bits[@backingInt(reg)] = 32,
+        .movq_rax_xmm => |reg| defined_bits[@backingInt(reg)] = 64,
         .movss_xmm => |move| {
-            const dst = @intFromEnum(move.dst);
+            const dst = @backingInt(move.dst);
             defined_bits[dst] = @max(defined_bits[dst], @as(u16, 32));
         },
         .movsd_xmm => |move| {
-            const dst = @intFromEnum(move.dst);
+            const dst = @backingInt(move.dst);
             defined_bits[dst] = @max(defined_bits[dst], @as(u16, 64));
         },
-        .addps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .subps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .mulps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .addpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .subpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .mulpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .andps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .pxor_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .pcmpgtd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .cmpeqps_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
-        .cmpeqpd_xmm => |binary| defined_bits[@intFromEnum(binary.dst)] = 128,
+        .addps_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .subps_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .mulps_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .addpd_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .subpd_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .mulpd_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .andps_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .pxor_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .pcmpgtd_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .cmpeqps_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
+        .cmpeqpd_xmm => |binary| defined_bits[@backingInt(binary.dst)] = 128,
         else => {},
     }
 }
 
 fn hasLabel(function: MachineFunction, name: []const u8) bool {
     for (function.instructions.items) |instruction| switch (instruction) {
-        .linux_syscall, .register_snapshot_rdi, .indirect_jump => {},
+        .linux_syscall, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax, .indirect_jump => {},
         .label => |label_name| if (std.mem.eql(u8, label_name, name)) return true,
         .mov_imm_eax,
         .mov_imm_rax,
@@ -1161,6 +1168,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .cvttsd2si_xmm0_eax,
         .cvtsd2ss_xmm0_xmm0,
         .cvtss2sd_xmm0_xmm0,
+        .sqrtss_xmm0,
+        .sqrtsd_xmm0,
         .cvtsd2ss_xmm,
         .cvtss2sd_xmm,
         .mov_edi_edi,
@@ -1180,6 +1189,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .fneg_x86_fp80_stack8_st0,
         .i80_rax_rdx_st0,
         .x87_st0_i80_rax_rdx,
+        .x87_binary_pop,
+        .x87_sqrt_st0,
         .fneg_fp128_xmm0,
         .sub_rsp_8,
         .add_rsp_8,

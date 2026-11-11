@@ -90,13 +90,14 @@ test "aggregate storage layouts include nested packed fields and reject incomple
         .{ .text = "{ <2 x i64> }", .bytes = 16, .alignment = 16 },
         .{ .text = "[4 x <4 x i32>]", .bytes = 64, .alignment = 16 },
         .{ .text = "[8192 x i64]", .bytes = 65536, .alignment = 8 },
+        .{ .text = "[524288 x i64]", .bytes = 4194304, .alignment = 8 },
         .{ .text = "[0 x i8]", .bytes = 0, .alignment = 1 },
         .{ .text = "{ double }", .bytes = 8, .alignment = 8 },
         .{ .text = "{ i8, x86_fp80 }", .bytes = 32, .alignment = 16 },
         .{ .text = "<{ i8, half, float, double, fp128 }>", .bytes = 31, .alignment = 1 },
     };
     for (cases) |case| try std.testing.expectEqualDeep(storage.Layout{ .bytes = case.bytes, .alignment = case.alignment }, storage.query(&context, .{ .aggregate = case.text }).?);
-    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[8193 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <4 x i64> }" }) |text|
+    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[524289 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <4 x i64> }" }) |text|
         try std.testing.expect(storage.query(&context, .{ .aggregate = text }) == null);
     context.target_datalayout = "e-a:64";
     try std.testing.expectEqualDeep(storage.Layout{ .bytes = 8, .alignment = 8 }, storage.query(&context, .{ .aggregate = "{ i8 }" }).?);
@@ -124,6 +125,9 @@ test "bounded storage executes narrow odd and large objects without changing adj
         .{ .ty = "[4096 x i8]", .bytes = 4096 },
         .{ .ty = "[8193 x i8]", .bytes = 8193 },
         .{ .ty = "[65536 x i8]", .bytes = 65536 },
+        .{ .ty = "[131072 x i8]", .bytes = 131072 },
+        .{ .ty = "[2300000 x i8]", .bytes = 2300000 },
+        .{ .ty = "[4194304 x i8]", .bytes = 4194304 },
     };
     for (cases) |case| {
         const text = try std.fmt.allocPrint(std.testing.allocator,
@@ -581,8 +585,8 @@ test "large frame views keep aggregate object limits and non-native layouts clos
     for ([_]struct { ty: []const u8, layout: ?[]const u8 }{
         .{ .ty = "[2097153 x i32]", .layout = null },
         .{ .ty = "[2147483647 x i32]", .layout = null },
-        .{ .ty = "[1048576 x i8]", .layout = null },
-        .{ .ty = "{ [262144 x i32] }", .layout = null },
+        .{ .ty = "[4194305 x i8]", .layout = null },
+        .{ .ty = "{ [1048577 x i32] }", .layout = null },
         .{ .ty = "[262144 x i32]", .layout = "E-p:64:64" },
         .{ .ty = "[262144 x i32]", .layout = "e-p:32:32" },
         .{ .ty = "[262144 x i32]", .layout = "e-i32:64" },

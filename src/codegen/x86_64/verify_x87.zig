@@ -5,7 +5,7 @@ const machine = @import("machine.zig");
 fn affected(function: machine.MachineFunction) bool {
     if (function.ret_ty == .x86_fp80) return true;
     for (function.instructions.items) |inst| switch (inst) {
-        .fneg_x86_fp80_stack8_st0, .i80_rax_rdx_st0, .x87_st0_i80_rax_rdx => return true,
+        .fneg_x86_fp80_stack8_st0, .i80_rax_rdx_st0, .x87_st0_i80_rax_rdx, .x87_binary_pop, .x87_sqrt_st0 => return true,
         .direct_call => |call| if (call.ret_ty == .x86_fp80) return true,
         .indirect_call_rax => |ty| if (ty == .x86_fp80) return true,
         else => {},
@@ -59,6 +59,11 @@ pub fn verify(function: machine.MachineFunction) !void {
                 if (depth == 0) return error.X87StackUnderflow;
                 depth -= 1;
             },
+            .x87_binary_pop => {
+                if (depth < 2) return error.X87StackUnderflow;
+                depth -= 1;
+            },
+            .x87_sqrt_st0 => if (depth == 0) return error.X87StackUnderflow,
             .direct_call => |call| {
                 if (depth != 0) return error.X87StackNotEmptyAtCall;
                 depth = if (call.ret_ty == .x86_fp80) 1 else 0;

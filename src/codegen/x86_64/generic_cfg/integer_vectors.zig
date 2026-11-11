@@ -60,7 +60,10 @@ fn laneIntrinsic(allocator: std.mem.Allocator, call: ir.CallInst) !?[]const u8 {
         const vector_name = try std.fmt.allocPrint(allocator, "llvm.{s}.v{d}i{d}", .{ name, s.len, s.bits });
         if (!std.mem.eql(u8, call.callee, vector_name)) continue;
         if (call.args.items.len != arity or call.callee_value != null or call.callee_function_ty != null or
-            call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.ret_attrs != null or call.calling_conv != null)
+            call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null)
+            return error.UnsupportedIntegerVector;
+        if (call.ret_attrs != null and !(std.mem.eql(u8, name, "ctpop") and
+            @import("intrinsic_attrs.zig").matchesIntegerRange(call.ret_attrs, s.bits, 0, @as(u128, s.bits) + 1)))
             return error.UnsupportedIntegerVector;
         if (call.tail_kind) |tail| if (std.mem.eql(u8, tail, "musttail")) return error.UnsupportedIntegerVector;
         for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null) return error.UnsupportedIntegerVector;
@@ -129,7 +132,7 @@ const Builder = struct {
         }
         const kind: @FieldType(ir.Instruction, "kind") = if (concrete == .int)
             .{ .binary = .{ .op = .add, .ty = ty, .lhs = concrete, .rhs = .{ .int = 0 } } }
-        else if (ty.eql(.{ .int = 128 }))
+        else if (ty == .int and ty.int > 64 and ty.int <= 128)
             .{ .binary = .{ .op = .@"or", .ty = ty, .lhs = concrete, .rhs = .{ .int = 0 } } }
         else
             .{ .cast = .{ .op = .bitcast, .from_ty = ty, .value = concrete, .to_ty = ty } };
@@ -305,6 +308,23 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
             var value: ?Lanes = null;
             var handled = true;
             switch (inst.kind) {
+                .gep => |gep| if (shape(gep.resultType())) |s| {
+                    if (!s.pointer or gep.ptr_addrspace != null) return error.UnsupportedIntegerVector;
+                    var lanes: Lanes = .{ .ty = gep.resultType(), .values = @splat(.poison) };
+                    for (lanes.values[0..s.len], 0..) |*lane, i| {
+                        var scalar = gep;
+                        scalar.indices = try gep.indices.clone(allocator);
+                        for (scalar.indices.items) |*index| if (shape(index.ty)) |indices| {
+                            if (indices.pointer or indices.len != s.len) return error.UnsupportedIntegerVector;
+                            index.value = try defined((try b.lanes(index.value, index.ty)).values[i], indices.scalar());
+                            index.ty = indices.scalar();
+                        };
+                        lane.* = try b.emit(.{ .gep = scalar });
+                    }
+                    value = lanes;
+                } else {
+                    handled = false;
+                },
                 .phi => |phi| if (shape(phi.ty)) |s| {
                     const destinations = vectors.get(inst.result orelse return error.UnsupportedIntegerVector).?;
                     for (destinations.values[0..s.len], 0..) |destination, i| {

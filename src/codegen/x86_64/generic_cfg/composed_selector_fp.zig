@@ -14,7 +14,31 @@ const Diagnostic = inspection.Diagnostic;
 const XmmReg = x86_64_types.XmmReg;
 const scalar_xmm_regs = selector_types.selector_allocatable_xmm_regs;
 
+pub fn lowerSqrt(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, bits: u16) !?Diagnostic {
+    const result_name = result orelse return .{ .unsupported_value = "composed-block-sqrt-result" };
+    const ty: ir.Type = if (bits == 32) .float else if (bits == 64) .double else unreachable;
+    const operation = @import("extended_math_intrinsics.zig").ordinaryOperation(call, ty, bits, true) orelse
+        return .{ .no_emitter = "composed-block-sqrt-form" };
+    if (!std.mem.eql(u8, @import("extended_math_intrinsics.zig").operations[operation], "sqrt"))
+        return .{ .no_emitter = "composed-block-sqrt-form" };
+    if (try materializeFpValue(selector, call.args.items[0].value, .xmm0, bits)) |diagnostic| return diagnostic;
+    try selector_state.clobberXmmReg(selector, .xmm0);
+    try selector.machine.instructions.append(selector.allocator, if (bits == 32) .sqrtss_xmm0 else .sqrtsd_xmm0);
+    try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = bits } });
+    return null;
+}
+
 pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, binary: ir.BinaryInst) !?Diagnostic {
+    if (binary.abi_x87_operands) {
+        if (!binary.ty.eql(.{ .int = 128 })) return .{ .unsupported_type = "extended80-arithmetic-carrier" };
+        return @import("extended80_arithmetic.zig").lower(selector, result, binary.lhs, binary.rhs, switch (binary.op) {
+            .fadd => .add,
+            .fsub => .sub,
+            .fmul => .mul,
+            .fdiv => .div,
+            else => return .{ .no_emitter = "extended80-arithmetic-operation" },
+        });
+    }
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (binary.ty == .half) return lowerHalfFadd(selector, result_name, binary);
     const bits = fpBits(binary.ty) orelse return .{ .no_emitter = "composed-block-fp-binary-type" };

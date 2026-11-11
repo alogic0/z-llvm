@@ -29,14 +29,19 @@ fn advisory(attrs: ?[]const u8) bool {
 }
 fn operation(call: ir.CallInst) ?usize {
     const format_index = format(call.ret_ty) orelse return null;
+    return ordinaryOperation(call, call.ret_ty, widths[format_index], format_index == 1);
+}
+
+pub fn ordinaryOperation(call: ir.CallInst, ty: ir.Type, bits: usize, allow_sqrt: bool) ?usize {
+    if (!call.ret_ty.eql(ty)) return null;
     if (call.callee_value != null or
         call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or
         call.operand_bundle != null or call.calling_conv != null or !advisory(call.ret_attrs)) return null;
     sysv.rejectUnsupportedCallEnvelope(call) catch return null;
     var spelling: [64]u8 = undefined;
     for (operations, 0..) |name, index| {
-        if (format_index != 1 and std.mem.eql(u8, name, "sqrt")) continue;
-        const intrinsic = std.fmt.bufPrint(&spelling, "llvm.{s}.f{d}", .{ name, widths[format_index] }) catch unreachable;
+        if (!allow_sqrt and std.mem.eql(u8, name, "sqrt")) continue;
+        const intrinsic = std.fmt.bufPrint(&spelling, "llvm.{s}.f{d}", .{ name, bits }) catch return null;
         if (!ir.identifiers.eql(call.callee, intrinsic)) continue;
         if (call.args.items.len != (if (std.mem.eql(u8, name, "fma")) @as(usize, 3) else 1)) return null;
         for (call.args.items) |arg| {
@@ -52,7 +57,7 @@ fn operation(call: ir.CallInst) ?usize {
     return null;
 }
 
-fn recursive(function: ir.Function, symbol: []const u8, context: ?*const machine.ReadOnlyModuleContext) bool {
+pub fn recursive(function: ir.Function, symbol: []const u8, context: ?*const machine.ReadOnlyModuleContext) bool {
     var current = symbol;
     const aliases = if (context) |ctx| ctx.aliases else &.{};
     for (0..aliases.len + 1) |_| {
@@ -75,7 +80,7 @@ const Use = struct {
         if (value.* == .named and ir.identifiers.eql(value.named, self.name)) self.found.* = true;
     }
 };
-fn used(function: ir.Function, name: []const u8) bool {
+pub fn resultUsed(function: ir.Function, name: []const u8) bool {
     var found = false;
     const visitor: Use = .{ .name = name, .found = &found };
     for (function.blocks.items) |block| {
@@ -96,7 +101,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
             if (!inst.removed and inst.result != null and inst.kind == .call) if (operation(inst.kind.call)) |index| {
                 // Machine relocations outlive the selector's private arena.
                 const callee = library_names[format(inst.kind.call.ret_ty).?][index];
-                if (!recursive(function, callee, context) and used(function, inst.result.?)) {
+                if (!recursive(function, callee, context) and resultUsed(function, inst.result.?)) {
                     try candidate.begin(&block, block_index, instruction_index);
                     var copy = inst;
                     copy.kind.call.callee = callee;

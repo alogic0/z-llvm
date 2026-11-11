@@ -37,7 +37,8 @@ fn operation(call: ir.CallInst) ?Operation {
                 // overflow check after wrapping multiplication. General wide
                 // products still require an independently lowered high half.
                 const rhs = call.args.items[1].value;
-                if (ty.int != 128 or rhs != .int or rhs.int < 1 or rhs.int > std.math.maxInt(u32)) return null;
+                if (!(ty.int == 128 and !signed) and
+                    (ty.int != 128 or rhs != .int or rhs.int < 1 or rhs.int > std.math.maxInt(u32))) return null;
             }
             return .{ .op = op, .signed = signed, .bits = ty.int };
         }
@@ -102,12 +103,18 @@ const Builder = struct {
 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    return legalizeWithContext(allocator, function, null);
+}
+
+pub fn legalizeWithContext(allocator: std.mem.Allocator, function: ir.Function, context: ?*const @import("../machine.zig").ReadOnlyModuleContext) !?ir.Function {
     var names = std.StringHashMap(Entry).init(allocator);
     var serial: forms.TemporaryNames = .{};
     defer serial.deinit(allocator);
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.result == null or inst.kind != .call) continue;
         const op = operation(inst.kind.call) orelse continue;
+        if (op.bits == 128 and op.op == .mul and !op.signed and
+            @import("extended_math_intrinsics.zig").recursive(function, "__udivti3", context)) continue;
         try names.put(inst.result.?, .{
             .operation = op,
             .ty = inst.kind.call.ret_ty,
@@ -173,7 +180,15 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                             .rhs = rhs,
                         } } });
                         const builder: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .carrier = full };
-                        if (entry.operation.op == .mul) {
+                        if (entry.operation.op == .mul and entry.operation.bits == 128 and !entry.operation.signed and
+                            !(original_rhs == .int and original_rhs.int >= 1 and original_rhs.int <= std.math.maxInt(u32)))
+                        {
+                            const nonzero = try builder.emit(.{ .icmp = .{ .predicate = .ne, .operand_ty = full, .lhs = rhs, .rhs = .{ .int = 0 } } });
+                            const safe = try builder.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = nonzero, .ty = full, .true_value = rhs, .false_value = .{ .int = 1 } } });
+                            const round_trip = try builder.emit(.{ .binary = .{ .op = .udiv, .ty = full, .lhs = .{ .named = entry.wrapped }, .rhs = safe } });
+                            const changed = try builder.emit(.{ .icmp = .{ .predicate = .ne, .operand_ty = full, .lhs = round_trip, .rhs = lhs } });
+                            try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 1 }, .lhs = nonzero, .rhs = changed } } });
+                        } else if (entry.operation.op == .mul) {
                             const round_trip = try builder.emit(.{ .binary = .{
                                 .op = if (entry.operation.signed) .sdiv else .udiv,
                                 .ty = full,
