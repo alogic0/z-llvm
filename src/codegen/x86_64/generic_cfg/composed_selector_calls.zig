@@ -1192,7 +1192,12 @@ fn accumulatorInputDisplacement(
     };
     const source = selector_state.resolveValue(selector, value) orelse return fallback;
     return switch (source) {
-        .eax, .rax => .{ .reuse_source = name },
+        // The strict query in scratch_preferred propagates a failed canonical
+        // liveness check during preparation, including for PHI identities.
+        .eax, .rax => if (selector_state.valueIsLiveAfterCurrent(selector, name) catch return .scratch_preferred)
+            fallback
+        else
+            .{ .reuse_source = name },
         else => fallback,
     };
 }

@@ -682,6 +682,12 @@ fn callRequiresPreservationFrame(call: ir.CallInst) bool {
         std.mem.eql(u8, call.callee, "llvm.abs.i32") or
         std.mem.eql(u8, call.callee, "llvm.abs.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i128") or
+        std.mem.eql(u8, call.callee, "llvm.ctpop.i64") or
+        std.mem.eql(u8, call.callee, "llvm.ctlz.i16") or
+        std.mem.eql(u8, call.callee, "llvm.fshl.i32") or
+        std.mem.eql(u8, call.callee, "llvm.bitreverse.i32") or
+        std.mem.eql(u8, call.callee, "llvm.bitreverse.i64") or
+        std.mem.eql(u8, call.callee, "llvm.bswap.i16") or
         std.mem.eql(u8, call.callee, "llvm.bswap.i32") or
         std.mem.eql(u8, call.callee, "llvm.bswap.i64");
 }

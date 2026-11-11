@@ -3170,6 +3170,43 @@
       ],
       "observations": 852,
       "stdout": "runtime-frontier observations=852 pairs=intrinsics=vectors=half=aliases=preserved\n"
+    },
+    {
+      "population": "intrinsic_preservation",
+      "prefix": "intrinsic-preservation",
+      "fixture": "intrinsic_preservation",
+      "functions": [
+        "intrinsic_preservation_count64_register",
+        "intrinsic_preservation_count64_computed",
+        "intrinsic_preservation_count64_load",
+        "intrinsic_preservation_leading16_register",
+        "intrinsic_preservation_leading16_computed",
+        "intrinsic_preservation_leading16_load",
+        "intrinsic_preservation_swap16_register",
+        "intrinsic_preservation_swap16_computed",
+        "intrinsic_preservation_swap16_load",
+        "intrinsic_preservation_swap32_register",
+        "intrinsic_preservation_swap32_computed",
+        "intrinsic_preservation_swap32_load",
+        "intrinsic_preservation_swap64_register",
+        "intrinsic_preservation_swap64_computed",
+        "intrinsic_preservation_swap64_load",
+        "intrinsic_preservation_reverse32_register",
+        "intrinsic_preservation_reverse32_computed",
+        "intrinsic_preservation_reverse32_load",
+        "intrinsic_preservation_reverse64_register",
+        "intrinsic_preservation_reverse64_computed",
+        "intrinsic_preservation_reverse64_load",
+        "intrinsic_preservation_funnel32_register",
+        "intrinsic_preservation_funnel32_computed",
+        "intrinsic_preservation_funnel32_load",
+        "intrinsic_preservation_roundup"
+      ],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
+      "observations": 1168,
+      "stdout": "intrinsic-preservation observations=1168 live=aliases=memory=preserved\n"
     }
   ]
 }

@@ -1683,3 +1683,61 @@ test "native ctpop preserves fastcc intrinsic admission" {
     const run: *const fn (u64) callconv(.c) u64 = @ptrCast(mapping.ptr);
     try std.testing.expectEqual(@as(u64, 32), run(0x0123456789abcdef));
 }
+
+test "destructive intrinsic preserves a live accumulator input" {
+    const input =
+        \\declare i64 @llvm.ctpop.i64(i64)
+        \\define i64 @live_count(i16 %raw) {
+        \\entry:
+        \\  %value = zext i16 %raw to i64
+        \\  %count = call range(i64 0, 65) i64 @llvm.ctpop.i64(i64 %value)
+        \\  %sum = add i64 %value, 9
+        \\  %negative = sub i64 0, %value
+        \\  %aligned = and i64 %sum, %negative
+        \\  %result = add i64 %aligned, %count
+        \\  ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("live_count", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const run: *const fn (u16) callconv(.c) u64 = @ptrCast(mapping.ptr);
+    for ([_]u16{ 0, 1, 2, 4, 8, 16, 32, 64, 80, 128, 255, 256, 1024, 32768, 65535 }) |raw| {
+        const value: u64 = raw;
+        try std.testing.expectEqual(((value + 9) & (0 -% value)) + @popCount(value), run(raw));
+    }
+}
+
+test "destructive intrinsic keeps canonical liveness failure closed" {
+    var machine = MachineFunction.init("invalid-live-count", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.stack_frame_bytes = 24;
+    try selector_state.bindValueLoc(&selector, "value", .rax);
+    try selector.address_dependencies.replaceAddress("owner", &.{
+        .{ .name = "value", .identity_type = .integer, .role = .index },
+    });
+    var call = ir.CallInst{ .ret_ty = .{ .int = 64 }, .callee = "llvm.ctpop.i64", .args = .empty };
+    defer call.deinit(std.testing.allocator);
+    try call.args.append(std.testing.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .named = "value" } });
+    const original_binding = selector.values.get("value").?;
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_calls.lowerCall(&selector, "result", call));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(original_binding, selector.values.get("value").?);
+    try std.testing.expect(!selector.values.contains("result"));
+    try selector.phi_results.put("value", {});
+    try std.testing.expectError(error.AddressDependencyMissingPlan, selector_calls.lowerCall(&selector, "result", call));
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(original_binding, selector.values.get("value").?);
+    try std.testing.expect(!selector.values.contains("result"));
+}
