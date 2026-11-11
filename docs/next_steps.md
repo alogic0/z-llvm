@@ -1,12 +1,11 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [shift and call checkpoint](evidence/shift_and_call_operands.md)
-at `2eb2fc9b`: **8,807/8,928** compiler definitions and **318/455** runtime
-definitions. All 121 remaining original compiler definitions stay in scope. The
-complete current census identifies remaining floating/structured values, integer
-division, casts and record-freeze boundaries
-for subsequent coherent groups. Use focused original-function and native checks during
+from the accepted [integer pair and storage checkpoint](evidence/integer_pair_storage.md)
+at `631c973d`: **8,823/8,928** compiler definitions and **318/455** runtime
+definitions. All 105 remaining original compiler definitions stay in scope. The
+complete current census identifies remaining floating/structured values and
+storage boundaries for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
 required replay cannot finish.

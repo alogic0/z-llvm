@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `2eb2fc9b`,
-selecting 8,807/8,928 compiler definitions and 318/455 runtime definitions.
-Continue through all 121 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `631c973d`,
+selecting 8,823/8,928 compiler definitions and 318/455 runtime definitions.
+Continue through all 105 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -243,3 +243,19 @@ All 3,218 frozen source hashes bind to the accepted code tree. Continue through
 full-width integer division, typed i52 truncation and two-word record freezes,
 then every remaining original rejection. See the
 [accepted shift and call evidence](../evidence/shift_and_call_operands.md).
+
+Batch 14 is accepted at `631c973d`: standard full-width i128 division, private
+word bridges for i52 truncations and stable freezes of existing flat two-word
+records. Complete original-input census and independent production agree on
+8,823 compiler selections, adding sixteen without lost successes or owners;
+runtime retains 318. Debug/ReleaseSafe each pass 2,109 units, 25 structural and
+two profile checks; readiness completion explicitly retains a missing Zig cache
+object failure and its successful isolated-cache resume. All seventeen serial
+gates and both complete 89-population native suites pass. Both strict native
+comparators preserve all 3,197 preceding outcomes and 1,311 artifacts per build
+exactly. All 162 new fault controls detect their errors. All 36 selected core
+objects and observations match; wrapper metadata differences and strict log
+failures remain explicit. All 4,367,199 compiler events balance, and 3,235 frozen
+file hashes bind to the committed code tree. Continue through all 105 remaining
+original compiler rejections. See the
+[accepted integer pair/storage evidence](../evidence/integer_pair_storage.md).
