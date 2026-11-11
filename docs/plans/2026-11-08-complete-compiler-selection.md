@@ -1,17 +1,24 @@
 # Complete compiler selection
 
-Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `516c7b43`,
-selecting 8,879/8,928 compiler definitions and 353/455 runtime definitions.
-Continue through all 49 remaining original compiler definitions.
+Status: complete at accepted code `efa62fa2` on 2026-11-11. Complete original-input
+census and independent production select **8,928/8,928 compiler definitions**,
+adding the final 49 with no lost selections or owner changes. Runtime reaches
+**387/455**, adding 34 while preserving every earlier selection and owner.
+See the [completion evidence](../evidence/compiler_selection_completion.md) and
+[acceptance record](../evidence/compiler_selection_completion_acceptance_20261111.json).
 
-The [scalar math and integer checkpoint](../evidence/scalar_math_and_integer_boundaries.md)
-adds nineteen compiler and two runtime selections with complete census,
-independent production and event agreement. Both compiler builds preserve all
-96 prior native populations, 3,557 command outcomes and 1,461 artifact hashes.
-All seventeen integration gates pass. Continue implementing the remaining
-frontier; successor focused results receive no cumulative count credit until
-their own complete original-input acceptance.
+Debug/ReleaseSafe each pass 2,157 unit, 63 structural and two profile checks.
+All eight readiness procedures and seventeen integration gates pass. Both
+112-population native suites preserve all 101 prior entries, 3,737 command
+outcomes and 1,536 artifact hashes per build; all 594 new fault controls are
+detected. All 4,492,466 compiler event records audit successfully, and the
+validated source/binaries bind to the accepted tree.
+
+The selection objective is achieved. Production subsequently reports
+`UnsupportedGlobalData` during object writing and returns actual one. Complete
+compiler objects, linking, startup and self-rebuild remain separate work, as do
+the remaining 68 runtime definitions. The validated performance deliveries at
+`c19bdc66` and `0bf96594` remain accepted.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -50,6 +57,10 @@ their own validation routing.
 Evidence root: `local-state/validations/compiler-selection-completion-20261108/`.
 The previous accepted checkpoint remains authoritative until a new cumulative
 acceptance is recorded. Progress counts before that are provisional.
+
+## Acceptance history
+
+These entries retain the frontier recorded at each checkpoint.
 
 The first checkpoint is accepted at `9ba5e61c`: pointer freeze aliases, private normalization
 of scalar `samesign` comparisons and signed interpretation of unsigned-spelled
@@ -314,3 +325,20 @@ See the [accepted floating evidence](../evidence/floating_conversions_predicates
 Continue through all 68 original compiler rejections. Isolated store-only half
 storage, wide byte swaps, scalar vector choices, further conversions and math
 intrinsics receive no cumulative acceptance credit until complete replays.
+
+Batch 22 is accepted at `516c7b43`: complete compiler census and independent
+production agree on 8,879 selections and 49 rejections, while runtime reaches
+353/455. Both builds preserve all 96 preceding native populations and their
+artifacts, and all seventeen integration gates pass. See the
+[scalar math and integer evidence](../evidence/scalar_math_and_integer_boundaries.md).
+
+Batch 30 completes this plan at `efa62fa2`. Complete original-input census,
+independent production and all 4,492,466 event records agree on 8,928 selections
+and zero selection failures, preserving every prior success and owner. Runtime
+reaches 387/455. Both 112-population native suites and all seventeen integration
+gates pass. All 594 new fault controls are detected, and all preceding command
+outcomes and artifact hashes remain exact. Source/binary bindings and retained
+pins verify. The subsequent `UnsupportedGlobalData` object-writing failure,
+68 runtime rejections, compiler startup and self-rebuild remain separate from
+this completed selection milestone. See the
+[completion evidence](../evidence/compiler_selection_completion.md).

@@ -1,25 +1,29 @@
-# Complete compiler selection resumed
+# Compiler selection complete
 
-Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [scalar math and integer checkpoint](evidence/scalar_math_and_integer_boundaries.md)
-at `516c7b43`: **8,879/8,928** compiler definitions and **353/455** runtime
-definitions. All 49 remaining original compiler definitions stay in scope. The
-complete current census identifies remaining math, structured values and
-storage boundaries for subsequent coherent groups. Use focused original-function and native checks during
-implementation; complete unchanged-input census and independent production
-replay accept counts at cohesive checkpoints. Revisit performance only when a
-required replay cannot finish.
+The [all-8,928 selection plan](plans/2026-11-08-complete-compiler-selection.md)
+is complete at accepted code `efa62fa2`: **8,928/8,928** original compiler
+definitions and **387/455** runtime definitions. Complete census, independent
+production and event audits agree, adding the final 49 compiler and 34 runtime
+selections without lost successes or owner changes. See the
+[completion evidence](evidence/compiler_selection_completion.md) and
+[acceptance record](evidence/compiler_selection_completion_acceptance_20261111.json).
 
-Batch 22 adds nineteen compiler and two runtime selections with complete census,
-independent production and event agreement, preserving every earlier success
-and owner. Debug/ReleaseSafe each pass 2,139 units, 63 structural and two profile
-checks; readiness and all 17 integration gates pass. Both complete 101-population
-native suites preserve 3,557 preceding outcomes and all 1,461 artifact hashes
-per build; all 270 new fault controls are detected. Source/binary bindings and
-all 4,397,032 compiler event rows audit successfully. Continue with half math,
-extended80 arithmetic, remainders, vector classification, wide counts and larger
-storage; isolated results receive no cumulative acceptance credit until complete
-original-input replays.
+Debug/ReleaseSafe each pass 2,157 unit, 63 structural and two profile checks.
+Readiness and all seventeen integration gates pass. Both complete 112-population
+native suites preserve all 101 preceding entries, 3,737 command outcomes and
+1,536 artifact hashes per build; all 594 new fault controls are detected.
+All 4,492,466 compiler event records audit successfully, and source/binary
+bindings and retained pins verify.
+
+Next work is the **`UnsupportedGlobalData` object-writing boundary** reported
+after all 8,928 selections, and the remaining **68 runtime definitions**.
+Complete compiler-object emission, unchanged whole-compiler linking, startup
+and self-rebuild require their own proofs. The selection milestone grants no
+credit for these stages. Preserve the original inputs, accepted evidence,
+fixed prefix/cohort, ratchet 130 and frozen interfaces. Revisit performance
+when a required replay cannot finish.
+
+The following checkpoints record the earlier acceptance history.
 
 Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) and
 selector snapshot-storage changes pass all 17 serial gates, all 79 native

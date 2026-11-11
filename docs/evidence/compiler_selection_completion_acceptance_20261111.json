@@ -1,0 +1,2586 @@
+{
+  "schema": "compiler-selection-completion-acceptance-v1",
+  "status": "passed",
+  "recorded_date": "2026-11-11",
+  "accepted_revision": "efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898",
+  "accepted_tree": "1463c97bf2380279d773caf446a779a25750e05d",
+  "baseline_accepted_revision": "516c7b43bc5e1a95e1f4e0ae2beab11ecf92c6f0",
+  "evidence_root": "local-state/validations/compiler-selection-completion-20261108/batch-30",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-unknown-linux-gnu",
+  "active_objective": {
+    "definitions": 8928,
+    "selected": 8928,
+    "remaining": 0,
+    "complete": true
+  },
+  "compiler": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "definitions": 8928,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 8928,
+        "selected": 8879,
+        "failed": 49
+      },
+      "after": {
+        "event": "complete",
+        "examined": 8928,
+        "selected": 8928,
+        "failed": 0
+      },
+      "lost_selections": [],
+      "gained_selections": [
+        "Io.concurrent__func_53120.TypeErased.start",
+        "Io.concurrent__func_53122.TypeErased.start",
+        "Sema.arith.floatAdd",
+        "Sema.arith.floatDiv",
+        "Sema.arith.floatDivCeil",
+        "Sema.arith.floatDivFloor",
+        "Sema.arith.floatDivIsExact",
+        "Sema.arith.floatDivTrunc",
+        "Sema.arith.floatMul",
+        "Sema.arith.floatSub",
+        "Sema.arith.modRemScalar",
+        "Sema.sliceToIpString",
+        "Value.ceilScalar",
+        "Value.cosScalar",
+        "Value.exp2Scalar",
+        "Value.expScalar",
+        "Value.floorScalar",
+        "Value.log10Scalar",
+        "Value.log2Scalar",
+        "Value.logScalar",
+        "Value.mulAddScalar",
+        "Value.roundScalar",
+        "Value.sinScalar",
+        "Value.sqrtScalar",
+        "Value.tanScalar",
+        "Value.truncScalar",
+        "Value.writeToMemory",
+        "codegen.aarch64.Assemble.SymbolSpec.parse__func_45214",
+        "codegen.aarch64.Select.Value.Index.address",
+        "codegen.aarch64.Select.Value.Materialize.finish",
+        "codegen.aarch64.Select.storeReg",
+        "codegen.c.DeclGen.renderUndefValue",
+        "codegen.c.DeclGen.renderValue",
+        "codegen.generateSymbol",
+        "codegen.llvm.FuncGen.airReduce",
+        "codegen.llvm.Object.lowerType",
+        "codegen.loongarch.Select.storeReg",
+        "codegen.x86_64.abi.classifySystemV",
+        "compress.zstd.Decompress.stream",
+        "fmt.parse_float.parseFloat__func_13667",
+        "fmt.parse_float.parseFloat__func_1965",
+        "fmt.parse_float.parseFloat__func_26825",
+        "link.Dwarf.updateConstInner",
+        "link.Elf.flushInner",
+        "link.Wasm.Flush.finish",
+        "math.big.int.Mutable.setFloat__func_20254",
+        "mem.writePackedInt__func_9931",
+        "zig.system.detectNativeCpuAndFeatures",
+        "zig.system.x86.detectNativeFeatures"
+      ],
+      "owner_changes": []
+    },
+    "census_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 4660167391509
+    },
+    "production_audit": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "input_bytes": 443624107,
+      "definitions": 8928,
+      "selection_completed": true,
+      "counts": {
+        "selected": 8928,
+        "selected_successfully": 8928,
+        "failed": 0
+      },
+      "profile_function_count": 8928,
+      "all_function_outcomes_match": true,
+      "selected_identities_match": true,
+      "failure_tuples_match": true,
+      "prior_successes_preserved": true,
+      "gained_selections": [
+        "Io.concurrent__func_53120.TypeErased.start",
+        "Io.concurrent__func_53122.TypeErased.start",
+        "Sema.arith.floatAdd",
+        "Sema.arith.floatDiv",
+        "Sema.arith.floatDivCeil",
+        "Sema.arith.floatDivFloor",
+        "Sema.arith.floatDivIsExact",
+        "Sema.arith.floatDivTrunc",
+        "Sema.arith.floatMul",
+        "Sema.arith.floatSub",
+        "Sema.arith.modRemScalar",
+        "Sema.sliceToIpString",
+        "Value.ceilScalar",
+        "Value.cosScalar",
+        "Value.exp2Scalar",
+        "Value.expScalar",
+        "Value.floorScalar",
+        "Value.log10Scalar",
+        "Value.log2Scalar",
+        "Value.logScalar",
+        "Value.mulAddScalar",
+        "Value.roundScalar",
+        "Value.sinScalar",
+        "Value.sqrtScalar",
+        "Value.tanScalar",
+        "Value.truncScalar",
+        "Value.writeToMemory",
+        "codegen.aarch64.Assemble.SymbolSpec.parse__func_45214",
+        "codegen.aarch64.Select.Value.Index.address",
+        "codegen.aarch64.Select.Value.Materialize.finish",
+        "codegen.aarch64.Select.storeReg",
+        "codegen.c.DeclGen.renderUndefValue",
+        "codegen.c.DeclGen.renderValue",
+        "codegen.generateSymbol",
+        "codegen.llvm.FuncGen.airReduce",
+        "codegen.llvm.Object.lowerType",
+        "codegen.loongarch.Select.storeReg",
+        "codegen.x86_64.abi.classifySystemV",
+        "compress.zstd.Decompress.stream",
+        "fmt.parse_float.parseFloat__func_13667",
+        "fmt.parse_float.parseFloat__func_1965",
+        "fmt.parse_float.parseFloat__func_26825",
+        "link.Dwarf.updateConstInner",
+        "link.Elf.flushInner",
+        "link.Wasm.Flush.finish",
+        "math.big.int.Mutable.setFloat__func_20254",
+        "mem.writePackedInt__func_9931",
+        "zig.system.detectNativeCpuAndFeatures",
+        "zig.system.x86.detectNativeFeatures"
+      ],
+      "source_and_backend_verified": true,
+      "process_completed": true,
+      "actual_returncode": 1,
+      "diagnostic_status": "blocked",
+      "failure_stage": "object_write",
+      "object_complete": false,
+      "scope": "Complete original-input selection; object completion is recorded independently; no compiler startup or self-rebuild credit"
+    },
+    "production_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 1,
+      "wall_ns": 5026226707795
+    },
+    "production_events": {
+      "sequence": 4492466,
+      "elapsed_ns": 4993424119952,
+      "begins": 8928,
+      "ends": 8928,
+      "selected": 8928,
+      "failed": 0,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 8928,
+        "failed_functions": 0,
+        "normalization_runs": 67664,
+        "legalizer_attempts": 1550788,
+        "legalizer_rewrites": 66641,
+        "original_form_retries": 34775,
+        "original_form_selected": 7905,
+        "selection_iterations": 67664,
+        "max_selection_iterations": 32,
+        "emitted_instructions": 22535488,
+        "emitted_spill_instructions": 5358000
+      },
+      "unique_functions": 8928
+    },
+    "object_complete": false,
+    "production_diagnostic": {
+      "status": "blocked",
+      "failure_stage": "object_write",
+      "error": "error: UnsupportedGlobalData"
+    }
+  },
+  "runtime": {
+    "census": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "definitions": 455,
+      "complete_unfiltered_streams": true,
+      "before": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 353,
+        "failed": 102
+      },
+      "after": {
+        "event": "complete",
+        "examined": 455,
+        "selected": 387,
+        "failed": 68
+      },
+      "lost_selections": [],
+      "gained_selections": [
+        "compiler_rt.addf3.add_f80",
+        "compiler_rt.cos.cos_f80",
+        "compiler_rt.divtf3.__divtf3",
+        "compiler_rt.divxf3.__divxf3",
+        "compiler_rt.exp.exp",
+        "compiler_rt.exp.exp_f32",
+        "compiler_rt.exp_f128.exp",
+        "compiler_rt.exp_f128.exp2",
+        "compiler_rt.float_from_int.__floatditf",
+        "compiler_rt.float_from_int.__floateitf",
+        "compiler_rt.float_from_int.__floateixf",
+        "compiler_rt.float_from_int.__floatsitf",
+        "compiler_rt.float_from_int.__floatunditf",
+        "compiler_rt.float_from_int.__floatuneitf",
+        "compiler_rt.float_from_int.__floatuneixf",
+        "compiler_rt.float_from_int.__floatunsitf",
+        "compiler_rt.fma.fma_f128",
+        "compiler_rt.fmod.fmod_f80",
+        "compiler_rt.int_from_float.__fixdfei",
+        "compiler_rt.int_from_float.__fixhfei",
+        "compiler_rt.int_from_float.__fixsfei",
+        "compiler_rt.int_from_float.__fixtfei",
+        "compiler_rt.int_from_float.__fixunsdfei",
+        "compiler_rt.int_from_float.__fixunshfei",
+        "compiler_rt.int_from_float.__fixunssfei",
+        "compiler_rt.int_from_float.__fixunstfei",
+        "compiler_rt.int_from_float.__fixunsxfei",
+        "compiler_rt.int_from_float.__fixxfei",
+        "compiler_rt.mulc3.__mulxc3",
+        "compiler_rt.powiXf2.__powixf2",
+        "compiler_rt.rem_pio2_large.rem_pio2_large",
+        "compiler_rt.rem_pio2l.rem_pio2l__func_34",
+        "compiler_rt.trig.tanq",
+        "compiler_rt.trig.tanx"
+      ],
+      "owner_changes": []
+    },
+    "production_audit": {
+      "schema": 1,
+      "status": "passed",
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "input_bytes": 1856543,
+      "definitions": 455,
+      "selection_completed": true,
+      "counts": {
+        "selected": 455,
+        "selected_successfully": 387,
+        "failed": 68
+      },
+      "profile_function_count": 455,
+      "all_function_outcomes_match": true,
+      "selected_identities_match": true,
+      "failure_tuples_match": true,
+      "prior_successes_preserved": true,
+      "gained_selections": [
+        "compiler_rt.addf3.add_f80",
+        "compiler_rt.cos.cos_f80",
+        "compiler_rt.divtf3.__divtf3",
+        "compiler_rt.divxf3.__divxf3",
+        "compiler_rt.exp.exp",
+        "compiler_rt.exp.exp_f32",
+        "compiler_rt.exp_f128.exp",
+        "compiler_rt.exp_f128.exp2",
+        "compiler_rt.float_from_int.__floatditf",
+        "compiler_rt.float_from_int.__floateitf",
+        "compiler_rt.float_from_int.__floateixf",
+        "compiler_rt.float_from_int.__floatsitf",
+        "compiler_rt.float_from_int.__floatunditf",
+        "compiler_rt.float_from_int.__floatuneitf",
+        "compiler_rt.float_from_int.__floatuneixf",
+        "compiler_rt.float_from_int.__floatunsitf",
+        "compiler_rt.fma.fma_f128",
+        "compiler_rt.fmod.fmod_f80",
+        "compiler_rt.int_from_float.__fixdfei",
+        "compiler_rt.int_from_float.__fixhfei",
+        "compiler_rt.int_from_float.__fixsfei",
+        "compiler_rt.int_from_float.__fixtfei",
+        "compiler_rt.int_from_float.__fixunsdfei",
+        "compiler_rt.int_from_float.__fixunshfei",
+        "compiler_rt.int_from_float.__fixunssfei",
+        "compiler_rt.int_from_float.__fixunstfei",
+        "compiler_rt.int_from_float.__fixunsxfei",
+        "compiler_rt.int_from_float.__fixxfei",
+        "compiler_rt.mulc3.__mulxc3",
+        "compiler_rt.powiXf2.__powixf2",
+        "compiler_rt.rem_pio2_large.rem_pio2_large",
+        "compiler_rt.rem_pio2l.rem_pio2l__func_34",
+        "compiler_rt.trig.tanq",
+        "compiler_rt.trig.tanx"
+      ],
+      "source_and_backend_verified": true,
+      "process_completed": true,
+      "actual_returncode": 1,
+      "object_complete": false
+    },
+    "production_events": {
+      "sequence": 129777,
+      "elapsed_ns": 11536362046,
+      "begins": 455,
+      "ends": 455,
+      "selected": 387,
+      "failed": 68,
+      "active": null,
+      "pending_legalizer": null,
+      "activity": null,
+      "retry": false,
+      "complete": true,
+      "succeeded": false,
+      "counters": {
+        "selected_functions": 387,
+        "failed_functions": 68,
+        "normalization_runs": 2157,
+        "legalizer_attempts": 42412,
+        "legalizer_rewrites": 1937,
+        "original_form_retries": 1070,
+        "original_form_selected": 235,
+        "selection_iterations": 2157,
+        "max_selection_iterations": 21,
+        "emitted_instructions": 268519,
+        "emitted_spill_instructions": 64124
+      },
+      "unique_functions": 455
+    },
+    "object_complete": false
+  },
+  "validation": {
+    "units": {
+      "Debug": 2157,
+      "ReleaseSafe": 2157
+    },
+    "structural": {
+      "Debug": 63,
+      "ReleaseSafe": 63
+    },
+    "profile": {
+      "Debug": 2,
+      "ReleaseSafe": 2
+    },
+    "unit_processes": {
+      "Debug": {
+        "status": "finished",
+        "outcome": "completed",
+        "actual_returncode": 0,
+        "wall_ns": 260314639379
+      },
+      "ReleaseSafe": {
+        "status": "finished",
+        "outcome": "completed",
+        "actual_returncode": 0,
+        "wall_ns": 273404985840
+      }
+    },
+    "readiness": {
+      "schema": 1,
+      "status": "passed",
+      "procedures": [
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/compare_opt.zig"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 119151352961
+        },
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/run_optimizer_correctness.zig"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 5868404631
+        },
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/lint_zig_ir_manifest.zig"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 553010597
+        },
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/run_zig_corpus.zig"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 2609303828
+        },
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/run_handoff_validation.zig"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 3160345233
+        },
+        {
+          "argv": [
+            "zig",
+            "run",
+            "tools/run_generated_scalar_diff.zig"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 545715487077
+        },
+        {
+          "argv": [
+            "zig",
+            "build",
+            "release-pipeline-policy"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 908264321
+        },
+        {
+          "argv": [
+            "bash",
+            "tools/run_abi_differential.sh",
+            "local-state/validations/compiler-selection-completion-20261108/batch-30/readiness-abi-v3"
+          ],
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 17459285184
+        }
+      ],
+      "process": {
+        "status": "finished",
+        "outcome": "completed",
+        "actual_returncode": 0,
+        "wall_ns": 697504864111
+      },
+      "compiler_unit_and_profile": {
+        "Debug": {
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 260314639379
+        },
+        "ReleaseSafe": {
+          "status": "finished",
+          "outcome": "completed",
+          "actual_returncode": 0,
+          "wall_ns": 273404985840
+        }
+      },
+      "cache_root": "local-state/validations/compiler-selection-completion-20261108/batch-30/readiness-zig-local-v3",
+      "source_snapshot": "local-state/validations/compiler-selection-completion-20261108/batch-30/source-v3.json"
+    },
+    "abi_differential": {
+      "matched_cases": 60,
+      "function_mode_matches": 30
+    },
+    "native_populations": 112,
+    "Debug": {
+      "local": 94574370,
+      "reference": 47287185
+    },
+    "ReleaseFast": {
+      "local": 94574370,
+      "reference": 47287185
+    },
+    "debug_native_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 1390839202389
+    },
+    "debug_native_comparison": {
+      "status": "passed",
+      "registry": {
+        "prior_populations": 101,
+        "current_populations": 112,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3737,
+      "byte_identical_prior_artifacts": {
+        "--emit=selection-owner-manifest": 609,
+        "--emit=obj": 615,
+        "optimizer": 312
+      },
+      "new_population_commands": 396,
+      "artifact_differences": []
+    },
+    "fast_native_comparison": {
+      "status": "passed",
+      "registry": {
+        "prior_populations": 101,
+        "current_populations": 112,
+        "prior_entries_unchanged": true
+      },
+      "retained_command_outcomes": 3737,
+      "byte_identical_prior_artifacts": {
+        "--emit=selection-owner-manifest": 609,
+        "--emit=obj": 615,
+        "optimizer": 312
+      },
+      "new_population_commands": 396,
+      "artifact_differences": []
+    },
+    "new_populations": {
+      "functions": 133,
+      "per_execution_observations": 3010560,
+      "records": [
+        {
+          "mode": "Debug",
+          "population": "half_math",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 14,
+          "per_execution_observations": 917504,
+          "local_observations": 5505024,
+          "reference_observations": 2752512,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "scalar_sqrt",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 2,
+          "per_execution_observations": 8192,
+          "local_observations": 49152,
+          "reference_observations": 24576,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "extended80_arithmetic",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 15,
+          "per_execution_observations": 61440,
+          "local_observations": 368640,
+          "reference_observations": 184320,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "floating_remainder",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 18,
+          "per_execution_observations": 442368,
+          "local_observations": 2654208,
+          "reference_observations": 1327104,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "integer_boundaries",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "half_classification",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 16,
+          "per_execution_observations": 1048576,
+          "local_observations": 6291456,
+          "reference_observations": 3145728,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "vector_counts",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 4,
+          "per_execution_observations": 32768,
+          "local_observations": 196608,
+          "reference_observations": 98304,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "wide_values",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 35,
+          "per_execution_observations": 286720,
+          "local_observations": 1720320,
+          "reference_observations": 860160,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "storage_boundaries",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 7,
+          "per_execution_observations": 57344,
+          "local_observations": 344064,
+          "reference_observations": 172032,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "vector_transport",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 12,
+          "per_execution_observations": 73728,
+          "local_observations": 442368,
+          "reference_observations": 221184,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "hardware_queries",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "half_math",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 14,
+          "per_execution_observations": 917504,
+          "local_observations": 5505024,
+          "reference_observations": 2752512,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "scalar_sqrt",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 2,
+          "per_execution_observations": 8192,
+          "local_observations": 49152,
+          "reference_observations": 24576,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "extended80_arithmetic",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 15,
+          "per_execution_observations": 61440,
+          "local_observations": 368640,
+          "reference_observations": 184320,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "floating_remainder",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 18,
+          "per_execution_observations": 442368,
+          "local_observations": 2654208,
+          "reference_observations": 1327104,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "integer_boundaries",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "half_classification",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 16,
+          "per_execution_observations": 1048576,
+          "local_observations": 6291456,
+          "reference_observations": 3145728,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "vector_counts",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 4,
+          "per_execution_observations": 32768,
+          "local_observations": 196608,
+          "reference_observations": 98304,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "wide_values",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 35,
+          "per_execution_observations": 286720,
+          "local_observations": 1720320,
+          "reference_observations": 860160,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "storage_boundaries",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 7,
+          "per_execution_observations": 57344,
+          "local_observations": 344064,
+          "reference_observations": 172032,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "vector_transport",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 12,
+          "per_execution_observations": 73728,
+          "local_observations": 442368,
+          "reference_observations": 221184,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "hardware_queries",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        }
+      ],
+      "fault_controls": 594,
+      "detected_faults": 594
+    },
+    "fault_audit": {
+      "schema": 1,
+      "status": "passed",
+      "records": [
+        {
+          "mode": "Debug",
+          "population": "half_math",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 14,
+          "per_execution_observations": 917504,
+          "local_observations": 5505024,
+          "reference_observations": 2752512,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "scalar_sqrt",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 2,
+          "per_execution_observations": 8192,
+          "local_observations": 49152,
+          "reference_observations": 24576,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "extended80_arithmetic",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 15,
+          "per_execution_observations": 61440,
+          "local_observations": 368640,
+          "reference_observations": 184320,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "floating_remainder",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 18,
+          "per_execution_observations": 442368,
+          "local_observations": 2654208,
+          "reference_observations": 1327104,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "integer_boundaries",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "half_classification",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 16,
+          "per_execution_observations": 1048576,
+          "local_observations": 6291456,
+          "reference_observations": 3145728,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "vector_counts",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 4,
+          "per_execution_observations": 32768,
+          "local_observations": 196608,
+          "reference_observations": 98304,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "wide_values",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 35,
+          "per_execution_observations": 286720,
+          "local_observations": 1720320,
+          "reference_observations": 860160,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "storage_boundaries",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 7,
+          "per_execution_observations": 57344,
+          "local_observations": 344064,
+          "reference_observations": 172032,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "vector_transport",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 12,
+          "per_execution_observations": 73728,
+          "local_observations": 442368,
+          "reference_observations": 221184,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "Debug",
+          "population": "hardware_queries",
+          "status": "passed",
+          "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "half_math",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 14,
+          "per_execution_observations": 917504,
+          "local_observations": 5505024,
+          "reference_observations": 2752512,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "scalar_sqrt",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 2,
+          "per_execution_observations": 8192,
+          "local_observations": 49152,
+          "reference_observations": 24576,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "extended80_arithmetic",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 15,
+          "per_execution_observations": 61440,
+          "local_observations": 368640,
+          "reference_observations": 184320,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "floating_remainder",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 18,
+          "per_execution_observations": 442368,
+          "local_observations": 2654208,
+          "reference_observations": 1327104,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "integer_boundaries",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "half_classification",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 16,
+          "per_execution_observations": 1048576,
+          "local_observations": 6291456,
+          "reference_observations": 3145728,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "vector_counts",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 4,
+          "per_execution_observations": 32768,
+          "local_observations": 196608,
+          "reference_observations": 98304,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "wide_values",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 35,
+          "per_execution_observations": 286720,
+          "local_observations": 1720320,
+          "reference_observations": 860160,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "storage_boundaries",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 7,
+          "per_execution_observations": 57344,
+          "local_observations": 344064,
+          "reference_observations": 172032,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "vector_transport",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 12,
+          "per_execution_observations": 73728,
+          "local_observations": 442368,
+          "reference_observations": 221184,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        },
+        {
+          "mode": "ReleaseFast",
+          "population": "hardware_queries",
+          "status": "passed",
+          "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+          "compiler_bound": true,
+          "functions": 5,
+          "per_execution_observations": 40960,
+          "local_observations": 245760,
+          "reference_observations": 122880,
+          "fault_status": "passed",
+          "controls": 27,
+          "detected": 27
+        }
+      ],
+      "controls": 594,
+      "detected": 594,
+      "new_population_functions": 133,
+      "new_observations_per_execution": 3010560
+    },
+    "registry_audit": {
+      "old": 101,
+      "current": 112,
+      "unchanged": true,
+      "additions": [
+        {
+          "population": "half_math",
+          "prefix": "half-math",
+          "fixture": "half_math",
+          "functions": [
+            "half_math_trunc",
+            "half_math_round",
+            "half_math_ceil",
+            "half_math_floor",
+            "half_math_log10",
+            "half_math_log2",
+            "half_math_log",
+            "half_math_exp2",
+            "half_math_exp",
+            "half_math_tan",
+            "half_math_cos",
+            "half_math_sin",
+            "half_math_sqrt",
+            "half_math_fma"
+          ],
+          "libraries": [
+            "m"
+          ],
+          "observations": 917504,
+          "stdout": "half-math observations=917504 exhaustive=promotion=fma=rounding=errno=live=guards=preserved\n"
+        },
+        {
+          "population": "scalar_sqrt",
+          "prefix": "scalar-sqrt",
+          "fixture": "scalar_sqrt",
+          "functions": [
+            "scalar_sqrt_32_sqrt",
+            "scalar_sqrt_64_sqrt"
+          ],
+          "libraries": [
+            "m"
+          ],
+          "observations": 8192,
+          "stdout": "scalar-sqrt observations=8192 native=llvm=payloads=errno=x87=live=guards=preserved\n"
+        },
+        {
+          "population": "extended80_arithmetic",
+          "prefix": "extended80-arithmetic",
+          "fixture": "extended80_arithmetic",
+          "functions": [
+            "extended80_arithmetic_add_0",
+            "extended80_arithmetic_add_1",
+            "extended80_arithmetic_add_2",
+            "extended80_arithmetic_sub_0",
+            "extended80_arithmetic_sub_1",
+            "extended80_arithmetic_sub_2",
+            "extended80_arithmetic_mul_0",
+            "extended80_arithmetic_mul_1",
+            "extended80_arithmetic_mul_2",
+            "extended80_arithmetic_div_0",
+            "extended80_arithmetic_div_1",
+            "extended80_arithmetic_div_2",
+            "extended80_arithmetic_sqrt_0",
+            "extended80_arithmetic_sqrt_1",
+            "extended80_arithmetic_sqrt_2"
+          ],
+          "libraries": [
+            "m"
+          ],
+          "observations": 61440,
+          "stdout": "extended80-arithmetic observations=61440 native=llvm=literal=payloads=errno=x87=live=guards=preserved\n"
+        },
+        {
+          "population": "floating_remainder",
+          "prefix": "floating-remainder",
+          "fixture": "floating_remainder",
+          "functions": [
+            "floating_remainder_0_0",
+            "floating_remainder_0_1",
+            "floating_remainder_0_2",
+            "floating_remainder_1_0",
+            "floating_remainder_1_1",
+            "floating_remainder_1_2",
+            "floating_remainder_2_0",
+            "floating_remainder_2_1",
+            "floating_remainder_2_2",
+            "floating_remainder_3_0",
+            "floating_remainder_3_1",
+            "floating_remainder_3_2",
+            "floating_remainder_4_0",
+            "floating_remainder_4_1",
+            "floating_remainder_4_2",
+            "floating_remainder_5_0",
+            "floating_remainder_5_1",
+            "floating_remainder_5_2"
+          ],
+          "libraries": [
+            "m"
+          ],
+          "observations": 442368,
+          "stdout": "floating-remainder observations=442368 libm=llvm=half-sub=literal=payloads=errno=x87=live=guards=preserved\n"
+        },
+        {
+          "population": "integer_boundaries",
+          "prefix": "integer-boundaries",
+          "fixture": "integer_boundaries",
+          "functions": [
+            "integer_boundaries_umul",
+            "integer_boundaries_smul",
+            "integer_boundaries_target",
+            "integer_boundaries_memset",
+            "integer_boundaries_memset_constant"
+          ],
+          "observations": 40960,
+          "stdout": "integer-boundaries observations=40960 product=overflow=target=range=live=guards=preserved\n"
+        },
+        {
+          "population": "half_classification",
+          "prefix": "half-classification",
+          "fixture": "half_classification",
+          "functions": [
+            "half_classification_0",
+            "half_classification_1",
+            "half_classification_2",
+            "half_classification_4",
+            "half_classification_8",
+            "half_classification_16",
+            "half_classification_32",
+            "half_classification_64",
+            "half_classification_128",
+            "half_classification_256",
+            "half_classification_512",
+            "half_classification_3",
+            "half_classification_1020",
+            "half_classification_448",
+            "half_classification_60",
+            "half_classification_1023"
+          ],
+          "observations": 1048576,
+          "stdout": "half-classification observations=1048576 exhaustive=classes=masks=live=guards=preserved\n"
+        },
+        {
+          "population": "vector_counts",
+          "prefix": "vector-counts",
+          "fixture": "vector_counts",
+          "functions": [
+            "vector_counts_range",
+            "vector_counts_mask",
+            "vector_counts_min",
+            "vector_counts_shuffle"
+          ],
+          "observations": 32768,
+          "stdout": "vector-counts observations=32768 range=popcount=masks=reduction=shuffle=live=guards=preserved\n"
+        },
+        {
+          "population": "wide_values",
+          "prefix": "wide-values",
+          "fixture": "wide_values",
+          "functions": [
+            "wide_values_65_abs_0",
+            "wide_values_65_abs_1",
+            "wide_values_65_ctlz_0",
+            "wide_values_65_ctlz_1",
+            "wide_values_65_cttz_0",
+            "wide_values_65_cttz_1",
+            "wide_values_65_ctpop_0",
+            "wide_values_65_ctpop_1",
+            "wide_values_80_abs_0",
+            "wide_values_80_abs_1",
+            "wide_values_80_ctlz_0",
+            "wide_values_80_ctlz_1",
+            "wide_values_80_cttz_0",
+            "wide_values_80_cttz_1",
+            "wide_values_80_ctpop_0",
+            "wide_values_80_ctpop_1",
+            "wide_values_113_abs_0",
+            "wide_values_113_abs_1",
+            "wide_values_113_ctlz_0",
+            "wide_values_113_ctlz_1",
+            "wide_values_113_cttz_0",
+            "wide_values_113_cttz_1",
+            "wide_values_113_ctpop_0",
+            "wide_values_113_ctpop_1",
+            "wide_values_127_abs_0",
+            "wide_values_127_abs_1",
+            "wide_values_127_ctlz_0",
+            "wide_values_127_ctlz_1",
+            "wide_values_127_cttz_0",
+            "wide_values_127_cttz_1",
+            "wide_values_127_ctpop_0",
+            "wide_values_127_ctpop_1",
+            "wide_values_call_0",
+            "wide_values_call_1",
+            "wide_values_call_2"
+          ],
+          "observations": 286720,
+          "stdout": "wide-values observations=286720 widths=counts=abs=literals=call=live=guards=preserved\n"
+        },
+        {
+          "population": "storage_boundaries",
+          "prefix": "storage-boundaries",
+          "fixture": "storage_boundaries",
+          "functions": [
+            "storage_boundaries_fp32_0",
+            "storage_boundaries_fp32_1",
+            "storage_boundaries_fp64_0",
+            "storage_boundaries_fp64_1",
+            "storage_boundaries_object131072",
+            "storage_boundaries_object2300000",
+            "storage_boundaries_object4194304"
+          ],
+          "observations": 57344,
+          "stdout": "storage-boundaries observations=57344 tables=merged=payloads=objects=pages=guards=live=preserved\n"
+        },
+        {
+          "population": "vector_transport",
+          "prefix": "vector-transport",
+          "fixture": "vector_transport",
+          "functions": [
+            "vector_transport_wide80_body",
+            "vector_transport_wide80",
+            "vector_transport_wide113_body",
+            "vector_transport_wide113",
+            "vector_transport_wide127_body",
+            "vector_transport_wide127",
+            "vector_transport_gep0",
+            "vector_transport_gep1",
+            "vector_transport_phi0",
+            "vector_transport_phi1",
+            "vector_transport_literal_chain",
+            "vector_transport_stack_sentinel"
+          ],
+          "observations": 73728,
+          "stdout": "vector-transport observations=73728 wide=gep=phi=payloads=staging=guards=live=preserved\n"
+        },
+        {
+          "population": "hardware_queries",
+          "prefix": "hardware-queries",
+          "fixture": "hardware_queries",
+          "functions": [
+            "hardware_queries_named",
+            "hardware_queries_leaf0",
+            "hardware_queries_leaf7",
+            "hardware_queries_xcr0",
+            "hardware_queries_delayed"
+          ],
+          "observations": 40960,
+          "stdout": "hardware-queries observations=40960 cpuid=xcr0=live=rbx=stack=guards=preserved\n"
+        }
+      ],
+      "functions": 133,
+      "observations": 3010560
+    },
+    "regeneration": {
+      "schema": 1,
+      "status": "passed",
+      "populations": [
+        "half_math",
+        "scalar_sqrt",
+        "extended80_arithmetic",
+        "floating_remainder",
+        "integer_boundaries",
+        "half_classification",
+        "vector_counts",
+        "wide_values",
+        "storage_boundaries",
+        "vector_transport",
+        "hardware_queries"
+      ],
+      "generators": 11,
+      "identical_ir_and_driver_files": 22,
+      "all_registry_entries_match": true,
+      "generation_record": "audit-regeneration-v3.json",
+      "note": "All generators and file comparisons passed in v3; its final summary had a jq syntax error. This audit rechecks every retained output and completes that summary."
+    },
+    "release_bundle_retained": {
+      "schema": 1,
+      "status": "passed",
+      "rows": 100,
+      "identity": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+      "all_objects_match_manifest": true,
+      "manifest_byte_identical_to_accepted_baseline": true,
+      "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+      "bundle": "local-state/validations/compiler-selection-completion-20261108/batch-30/retained-release-source-bundle-v4"
+    },
+    "core_cohort": {
+      "schema": 1,
+      "records": 36,
+      "identities_match": true,
+      "unique_identities": 36,
+      "mode_counts": [
+        {
+          "mode": "ReleaseFast",
+          "records": 12
+        },
+        {
+          "mode": "ReleaseSafe",
+          "records": 12
+        },
+        {
+          "mode": "ReleaseSmall",
+          "records": 12
+        }
+      ],
+      "all_selected_objects_and_observations_match": true,
+      "strict_all_field_equality": false,
+      "wrapper_metadata": {
+        "reviewed_fields": [
+          "reference_bytes",
+          "reference_sha256",
+          "linked_bytes",
+          "linked_sha256"
+        ],
+        "differing_records": 30,
+        "records": [
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "InternPool.PackedU64.get"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4153776",
+              "reference_sha256": "175a1296f10469952a673fdb6c4715b38a138160842eee1aea87fc68a456a11d",
+              "linked_bytes": "6287668",
+              "linked_sha256": "c3f0764977cc0a6127611bd9ed4e097388542fd9012eddb5c11478a44c383002"
+            },
+            "after": {
+              "reference_bytes": "4153784",
+              "reference_sha256": "ef251f7cf9bbdc0d602ebd25e524eb42e173bdcf6db75bc77f743f5886ea9c07",
+              "linked_bytes": "6287668",
+              "linked_sha256": "f4e07c771c891664a05eb2f817ea51fae5c5960b14fe26b2760b7f61ccd5fd17"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "InternPool.PackedU64.init"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4153776",
+              "reference_sha256": "844499336142cfee49547b3363f60ce138706ebecd4fb96e3b368c830e734184",
+              "linked_bytes": "6287668",
+              "linked_sha256": "3c8983226e11ab32556ea5b2d10592ecba5a86371b309f282637c5aa3195ab42"
+            },
+            "after": {
+              "reference_bytes": "4153792",
+              "reference_sha256": "b4dce7478f7e8ed30a3a30e0002a596265536349df930bc6c35e84c21b9053c6",
+              "linked_bytes": "6287668",
+              "linked_sha256": "7a3673746cc3b6407a6a92790ecca8e759d566b6890355da601d1e42cf9d2f2c"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "Io.Event.reset"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4151560",
+              "reference_sha256": "258ce75d0c05b8ae35a662a0fa039c18542da79abef963c5cc08bad9e490a164",
+              "linked_bytes": "6288265",
+              "linked_sha256": "be2e9c7adeddaf74f834128a407f781f6a52a2b27989d70c4d44badd6dbcb1c2"
+            },
+            "after": {
+              "reference_bytes": "4151576",
+              "reference_sha256": "7086d25fb442f4bef069ef20b538a5023a77ed18876da3e8604dfc30ad95049d",
+              "linked_bytes": "6288265",
+              "linked_sha256": "153f6adf8350b1c15af5abea857531205dcf45a6127735e2021c10ff96339e48"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "ascii.isAscii"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4154328",
+              "reference_sha256": "9ee722f28cb856d6e64b079334cc67220a749a2492a50868f8fd0df7ae5971cc",
+              "linked_bytes": "6292446",
+              "linked_sha256": "f70347e99fdcdbb0e79485fdd5f2032f9495b7eab6f1b03e19ba790af3dba563"
+            },
+            "after": {
+              "reference_bytes": "4154336",
+              "reference_sha256": "e4214fccc5ab1817ea9d52806f64562e07d0a8a367438c14097da08bd68db049",
+              "linked_bytes": "6292446",
+              "linked_sha256": "415bbd63a02feb4b1e4f1f9632c126a100c913ca23b70a7156dfe9773b0fc6c1"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "atomic.Mutex.tryLock"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4148392",
+              "reference_sha256": "ad396995c2cdefab152e538d134aadec0a593abb3a6b2a7d768b141455af4e0e",
+              "linked_bytes": "6287753",
+              "linked_sha256": "49d9d94f63e62fbf4297faf043f751b788f11991febf0ca1f0305913823de954"
+            },
+            "after": {
+              "reference_bytes": "4148408",
+              "reference_sha256": "5eef754804f098b28ad06af67bf4c05b05f789fa8bff6b00298cd1ee74ba5af8",
+              "linked_bytes": "6287753",
+              "linked_sha256": "451396fd64e5235d07c7eb5613fbb7265e2e6d3fc801ebbaef55800a46a962e6"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "bit_set.Dynamic.maskIndex"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4153928",
+              "reference_sha256": "5a8428e902e0db2517c4552bfe5cd4394c3f0d9ab7800a96871d847e966937d6",
+              "linked_bytes": "6287625",
+              "linked_sha256": "90fb6a7db1e9306e883508c10f3855110a89d0e173477c29cf4676baac03b9b5"
+            },
+            "after": {
+              "reference_bytes": "4153944",
+              "reference_sha256": "f5efa2a62d35ba785ffa7426083d9124315b245029c4a05aa06c558e385b359b",
+              "linked_bytes": "6287625",
+              "linked_sha256": "a7e7f1e09d19cd2cb593644650234fc80fc5ebc0397644d9c89ab0036022e724"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4152416",
+              "reference_sha256": "73a57fa371e95a2ce1f9e9e7eb6cf3e337f3faf58ce830dd23985adb191f59e7",
+              "linked_bytes": "6291977",
+              "linked_sha256": "a0afe33f8a9bd7a32a6c31a7333a0f45aa0070aa5a7dcd5e554d1b566e392f2d"
+            },
+            "after": {
+              "reference_bytes": "4152424",
+              "reference_sha256": "10041dee6959b2275f2d5d315ab14eda5b19c1dff0bad217918391b0f0e61bdf",
+              "linked_bytes": "6291977",
+              "linked_sha256": "1124b3be13fb17f4dc37fd143a1a66af456b77a0b6ef874688e8cd7e548d9ecd"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4147824",
+              "reference_sha256": "14a6fe9d64d64ceddb928e7ee630ead409cc4fb53852a27342b7e257d699c4de",
+              "linked_bytes": "6291977",
+              "linked_sha256": "cb5eabfc21bbfc1b957f78788e4a1b1da5487999ae77387de60601e74efddc54"
+            },
+            "after": {
+              "reference_bytes": "4147840",
+              "reference_sha256": "25ce5360370b58527bc04346889c29e86383f788c28c2d23aea7d51312a21de6",
+              "linked_bytes": "6291977",
+              "linked_sha256": "553384ded7226f6bc694b1e7dca51814a7e2cb2e28ffbd371b027d02815c7e9c"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Requirements.size"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4148248",
+              "reference_sha256": "6dbca204106a62f49f9dfa4eb5dedd36e8b764d93dafc8969e13bb91d326c662",
+              "linked_bytes": "6291806",
+              "linked_sha256": "ed11f872171d1cb9407f3a1217c6517b6c46daec157119eda98d2a75bdde73fb"
+            },
+            "after": {
+              "reference_bytes": "4148256",
+              "reference_sha256": "d3ef7989d11e16eaa78bf7719726c53c11c5c06cb4ae3831cb4bea655ad1bfbe",
+              "linked_bytes": "6291806",
+              "linked_sha256": "91ab95ef47c67723abc7bde3678296a842148b218ee14d04c6d86f3a4e15e792"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Requirements.slotType"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4148336",
+              "reference_sha256": "c09bef74166da6bea5870bb3ff10e92b9157944feebd4f9e0fb32b8c3bf8bbf2",
+              "linked_bytes": "6291806",
+              "linked_sha256": "3d175cc4fe10238960f24899c3fb657c1b699b5df2e01e61abfcbe7f85a455db"
+            },
+            "after": {
+              "reference_bytes": "4148344",
+              "reference_sha256": "8459b59d8864ac20c5ca74b32c7f99c1c50475ed2e449f802e887ea1a5d3d1ec",
+              "linked_bytes": "6291806",
+              "linked_sha256": "720403fdb5cb96fe2f36ed80c7ad1f72d38e0068a0e46d90c778aafb5666a94a"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Signature.size"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4148304",
+              "reference_sha256": "f2dc5cba76dc558dfea0addeaa88b3d14f03e9885bb3d99ac198bbb47da121d0",
+              "linked_bytes": "6291806",
+              "linked_sha256": "d624d4d25b236bbf5d194ec7c99a215189bdf5d2b50ee96fe4b1cfb294fce28d"
+            },
+            "after": {
+              "reference_bytes": "4148320",
+              "reference_sha256": "9893c2217ce56f3a97cb22836f9f6003b1643fae4502852506209a2e7e0160cd",
+              "linked_bytes": "6291806",
+              "linked_sha256": "c9d7867ae88c3877468940aa69380b037345650314251696d0e7bf04d5f0f22a"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseFast",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Signature.slotType"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4148600",
+              "reference_sha256": "87208ac10e5cf286249062e517439fd6b1558ca1b5ed028a80674ab371a13d94",
+              "linked_bytes": "6291806",
+              "linked_sha256": "181a6631c338703ca7eb399ce226d1fe4ce0233e8f6490a09fdb93f1faf1063d"
+            },
+            "after": {
+              "reference_bytes": "4148608",
+              "reference_sha256": "1e64ea67ab5e89127ac34aed8a0ad67a00ce13aec30ff733208b070436d75791",
+              "linked_bytes": "6291806",
+              "linked_sha256": "3a9715a9a9a1eb0631af0ba62b88d2b6355b20e317f204e71357540fb4b8a566"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "InternPool.PackedU64.get"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4039624",
+              "reference_sha256": "1c7a205f27c4111ef3eb49b371b9d79595364376e69dcc5333a69abda00b482f",
+              "linked_bytes": "6142796",
+              "linked_sha256": "8a6df0980c87f50b1d1a663c24f90c2d7869b0c1c2c9c1ca3ef81cea5ff32250"
+            },
+            "after": {
+              "reference_bytes": "4039640",
+              "reference_sha256": "22d495eb8e1659ec3a2fc611ea776b843546fb93a4ae74e408c82056ceb7ecb1",
+              "linked_bytes": "6142796",
+              "linked_sha256": "713cc1c740499422573b92bbd0a9101377d32295e3a8ea91c466dea6d39160f6"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "InternPool.PackedU64.init"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4039632",
+              "reference_sha256": "16d50b0ff2ada42859a4027e29ecd6e5495e5e3b67fff69975126c9d01cdb5ef",
+              "linked_bytes": "6142796",
+              "linked_sha256": "0c60f0d2b3b629bdbfa729514acbc99438e0863c256e84b055a497268ef61d47"
+            },
+            "after": {
+              "reference_bytes": "4039640",
+              "reference_sha256": "d23313c5501c3b9f366e5fd4723f6d87a74041d3fff4ea6e272a32ddf867cc34",
+              "linked_bytes": "6142796",
+              "linked_sha256": "618abe4eab4bc3aefa1328efcf590d56def909d3691dfd048f097a9b33e84cbb"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "Io.Event.reset"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4035704",
+              "reference_sha256": "42829d6a4f28edf263202a7a318204eda8a24f7e23c7c5acb6e82d01a79f2f3c",
+              "linked_bytes": "6142732",
+              "linked_sha256": "87fea67731f954665ab2e6032a610011aa9b815f996abee57b7119fa36e6e7e1"
+            },
+            "after": {
+              "reference_bytes": "4035720",
+              "reference_sha256": "f2be7f6c36cf84f6e35f3bb2a2263c138c6a7f0fbfbf1f5a4cafc5280b7df5ae",
+              "linked_bytes": "6142732",
+              "linked_sha256": "f216ee58861dfd1b2f2a5545ce06f76b7346423cdded9521b8085a049fa98fcf"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "ascii.isAscii"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4040344",
+              "reference_sha256": "4a3b2fb1af8bb0689c65becd909d06e6c7f360462919181580d6b4e85f0b7b28",
+              "linked_bytes": "6147638",
+              "linked_sha256": "7f031b4ad8175cb3ac531b76f590a35e2ad9ec87b1d9034d5180fadba95e7331"
+            },
+            "after": {
+              "reference_bytes": "4040352",
+              "reference_sha256": "6b60b67864477ef65a3ace052017f2a336fb1b92e915e51aee9ac74824c4217e",
+              "linked_bytes": "6147638",
+              "linked_sha256": "72d3b30a3c1199a2cfc2d4807949689f238e2f2efc6c33f9f2eab4f97b671dc5"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "atomic.Mutex.tryLock"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4034200",
+              "reference_sha256": "261e333ca2210e852001817d881a02d2f92b6e3f07d369b3cffec9bd41a8cdeb",
+              "linked_bytes": "6142646",
+              "linked_sha256": "a859c0bdef21315bfd7f5478ea2212337c336c355bb859e53fb50869feddf9ee"
+            },
+            "after": {
+              "reference_bytes": "4034208",
+              "reference_sha256": "71a1b9cb355b84110e58be01d0c24da12cfbd4f5a1605140adf3262ff4bea348",
+              "linked_bytes": "6142646",
+              "linked_sha256": "331d7fd59d30b67b9cec16d656d12daf2e53500999f0f78f52933578d8a4dfc7"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "bit_set.Dynamic.maskIndex"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4039816",
+              "reference_sha256": "99e5fa5bd533e057ca136927baeedc6888f7b258759494a427cb00320a4d99da",
+              "linked_bytes": "6142732",
+              "linked_sha256": "34b48cd98c143056b862d8078e70bea78deef498834718fb0d83ff5c758fc5ff"
+            },
+            "after": {
+              "reference_bytes": "4039824",
+              "reference_sha256": "618e7104d82f9aa59f040c24428915fc20b262581290b63f9b1227df19e5c92b",
+              "linked_bytes": "6142732",
+              "linked_sha256": "84d7ef152911dffddbd7b5af0aed9ecea4a575216a55903a5dff201fd1460de5"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isFree"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4038520",
+              "reference_sha256": "594897ddb682bb270e3390f5178f27c78e62010897aa0a043ce672c159182370",
+              "linked_bytes": "6147318",
+              "linked_sha256": "c559c8c188a62c4c9a4930336ae5080b64b82d6f12652e27606b1dc970c106c6"
+            },
+            "after": {
+              "reference_bytes": "4038536",
+              "reference_sha256": "2d72aa9bb5aa8dc18b040bf698e9fbe9e3d9d45abf49a0405eb5cc6e3d2eeebf",
+              "linked_bytes": "6147318",
+              "linked_sha256": "1b1adfce68898b0166182029f6aeabe5e75bbfa85a8f6666c2fd4b7f42026c1c"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4034472",
+              "reference_sha256": "b90601b9401c966e75b945b52bdeb70c00d83c887ad37aa82436039c6ac4f2ec",
+              "linked_bytes": "6147318",
+              "linked_sha256": "007a0e32324b201b15425d1d51974c872fd0969c94be97fb4e48305fcc32d7ee"
+            },
+            "after": {
+              "reference_bytes": "4034488",
+              "reference_sha256": "4407cf162ec700c44e23557f7203e4a499d4855f1198bbb10e17fcf556977315",
+              "linked_bytes": "6147318",
+              "linked_sha256": "41dd35b4817c58d351c684531a2625ca245e9df3669e658099fa4c76c96af456"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Requirements.size"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4034336",
+              "reference_sha256": "df6a45aea78b1420a77c37c9f283e6515144ca944e1395340aaf8654a796bbe3",
+              "linked_bytes": "6147062",
+              "linked_sha256": "cc0c64dca78bcf5cfa286daf8f63e484915b5935276ccc117900c7a7753243e7"
+            },
+            "after": {
+              "reference_bytes": "4034344",
+              "reference_sha256": "b51491406b482aedfb75282b7cd07503dd933f02e1073e411cc496ae9b4b9f8d",
+              "linked_bytes": "6147062",
+              "linked_sha256": "e09ae8a58ba83242bb87eb50a6a8656cf6e09c57d1d0b165ba1d37c3a97e8624"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Requirements.slotType"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4034384",
+              "reference_sha256": "0e1c90d2fe6bfe2995db8efc5c3d9b6d3fa60edc297a6f139b5c8b9c422fe2ba",
+              "linked_bytes": "6147062",
+              "linked_sha256": "386c69ac7227dd1a0cf37345c5f701196887e81274d69d433f90908cd7ac40f8"
+            },
+            "after": {
+              "reference_bytes": "4034400",
+              "reference_sha256": "94b88f03425781253578907f832e68b4f689731df67bfa397677c04d8f314280",
+              "linked_bytes": "6147062",
+              "linked_sha256": "187a944f8ae6a367e2b197b84a20430ab1772f32cea35fca3d3c346f3e16fff1"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Signature.size"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4034360",
+              "reference_sha256": "1327d389b48a43180b78552dc9cbb8a94cfe94334136a8bb4d0d2f7d06937fab",
+              "linked_bytes": "6147062",
+              "linked_sha256": "94acdddbf7c4edc9abdb37258d370f4ec263cac4495bffac10a97e80c979421f"
+            },
+            "after": {
+              "reference_bytes": "4034368",
+              "reference_sha256": "b532df89e32b177e74dcc9daf7e8a3b5e343b1f20fb7ce1d797fcba6c086795a",
+              "linked_bytes": "6147062",
+              "linked_sha256": "51ccb18934f19095918273f9d4967f0fa8a947b85762ffad071de29801f3cd61"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSafe",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Signature.slotType"
+            ],
+            "fields": [
+              "linked_sha256",
+              "reference_bytes",
+              "reference_sha256"
+            ],
+            "before": {
+              "reference_bytes": "4034440",
+              "reference_sha256": "6e8b0107daa452396e883f06a766331a4e2c576bd69811a86aff69471cf9bcaf",
+              "linked_bytes": "6147062",
+              "linked_sha256": "fbaa7cc481c1b8b9128292b9df54dafcdfcbdecddb15c2a912e267b8c268dd43"
+            },
+            "after": {
+              "reference_bytes": "4034456",
+              "reference_sha256": "61d33a483c02e6f0c3ec9900ae74d10ff9ffc8e8cadace4062371979556ec258",
+              "linked_bytes": "6147062",
+              "linked_sha256": "94e12fb7dc31eb90f53088971189317115804d4a3a31153872e3325cf0882de1"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSmall",
+              "../ziglang/src/main.zig",
+              "InternPool.PackedU64.get"
+            ],
+            "fields": [
+              "linked_sha256"
+            ],
+            "before": {
+              "reference_bytes": "149944",
+              "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+              "linked_bytes": "356030",
+              "linked_sha256": "84006c8f41289e2b0c65fa13b8ec448f0035923b0b5b4500dc2e381f88868e66"
+            },
+            "after": {
+              "reference_bytes": "149944",
+              "reference_sha256": "01cad33aca1d237b638467b09f33d0cf545521db1f9c76ae06037b733525043a",
+              "linked_bytes": "356030",
+              "linked_sha256": "82e7fee902b89f4759d163f29a7f9d26862ced09cc2b8cad32c4675411cfa0ff"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSmall",
+              "../ziglang/src/main.zig",
+              "bit_set.Dynamic.maskIndex"
+            ],
+            "fields": [
+              "linked_sha256"
+            ],
+            "before": {
+              "reference_bytes": "149872",
+              "reference_sha256": "2fd34967a38babe25d3ab728000c7f7a44b7b38b32caa9670d684f4fa63bc609",
+              "linked_bytes": "356005",
+              "linked_sha256": "02d52a039405a263b7a14b4ac40b873590181d6461f30b280eea76bef93f8a76"
+            },
+            "after": {
+              "reference_bytes": "149872",
+              "reference_sha256": "2fd34967a38babe25d3ab728000c7f7a44b7b38b32caa9670d684f4fa63bc609",
+              "linked_bytes": "356005",
+              "linked_sha256": "b3e56b6e611d3130340999a3e706787d154fc1bbeebbef423b43345a09b405c0"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSmall",
+              "../ziglang/src/main.zig",
+              "hash_map.Custom(*Zcu.Namespace,void,hash_map.AutoContext(*Zcu.Namespace),80).Metadata.isTombstone"
+            ],
+            "fields": [
+              "linked_sha256"
+            ],
+            "before": {
+              "reference_bytes": "149768",
+              "reference_sha256": "71de76cacc973a3644ee5257ed0d184bb036d0e2c3df77826a8b534fec5f0b46",
+              "linked_bytes": "356048",
+              "linked_sha256": "43a80de8f67357769130e64c46a63c54daf35c0a61b828d0589f05d40d83684d"
+            },
+            "after": {
+              "reference_bytes": "149768",
+              "reference_sha256": "71de76cacc973a3644ee5257ed0d184bb036d0e2c3df77826a8b534fec5f0b46",
+              "linked_bytes": "356048",
+              "linked_sha256": "dfd2e94f69ac04d87decdd2eef0edc2211eb2f61500339e26507381aead811e5"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSmall",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Requirements.slotType"
+            ],
+            "fields": [
+              "linked_sha256"
+            ],
+            "before": {
+              "reference_bytes": "149664",
+              "reference_sha256": "e50a6c386ae71b6da538d1cd15a27be2f4d70dbbd450bade592d09a1b978c774",
+              "linked_bytes": "355886",
+              "linked_sha256": "21bef7ac1508f2410159bd0fe1384efc5391938af87db95a37e3b1a7d053ffd3"
+            },
+            "after": {
+              "reference_bytes": "149664",
+              "reference_sha256": "e50a6c386ae71b6da538d1cd15a27be2f4d70dbbd450bade592d09a1b978c774",
+              "linked_bytes": "355886",
+              "linked_sha256": "583ed22be135874beccf58a41421cc957572a0026d75c6099f6f13c46986b509"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSmall",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Signature.size"
+            ],
+            "fields": [
+              "linked_sha256"
+            ],
+            "before": {
+              "reference_bytes": "149664",
+              "reference_sha256": "981c89cda9bb178597bf907fdc9ca4a4d96225b0b8ded4bcbf9564e626526a8a",
+              "linked_bytes": "355886",
+              "linked_sha256": "6e0ca4eaef2cd970ced3628a9e93faa20d130827f596821871e41810e05b539e"
+            },
+            "after": {
+              "reference_bytes": "149664",
+              "reference_sha256": "981c89cda9bb178597bf907fdc9ca4a4d96225b0b8ded4bcbf9564e626526a8a",
+              "linked_bytes": "355886",
+              "linked_sha256": "7f7ef30437410f478f3dc9ff5493e03cac0cb4ed6e576e049bbc5b64b0dd352e"
+            }
+          },
+          {
+            "identity": [
+              "ReleaseSmall",
+              "../ziglang/src/main.zig",
+              "link.MachO.CodeSignature.Signature.slotType"
+            ],
+            "fields": [
+              "linked_sha256"
+            ],
+            "before": {
+              "reference_bytes": "149696",
+              "reference_sha256": "b8e2be571cafd55f9d19259e137c27866fee71be1d45040d038ac8abe9b78402",
+              "linked_bytes": "355886",
+              "linked_sha256": "9811f911ca4f192a4a1671aa2720713b9e673ce52103318ccec12ad2216c068d"
+            },
+            "after": {
+              "reference_bytes": "149696",
+              "reference_sha256": "b8e2be571cafd55f9d19259e137c27866fee71be1d45040d038ac8abe9b78402",
+              "linked_bytes": "355886",
+              "linked_sha256": "b83965a3a36dfe5abea79336f9c9c73b85d06d2eec9eb22d1657b435337d4f83"
+            }
+          }
+        ]
+      },
+      "status": "passed"
+    },
+    "core_strict_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 1,
+      "wall_ns": 204429888
+    },
+    "full_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 3707418384250
+    },
+    "full_run": {
+      "schema": 1,
+      "subgates": 17,
+      "unique_subgates": 17,
+      "all_gates_passed": true,
+      "gates": [
+        {
+          "id": "selected-object-suite",
+          "tool": "tools/run_distribution_no_llvm_codegen_subset.zig",
+          "exit_status": "0",
+          "duration_ms": "81930",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "2250",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "4137",
+          "cache_status": "none"
+        },
+        {
+          "id": "selected-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "4020",
+          "cache_status": "none"
+        },
+        {
+          "id": "zig-source-native-link",
+          "tool": "tools/run_distribution_zig_source_native_link.zig",
+          "exit_status": "0",
+          "duration_ms": "23845",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-postopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "97803",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-preopt",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "--pipeline": "preopt",
+          "exit_status": "0",
+          "duration_ms": "41330",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-ir-writer",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "20942",
+          "cache_status": "none"
+        },
+        {
+          "id": "integrated-object-release",
+          "tool": "tools/run_distribution_zig_integrated_object.zig",
+          "exit_status": "0",
+          "duration_ms": "14472",
+          "cache_status": "none"
+        },
+        {
+          "id": "real-rows-release-fast",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseFast",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "874111",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-safe",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSafe",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "898593",
+          "cache_status": "hit"
+        },
+        {
+          "id": "real-rows-release-small",
+          "tool": "src/distribution_real_rows_gate.zig",
+          "--mode": "ReleaseSmall",
+          "--limit": "100",
+          "exit_status": "0",
+          "duration_ms": "471658",
+          "cache_status": "hit"
+        },
+        {
+          "id": "integrated-executable",
+          "tool": "tools/run_distribution_zig_integrated_exe.zig",
+          "exit_status": "0",
+          "duration_ms": "2366012",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-object-inspection",
+          "tool": "tools/run_native_link_object_inspection.zig",
+          "exit_status": "0",
+          "duration_ms": "718",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-link",
+          "tool": "tools/run_distribution_native_link_m5.zig",
+          "exit_status": "0",
+          "duration_ms": "1515",
+          "cache_status": "none"
+        },
+        {
+          "id": "release-native-probe",
+          "tool": "tools/probe_native_linker_compatibility.zig",
+          "exit_status": "0",
+          "duration_ms": "1422",
+          "cache_status": "none"
+        },
+        {
+          "id": "boundary-gates",
+          "tool": "tools/run_distribution_boundary_gates.zig",
+          "exit_status": "0",
+          "duration_ms": "11439",
+          "cache_status": "none"
+        }
+      ],
+      "real_rows": [
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseFast",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseSafe",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        },
+        {
+          "counter_schema": "distribution-real-rows-v3",
+          "mode": "ReleaseSmall",
+          "selector_version": "real-candidate-selector-v3",
+          "candidate_file_hash": "847e014b2abab0800d0df690ef324dc5fa01299dcf60645b4dc55ca406fe2a31",
+          "limit": "100",
+          "candidate_rows": "100",
+          "real_functions_lowered": "100",
+          "real_objects_emitted": "100",
+          "real_native_linked": "100",
+          "real_executed": "12",
+          "real_programs_ok": "12",
+          "first_failing_real_row": "-",
+          "first_failing_stage": "-",
+          "local_fail": "0"
+        }
+      ],
+      "serial": [
+        {
+          "schema_version": "1",
+          "run_id": "735d6cd63aca2680d73a456320aa8412",
+          "scratch_path": "local-state/validations/compiler-selection-completion-20261108/batch-30/serial-v3",
+          "bundle_path": "local-state/validations/compiler-selection-completion-20261108/batch-30/serial-v3/release_source_object_bundle",
+          "target": "x86_64-unknown-linux-gnu",
+          "mode": "serial",
+          "real_rows_concurrency": "3",
+          "subgates": "17",
+          "wall_ms": "3707164",
+          "starting_free_bytes": "30660165632",
+          "minimum_observed_free_bytes": "29838082048",
+          "final_free_bytes": "39494529024",
+          "observed_peak_bytes": "822083584",
+          "reserve_bytes": "11410065408",
+          "required_start_bytes": "20000000000",
+          "local_fail": "0"
+        }
+      ],
+      "release_object_bundle": [
+        {
+          "schema_version": "1",
+          "produced": "1",
+          "consumers": "3",
+          "identity": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+          "executions_cached": "false",
+          "local_fail": "0"
+        }
+      ],
+      "inventory": [
+        {
+          "schema_version": "1",
+          "subgates": "17",
+          "runner": "zig-run",
+          "runner_input_scope": "command",
+          "target": "x86_64-unknown-linux-gnu",
+          "reported_cache_contracts": "3",
+          "unreported_cache_contracts": "14",
+          "release_source_object_bundle_contracts": "4",
+          "no_artifact_contracts": "13",
+          "local_fail": "0"
+        }
+      ],
+      "status": "passed"
+    },
+    "execution_controls": {
+      "schema": "execution-breadth-controls-v2",
+      "harness_reuse": true,
+      "negative_controls": 54,
+      "function_modes": 21,
+      "observations": 22788,
+      "status": "passed"
+    },
+    "strict_log_comparisons": {
+      "full": {
+        "status": "finished",
+        "outcome": "completed",
+        "actual_returncode": 1,
+        "wall_ns": 757174333
+      },
+      "real_rows": {
+        "status": "finished",
+        "outcome": "completed",
+        "actual_returncode": 1,
+        "wall_ns": 755396676
+      },
+      "canonical_rows": {
+        "before": 1540,
+        "after": 1551
+      },
+      "equality_claimed": false
+    }
+  },
+  "source_binding": {
+    "schema": 1,
+    "status": "passed",
+    "frozen_head": "1717b5af08b3e6bf5793fafd7bc68b29a4f2484f",
+    "committed_head": "efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898",
+    "committed_tree": "1463c97bf2380279d773caf446a779a25750e05d",
+    "files": 3373,
+    "compiler_source_files": 614,
+    "all_file_hashes_match": true,
+    "build_receipts_match": true,
+    "frozen_source_verified_after_all_runs": true
+  },
+  "binary_binding": {
+    "schema": 1,
+    "status": "passed",
+    "frozen_source_unchanged_after_all_runs": true,
+    "compiler_source_files": 614,
+    "build_receipts_match": true,
+    "executed_binary_hashes_unchanged": true,
+    "checksums": "local-state/validations/compiler-selection-completion-20261108/batch-30/expected-binaries-v3.sha256",
+    "checksum_count": 3,
+    "checksum_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 389478049
+    },
+    "Debug": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-30/compiler-v3/Debug/bin/z_llvm",
+      "sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+      "source_head": "1717b5af08b3e6bf5793fafd7bc68b29a4f2484f"
+    },
+    "ReleaseFast": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-30/compiler-v3/ReleaseFast/bin/z_llvm",
+      "sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+      "source_head": "1717b5af08b3e6bf5793fafd7bc68b29a4f2484f"
+    },
+    "census": {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-30/census-v3",
+      "sha256": "c3121ccdcb745a012e72100bfda7b65cf4c2b8d38502e072272f4ec7a27ef191"
+    },
+    "full_native_and_production_compiler_bindings_match": true
+  },
+  "compiler_builds": {
+    "Debug": {
+      "compiler": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-30/compiler-v3/Debug/bin/z_llvm",
+      "compiler_sha256": "f3502e3e7075418d9219a15af322fe633397cc586d784272a26c1ae605699678",
+      "build_mode": "Debug",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    },
+    "ReleaseFast": {
+      "compiler": "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-30/compiler-v3/ReleaseFast/bin/z_llvm",
+      "compiler_sha256": "122f8691264a6b046a5bead99a38c4efca24d5fae7da2834f54c0ad6f8f63536",
+      "build_mode": "ReleaseFast",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    }
+  },
+  "fixed_contracts": {
+    "real_prefix": 100,
+    "core_execution_cohort": 12,
+    "compiler_rt_bypass_ratchet": 130,
+    "frozen_contracts": 24,
+    "accepted_status_json_unchanged": true,
+    "frozen_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 188733926
+    },
+    "scratch_pins": 13,
+    "scratch_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 189248101
+    },
+    "air_payloads": 3,
+    "air_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 3397719564
+    },
+    "prior_acceptance_seal_process": {
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0,
+      "wall_ns": 18460023569
+    }
+  },
+  "limitations": [
+    "Production completes all selection and stops at UnsupportedGlobalData in object_write; no compiler object, startup or self-rebuild is accepted",
+    "Runtime selection remains 387/455; the 68 rejected definitions receive no completion credit",
+    "CPU queries admit only exact validated assembly forms; instruction availability remains source controlled",
+    "Strict full-log equality is not claimed after eleven mandatory population summaries were added",
+    "Concurrent timings establish completion without a controlled performance ratio"
+  ]
+}
