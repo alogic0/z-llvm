@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `50ba1a5d`,
-selecting 8,838/8,928 compiler definitions and 331/455 runtime definitions.
-Continue through all 90 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `669fd097`,
+selecting 8,860/8,928 compiler definitions and 351/455 runtime definitions.
+Continue through all 68 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -289,3 +289,20 @@ retained-input and core-object checks pass. See the
 [accepted extended80 transport evidence](../evidence/extended80_payload_transport.md).
 Continue through all 90 original rejections. Isolated numerical conversion,
 comparison and sign-operation results require their own cumulative acceptance.
+
+Batch 18 accepts the combined conversion, predicate and sign work at
+`669fd097`. Complete original compiler census and independent production agree
+on 8,860 selections and 68 rejections, adding 22 without lost successes or
+owner changes; runtime reaches 351/455, adding twenty. All 4,375,366 compiler
+event rows audit successfully. Debug/ReleaseSafe each pass 2,127 units,
+63 structural and two profile checks; readiness and all seventeen integration
+gates pass. Both complete 96-population native suites preserve all preceding
+92 entries, 3,413 outcomes and 1,401 artifact hashes per build exactly. All
+216 new fault controls detect their errors. Every selected core object and
+observation matches; reviewed wrapper metadata and strict log differences
+remain explicit. Source, binary and retained-input bindings pass, including
+fresh distinct-name records after an initial receipt/report filename collision.
+See the [accepted floating evidence](../evidence/floating_conversions_predicates.md).
+Continue through all 68 original compiler rejections. Isolated store-only half
+storage, wide byte swaps, scalar vector choices, further conversions and math
+intrinsics receive no cumulative acceptance credit until complete replays.
