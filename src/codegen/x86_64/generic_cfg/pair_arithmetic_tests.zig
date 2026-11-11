@@ -3,6 +3,32 @@ const ir = @import("../../../ir.zig");
 const forms = @import("pair_arithmetic.zig");
 const cleanup = @import("pair_dead_values.zig");
 
+test "pair arithmetic constant logical shifts retain primitive projections and terminate" {
+    for ([_]u8{ 0, 1, 7, 31, 32, 40, 48, 56, 63, 65, 96, 127 }) |amount| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\define i128 @shift(i128 %__zllvm_scalar_form_0) {{
+            \\entry:
+            \\ %answer = lshr i128 %__zllvm_scalar_form_0, {d}
+            \\ ret i128 %answer
+            \\}}
+        , .{amount});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const view = (try forms.legalize(arena.allocator(), original)) orelse return error.TestExpectedRewrite;
+        try std.testing.expect(try forms.legalize(arena.allocator(), view) == null);
+        try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+        try std.testing.expectEqual(@as(i128, amount), original.blocks.items[0].instructions.items[0].kind.binary.rhs.int);
+        module.functions.items[0] = view;
+        defer module.functions.items[0] = original;
+        try module.verify();
+    }
+}
+
 test "pair arithmetic cleanup owns removals and preserves memory and calls" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\declare void @sink(i128)

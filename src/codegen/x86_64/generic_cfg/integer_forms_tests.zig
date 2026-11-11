@@ -7,6 +7,263 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "integer forms zero-extended returns publish clean native carriers" {
+    for ([_]u16{ 1, 7, 8, 16, 23, 31 }) |bits| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\define zeroext i{d} @run(i64 %input, i64 %seed) {{
+            \\entry:
+            \\ %mixed = xor i64 %input, %seed
+            \\ %small = trunc i64 %mixed to i{d}
+            \\ ret i{d} %small
+            \\}}
+        , .{ bits, bits, bits });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var lowered = machine.MachineFunction.init("run", .{ .int = bits });
+        defer lowered.deinit(std.testing.allocator);
+        const selected = try selector.tryLower(std.testing.allocator, &lowered, module.functions.items[0]);
+        if (selected == .unsupported) std.debug.print("zero-extended return i{d}: {s}\n", .{ bits, selected.unsupported.detail() });
+        try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+        try verify.verifyFunction(lowered);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, lowered);
+        defer std.testing.allocator.free(bytes);
+        const executable = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(executable);
+        @memcpy(executable[0..bytes.len], bytes);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(executable.ptr);
+        const mask = (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+        const values = [_]u64{ 0, 1, 127, 128, 255, 65535, 0x0123456789abcdef, std.math.maxInt(u64) };
+        for (values) |input| for (values) |seed| try std.testing.expectEqual((input ^ seed) & mask, run(input, seed));
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const view = (try narrow.legalize(arena.allocator(), original)) orelse return error.TestExpectedRewrite;
+        try std.testing.expectEqualStrings("zeroext", original.ret_attrs.?);
+        try std.testing.expect(original.ret_ty.eql(.{ .int = bits }));
+        try std.testing.expect(view.ret_ty.eql(.{ .int = 32 }) and view.ret_attrs == null);
+        try std.testing.expect(try narrow.legalize(arena.allocator(), view) == null);
+        try module.verify();
+    }
+}
+
+test "integer forms execute constant-left shifts with live count aliases" {
+    for ([_]u16{ 32, 64 }) |bits| for ([_][]const u8{ "shl", "lshr", "ashr" }) |operation| {
+        const top: u64 = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+        const mask: u64 = if (bits == 64) std.math.maxInt(u64) else std.math.maxInt(u32);
+        for ([_]bool{ false, true }) |unsigned_spelling| for ([_]bool{ false, true }) |spill_count| {
+            const text = try std.fmt.allocPrint(std.testing.allocator,
+                \\define i64 @run(i64 %count, i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %g) {{
+                \\entry:
+                \\ %masked = and i64 %count, {d}
+                \\ {s}
+                \\ {s}
+                \\ %shifted = {s} i{d} {d}, {s}
+                \\ {s}
+                \\ {s}
+                \\ %one = xor i64 %wide, %marker
+                \\ %two = add i64 %one, %c
+                \\ %three = xor i64 %two, %d
+                \\ %four = sub i64 %three, %e
+                \\ %five = xor i64 %four, %f
+                \\ %result = add i64 %five, %g
+                \\ ret i64 %result
+                \\}}
+            , .{
+                bits - 1,
+                if (bits == 32) "%narrow_count = trunc i64 %masked to i32" else "",
+                if (spill_count) "%marker = xor i64 %a, %b" else "",
+                operation,
+                bits,
+                if (unsigned_spelling) @as(i128, top) else -@as(i128, top),
+                if (bits == 32) "%narrow_count" else "%masked",
+                if (bits == 32) "%wide = zext i32 %shifted to i64" else "%wide = xor i64 %shifted, 0",
+                if (spill_count) "" else "%marker = xor i64 %a, %b",
+            });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var lowered = machine.MachineFunction.init("run", .{ .int = 64 });
+            defer lowered.deinit(std.testing.allocator);
+            const selected = try selector.tryLower(std.testing.allocator, &lowered, module.functions.items[0]);
+            if (selected == .unsupported) std.debug.print("literal-left {s} i{d} spill={} unsigned={}: {s}\n", .{ operation, bits, spill_count, unsigned_spelling, selected.unsupported.detail() });
+            try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+            try verify.verifyFunction(lowered);
+            const bytes = try encoding.encodeFunction(std.testing.allocator, lowered);
+            defer std.testing.allocator.free(bytes);
+            const executable = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+            defer std.posix.munmap(executable);
+            @memcpy(executable[0..bytes.len], bytes);
+            const run: *const fn (u64, u64, u64, u64, u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(executable.ptr);
+            for (0..bits) |amount| for ([_]u64{ 0, 0x0123456789abcdef, std.math.maxInt(u64) }) |seed| {
+                const count: u6 = @intCast(amount);
+                const shifted: u64 = if (std.mem.eql(u8, operation, "shl")) (top << count) & mask else if (std.mem.eql(u8, operation, "lshr")) top >> count else if (bits == 64) @bitCast(@as(i64, @bitCast(top)) >> count) else @as(u32, @bitCast(@as(i32, @bitCast(@as(u32, @truncate(top)))) >> @as(u5, @intCast(amount))));
+                const a = seed;
+                const b = seed ^ 0xa55a55aa12345678;
+                const c = seed +% amount;
+                const d = ~seed;
+                const e = seed *% 17;
+                const f = seed ^ amount;
+                const g = seed -% amount;
+                const expected = (((((shifted ^ (a ^ b)) +% c) ^ d) -% e) ^ f) +% g;
+                try std.testing.expectEqual(expected, run(amount | 0xfedcba9876543200, a, b, c, d, e, f, g));
+            };
+        };
+    };
+}
+
+test "integer forms literal-shift views preserve flags identities and fixed points" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i64 @shift(i64 %__zllvm_scalar_form_0) {
+        \\entry:
+        \\ %answer = ashr exact i64 -9223372036854775808, %__zllvm_scalar_form_0
+        \\ ret i64 %answer
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const original = module.functions.items[0];
+    try std.testing.expect(!forms.requiresNormalization(original));
+    const view = (try forms.legalize(arena.allocator(), original)) orelse return error.TestExpectedRewrite;
+    try std.testing.expect(try forms.legalize(arena.allocator(), view) == null);
+    try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+    try std.testing.expect(original.blocks.items[0].instructions.items[0].kind.binary.lhs == .int);
+    const retained = view.blocks.items[0].instructions.items[1];
+    try std.testing.expectEqualStrings("answer", retained.result.?);
+    try std.testing.expect(retained.kind.binary.op == .ashr and retained.kind.binary.flags.exact);
+    try std.testing.expectEqualStrings("__zllvm_scalar_form_0", retained.kind.binary.rhs.named);
+    module.functions.items[0] = view;
+    defer module.functions.items[0] = original;
+    try module.verify();
+}
+
+test "pair shifts execute constant projections from zero extensions" {
+    for ([_]u8{ 40, 1, 7, 31, 32, 48, 56, 63, 64, 65, 96, 127 }) |amount| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\define i64 @run(i64 %input, i64 %live) {{
+            \\entry:
+            \\ %pair = zext i64 %input to i128
+            \\ %shifted = lshr i128 %pair, {d}
+            \\ %byte = trunc i128 %shifted to i8
+            \\ %wide = zext i8 %byte to i64
+            \\ %one = xor i64 %wide, %input
+            \\ %result = xor i64 %one, %live
+            \\ ret i64 %result
+            \\}}
+        , .{amount});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var lowered = machine.MachineFunction.init("run", .{ .int = 64 });
+        defer lowered.deinit(std.testing.allocator);
+        const selected = try selector.tryLower(std.testing.allocator, &lowered, module.functions.items[0]);
+        if (selected == .unsupported) std.debug.print("pair projection {d}: {s}\n", .{ amount, selected.unsupported.detail() });
+        try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+        try verify.verifyFunction(lowered);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, lowered);
+        defer std.testing.allocator.free(bytes);
+        const executable = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(executable);
+        @memcpy(executable[0..bytes.len], bytes);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(executable.ptr);
+        for ([_]u64{ 0, 1, 0x0123456789abcdef, 0x8000000000000000, std.math.maxInt(u64) }) |input| for ([_]u64{ 0, 0xa55a55aa12345678, std.math.maxInt(u64) }) |live| {
+            const projected: u64 = @intCast((@as(u128, input) >> @as(u7, @intCast(amount))) & 255);
+            try std.testing.expectEqual(projected ^ input ^ live, run(input, live));
+        };
+    }
+}
+
+test "pair shifts serialize widened words with live vector projections" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+        \\define void @run(ptr %output, i64 %input, i64 %live, i64 %length) {
+        \\entry:
+        \\ %copy_source = alloca i64, align 8
+        \\ store i64 %input, ptr %copy_source, align 8
+        \\ call void @llvm.memcpy.p0.p0.i64(ptr %output, ptr %copy_source, i64 %length, i1 false)
+        \\ br label %serialize
+        \\serialize:
+        \\ %first_word = add i64 %input, %live
+        \\ %first = zext i64 %first_word to i128
+        \\ %second_word = xor i64 %input, %live
+        \\ %second = zext i64 %second_word to i128
+        \\ %a = lshr i128 %first, 40
+        \\ %b = lshr i128 %first, 48
+        \\ %c = lshr i128 %first, 56
+        \\ %a8 = trunc i128 %a to i8
+        \\ %b8 = trunc i128 %b to i8
+        \\ %c8 = trunc i128 %c to i8
+        \\ %low = trunc i64 %first_word to i8
+        \\ %insert = insertelement <4 x i128> poison, i128 %first, i64 0
+        \\ %splat = shufflevector <4 x i128> %insert, <4 x i128> poison, <4 x i32> zeroinitializer
+        \\ %shifted = lshr <4 x i128> %splat, <i128 8, i128 16, i128 24, i128 32>
+        \\ %bytes = trunc <4 x i128> %shifted to <4 x i8>
+        \\ store i8 %low, ptr %output, align 1
+        \\ %p1 = getelementptr i8, ptr %output, i64 1
+        \\ store <4 x i8> %bytes, ptr %p1, align 1
+        \\ %p5 = getelementptr i8, ptr %output, i64 5
+        \\ store i8 %a8, ptr %p5, align 1
+        \\ %p6 = getelementptr i8, ptr %output, i64 6
+        \\ store i8 %b8, ptr %p6, align 1
+        \\ %p7 = getelementptr i8, ptr %output, i64 7
+        \\ store i8 %c8, ptr %p7, align 1
+        \\ %d = lshr i128 %second, 40
+        \\ %e = lshr i128 %second, 48
+        \\ %f = lshr i128 %second, 56
+        \\ %d8 = trunc i128 %d to i8
+        \\ %e8 = trunc i128 %e to i8
+        \\ %f8 = trunc i128 %f to i8
+        \\ %second_low = trunc i64 %second_word to i8
+        \\ %insert2 = insertelement <4 x i128> poison, i128 %second, i64 0
+        \\ %splat2 = shufflevector <4 x i128> %insert2, <4 x i128> poison, <4 x i32> zeroinitializer
+        \\ %shifted2 = lshr <4 x i128> %splat2, <i128 8, i128 16, i128 24, i128 32>
+        \\ %bytes2 = trunc <4 x i128> %shifted2 to <4 x i8>
+        \\ %p8 = getelementptr i8, ptr %output, i64 8
+        \\ store i8 %second_low, ptr %p8, align 1
+        \\ %p9 = getelementptr i8, ptr %output, i64 9
+        \\ store <4 x i8> %bytes2, ptr %p9, align 1
+        \\ %p13 = getelementptr i8, ptr %output, i64 13
+        \\ store i8 %d8, ptr %p13, align 1
+        \\ %p14 = getelementptr i8, ptr %output, i64 14
+        \\ store i8 %e8, ptr %p14, align 1
+        \\ %p15 = getelementptr i8, ptr %output, i64 15
+        \\ store i8 %f8, ptr %p15, align 1
+        \\ ret void
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    var lowered = machine.MachineFunction.init("run", .void);
+    defer lowered.deinit(std.testing.allocator);
+    const selected = try selector.tryLower(std.testing.allocator, &lowered, module.functions.items[0]);
+    if (selected == .unsupported) std.debug.print("pair/vector serialization: {s}\n", .{selected.unsupported.detail()});
+    try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+    try verify.verifyFunction(lowered);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, lowered);
+    defer std.testing.allocator.free(bytes);
+    const executable = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(executable);
+    @memcpy(executable[0..bytes.len], bytes);
+    const run: *const fn ([*]u8, u64, u64, u64) callconv(.c) void = @ptrCast(executable.ptr);
+    const values = [_]u64{ 0, 1, 0x0123456789abcdef, 0x8000000000000000, std.math.maxInt(u64) };
+    for (values) |input| for (values) |live| for ([_]u64{ 0, 1, 7, 8 }) |length| {
+        var output: [32]u8 = @splat(0xa5);
+        var expected = output;
+        for (0..8) |index| {
+            const shift: u6 = @intCast(index * 8);
+            expected[8 + index] = @truncate((input +% live) >> shift);
+            expected[16 + index] = @truncate((input ^ live) >> shift);
+        }
+        run(output[8..].ptr, input, live, length);
+        try std.testing.expectEqualSlices(u8, &expected, &output);
+    };
+}
+
 test "integer forms execute odd-width zero extension with dirty upper bits and live aliases" {
     for ([_][2]u16{ .{ 8, 33 }, .{ 32, 39 }, .{ 33, 39 }, .{ 39, 51 }, .{ 51, 52 }, .{ 52, 63 } }) |widths| {
         const source = try std.fmt.allocPrint(std.testing.allocator,

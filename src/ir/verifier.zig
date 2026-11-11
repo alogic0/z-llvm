@@ -1156,6 +1156,8 @@ pub fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     var saw_captures = false;
     var saw_align = false;
     var saw_dereferenceable = false;
+    var saw_dereferenceable_or_null = false;
+    var saw_extension = false;
     var saw_immarg = false;
     var saw_range = false;
     var saw_sret = false;
@@ -1219,6 +1221,8 @@ pub fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
             continue;
         }
         if (std.mem.eql(u8, token, "zeroext") or std.mem.eql(u8, token, "signext")) {
+            if (saw_extension) return error.UnsupportedCallAttribute;
+            saw_extension = true;
             switch (ty) {
                 .int => {},
                 else => return error.UnsupportedCallAttribute,
@@ -1249,6 +1253,13 @@ pub fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
             if (ty != .ptr) return error.UnsupportedCallAttribute;
             if (payload.len == 0) return error.UnsupportedCallAttribute;
             _ = try std.fmt.parseInt(u64, payload, 10);
+            continue;
+        }
+        if (abiPayload(token, "dereferenceable_or_null")) |payload| {
+            if (saw_dereferenceable_or_null or ty != .ptr or payload.len == 0) return error.UnsupportedCallAttribute;
+            saw_dereferenceable_or_null = true;
+            for (payload) |byte| if (!std.ascii.isDigit(byte)) return error.UnsupportedCallAttribute;
+            _ = std.fmt.parseInt(u64, payload, 10) catch return error.UnsupportedCallAttribute;
             continue;
         }
         if (abiPayload(token, "sret")) |payload| {

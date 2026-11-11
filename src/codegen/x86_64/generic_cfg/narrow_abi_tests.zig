@@ -273,7 +273,7 @@ test "narrow ABI rejects malformed facts and extension promises before changing 
     ;
     var module = try ir.Module.parse(std.testing.allocator, text);
     defer module.deinit();
-    for ([_][]const u8{ "signext", "zeroext", "nonnull", "range(i16 0, 8)", "range(i8 5, 5)", "range(i8 0, 256)", "noundef noundef" }) |attrs| {
+    for ([_][]const u8{ "signext", "zeroext zeroext", "nonnull", "range(i16 0, 8)", "range(i8 5, 5)", "range(i8 0, 256)", "noundef noundef" }) |attrs| {
         var function = module.functions.items[0];
         function.ret_attrs = attrs;
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -286,12 +286,12 @@ test "narrow ABI rejects malformed facts and extension promises before changing 
 test "narrow ABI retains unsupported extension call convention and intrinsic boundaries" {
     const calls = [_][]const u8{
         "%result = call signext i8 @callee()",
-        "%result = call zeroext i8 @callee()",
+        "%result = call zeroext i32 @callee()",
         "%result = call coldcc i8 @callee()",
         "%result = musttail call i8 @callee()",
         "%result = call i8 (i32, ...) @callee(i32 1)",
         "%result = call i8 @callee(i8 signext 1)",
-        "%result = call i8 @callee(i8 zeroext 1)",
+        "%result = call i8 @callee(i32 zeroext 1)",
         "%result = call i32 @callee()",
         "%result = call i8 @llvm.unknown.i8()",
     };

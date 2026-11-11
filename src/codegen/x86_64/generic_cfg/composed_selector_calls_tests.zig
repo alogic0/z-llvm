@@ -1128,7 +1128,7 @@ test "composed boolean calls route default ccc and fastcc through typed argument
         .{ .ty = .ptr, .loc = .{ .stack_scalar = .{ .base_disp = 24, .bits = 64 } } },
         .{ .ty = .ptr, .loc = .{ .stack128 = 32 } },
     };
-    for ([_]?[]const u8{ null, "ccc", "fastcc" }) |convention| {
+    for ([_]?[]const u8{ null, "ccc", "fastcc" }) |convention| for ([_]?[]const u8{ null, "zeroext", "noundef zeroext" }) |ret_attrs| {
         for (cases) |case| {
             for ([_]usize{ 0, 1, 6 }) |count| {
                 var machine = MachineFunction.init("boolean-call-arguments", .{ .int = 1 });
@@ -1141,7 +1141,7 @@ test "composed boolean calls route default ccc and fastcc through typed argument
                 selector.allocation_plan = &plan;
                 selector.stack_frame_bytes = 128;
                 try selector_state.bindValueLoc(&selector, "argument", case.loc);
-                var call = ir.CallInst{ .ret_ty = .{ .int = 1 }, .callee = "callee", .calling_conv = convention, .args = .empty };
+                var call = ir.CallInst{ .ret_ty = .{ .int = 1 }, .ret_attrs = ret_attrs, .callee = "callee", .calling_conv = convention, .args = .empty };
                 defer call.deinit(std.testing.allocator);
                 for (0..count) |_| try call.args.append(std.testing.allocator, .{
                     .ty = case.ty,
@@ -1153,7 +1153,7 @@ test "composed boolean calls route default ccc and fastcc through typed argument
                 try std.testing.expectEqual(@as(u16, 1), selector.accumulator_domain.occupant.?.logical_bits);
             }
         }
-    }
+    };
 }
 
 test "composed boolean calls retain the bounded argument and call envelope" {
@@ -1168,7 +1168,7 @@ test "composed boolean calls retain the bounded argument and call envelope" {
         diagnostic: ?[]const u8 = null,
         failure: ?anyerror = null,
     }{
-        .{ .ret_attrs = "zeroext", .diagnostic = "composed-block-call-form" },
+        .{ .ret_attrs = "zeroext zeroext", .diagnostic = "composed-block-call-form" },
         .{ .ret_attrs = "signext", .diagnostic = "composed-block-call-form" },
         .{ .calling_conv = "coldcc", .diagnostic = "composed-block-call-form" },
         .{ .indirect = true, .diagnostic = "composed-block-indirect-call" },

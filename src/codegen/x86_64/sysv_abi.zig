@@ -597,8 +597,9 @@ fn isAttributeGroupReference(attrs: []const u8) bool {
 
 pub fn callReturnAttrsSupported(call: ir.CallInst) bool {
     const attrs = call.ret_attrs orelse return true;
-    // Return facts do not change the register representation. Parameter-only
-    // promises (capture, memory effects, allocptr) are excluded here.
+    // Sub-word zero extensions use the private clean 32-bit ABI carrier.
+    // Other accepted return facts do not change register representation;
+    // parameter-only promises remain excluded here.
     ir.verifyParameterAttrs(call.ret_ty, attrs) catch return false;
     var rest = std.mem.trim(u8, attrs, " \t");
     while (rest.len != 0) {
@@ -607,9 +608,10 @@ pub fn callReturnAttrsSupported(call: ir.CallInst) bool {
         const token = rest[0..end];
         rest = std.mem.trim(u8, rest[end..], " \t");
         if (std.mem.eql(u8, token, "noundef") and call.ret_ty != .void) continue;
+        if (call.ret_ty == .int and call.ret_ty.int > 0 and call.ret_ty.int < 32 and std.mem.eql(u8, token, "zeroext")) continue;
         if (call.ret_ty == .int and std.mem.startsWith(u8, token, "range(")) continue;
         if (call.ret_ty == .ptr and (std.mem.eql(u8, token, "noalias") or std.mem.eql(u8, token, "nonnull") or
-            std.mem.startsWith(u8, token, "dereferenceable("))) continue;
+            std.mem.startsWith(u8, token, "dereferenceable(") or std.mem.startsWith(u8, token, "dereferenceable_or_null("))) continue;
         if (call.ret_ty == .ptr and std.mem.eql(u8, token, "align")) {
             const alignment_end = syntax.findTopLevelTokenEnd(rest) orelse return false;
             if (alignment_end == 0) return false;
@@ -735,6 +737,7 @@ pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
             continue;
         }
         if (std.mem.startsWith(u8, token, "dereferenceable(")) continue;
+        if (std.mem.startsWith(u8, token, "dereferenceable_or_null(")) continue;
         if (!std.mem.eql(u8, token, "align")) return false;
         const alignment_end = syntax.findTopLevelTokenEnd(rest) orelse return false;
         if (alignment_end == 0) return false;
@@ -823,15 +826,37 @@ test "pointer initialization promises validate complete signed nonoverlapping ra
     }) |attrs| try std.testing.expect(!pointerCallAttrsAreAdvisory(attrs));
 }
 
-test "call value facts validate typed wrapped ranges without extending the ABI" {
+test "call zero-extended and nullable return attributes retain closed contracts" {
+    for ([_]u16{ 1, 7, 8, 16, 23, 31 }) |bits| for ([_][]const u8{ "zeroext", "noundef zeroext", "zeroext noundef" }) |attrs| {
+        const ty: ir.Type = .{ .int = bits };
+        const call: ir.CallInst = .{ .callee = "callee", .ret_ty = ty, .ret_attrs = attrs, .args = .empty };
+        try rejectUnsupportedCallEnvelope(call);
+        try rejectUnsupportedCallArgAttrs(.{ .ty = ty, .attrs = attrs, .value = .{ .named = "v" } });
+    };
+    for ([_][]const u8{ "dereferenceable_or_null(16)", "noundef noalias align 8 dereferenceable_or_null(140)" }) |attrs| {
+        try rejectUnsupportedCallEnvelope(.{ .callee = "callee", .ret_ty = .ptr, .ret_attrs = attrs, .args = .empty });
+        try rejectUnsupportedCallArgAttrs(.{ .ty = .ptr, .attrs = attrs, .value = .{ .named = "p" } });
+    }
+    for ([_]ir.Type{ .ptr, .{ .int = 32 }, .{ .int = 64 }, .float }) |ty| {
+        try std.testing.expect(!callReturnAttrsSupported(.{ .callee = "callee", .ret_ty = ty, .ret_attrs = "zeroext", .args = .empty }));
+    }
+    for ([_][]const u8{ "signext", "zeroext signext", "zeroext zeroext", "zeroext unknown", "zeroext range(i16 0, 128)" }) |attrs| {
+        try std.testing.expect(!callReturnAttrsSupported(.{ .callee = "callee", .ret_ty = .{ .int = 8 }, .ret_attrs = attrs, .args = .empty }));
+    }
+    for ([_][]const u8{ "dereferenceable_or_null()", "dereferenceable_or_null(-1)", "dereferenceable_or_null(16)junk", "dereferenceable_or_null(16) dereferenceable_or_null(16)", "dereferenceable_or_null(18446744073709551616)" }) |attrs| {
+        try std.testing.expect(!callReturnAttrsSupported(.{ .callee = "callee", .ret_ty = .ptr, .ret_attrs = attrs, .args = .empty }));
+    }
+}
+
+test "call value facts validate typed ranges and clean subword extensions" {
     var call: ir.CallInst = .{ .callee = "callee", .ret_ty = .{ .int = 8 }, .args = .empty };
-    for ([_][]const u8{ "noundef", "range(i8 0, 128)", "noundef range(i8 -128, 0)", "range(i8 250, 5)", "range(i8 0, 0)" }) |attrs| {
+    for ([_][]const u8{ "noundef", "zeroext", "noundef zeroext", "range(i8 0, 128)", "noundef range(i8 -128, 0)", "range(i8 250, 5)", "range(i8 0, 0)" }) |attrs| {
         call.ret_attrs = attrs;
         try rejectUnsupportedCallEnvelope(call);
         try rejectUnsupportedCallArgAttrs(.{ .ty = call.ret_ty, .attrs = attrs, .value = .{ .named = "v" } });
     }
     for ([_][]const u8{
-        "zeroext",                       "signext",                "noundef zeroext",   "range(i16 0, 128)", "range(i8 0 128)",
+        "zeroext zeroext",               "signext",                "zeroext signext",   "range(i16 0, 128)", "range(i8 0 128)",
         "range(i8 0,,128)",              "range(i8 0, 256)",       "range(i8 -129, 0)", "range(i8 255, -1)", "range(i8 5, 5)",
         "range(i8 0, 5) range(i8 0, 5)", "range(i8 0, 5) unknown", "noundef noundef",
     }) |attrs| {

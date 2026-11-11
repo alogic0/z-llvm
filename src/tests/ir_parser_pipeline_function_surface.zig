@@ -26,6 +26,43 @@ const target_transform_info = ir_common.target_transform_info;
 const instcombine = ir_common.instcombine;
 const zig_air_export = ir_common.zig_air_export;
 const zig_air_lowering = ir_common.zig_air_lowering;
+
+test "nullable memory attributes retain every function and call boundary" {
+    for ([_][]const u8{ "dereferenceable_or_null(0)", "dereferenceable_or_null(16)", "noundef align 8 dereferenceable_or_null(140)", "dereferenceable(8) dereferenceable_or_null(16)" }) |attrs| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare {0s} ptr @helper(ptr {0s})
+            \\define {0s} ptr @forward(ptr {0s} %input) {{
+            \\entry:
+            \\ %answer = call {0s} ptr @helper(ptr {0s} %input)
+            \\ ret ptr %answer
+            \\}}
+        , .{attrs});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const function = module.functions.items[0];
+        try std.testing.expectEqualStrings(attrs, function.ret_attrs.?);
+        try std.testing.expectEqualStrings(attrs, function.params.items[0].attrs.?);
+        const call = function.blocks.items[0].instructions.items[0].kind.call;
+        try std.testing.expectEqualStrings(attrs, call.ret_attrs.?);
+        try std.testing.expectEqualStrings(attrs, call.args.items[0].attrs.?);
+    }
+}
+
+test "memory promise payloads and extension attributes reject malformed duplicate and incompatible forms" {
+    for ([_][]const u8{ "dereferenceable_or_null()", "dereferenceable_or_null(-1)", "dereferenceable_or_null(+16)", "dereferenceable_or_null(1_6)", "dereferenceable_or_null(0x10)", "dereferenceable_or_null(16)junk", "dereferenceable_or_null(18446744073709551616)", "dereferenceable_or_null(16) dereferenceable_or_null(16)" }) |attrs| {
+        try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.ptr, attrs));
+    }
+    try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.{ .int = 64 }, "dereferenceable_or_null(16)"));
+    for ([_][]const u8{ "zeroext zeroext", "signext signext", "zeroext signext", "signext zeroext" }) |attrs| {
+        try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.{ .int = 8 }, attrs));
+    }
+    for ([_][]const u8{ "zeroext", "signext" }) |attrs| {
+        try ir.verifyParameterAttrs(.{ .int = 8 }, attrs);
+        try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.ptr, attrs));
+    }
+}
 const dce = ir_common.dce;
 const dse = ir_common.dse;
 const early_cse = ir_common.early_cse;

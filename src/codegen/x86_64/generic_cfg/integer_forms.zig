@@ -102,7 +102,19 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
-                .binary => |value| if (integer(value.ty) and supported(value.op) and operand(value.lhs, value.ty.int) and operand(value.rhs, value.ty.int) and
+                .binary => |value| if ((value.ty.eql(.{ .int = 32 }) or value.ty.eql(.{ .int = 64 })) and
+                    (value.op == .shl or value.op == .lshr or value.op == .ashr) and
+                    value.lhs == .int and value.rhs == .named and
+                    operand(value.lhs, value.ty.int) and operand(value.rhs, value.ty.int))
+                {
+                    // Use the existing full-word constant and named shift
+                    // authorities, retaining the original count and flags.
+                    try candidate.begin(&block, block_index, instruction_index);
+                    var copy = inst;
+                    copy.kind.binary.lhs = try binary(allocator, function, &block, &serial, value.ty, .add, value.lhs, .{ .int = 0 });
+                    try block.instructions.append(allocator, copy);
+                    continue;
+                } else if (integer(value.ty) and supported(value.op) and operand(value.lhs, value.ty.int) and operand(value.rhs, value.ty.int) and
                     ((value.ty.int != 32 and value.ty.int != 64) or value.op == .sdiv or value.op == .srem))
                 {
                     // The ordinary two-register multiply action uses a word

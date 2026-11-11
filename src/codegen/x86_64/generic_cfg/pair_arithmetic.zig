@@ -182,10 +182,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                         .add, .sub, .mul, .@"and", .xor => true,
                         .@"or" => value.lhs == .int or value.rhs == .int,
                         .shl => value.rhs == .named or value.rhs.int != 64,
-                        // Expanded arithmetic already owns scalar words. A
-                        // high-word projection can reuse them without loading
-                        // a second pair while other vector lanes remain live.
-                        .lshr => value.rhs == .named or value.rhs.int > 64 or
+                        // Keep the primitive high-word projection used by
+                        // split/finish. Other counts use ordinary scalar words;
+                        // expanded definitions can also reuse their known words.
+                        .lshr => value.rhs == .named or value.rhs.int != 64 or
                             (value.rhs.int == 64 and value.lhs == .named and known_parts.contains(value.lhs.named)),
                         .ashr => value.rhs == .named or value.rhs.int != 127,
                         .udiv, .urem, .sdiv, .srem => divisor(value) != null,
