@@ -147,6 +147,19 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     const answer = try unsigned(allocator, function, &block, &serial, cast.from_ty, wide, cast.value);
                     try finish(allocator, &block, inst, wide, cast.to_ty, answer);
                     continue;
+                } else if (cast.op == .trunc and integer(cast.from_ty) and integer(cast.to_ty) and
+                    cast.from_ty.int > cast.to_ty.int and (cast.from_ty.int == 52 or cast.to_ty.int == 52) and
+                    operand(cast.value, cast.from_ty.int) and
+                    !@import("value_use/actions/scalar_cast.zig").isAccumulatorScalarCast(cast, false))
+                {
+                    // Bridge other i52 truncations through the established word
+                    // actions. The source remains typed, and the original result
+                    // keeps its declared width; no memory or ABI extent changes.
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const wide: ir.Type = .{ .int = 64 };
+                    const answer = try unsigned(allocator, function, &block, &serial, cast.from_ty, wide, cast.value);
+                    try finish(allocator, &block, inst, wide, cast.to_ty, answer);
+                    continue;
                 } else if (truncatedWord(function, cast)) |source| {
                     // zext(trunc(x)) is an ordinary word mask. This also avoids
                     // requiring a separate register carrier for the inner width.

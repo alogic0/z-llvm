@@ -102,6 +102,21 @@ fn memory(attrs: ir.MemoryAttrs, ty_space: ?[]const u8, ptr_space: ?[]const u8) 
     return !attrs.isBarrier() and attrs.syncscope == null and ty_space == null and ptr_space == null;
 }
 
+fn freezeOperand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, original: ir.Value) !ir.Value {
+    var value = original;
+    if (value == .undef or value == .poison or value == .zero_initializer)
+        value = if (ty == .ptr) .null_value else .{ .int = 0 };
+    if (ty == .ptr) {
+        if (value == .null_value) {
+            const zero = try binary(allocator, function, block, serial, .add, word, .{ .int = 0 }, .{ .int = 0 }, null);
+            return cast(allocator, function, block, serial, .inttoptr, word, zero, .ptr, null);
+        }
+        if (value != .named or std.mem.startsWith(u8, value.named, "@"))
+            return address(allocator, function, block, serial, value, 0, null);
+    } else if (value != .named) return binary(allocator, function, block, serial, .add, word, value, .{ .int = 0 }, null);
+    return value;
+}
+
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
     if (!pairs.supportsLayout(context) or !helpers.isDefaultOrFastcc(function.calling_conv)) return null;
     for (function.params.items) |param| if (fields(param.ty) != null) return null;
@@ -128,7 +143,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 if (call.callee_value) |callee| if (callee != .named or callee.named.len == 0 or callee.named[0] == '@') return null;
                 sysv.rejectUnsupportedCallEnvelope(call) catch return null;
             },
-            .phi, .select => {},
+            .phi, .select, .freeze => {},
             .insertvalue => |insert| {
                 const which = index(insert.indices) orelse return null;
                 if (!insert.value_ty.eql(fields(ty).?[which])) return null;
@@ -151,6 +166,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     },
                     .phi => |phi| if (!phi.ty.eql(item.value_ptr.*)) return null,
                     .select => |select| if (!select.ty.eql(item.value_ptr.*)) return null,
+                    .freeze => |freeze| if (!freeze.ty.eql(item.value_ptr.*)) return null,
                     .store => |store| {
                         if (!store.ty.eql(item.value_ptr.*) or store.value != .named or !ir.identifiers.eql(store.value.named, item.key_ptr.*) or
                             (store.ptr == .named and ir.identifiers.eql(store.ptr.named, item.key_ptr.*)) or !memory(store.attrs, store.ty_addrspace, store.ptr_addrspace)) return null;
@@ -224,6 +240,22 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         copy.kind.select.ty = ty;
                         copy.kind.select.true_value = leaf(function, names, select.true_value, select.ty, part, 0) orelse return null;
                         copy.kind.select.false_value = leaf(function, names, select.false_value, select.ty, part, 0) orelse return null;
+                        try block.instructions.append(allocator, copy);
+                    }
+                    continue;
+                },
+                .freeze => |freeze| if (fields(freeze.ty)) |types| {
+                    // Each field is an independent LLVM scalar value. Freeze it
+                    // once, then share that SSA definition across every use.
+                    // This retains all defined bits and a stable choice for
+                    // each undefined/poison field, including pointer fields.
+                    for (types, 0..) |ty, part| {
+                        var copy = inst;
+                        copy.result = names.get(inst.result.?).?[part];
+                        copy.kind.freeze.ty = ty;
+                        const source = leaf(function, names, freeze.value, freeze.ty, part, 0) orelse return null;
+                        copy.kind.freeze.value = try freezeOperand(allocator, function, &block, &serial, ty, source);
+                        copy.metadata = null;
                         try block.instructions.append(allocator, copy);
                     }
                     continue;

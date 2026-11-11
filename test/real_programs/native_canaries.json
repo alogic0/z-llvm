@@ -2348,6 +2348,73 @@
       ],
       "observations": 520,
       "stdout": "call-return-attributes observations=520 zeroext=nullable=padding=live=guards=preserved\n"
+    },
+    {
+      "population": "integer_pair_division",
+      "prefix": "integer-pair-division",
+      "fixture": "integer_pair_division",
+      "functions": [
+        "pair_division_udiv_named",
+        "pair_division_udiv_constant",
+        "pair_division_urem_named",
+        "pair_division_urem_constant",
+        "pair_division_sdiv_named",
+        "pair_division_sdiv_constant",
+        "pair_division_srem_named",
+        "pair_division_srem_constant"
+      ],
+      "observations": 7928,
+      "stdout": "integer-pair-division observations=7928 quotient=remainder=signed=live=abi=preserved\n"
+    },
+    {
+      "population": "integer_truncation",
+      "prefix": "integer-truncation",
+      "fixture": "integer_truncation",
+      "functions": [
+        "integer_truncation_53_to_52",
+        "integer_truncation_55_to_52",
+        "integer_truncation_56_to_52",
+        "integer_truncation_63_to_52",
+        "integer_truncation_64_to_52",
+        "integer_truncation_52_to_1",
+        "integer_truncation_52_to_2",
+        "integer_truncation_52_to_5",
+        "integer_truncation_52_to_6",
+        "integer_truncation_52_to_7",
+        "integer_truncation_52_to_8",
+        "integer_truncation_52_to_16",
+        "integer_truncation_52_to_31",
+        "integer_truncation_52_to_32",
+        "integer_truncation_52_to_33",
+        "integer_truncation_52_to_51"
+      ],
+      "observations": 1024,
+      "stdout": "integer-truncation observations=1024 widths=padding=live=stores=guards=preserved\n"
+    },
+    {
+      "population": "word_pair_freeze",
+      "prefix": "word-pair-freeze",
+      "fixture": "word_pair_freeze",
+      "functions": [
+        "word_pair_freeze_0_0",
+        "word_pair_freeze_0_1",
+        "word_pair_freeze_0_2",
+        "word_pair_freeze_0_3",
+        "word_pair_freeze_1_0",
+        "word_pair_freeze_1_1",
+        "word_pair_freeze_1_2",
+        "word_pair_freeze_1_3",
+        "word_pair_freeze_2_0",
+        "word_pair_freeze_2_1",
+        "word_pair_freeze_2_2",
+        "word_pair_freeze_2_3",
+        "word_pair_freeze_3_0",
+        "word_pair_freeze_3_1",
+        "word_pair_freeze_3_2",
+        "word_pair_freeze_3_3"
+      ],
+      "observations": 1024,
+      "stdout": "word-pair-freeze observations=1024 defined=stable=clobbers=stores=guards=preserved\n"
     }
   ]
 }

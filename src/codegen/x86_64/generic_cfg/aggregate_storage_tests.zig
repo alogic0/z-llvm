@@ -8,6 +8,64 @@ const storage = @import("storage_layout.zig");
 const frame = @import("padded_frame.zig");
 const values = @import("word_pair_values.zig");
 
+test "word pair freezes preserve defined fields and stable independent choices" {
+    for ([_][2][]const u8{ .{ "ptr", "i64" }, .{ "i64", "ptr" }, .{ "ptr", "ptr" }, .{ "i64", "i64" } }) |types| {
+        for ([_]bool{ false, true }) |partial| {
+            const text = try std.fmt.allocPrint(std.testing.allocator,
+                \\define i64 @probe(i64 %a, i64 %b, i64 %live) {{
+                \\entry:
+                \\ %av = {0s}
+                \\ %bv = {1s}
+                \\ %first = insertvalue {{ {2s}, {3s} }} poison, {2s} %av, 0
+                \\ %whole = insertvalue {{ {2s}, {3s} }} %first, {3s} %bv, 1
+                \\ %frozen = freeze {{ {2s}, {3s} }} %{4s}
+                \\ %first_out = extractvalue {{ {2s}, {3s} }} %frozen, 0
+                \\ %second_out = extractvalue {{ {2s}, {3s} }} %frozen, 1
+                \\ %second_again = extractvalue {{ {2s}, {3s} }} %frozen, 1
+                \\ %one = {5s}
+                \\ %two = {6s}
+                \\ %again = {7s}
+                \\ %stable = xor i64 %two, %again
+                \\ %observed = xor i64 %one, %{8s}
+                \\ %answer = xor i64 %observed, %live
+                \\ ret i64 %answer
+                \\}}
+            , .{
+                if (std.mem.eql(u8, types[0], "ptr")) "inttoptr i64 %a to ptr" else "add i64 %a, 0",
+                if (std.mem.eql(u8, types[1], "ptr")) "inttoptr i64 %b to ptr" else "add i64 %b, 0",
+                types[0],
+                types[1],
+                if (partial) "first" else "whole",
+                if (std.mem.eql(u8, types[0], "ptr")) "ptrtoint ptr %first_out to i64" else "add i64 %first_out, 0",
+                if (std.mem.eql(u8, types[1], "ptr")) "ptrtoint ptr %second_out to i64" else "add i64 %second_out, 0",
+                if (std.mem.eql(u8, types[1], "ptr")) "ptrtoint ptr %second_again to i64" else "add i64 %second_again, 0",
+                if (partial) "stable" else "two",
+            });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const original = module.functions.items[0];
+            const view = (try values.legalize(arena.allocator(), original, null)) orelse return error.TestExpectedRewrite;
+            try std.testing.expect(try values.legalize(arena.allocator(), view, null) == null);
+            var private = module;
+            private.functions = try module.functions.clone(arena.allocator());
+            private.functions.items[0] = view;
+            try private.verify();
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            const run: *const fn (u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+            const inputs = [_]u64{ 0, 1, 0x123456789abcdef0, 1 << 63, std.math.maxInt(u64) };
+            for (inputs) |a| for (inputs) |b| for (inputs) |live|
+                try std.testing.expectEqual(a ^ (if (partial) @as(u64, 0) else b) ^ live, run(a, b, live));
+            try module.verify();
+            try std.testing.expect(original.blocks.items[0].instructions.items[4].kind.freeze.ty == .aggregate);
+        }
+    }
+}
+
 test "aggregate storage layouts include nested packed fields and reject incomplete definitions" {
     const names = [_]ir.NamedTypeDefinition{
         .{ .name = "File", .body = "{ i32, { i8 }, [3 x i8] }", .raw = "" },

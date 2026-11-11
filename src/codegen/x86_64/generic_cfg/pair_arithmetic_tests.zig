@@ -3,6 +3,83 @@ const ir = @import("../../../ir.zig");
 const forms = @import("pair_arithmetic.zig");
 const cleanup = @import("pair_dead_values.zig");
 
+test "pair division calls preserve operand order source flags and closed helper recursion" {
+    const cases = [_]struct { op: []const u8, symbol: []const u8, exact: bool }{
+        .{ .op = "udiv", .symbol = "__udivti3", .exact = true },
+        .{ .op = "urem", .symbol = "__umodti3", .exact = false },
+        .{ .op = "sdiv", .symbol = "__divti3", .exact = true },
+        .{ .op = "srem", .symbol = "__modti3", .exact = false },
+    };
+    for (cases) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare i128 @{0s}(i128, i128)
+            \\define i128 @checked(i128 %__zllvm_scalar_form_0, i128 %right) {{
+            \\entry:
+            \\ %answer = {1s} {2s}i128 %__zllvm_scalar_form_0, %right
+            \\ ret i128 %answer
+            \\}}
+        , .{ case.symbol, case.op, if (case.exact) "exact " else "" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const view = (try forms.legalize(arena.allocator(), original)) orelse return error.TestExpectedRewrite;
+        try std.testing.expect(try forms.legalize(arena.allocator(), view) == null);
+        try std.testing.expect(original.blocks.items[0].instructions.items[0].kind == .binary);
+        try std.testing.expectEqual(case.exact, original.blocks.items[0].instructions.items[0].kind.binary.flags.exact);
+        const call = view.blocks.items[0].instructions.items[0].kind.call;
+        try std.testing.expectEqualStrings(case.symbol, call.callee);
+        try std.testing.expect(call.ret_ty.eql(.{ .int = 128 }) and call.args.items.len == 2);
+        try std.testing.expectEqualStrings("__zllvm_scalar_form_0", call.args.items[0].value.named);
+        try std.testing.expectEqualStrings("right", call.args.items[1].value.named);
+        try std.testing.expectEqualStrings("answer", view.blocks.items[0].instructions.items[0].result.?);
+        module.functions.items[0] = view;
+        defer module.functions.items[0] = original;
+        try module.verify();
+    }
+    for ([_][]const u8{ "__udivti3", "\"__udi\\76ti3\"" }) |name| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i128 @{s}(i128 %a, i128 %b) {{\nentry:\n %r = udiv i128 %a, %b\n ret i128 %r\n}}\n", .{name});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try forms.legalize(arena.allocator(), module.functions.items[0]) == null);
+    }
+}
+
+test "pair division materializes full width literal arguments without mutating source" {
+    for ([_][]const u8{ "udiv", "urem", "sdiv", "srem" }) |op| {
+        for ([_]bool{ false, true }) |literal_left| {
+            const source = try std.fmt.allocPrint(
+                std.testing.allocator,
+                "declare i128 @__udivti3(i128, i128)\ndeclare i128 @__umodti3(i128, i128)\ndeclare i128 @__divti3(i128, i128)\ndeclare i128 @__modti3(i128, i128)\ndefine i128 @f(i128 %a) {{\nentry:\n %r = {s} i128 {s}, {s}\n ret i128 %r\n}}\n",
+                .{ op, if (literal_left) "-79228162514264337593543950339" else "%a", if (literal_left) "%a" else "79228162514264337593543950339" },
+            );
+            defer std.testing.allocator.free(source);
+            var module = try ir.Module.parse(std.testing.allocator, source);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const original = module.functions.items[0];
+            const view = (try forms.legalize(arena.allocator(), original)) orelse return error.TestExpectedRewrite;
+            try std.testing.expect(try forms.legalize(arena.allocator(), view) == null);
+            try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+            const call = view.blocks.items[0].instructions.items[view.blocks.items[0].instructions.items.len - 1].kind.call;
+            try std.testing.expect(call.args.items[0].value == .named and call.args.items[1].value == .named);
+            try std.testing.expectEqualStrings("a", call.args.items[if (literal_left) 1 else 0].value.named);
+            module.functions.items[0] = view;
+            defer module.functions.items[0] = original;
+            try module.verify();
+        }
+    }
+}
+
 test "pair arithmetic constant logical shifts retain primitive projections and terminate" {
     for ([_]u8{ 0, 1, 7, 31, 32, 40, 48, 56, 63, 65, 96, 127 }) |amount| {
         const text = try std.fmt.allocPrint(std.testing.allocator,
@@ -139,9 +216,9 @@ test "pair arithmetic private scalar expansion retains inputs and reaches a fixe
 
 test "pair arithmetic unsupported divisors operands widths and vectors stay closed" {
     for ([_][]const u8{
-        "define i128 @f(i128 %a, i128 %b) {\nentry:\n %r = udiv i128 %a, %b\n ret i128 %r\n}\n",
+        "define i128 @f(i128 %a) {\nentry:\n %r = udiv i128 %a, 0\n ret i128 %r\n}\n",
         "define i128 @f(i128 %a) {\nentry:\n %r = sdiv i128 %a, 0\n ret i128 %r\n}\n",
-        "define i128 @f(i128 %a) {\nentry:\n %r = udiv i128 %a, 4294967296\n ret i128 %r\n}\n",
+        "define i128 @f(i128 %a) {\nentry:\n %r = udiv i128 %a, undef\n ret i128 %r\n}\n",
         "define i128 @f(i128 %a) {\nentry:\n %r = mul i128 %a, undef\n ret i128 %r\n}\n",
         "define i96 @f(i96 %a, i96 %b) {\nentry:\n %r = mul i96 %a, %b\n ret i96 %r\n}\n",
         "define <2 x i64> @f(<2 x i64> %a, <2 x i64> %b) {\nentry:\n %r = mul <2 x i64> %a, %b\n ret <2 x i64> %r\n}\n",

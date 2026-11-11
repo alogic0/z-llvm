@@ -72,6 +72,14 @@ const Builder = struct {
         try self.block.instructions.append(self.allocator, copy);
         try self.known_parts.put(original.result.?, parts);
     }
+    fn callPair(self: Builder, value: ir.Value) !ir.Value {
+        if (value == .named) return value;
+        const parts = try self.split(value);
+        const lo = try self.cast(.zext, word, try self.literal(parts.lo), pair);
+        const hi = try self.cast(.zext, word, try self.literal(parts.hi), pair);
+        const shifted = try self.emit(.{ .binary = .{ .op = .shl, .ty = pair, .lhs = hi, .rhs = .{ .int = 64 } } });
+        return self.emit(.{ .binary = .{ .op = .@"or", .ty = pair, .lhs = lo, .rhs = shifted } });
+    }
     fn sign(self: Builder, parts: Parts) !ir.Value {
         return self.binary(.ashr, parts.hi, .{ .int = 63 });
     }
@@ -151,6 +159,21 @@ fn divisor(value: ir.BinaryInst) ?u32 {
     return @intCast(if (number < 0) -number else number);
 }
 
+fn divisionHelper(function: ir.Function, value: ir.BinaryInst) ?[]const u8 {
+    if (divisor(value) != null or (value.rhs == .int and value.rhs.int == 0)) return null;
+    const symbol = switch (value.op) {
+        .udiv => "__udivti3",
+        .urem => "__umodti3",
+        .sdiv => "__divti3",
+        .srem => "__modti3",
+        else => return null,
+    };
+    // A runtime helper body must not outline its own implementation into an
+    // immediate recursive call, including equivalent quoted symbol spellings.
+    if (ir.identifiers.eql(function.name, symbol)) return null;
+    return symbol;
+}
+
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
     var serial: forms.TemporaryNames = .{};
@@ -178,6 +201,19 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
             }
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (value.ty.eql(pair) and operand(value.lhs) and operand(value.rhs)) {
+                    if (divisionHelper(function, value)) |symbol| {
+                        try candidate.begin(&block, block_index, instruction_index);
+                        var call: ir.CallInst = .{ .callee = symbol, .ret_ty = pair, .args = .empty };
+                        try call.args.appendSlice(allocator, &.{
+                            .{ .ty = pair, .value = try builder.callPair(value.lhs) },
+                            .{ .ty = pair, .value = try builder.callPair(value.rhs) },
+                        });
+                        var copy = inst;
+                        copy.kind = .{ .call = call };
+                        copy.metadata = null;
+                        try block.instructions.append(allocator, copy);
+                        continue;
+                    }
                     const expanded = switch (value.op) {
                         .add, .sub, .mul, .@"and", .xor => true,
                         .@"or" => value.lhs == .int or value.rhs == .int,

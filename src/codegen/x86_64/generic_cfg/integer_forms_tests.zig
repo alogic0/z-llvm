@@ -382,12 +382,14 @@ test "integer forms narrow ABI carriers admit seventeen through thirty-one bits 
 }
 
 test "integer forms execute signed narrow arithmetic with live values and dirty input padding" {
-    const cases = [_]struct { operation: []const u8, expected: enum { shift, quotient, extend, zero52 } }{
+    const cases = [_]struct { operation: []const u8, expected: enum { shift, quotient, extend, zero52, trunc52, trunc2 } }{
         .{ .operation = "%n = trunc i64 %input to i7\n  %v = ashr i7 %n, 3\n  %wide = zext i7 %v to i64", .expected = .shift },
         .{ .operation = "%n = trunc i64 %input to i7\n  %v = ashr i7 %n, 3\n  %gate = icmp eq i64 %input, 64\n  %wide = zext i7 %v to i64", .expected = .shift },
         .{ .operation = "%n = trunc i64 %input to i31\n  %v = sdiv i31 %n, 3\n  %wide = zext i31 %v to i64", .expected = .quotient },
         .{ .operation = "%n = trunc i64 %input to i8\n  %v = sext i8 %n to i31\n  %wide = zext i31 %v to i64", .expected = .extend },
         .{ .operation = "%n = trunc i64 %input to i52\n  %v = icmp eq i52 %n, 0\n  %wide = zext i1 %v to i64", .expected = .zero52 },
+        .{ .operation = "%n = trunc i64 %input to i53\n  %v = trunc i53 %n to i52\n  %wide = zext i52 %v to i64", .expected = .trunc52 },
+        .{ .operation = "%n = trunc i64 %input to i52\n  %v = trunc i52 %n to i2\n  %wide = zext i2 %v to i64", .expected = .trunc2 },
     };
     for (cases) |case| {
         const text = try std.fmt.allocPrint(std.testing.allocator,
@@ -420,8 +422,14 @@ test "integer forms execute signed narrow arithmetic with live values and dirty 
                 .quotient => @divTrunc(@as(i64, @intCast((input & 0x7fffffff) ^ 0x40000000)) - 0x40000000, 3),
                 .extend => @as(i64, @intCast((input & 255) ^ 128)) - 128,
                 .zero52 => @intFromBool(input & ((@as(u64, 1) << 52) - 1) == 0),
+                .trunc52 => @intCast(input & ((@as(u64, 1) << 52) - 1)),
+                .trunc2 => @intCast(input & 3),
             };
-            const expected = @as(u64, @bitCast(answer)) & (if (case.expected == .shift) @as(u64, 127) else 0x7fffffff);
+            const expected = @as(u64, @bitCast(answer)) & switch (case.expected) {
+                .shift => @as(u64, 127),
+                .trunc52 => (@as(u64, 1) << 52) - 1,
+                else => 0x7fffffff,
+            };
             try std.testing.expectEqual(expected ^ live, run(input, live));
         };
     }
