@@ -1,23 +1,23 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [half and conversion checkpoint](evidence/half_and_extended_conversions.md)
-at `52d29d4c`: **8,829/8,928** compiler definitions and **320/455** runtime
-definitions. All 99 remaining original compiler definitions stay in scope. The
+from the accepted [extended80 transport checkpoint](evidence/extended80_payload_transport.md)
+at `50ba1a5d`: **8,838/8,928** compiler definitions and **331/455** runtime
+definitions. All 90 remaining original compiler definitions stay in scope. The
 complete current census identifies remaining floating/structured values and
 storage boundaries for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
 required replay cannot finish.
 
-Batch 15 adds six compiler and two runtime selections with complete census,
+Batch 16 adds nine compiler and eleven runtime selections with complete census,
 independent production and event agreement, preserving every earlier success
-and owner. Debug/ReleaseSafe each pass 2,114 units, 63 structural and two profile
-checks; readiness and all 17 integration gates pass. Both complete 91-population
-native suites preserve 3,305 preceding outcomes and all 1,356 artifact hashes
-per build. The failed initial full-run preflight remains explicit alongside its
-fresh successful replay. Extended80 payloads and direct calls are the isolated
-next slice; their bounded results receive no cumulative acceptance credit.
+and owner. Debug/ReleaseSafe each pass 2,121 units, 63 structural and two profile
+checks; readiness and all 17 integration gates pass. Both complete 92-population
+native suites preserve 3,377 preceding outcomes and all 1,386 artifact hashes
+per build. The next isolated slice implements numerical conversions, mixed SSE
+and extended80 calls, comparisons and bitwise sign operations; bounded results
+receive no cumulative acceptance credit until complete original-input replays.
 
 Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) and
 selector snapshot-storage changes pass all 17 serial gates, all 79 native

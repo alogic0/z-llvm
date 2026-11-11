@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `52d29d4c`,
-selecting 8,829/8,928 compiler definitions and 320/455 runtime definitions.
-Continue through all 99 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `50ba1a5d`,
+selecting 8,838/8,928 compiler definitions and 331/455 runtime definitions.
+Continue through all 90 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -275,3 +275,17 @@ full-v17 supplies complete acceptance. See the
 [accepted half/conversion evidence](../evidence/half_and_extended_conversions.md).
 Continue through all 99 original failures. The isolated extended80 payload and
 direct-call successor is provisional until its complete replays are accepted.
+
+Batch 16 is accepted at `50ba1a5d`: exact extended80 payloads, aligned memory
+arguments and direct-call ST0 capture/return. Complete compiler census and
+independent production agree on 8,838 selections and 90 rejections, adding nine
+with no lost selections or owners; runtime reaches 331/455, adding eleven.
+Debug/ReleaseSafe each pass 2,121 units, 63 structural and two profile checks.
+Readiness and all seventeen integration gates pass. Both complete 92-population
+native suites preserve all preceding 91 entries, 3,377 outcomes and 1,386
+artifact hashes per build exactly. All 54 new fault controls detect their
+errors. All 4,371,382 compiler event rows audit successfully; source, binary,
+retained-input and core-object checks pass. See the
+[accepted extended80 transport evidence](../evidence/extended80_payload_transport.md).
+Continue through all 90 original rejections. Isolated numerical conversion,
+comparison and sign-operation results require their own cumulative acceptance.
