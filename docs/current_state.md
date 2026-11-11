@@ -1,18 +1,23 @@
 # Current state
 
-The whole-compiler selection objective is complete at accepted code
-`efa62fa2`: **8,928/8,928 original compiler definitions** and **387/455 runtime
-definitions**. Complete census, independent production, and event audits agree.
-Debug and ReleaseSafe each pass 2,157 unit tests, 63 structural checks, and two
-profiling checks. All eight readiness procedures, seventeen integration gates,
-and both 112-population native suites pass.
+The compiler-object and self-rebuild objective is complete at accepted code
+`b738377e`, with backend implementation `e398030f`. Complete census, independent
+production and event audits establish local objects for **8,928/8,928 original
+compiler definitions** and **455/455 original runtime definitions**, preserving
+all previously selected identities and owners. The unchanged pinned compiler
+builds through the local postopt hook and rebuilds itself with fresh backend
+executions. Both retained executables pass version, behavior, invalid-source
+and f80 layout checks.
 
-Production still reports `UnsupportedGlobalData` during object writing after
-selection completes. Full compiler-object emission, linking, startup, self-rebuild,
-and the remaining 68 runtime definitions require further work. See the
-[completion evidence](evidence/compiler_selection_completion.md),
-[acceptance record](evidence/compiler_selection_completion_acceptance_20261111.json),
-and [active plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
+Debug and ReleaseSafe each pass 2,182 unit tests, 63 structural checks and two
+profiling checks. All eight readiness procedures, seventeen integration gates
+and both 115-population native suites pass; all 768 cumulative fault controls
+are detected. The self-build uses CPU 0 and a 1 GiB main stack. The 8 MiB
+generated-frame and 64 KiB stack-object guards remain unchanged. LLVM
+optimization and declared LLVM/system providers remain part of this proof.
+See the [completion evidence](evidence/compiler_object_self_rebuild.md),
+[acceptance record](evidence/compiler_object_self_rebuild_acceptance_20261111.json)
+and [completed plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
 
 ## Fixed compiler-core execution cohort
 
@@ -52,7 +57,7 @@ their original thresholds. See the [current policy](retention_headroom_policy.md
 ## Previous checkpoints
 
 The entries below preserve the status and scope recorded at earlier checkpoints.
-The completed selection result and current direction are described above.
+The completed compiler-object and self-rebuild result is described above.
 
 The user requested that work stop after the current integer intrinsic slice.
 That slice is complete at `f955509f`; the

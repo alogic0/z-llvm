@@ -1,0 +1,490 @@
+{
+  "schema": "compiler-object-and-self-rebuild-acceptance-v1",
+  "status": "passed",
+  "recorded_date": "2026-11-11",
+  "accepted_revision": "b738377e3e09de9b5265502c8e19c28bab5804cf",
+  "accepted_tree": "d96406a3b2f5849aa5ef9f0c7137f118e43f0152",
+  "backend_implementation_revision": "e398030feed75126288351e424d9de13f323be35",
+  "baseline_accepted_revision": "efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898",
+  "evidence_root": "local-state/validations/compiler-object-completion-20261111/batch-01",
+  "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "mode": "ReleaseFast",
+  "scope": {
+    "local_postopt_compiler_and_runtime_objects": true,
+    "llvm_optimization_retained": true,
+    "declared_llvm_and_system_providers_retained": true,
+    "behavior_compilation_pipeline": "candidate normal -fllvm",
+    "host_tools": "pinned emitter warms each generation outside the local object claim",
+    "os_main_stack_bytes": 1073741824,
+    "self_rebuild_cpu": 0,
+    "generated_frame_limit_bytes": 8388608,
+    "worker_stack_bytes": 62914560,
+    "llvm_free_claim": false,
+    "universal_zig_compatibility_claim": false,
+    "stack_object_limit_bytes": 65536
+  },
+  "milestones": {
+    "original_compiler_object": {
+      "status": "passed",
+      "definitions": 8928,
+      "selected": 8928,
+      "failed": 0,
+      "actual_backend_returncode": 0,
+      "object": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-whole-v26-result/backend/local.o",
+        "bytes": 149992792,
+        "sha256": "1c339589465e16b035d2953b9efa14da230f03327d4ebf2dbfea25c6bbe4a094"
+      },
+      "events": 4763096,
+      "preserved_owners": true,
+      "provider_requirements": 302
+    },
+    "original_runtime_object": {
+      "status": "passed",
+      "definitions": 455,
+      "selected": 455,
+      "failed": 0,
+      "previously_selected": 387,
+      "gained": 68,
+      "owner_changes": [],
+      "builds": [
+        {
+          "mode": "Debug",
+          "object": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-debug-v26-result/backend/local.o",
+            "bytes": 3089792,
+            "sha256": "bd2ac38f40c276d1f2c4954c64ee40cfe6ef05c022a31397317c18f70fb42396"
+          },
+          "events": 135024,
+          "execution": {
+            "local": {
+              "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-debug-v26-result/runtime-execution/local",
+              "bytes": 3070176,
+              "sha256": "1d53cc652226e7cb4dd64db86b54f36335d906b4c2229f8831a7b8ba5cca42a5"
+            },
+            "reference": {
+              "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-debug-v26-result/runtime-execution/reference",
+              "bytes": 228880,
+              "sha256": "97a0772184506efa4369b11b657da249bf837f7ce317a31b6db773e9ef88b536"
+            },
+            "status": "passed",
+            "driver": {
+              "path": "/home/oleg/prog/z_llvm/test/whole_compiler/runtime_completion_driver.c",
+              "bytes": 7223,
+              "sha256": "76b51f5bdb91d023684809ebd5e53fb455e202b585ab1b2806b7ca734003a2b5"
+            },
+            "reference_object": {
+              "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-debug-v26-result/runtime-execution/reference.o",
+              "bytes": 311496,
+              "sha256": "fa8cc55bcffdfb187b3f125e8644f2de1e12f57fefe4cf0943e0878b079920cd"
+            },
+            "local_observations": 1280,
+            "reference_observations": 1280,
+            "fault_controls": 6
+          }
+        },
+        {
+          "mode": "ReleaseFast",
+          "object": {
+            "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-fast-v26-result/backend/local.o",
+            "bytes": 3089792,
+            "sha256": "bd2ac38f40c276d1f2c4954c64ee40cfe6ef05c022a31397317c18f70fb42396"
+          },
+          "events": 135024,
+          "execution": {
+            "local": {
+              "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-fast-v26-result/runtime-execution/local",
+              "bytes": 3070176,
+              "sha256": "1d53cc652226e7cb4dd64db86b54f36335d906b4c2229f8831a7b8ba5cca42a5"
+            },
+            "reference": {
+              "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-fast-v26-result/runtime-execution/reference",
+              "bytes": 228880,
+              "sha256": "97a0772184506efa4369b11b657da249bf837f7ce317a31b6db773e9ef88b536"
+            },
+            "status": "passed",
+            "driver": {
+              "path": "/home/oleg/prog/z_llvm/test/whole_compiler/runtime_completion_driver.c",
+              "bytes": 7223,
+              "sha256": "76b51f5bdb91d023684809ebd5e53fb455e202b585ab1b2806b7ca734003a2b5"
+            },
+            "reference_object": {
+              "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/production-runtime-fast-v26-result/runtime-execution/reference.o",
+              "bytes": 311496,
+              "sha256": "fa8cc55bcffdfb187b3f125e8644f2de1e12f57fefe4cf0943e0878b079920cd"
+            },
+            "local_observations": 1280,
+            "reference_observations": 1280,
+            "fault_controls": 6
+          }
+        }
+      ]
+    },
+    "unchanged_build": {
+      "status": "passed",
+      "actual_returncode": 0,
+      "compiler_capture": true,
+      "all_hook_objects_complete": true,
+      "candidate": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/install/bin/zig",
+        "bytes": 150825160,
+        "sha256": "cc8389b1d973608f1a8d63f53790c942be387128c0eefca13ce18cc5e196977a"
+      },
+      "initial_object_reuse_explicit": true
+    },
+    "first_generation_behavior": {
+      "status": "passed",
+      "version": "0.17.0-dev.11+1c08b09d1",
+      "programs": 2,
+      "invalid_source_controls": 1
+    },
+    "self_rebuild": {
+      "status": "passed",
+      "backend_reuse": false,
+      "all_hook_objects_complete": true,
+      "candidate": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/self-rebuild/install/bin/zig",
+        "bytes": 150825160,
+        "sha256": "b2846840434d20b3385e1e2d7802453bd90de0a3104c838977699e5ee2e1b7ac"
+      },
+      "version": "0.17.0-dev.11+1c08b09d1",
+      "programs": 2,
+      "invalid_source_controls": 1
+    }
+  },
+  "supplemental_frontend_layout": {
+    "generations": 2,
+    "compile_time_checks_per_generation": 4,
+    "native_observations_per_generation": 9,
+    "normal_fllvm_pipeline": true,
+    "old_candidate_rejected": true,
+    "known_faulty_runtime_passes_bounded_execution_drivers": true,
+    "coverage_gap_addressed_by": "direct frontend f80 layout regression and complete allocated runtime graph comparison"
+  },
+  "self_compiler_ir_comparison": {
+    "schema": 2,
+    "status": "passed",
+    "original_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+    "candidate_sha256": "7217b032845c0bb8e653823eac80bfae571707eed60793047c2576e27b849976",
+    "lines": 6007492,
+    "functions": 8928,
+    "anonymous_definitions": 30854,
+    "renamed_private_globals": 30389,
+    "renamed_anonymous_ssa_values": 109,
+    "anonymous_mapping_is_bijective": true,
+    "value_mappings_are_bijective_per_function": true,
+    "renamed_values_cannot_alias_type_names": true,
+    "all_other_bytes_equal": true,
+    "strings_and_comments_unchanged": true,
+    "scope": "Only private anonymous globals and consistent anonymous SSA names differ; every remaining IR byte matches"
+  },
+  "both_runtime_allocated_graphs_equal_original": true,
+  "compiler_and_runtime_inputs": {
+    "compiler": {
+      "bytes": 443624107,
+      "definitions": 8928,
+      "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e"
+    },
+    "runtime": {
+      "bytes": 1856543,
+      "definitions": 455,
+      "sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af"
+    }
+  },
+  "whole_build": {
+    "schema": 1,
+    "status": "passed",
+    "first_generation": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/install/bin/zig",
+      "bytes": 150825160,
+      "sha256": "cc8389b1d973608f1a8d63f53790c942be387128c0eefca13ce18cc5e196977a"
+    },
+    "second_generation": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/self-rebuild/install/bin/zig",
+      "bytes": 150825160,
+      "sha256": "b2846840434d20b3385e1e2d7802453bd90de0a3104c838977699e5ee2e1b7ac"
+    },
+    "distinct_retained_executable_files": true,
+    "pinned_version": "0.17.0-dev.11+1c08b09d1",
+    "first_build_actual_returncode": 0,
+    "second_build_actual_returncode": 0,
+    "versions_passed": 2,
+    "behavior_program_compilations": 4,
+    "behavior_program_executions": 4,
+    "invalid_source_controls": 2,
+    "behavior_pipeline": "candidate normal -fllvm; not additional local object-backend coverage",
+    "first_hook_invocations": 2,
+    "second_hook_invocations": 2,
+    "actual_compiler_module_in_both_generations": true,
+    "all_hook_objects_complete": true,
+    "source_and_backend_verified": true,
+    "all_recorded_provider_hashes_verified": true,
+    "upstream_tracked_source_clean": true,
+    "llvm_optimization_and_providers_retained": true,
+    "self_build_cpu": 0,
+    "os_main_stack_bytes": 1073741824,
+    "generated_frame_limit_bytes": 8388608,
+    "stack_object_limit_bytes": 65536,
+    "self_backend_executions_fresh": true,
+    "initial_compiler_object_reuse_explicit": true,
+    "f80_frontend_regression": {
+      "generations": 2,
+      "compile_time_layout_checks_per_generation": 4,
+      "native_observations_per_generation": 9
+    },
+    "both_runtime_allocated_graphs_equal_original": true,
+    "self_compiler_ir_comparison": {
+      "schema": 2,
+      "status": "passed",
+      "original_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "candidate_sha256": "7217b032845c0bb8e653823eac80bfae571707eed60793047c2576e27b849976",
+      "lines": 6007492,
+      "functions": 8928,
+      "anonymous_definitions": 30854,
+      "renamed_private_globals": 30389,
+      "renamed_anonymous_ssa_values": 109,
+      "anonymous_mapping_is_bijective": true,
+      "value_mappings_are_bijective_per_function": true,
+      "renamed_values_cannot_alias_type_names": true,
+      "all_other_bytes_equal": true,
+      "strings_and_comments_unchanged": true,
+      "scope": "Only private anonymous globals and consistent anonymous SSA names differ; every remaining IR byte matches"
+    },
+    "first_generation_captures": [
+      {
+        "input": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/captures/3599232/input.ll",
+          "bytes": 1856543,
+          "sha256": "68ace8a2bc16e77e8f928bc829ca3357ecfeec0108a1b7b5a4616a858280350f"
+        },
+        "definitions": 455,
+        "object": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/captures/3599232/local.o",
+          "bytes": 3089792,
+          "sha256": "127db08c7a84844a8a0f36f516956c322f2e0723ae1cc614eb313936e3b668c8"
+        },
+        "backend_executed": true
+      },
+      {
+        "input": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/captures/3605129/input.ll",
+          "bytes": 443624107,
+          "sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e"
+        },
+        "definitions": 8928,
+        "object": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/captures/3605129/local.o",
+          "sha256": "1c339589465e16b035d2953b9efa14da230f03327d4ebf2dbfea25c6bbe4a094",
+          "bytes": 149992792
+        },
+        "backend_executed": false
+      }
+    ],
+    "second_generation_captures": [
+      {
+        "input": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/self-rebuild/captures/3606895/input.ll",
+          "bytes": 1855838,
+          "sha256": "ef3379e2d3d1189d83139adf69df2f9d943997c91345044cfb5f54f657dcd229"
+        },
+        "definitions": 455,
+        "object": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/self-rebuild/captures/3606895/local.o",
+          "bytes": 3089720,
+          "sha256": "d95f5bda443b252f87bd4f09382669932da51d27f30c9365608e649ec74a743e"
+        },
+        "backend_executed": true
+      },
+      {
+        "input": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/self-rebuild/captures/3615217/input.ll",
+          "bytes": 443624107,
+          "sha256": "7217b032845c0bb8e653823eac80bfae571707eed60793047c2576e27b849976"
+        },
+        "definitions": 8928,
+        "object": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/unchanged-build-v34-result/self-rebuild/captures/3615217/local.o",
+          "bytes": 149992792,
+          "sha256": "bb15219c74a45298a57e3ece3e0e436a4a7be3276ecd3cf0cac75956ddc92dae"
+        },
+        "backend_executed": true
+      }
+    ]
+  },
+  "whole_process": {
+    "actual_returncode": 0,
+    "wall_ns": 4527369946758,
+    "argv": [
+      "bash",
+      "local-state/validations/compiler-object-completion-20261111/batch-01/whole-command-v34.sh"
+    ]
+  },
+  "cumulative_validation": {
+    "schema": 2,
+    "status": "passed",
+    "source_checkpoint": "e398030feed75126288351e424d9de13f323be35",
+    "scope": "Cumulative final-backend validation; original compiler object and unchanged-build milestones are separate",
+    "units": [
+      {
+        "mode": "Debug",
+        "units": 2182,
+        "structural": 63,
+        "profile": 2,
+        "actual_returncode": 0
+      },
+      {
+        "mode": "ReleaseSafe",
+        "units": 2182,
+        "structural": 63,
+        "profile": 2,
+        "actual_returncode": 0
+      }
+    ],
+    "readiness": {
+      "schema": 1,
+      "status": "passed",
+      "procedures": 8,
+      "all_actual_zero": true,
+      "compiler_build": "Debug",
+      "compiler_receipt": "compiler-v26/Debug/bin/z_llvm.build.json"
+    },
+    "integration": {
+      "subgates": 17,
+      "all_passed": true,
+      "wall_ms": 3836189,
+      "minimum_observed_free_bytes": 30442463232,
+      "reserve_bytes": 11410065408
+    },
+    "native": {
+      "status": "passed",
+      "builds": [
+        "Debug",
+        "ReleaseFast"
+      ],
+      "populations_per_build": 115,
+      "local_observations_per_build": 94661250,
+      "reference_observations_per_build": 47330625
+    },
+    "preservation": {
+      "baseline_populations": 112,
+      "prior_command_outcomes_per_build": 4133,
+      "byte_identical_optimized_ir": 345,
+      "byte_identical_owners": 675,
+      "byte_identical_objects": 579,
+      "reviewed_objects": 102,
+      "unique_reviewed_pairs": 30,
+      "debug_and_fast_reviewed_hash_pairs_equal": true,
+      "preceding_m2_populations": 114,
+      "preceding_m2_outcomes": 4205,
+      "preceding_m2_optimized_ir": 351,
+      "preceding_m2_owners": 687,
+      "preceding_m2_unchanged_objects": 663,
+      "preceding_m2_reviewed_objects": 30
+    },
+    "fault_controls": {
+      "status": "passed",
+      "controls": 768,
+      "retained_controls": 594,
+      "global_controls": 54,
+      "runtime_frontier_controls": 54,
+      "intrinsic_preservation_controls": 54,
+      "original_runtime_object_controls": 12,
+      "all_detected": true,
+      "retained_diagnostics_outcomes_and_executable_hashes_equal_preceding_m2": true,
+      "full_native_executables_checked_fresh": true
+    },
+    "supplemental_raw_bit_oracle": {
+      "schema": 1,
+      "status": "passed",
+      "scope": "Fresh linked raw-bit oracles against byte-identical final Debug/ReleaseFast original runtime objects",
+      "local_observations": 902,
+      "reference_observations": 902,
+      "fault_controls": 6,
+      "all_detected": true,
+      "expected_values": "hardcoded independent IEEE/x87 integer payloads",
+      "input_and_executable_hashes_verified": true,
+      "compiler_source_checkpoint": "e398030feed75126288351e424d9de13f323be35"
+    },
+    "core": {
+      "records": 36,
+      "all_selected_objects_and_observations_match": true,
+      "reviewed_wrapper_records": 30
+    },
+    "full_log_review": {
+      "baseline_records": 1551,
+      "candidate_records": 1554,
+      "added_records": 3,
+      "all_differences_explicitly_accounted": true
+    },
+    "global_control_transition": {
+      "all_current_negative_controls_passed": true,
+      "former_fixture_positively_supported": true
+    },
+    "retained_contracts": {
+      "frozen_contracts": 24,
+      "scratch_files": 13,
+      "air_payloads": 3,
+      "batch30_artifacts": 51301,
+      "release_bundle_identity": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+      "release_bundle_objects_rehashed": 100
+    }
+  },
+  "source_binding": {
+    "schema": 1,
+    "status": "passed",
+    "implementation_commit": "b738377e3e09de9b5265502c8e19c28bab5804cf",
+    "implementation_tree": "d96406a3b2f5849aa5ef9f0c7137f118e43f0152",
+    "frozen_files": 3410,
+    "compiler_source_files": 620,
+    "all_frozen_file_hashes_equal_committed_snapshot": true,
+    "both_compiler_receipt_source_maps_equal": true,
+    "all_compiler_sources_match_git_tree": true,
+    "source_freeze_verified_after_all_runs": true,
+    "executed_binary_hashes_verified": true,
+    "compiler_binaries": [
+      {
+        "build": "Debug",
+        "sha256": "f3f260c2ca617c9d6c189056d2d5ea4c724ee978ac5f78d03d25eab5e91d173b"
+      },
+      {
+        "build": "ReleaseFast",
+        "sha256": "044401cf4bb110a4ba2c36f2dc593293718b99497366b1051d2f9d6f6fd05568"
+      }
+    ]
+  },
+  "preservation": {
+    "baseline_registry_entries": 112,
+    "command_outcomes_per_build": 4133,
+    "unchanged_optimizer_outputs_per_build": 345,
+    "unchanged_owner_manifests_per_build": 675,
+    "unchanged_objects_per_build": 579,
+    "individually_reviewed_objects_per_build": 102,
+    "strict_object_comparators_preserved_as_requires_review": true,
+    "unique_reviewed_pairs": 30,
+    "all_reviewed_pairs_same_in_debug_and_fast": true,
+    "core_records": 36,
+    "core_selected_objects_and_observations_unchanged": true,
+    "fixed_prefix": 100,
+    "execution_cohort": 12,
+    "bypass_ratchet": 130,
+    "accepted_status_unchanged": true,
+    "frozen_contracts": 24,
+    "scratch_files": 13,
+    "air_payloads": 3,
+    "historical_batch30_sealed_artifacts": 51301
+  },
+  "failures_retained": {
+    "provider_link_v7": true,
+    "native_helper_setup_v8": true,
+    "candidate_host_tool_stack_exhaustion_v9": true,
+    "candidate_llvm_main_stack_exhaustion_v16": true,
+    "failed_postprocessing_receipts_preserved": true,
+    "candidate_worker_stack_exhaustion_v18": true,
+    "wrong_f80_layout_v18": true,
+    "canceled_self_build_v20": true,
+    "expected_negative_controls_keep_actual_nonzero": true
+  },
+  "performance_claim": "Completion and resource compliance only; concurrent timings are not controlled performance measurements"
+}

@@ -1,10 +1,11 @@
 # Runtime completion contracts
 
-The compiler-object and self-rebuild plan keeps the original 455-definition
-runtime as a fixed population. Development selection reaches all 455; object
-emission, linked execution and cumulative validation are separate requirements.
-Accepted historical counts remain in the preceding acceptance record until the
-new checkpoint has all required proofs.
+The [compiler-object and self-rebuild checkpoint](../evidence/compiler_object_self_rebuild.md)
+accepts the original **455/455 runtime definitions** with complete local object
+emission, independent ELF/event/owner audits, linked execution and cumulative
+validation. All 387 preceding selections and owners are preserved. Both fresh
+runtime captures from the unchanged build and self-build also pass independent
+audits and match the original allocated section, symbol and relocation graph.
 
 The additional integer forms use existing checked typed homes and transfer
 transactions. Pair widening accounts for live incoming physical words in the

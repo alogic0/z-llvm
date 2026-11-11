@@ -9,17 +9,18 @@ invocation, selector ownership, and the scope of validation evidence.
 
 ## Status
 
-The accepted 2026-11-11 checkpoint selects **8,928/8,928 definitions** from the
-original Zig compiler input and **387/455 runtime definitions**. It passes
-2,157 unit tests in both Debug and ReleaseSafe, structural and profiling checks,
-and 112 native validation populations.
+The accepted 2026-11-11 checkpoint emits complete local objects for all
+**8,928 compiler definitions** and **455 runtime definitions**. The unchanged
+pinned Zig compiler builds through the local postopt hook, starts, passes the
+behavior checks, and rebuilds itself through that hook.
 
-Selection is one stage of compilation. Whole-compiler production still reaches
-`UnsupportedGlobalData` during object writing. Complete compiler-object
-emission, linking, startup, self-rebuild, and the remaining 68 runtime definitions
-are ongoing work. This is not yet a complete LLVM replacement.
+Debug and ReleaseSafe each pass 2,182 unit tests, 63 structural checks, and two
+profiling checks. All 17 integration gates and both 115-population native suites
+pass; all 768 cumulative fault controls are detected. The self-build uses CPU 0
+and a 1 GiB main stack. LLVM optimization and declared external providers remain
+part of this configuration.
 
-See the [completion evidence](docs/evidence/compiler_selection_completion.md),
+See the [completion evidence](docs/evidence/compiler_object_self_rebuild.md),
 [current state](docs/current_state.md), and [next steps](docs/next_steps.md).
 
 ## Build and isolated tests

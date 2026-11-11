@@ -1,36 +1,30 @@
-# Compiler selection complete
+# Compiler objects and self-rebuild complete
 
-The [all-8,928 selection plan](plans/2026-11-08-complete-compiler-selection.md)
-is complete at accepted code `efa62fa2`: **8,928/8,928** original compiler
-definitions and **387/455** runtime definitions. Complete census, independent
-production and event audits agree, adding the final 49 compiler and 34 runtime
-selections without lost successes or owner changes. See the
-[completion evidence](evidence/compiler_selection_completion.md) and
-[acceptance record](evidence/compiler_selection_completion_acceptance_20261111.json).
+The [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
+is complete at accepted code `b738377e`, with backend implementation `e398030f`.
+Complete census, independent production and balanced event audits establish
+local objects for **8,928/8,928 original compiler definitions** and **455/455
+original runtime definitions**, preserving prior selections and owners. The
+unchanged pinned compiler builds, starts, passes behavior checks and rebuilds
+itself through the local postopt hook. Both distinct executables also pass the
+f80 layout regression. See the [completion evidence](evidence/compiler_object_self_rebuild.md),
+[acceptance record](evidence/compiler_object_self_rebuild_acceptance_20261111.json)
+and [runtime contracts](codegen/runtime_completion.md).
 
-Debug/ReleaseSafe each pass 2,157 unit, 63 structural and two profile checks.
-Readiness and all seventeen integration gates pass. Both complete 112-population
-native suites preserve all 101 preceding entries, 3,737 command outcomes and
-1,536 artifact hashes per build; all 594 new fault controls are detected.
-All 4,492,466 compiler event records audit successfully, and source/binary
-bindings and retained pins verify.
+Debug/ReleaseSafe each pass 2,182 unit, 63 structural and two profile checks.
+Readiness, all seventeen integration gates and both 115-population native suites
+pass; all 768 cumulative fault controls are detected. Prior command outcomes,
+optimized IR and owner manifests match; every changed object has an individual
+review. The fixed prefix/cohort, ratchet 130, accepted-status file and frozen
+interfaces remain unchanged.
 
-Follow the [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
-Implementation checkpoint `97a248ee` emits the complete original compiler object:
-8,928 selections, actual backend zero and independently audited ELF/owners/events.
-The outer runner exposed a quoted-name comparison bug after emission; its failed
-receipt remains retained, with a separate successful object audit. Both 113-population
-native suites, all 17 gates and 594 retained fault controls passed that source.
-
-Runtime development now selects 455/455 and its original complete object passes
-1,205 linked checks against LLVM's reference. The added frontier has 852 checks
-for pair pressure, intrinsics, floating vectors, half preservation, aliases and
-x87 byval caller/callee ABI. These gains await cumulative acceptance; see the
-[runtime contracts](codegen/runtime_completion.md). Fresh compiler/runtime replays,
-full validation and unchanged-build linking/startup/self-rebuild follow the plan.
-Preserve the original inputs, accepted evidence,
-fixed prefix/cohort, ratchet 130 and frozen interfaces. Revisit performance
-when a required replay cannot finish.
+This closes the planned object, link, startup, behavior and self-rebuild stages.
+The tested self-build uses CPU 0 and a 1 GiB main stack, with the existing
+8 MiB generated-frame and 64 KiB stack-object guards. LLVM optimization and
+declared providers remain in use. Further work can reduce the frontend's stack
+requirements, extend configuration and runtime execution coverage, or measure
+performance under controlled conditions; these are separate follow-up scopes.
+Keep the accepted inputs, binaries, captures and sealed evidence as the baseline.
 
 The following checkpoints record the earlier acceptance history.
 

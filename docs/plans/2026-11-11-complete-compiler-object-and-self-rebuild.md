@@ -1,8 +1,10 @@
 # Complete compiler objects, runtime and self-rebuild
 
 Date: 2026-11-11
-Status: in progress; compiler object emitted and independently audited; runtime
-selection repair and cumulative acceptance are in progress.
+Status: complete at `b738377e`, backend implementation `e398030f`; all five
+milestones and cumulative validation pass. See the
+[completion evidence](../evidence/compiler_object_self_rebuild.md) and
+[acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
 Baseline: accepted code `efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898`, documentation
 `5490de0b909757afb57cacd27cc2f3ce5e176f10`.
 
@@ -329,13 +331,16 @@ only when an observed required replay cannot finish, and retain its blocker.
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.
-- [ ] Emit and validate the complete original compiler object, retaining all 8,928 selections.
-- [ ] Complete all 455 original runtime selections and validate its complete object.
-- [ ] Build and link the unchanged pinned compiler with complete local hook provenance.
-- [ ] Prove first-generation startup, behavior and invalid-source rejection.
-- [ ] Rebuild with that candidate; prove second-generation captures, link, startup and behavior.
-- [ ] Complete cumulative validation, source/binary/provider binding, documentation and evidence seals.
+- [x] Emit and validate the complete original compiler object, retaining all 8,928 selections.
+- [x] Complete all 455 original runtime selections and validate its complete object.
+- [x] Build and link the unchanged pinned compiler with complete local hook provenance.
+- [x] Prove first-generation startup, behavior and invalid-source rejection.
+- [x] Rebuild with that candidate; prove second-generation captures, link, startup and behavior.
+- [x] Complete cumulative validation, source/binary/provider binding, documentation and evidence seals.
 
-The immediate first deliverable is a named global-data rejection with its
-specific reason, required context and minimal fixture, followed by the smallest
-shared repair justified by that evidence.
+Acceptance retains the original inputs and separate fresh captures, explicit
+verified first-generation compiler-object reuse, fresh self-build backend
+executions and two distinct executable identities. The self-build frontend uses
+CPU 0 and a 1 GiB main stack; the 8 MiB generated-frame, 64 KiB stack-object and
+60 MiB upstream worker-stack limits remain unchanged. Both generations pass the
+f80 layout regression. LLVM optimization and declared providers remain in scope.

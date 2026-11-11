@@ -4750,6 +4750,21 @@ One line per completed cycle, append-only, newest last. This is the
   264 failures. Evidence:
   `docs/evidence/scalable_cfg_indirect_phi_acceptance_20261109.json`.
 
+- **2026-11-11 — Compiler objects and self-rebuild accepted** (`b738377e`,
+  backend `e398030f`): all 8,928 original compiler definitions and 455 original
+  runtime definitions emit complete local objects, with independent census,
+  production, event, owner and ELF audits. The unchanged pinned compiler builds
+  through the local postopt hook and rebuilds itself with fresh backend
+  executions. Both executables pass version, behavior, invalid-source and f80
+  layout checks. Debug/ReleaseSafe each pass 2,182 units, 63 structural and two
+  profile checks; readiness, all 17 integration gates and both 115-population
+  native suites pass. All 768 cumulative fault controls are detected. Every
+  changed retained object has an individual review. The fixed prefix 100,
+  execution cohort twelve and ratchet 130 remain unchanged. The self-build uses
+  CPU 0 and a 1 GiB main stack; LLVM optimization and declared providers remain.
+  Evidence: [completion report](../evidence/compiler_object_self_rebuild.md) and
+  [acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
