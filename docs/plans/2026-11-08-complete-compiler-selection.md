@@ -1,9 +1,9 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `631c973d`,
-selecting 8,823/8,928 compiler definitions and 318/455 runtime definitions.
-Continue through all 105 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `52d29d4c`,
+selecting 8,829/8,928 compiler definitions and 320/455 runtime definitions.
+Continue through all 99 remaining original compiler definitions.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256
@@ -259,3 +259,19 @@ failures remain explicit. All 4,367,199 compiler events balance, and 3,235 froze
 file hashes bind to the committed code tree. Continue through all 105 remaining
 original compiler rejections. See the
 [accepted integer pair/storage evidence](../evidence/integer_pair_storage.md).
+
+Batch 15 is accepted at `52d29d4c`: half products, quotients, exact negation
+and memory views, standard half/quad and i128/quad conversion helpers, and
+mixed scalar-SSE integer-pair calls. Complete compiler census and independent
+production agree on 8,829 selections and 99 rejections, adding six with no
+lost selections or owners; runtime reaches 320/455, adding two. Debug and Safe
+each pass 2,114 units, 63 structural and two profile checks. Readiness and all
+17 integration gates pass. Both 91-population native suites pass 59,822,370
+local observations per build and preserve the preceding 89 populations,
+3,305 command outcomes and all 1,356 artifact hashes exactly. All 108 new fault
+controls are detected. Source/binary/event and retained-input audits pass.
+The failed preflight full-v16 launch remains explicit; fresh same-source
+full-v17 supplies complete acceptance. See the
+[accepted half/conversion evidence](../evidence/half_and_extended_conversions.md).
+Continue through all 99 original failures. The isolated extended80 payload and
+direct-call successor is provisional until its complete replays are accepted.

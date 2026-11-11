@@ -1,14 +1,23 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [integer pair and storage checkpoint](evidence/integer_pair_storage.md)
-at `631c973d`: **8,823/8,928** compiler definitions and **318/455** runtime
-definitions. All 105 remaining original compiler definitions stay in scope. The
+from the accepted [half and conversion checkpoint](evidence/half_and_extended_conversions.md)
+at `52d29d4c`: **8,829/8,928** compiler definitions and **320/455** runtime
+definitions. All 99 remaining original compiler definitions stay in scope. The
 complete current census identifies remaining floating/structured values and
 storage boundaries for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
 required replay cannot finish.
+
+Batch 15 adds six compiler and two runtime selections with complete census,
+independent production and event agreement, preserving every earlier success
+and owner. Debug/ReleaseSafe each pass 2,114 units, 63 structural and two profile
+checks; readiness and all 17 integration gates pass. Both complete 91-population
+native suites preserve 3,305 preceding outcomes and all 1,356 artifact hashes
+per build. The failed initial full-run preflight remains explicit alongside its
+fresh successful replay. Extended80 payloads and direct calls are the isolated
+next slice; their bounded results receive no cumulative acceptance credit.
 
 Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) and
 selector snapshot-storage changes pass all 17 serial gates, all 79 native
