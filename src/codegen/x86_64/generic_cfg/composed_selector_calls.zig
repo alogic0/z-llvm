@@ -188,41 +188,13 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     const stack_count = if (integer_layout) |layout| layout.stack_words else 0;
     var stack_sources: [stack_arguments.max_stack_words]?FrameIndex = @splat(null);
     if (stack_count != 0) {
-        for (call.args.items, 0..) |arg, argument_index| {
-            const first_word = switch (integer_layout.?.locations[argument_index]) {
-                .stack => |word| word,
-                .split => |split| split.stack,
-                .register, .pair => continue,
-            };
-            const split = integer_layout.?.locations[argument_index] == .split;
-            const pair = arg.ty.eql(.{ .int = 128 });
-            const constant_pair = pair and arg.value == .int;
-            if (!constant_pair) if (try lowerDirectCallArg(selector, arg, .rdi)) |diagnostic| return diagnostic;
-            for (0..if (pair) @as(usize, 2) else 1) |word| {
-                if (split and word == 0) continue;
-                var source: ArgReg = if (pair and word == 1) .rsi else .rdi;
-                if (constant_pair) {
-                    const raw: u128 = @bitCast(arg.value.int);
-                    const part: u64 = @truncate(raw >> @as(u7, @intCast(word * 64)));
-                    if (try lowerDirectCallArg(selector, .{ .ty = .{ .int = 64 }, .value = .{ .int = @as(i64, @bitCast(part)) } }, .rdi)) |diagnostic| return diagnostic;
-                    source = .rdi;
-                }
-                // The private slot's physical word offset also accounts for
-                // alignment holes. The state authority owns its retained key.
-                var key_buffer: [40]u8 = undefined;
-                const stack_word = first_word + word - @intFromBool(split);
-                const key = try std.fmt.bufPrint(&key_buffer, "\x00outgoing.{d}", .{stack_word});
-                const frame = selector_state.allocateSpillSlot(selector, key) orelse return .{ .no_spill_envelope = "composed-block-call-stack-slots" };
-                stack_sources[stack_word] = frame;
-                try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame, .reg = source } });
-            }
-        }
+        if (try stageStackArguments(selector, call, integer_layout.?, &stack_sources)) |diagnostic| return diagnostic;
     }
     if (integer_layout) |layout| {
         for (call.args.items, 0..) |arg, index| {
             const register = switch (layout.locations[index]) {
                 .register, .pair => |reg| reg,
-                .stack => continue,
+                .stack, .sse => continue,
                 .split => |split| {
                     const target = ArgReg.fromIndex(split.register) catch unreachable;
                     if (!arg.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-call-arg-width" };
@@ -249,26 +221,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
 
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
-    var pushed_bytes: u32 = 0;
-    if (stack_count != 0) {
-        if (needs_alignment) return .{ .no_spill_envelope = "composed-block-call-stack-frame" };
-        if (stack_count % 2 != 0) {
-            try selector_frame.appendSubRsp(selector, 8);
-            pushed_bytes = 8;
-        }
-        var index = stack_count;
-        while (index != 0) {
-            index -= 1;
-            if (stack_sources[index]) |source| {
-                const displacement = std.math.add(u32, try source.byteOffset(), pushed_bytes) catch
-                    return .{ .no_spill_envelope = "composed-block-call-stack-offset" };
-                try selector.machine.instructions.append(selector.allocator, .{ .push_stack_disp32 = displacement });
-            } else {
-                try selector_frame.appendSubRsp(selector, 8);
-            }
-            pushed_bytes += 8;
-        }
-    }
+    if (stack_count != 0 and needs_alignment) return .{ .no_spill_envelope = "composed-block-call-stack-frame" };
+    const pushed_bytes = try pushStackArguments(selector, stack_sources[0..stack_count]);
     if (sysv_abi.isVariadicCall(call)) {
         // Caller values are preserved and integer/pointer arguments materialized.
         // MOV leaves condition flags unchanged and supplies the SysV AL count.
@@ -305,6 +259,57 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         else => unreachable,
     };
     return null;
+}
+
+fn stageStackArguments(selector: *ComposedBlockSelector, call: ir.CallInst, layout: stack_arguments.Layout, sources: *[stack_arguments.max_stack_words]?FrameIndex) !?Diagnostic {
+    for (call.args.items, 0..) |arg, argument_index| {
+        const first_word = switch (layout.locations[argument_index]) {
+            .stack => |word| word,
+            .split => |split| split.stack,
+            .register, .pair, .sse => continue,
+        };
+        const split = layout.locations[argument_index] == .split;
+        const pair = arg.ty.eql(.{ .int = 128 });
+        const constant_pair = pair and arg.value == .int;
+        if (!constant_pair) if (try lowerDirectCallArg(selector, arg, .rdi)) |diagnostic| return diagnostic;
+        for (0..if (pair) @as(usize, 2) else 1) |word| {
+            if (split and word == 0) continue;
+            var source: ArgReg = if (pair and word == 1) .rsi else .rdi;
+            if (constant_pair) {
+                const raw: u128 = @bitCast(arg.value.int);
+                const part: u64 = @truncate(raw >> @as(u7, @intCast(word * 64)));
+                if (try lowerDirectCallArg(selector, .{ .ty = .{ .int = 64 }, .value = .{ .int = @as(i64, @bitCast(part)) } }, .rdi)) |diagnostic| return diagnostic;
+                source = .rdi;
+            }
+            // The physical word also accounts for ABI alignment holes.
+            var key_buffer: [40]u8 = undefined;
+            const stack_word = first_word + word - @intFromBool(split);
+            const key = try std.fmt.bufPrint(&key_buffer, "\x00outgoing.{d}", .{stack_word});
+            const frame = selector_state.allocateSpillSlot(selector, key) orelse return .{ .no_spill_envelope = "composed-block-call-stack-slots" };
+            sources[stack_word] = frame;
+            try selector.machine.instructions.append(selector.allocator, .{ .spill_arg64_rsp = .{ .frame_index = frame, .reg = source } });
+        }
+    }
+    return null;
+}
+
+fn pushStackArguments(selector: *ComposedBlockSelector, sources: []const ?FrameIndex) !u32 {
+    if (sources.len == 0) return 0;
+    var pushed_bytes: u32 = 0;
+    if (sources.len % 2 != 0) {
+        try selector_frame.appendSubRsp(selector, 8);
+        pushed_bytes = 8;
+    }
+    var index = sources.len;
+    while (index != 0) {
+        index -= 1;
+        if (sources[index]) |source| {
+            const displacement = try std.math.add(u32, try source.byteOffset(), pushed_bytes);
+            try selector.machine.instructions.append(selector.allocator, .{ .push_stack_disp32 = displacement });
+        } else try selector_frame.appendSubRsp(selector, 8);
+        pushed_bytes += 8;
+    }
+    return pushed_bytes;
 }
 
 fn lowerReturnAddress(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
@@ -390,7 +395,27 @@ pub fn lowerUsubSat(selector: *ComposedBlockSelector, result: ?[]const u8, call:
 pub const lowerUsubSatI64 = lowerUsubSat;
 
 fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
-    var plan = try sysv_abi.planScalarCall(selector.allocator, call);
+    var register_args: std.ArrayList(ir.CallArg) = .empty;
+    defer register_args.deinit(selector.allocator);
+    var has_x87_memory = false;
+    for (call.args.items) |arg| has_x87_memory = has_x87_memory or arg.abi_x87_memory;
+    const memory_layout = if (has_x87_memory) stack_arguments.callLayout(call) orelse
+        return .{ .no_emitter = "composed-block-mixed-x87-layout" } else null;
+    var register_call = call;
+    if (memory_layout) |layout| {
+        for (call.args.items, 0..) |arg, index| {
+            try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
+            switch (layout.locations[index]) {
+                .stack => continue,
+                .split => return .{ .no_emitter = "composed-block-mixed-split-call" },
+                .register, .pair, .sse => try register_args.append(selector.allocator, arg),
+            }
+        }
+        register_call.args = register_args;
+    }
+    // The existing SSE planner retains register ownership; the shared physical
+    // layout owns extended80's memory words and their alignment holes.
+    var plan = try sysv_abi.planScalarCall(selector.allocator, register_call);
     defer plan.deinit(selector.allocator);
 
     const gpr_result = result != null and (call.ret_ty.eql(.{ .int = 32 }) or call.ret_ty.eql(.{ .int = 64 }) or call.ret_ty == .ptr);
@@ -416,7 +441,10 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
         if (try selector_state.spillValue(selector, name)) |diagnostic| return diagnostic;
     }
 
-    for (call.args.items, plan.assignments.items) |arg, assignment| switch (assignment) {
+    const stack_count = if (memory_layout) |layout| layout.stack_words else 0;
+    var stack_sources: [stack_arguments.max_stack_words]?FrameIndex = @splat(null);
+    if (memory_layout) |layout| if (try stageStackArguments(selector, call, layout, &stack_sources)) |diagnostic| return diagnostic;
+    for (register_call.args.items, plan.assignments.items) |arg, assignment| switch (assignment) {
         .gpr => |target| if (try lowerDirectCallArg(selector, arg, target)) |diagnostic| return diagnostic,
         .gpr_pair => |first| if (try lowerDirectCallArg(selector, arg, first)) |diagnostic| return diagnostic,
         .sse => |target| {
@@ -433,10 +461,18 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     };
     if (transaction) |*active| try active.finishCallPreparationAfterArguments();
 
+    if (stack_count != 0 and selector.stack_frame_bytes == 0) return .{ .no_spill_envelope = "composed-block-mixed-x87-frame" };
+    const pushed_bytes = try pushStackArguments(selector, stack_sources[0..stack_count]);
+    const physical_return = if (call.abi_x87_return) ir.Type.x86_fp80 else call.ret_ty;
     if (transaction != null)
-        try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
+        try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = physical_return } }, .clobber)
     else
-        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = physical_return } });
+    if (pushed_bytes != 0) try selector_frame.appendAddRsp(selector, pushed_bytes);
+    if (call.abi_x87_return) {
+        if (!call.ret_ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-mixed-x87-return" };
+        try selector_state.emitEflagsInstruction(selector, .x87_st0_i80_rax_rdx, .preserve);
+    }
     if (result) |result_name| {
         if (selector_vector.abiShape(call.ret_ty)) |shape| {
             try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 128, .shape = .{ .vector = shape } } });

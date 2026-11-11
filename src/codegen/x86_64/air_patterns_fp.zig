@@ -165,16 +165,16 @@ pub fn lowerFloatSubReturn(
     return true;
 }
 
-pub fn lowerX86Fp80NegReturn(
-    allocator: std.mem.Allocator,
-    machine: *MachineFunction,
+pub fn matchesExtendedNegReturn(
     function: ir.Function,
     block: ir.BasicBlock,
     ret: anytype,
+    ty: ir.Type,
 ) !bool {
+    if (ty != .x86_fp80 and ty != .fp128) return false;
     if (function.params.items.len != 1) return false;
-    if (!function.ret_ty.eql(.x86_fp80) or !ret.ty.eql(.x86_fp80)) return false;
-    if (!function.params.items[0].ty.eql(.x86_fp80)) return false;
+    if (!function.ret_ty.eql(ty) or !ret.ty.eql(ty)) return false;
+    if (!function.params.items[0].ty.eql(ty)) return false;
     if (block.instructions.items.len != 1) return false;
 
     const fsub_inst = block.instructions.items[0];
@@ -186,10 +186,21 @@ pub fn lowerX86Fp80NegReturn(
         .binary => |binary| binary,
         else => return false,
     };
-    if (fsub.op != .fsub or !fsub.ty.eql(.x86_fp80)) return false;
+    if (fsub.op != .fsub or !fsub.ty.eql(ty)) return false;
     if (!isFpText(fsub.lhs, "-0.000000e+00")) return false;
     if (!isNamed(fsub.rhs, function.params.items[0].name)) return false;
 
+    return true;
+}
+
+pub fn lowerX86Fp80NegReturn(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    function: ir.Function,
+    block: ir.BasicBlock,
+    ret: anytype,
+) !bool {
+    if (!try matchesExtendedNegReturn(function, block, ret, .x86_fp80)) return false;
     try machine.instructions.append(allocator, .fneg_x86_fp80_stack8_st0);
     try machine.instructions.append(allocator, .ret);
     return true;
@@ -202,24 +213,7 @@ pub fn lowerFp128NegReturn(
     block: ir.BasicBlock,
     ret: anytype,
 ) !bool {
-    if (function.params.items.len != 1) return false;
-    if (!function.ret_ty.eql(.fp128) or !ret.ty.eql(.fp128)) return false;
-    if (!function.params.items[0].ty.eql(.fp128)) return false;
-    if (block.instructions.items.len != 1) return false;
-
-    const fsub_inst = block.instructions.items[0];
-    if (fsub_inst.removed) return false;
-    const fsub_result = fsub_inst.result orelse return false;
-    if (!isNamed(ret.value orelse return error.InvalidRet, fsub_result)) return false;
-
-    const fsub = switch (fsub_inst.kind) {
-        .binary => |binary| binary,
-        else => return false,
-    };
-    if (fsub.op != .fsub or !fsub.ty.eql(.fp128)) return false;
-    if (!isFpText(fsub.lhs, "-0.000000e+00")) return false;
-    if (!isNamed(fsub.rhs, function.params.items[0].name)) return false;
-
+    if (!try matchesExtendedNegReturn(function, block, ret, .fp128)) return false;
     try machine.instructions.append(allocator, .fneg_fp128_xmm0);
     try machine.instructions.append(allocator, .ret);
     return true;

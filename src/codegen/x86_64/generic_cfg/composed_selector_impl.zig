@@ -204,7 +204,7 @@ fn bindPhysicalParams(selector: *ComposedBlockSelector, function: ir.Function) !
     for (function.params.items, 0..) |param, index| {
         try sysv_abi.rejectUnsupportedCallArgAttrs(.{ .ty = param.ty, .attrs = param.attrs, .value = .{ .named = param.name } });
         switch (layout.locations[index]) {
-            .register, .pair => {
+            .register, .pair, .sse => {
                 registers[count] = param;
                 count += 1;
             },
@@ -283,7 +283,7 @@ fn bindStackParams(selector: *ComposedBlockSelector, function: ir.Function) !?Di
         const word_offset = switch (layout.locations[index]) {
             .stack => |word| word,
             .split => |split| split.stack,
-            .register, .pair => continue,
+            .register, .pair, .sse => continue,
         };
         // The incoming return address precedes 8-byte argument slots. Copy
         // only the declared scalar width into our own persistent spill home.

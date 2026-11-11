@@ -62,7 +62,8 @@ fn callForm(mode: Mode, call: ir.CallInst) bool {
     var count: usize = 0;
     for (call.args.items) |arg| {
         sysv.rejectUnsupportedCallArgAttrs(arg) catch return false;
-        count += registers(mode, arg.ty) orelse return false;
+        count += registers(mode, arg.ty) orelse if (mode == .physical_abi and
+            (sysv.isScalarSseAbiType(arg.ty) or sysv.isVector128AbiType(arg.ty))) @as(usize, 0) else return false;
         if (wide(mode, arg.ty) and (!advisory(mode, arg.ty, arg.attrs) or !operand(arg.value))) return false;
     }
     return if (mode == .physical_abi) stack_arguments.callLayout(call) != null else count <= 6;

@@ -11,7 +11,9 @@ SysV parameters occupy aligned sixteen-byte stack slots independently of the
 integer argument cursor. Private parameter and call-argument flags retain that
 physical memory contract while their SSA types become integer carriers. Direct
 integer/pointer calls reuse the existing outgoing stack locations, preservation
-and pair-result handling. Indirect calls, scalar-SSE mixtures, unsupported
+and pair-result handling. Mixed SSE calls retain independent register cursors
+and stage complete memory arguments through the same physical layout. Indirect
+calls, split integer words in mixed calls, SSE stack overflow, unsupported
 attributes and `musttail` remain closed.
 
 An extended80 result occupies ST0. Explicit machine transfers move an integer
@@ -31,6 +33,6 @@ The C extended type carries ABI bits; floating arithmetic does not provide the
 oracle. Thirteen functions produce 53,248 observations per execution and three
 injected fault controls exercise result, storage and guard checks.
 
-This contract implements payload transport and direct integer/pointer ABI
-boundaries. Numerical extended80 arithmetic, comparisons and conversions need
-separate lowering contracts.
+This contract implements payload transport and direct ABI boundaries.
+[Numerical conversions](extended80_conversions.md) have a separate helper and
+rounding contract. Extended80 arithmetic and comparisons remain separate.

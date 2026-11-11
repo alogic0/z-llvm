@@ -45,6 +45,38 @@ const Builder = struct {
         const high = try b.emit(.{ .binary = .{ .op = .shl, .ty = cast.from_ty, .lhs = words[1], .rhs = .{ .int = 64 } } });
         return b.emit(.{ .binary = .{ .op = .@"or", .ty = cast.from_ty, .lhs = words[0], .rhs = high } });
     }
+    fn extendedIntegerCast(b: Builder, original: ir.Instruction, symbol: []const u8) !void {
+        const cast = original.kind.cast;
+        const pair: ir.Type = .{ .int = 128 };
+        if (cast.to_ty == .x86_fp80) {
+            const argument = if (cast.from_ty.eql(pair)) try b.integerArgument(cast) else try b.emit(.{ .cast = .{ .op = if (cast.op == .sitofp) .sext else .zext, .from_ty = cast.from_ty, .value = cast.value, .to_ty = pair } });
+            var call: ir.CallInst = .{ .callee = symbol, .ret_ty = .x86_fp80, .args = .empty };
+            try call.args.append(b.allocator, .{ .ty = pair, .value = argument });
+            try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .call = call } });
+        } else {
+            var call: ir.CallInst = .{ .callee = symbol, .ret_ty = pair, .args = .empty };
+            try call.args.append(b.allocator, .{ .ty = .x86_fp80, .value = cast.value });
+            if (cast.to_ty.eql(pair)) {
+                try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .call = call } });
+            } else {
+                // Every defined narrower conversion is representable in the
+                // wider helper result. Truncation retains its exact integer.
+                const wide = try b.emit(.{ .call = call });
+                const narrow_word = cast.to_ty.int < 64;
+                const source = if (narrow_word) try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = wide, .to_ty = word } }) else wide;
+                try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .cast = .{ .op = .trunc, .from_ty = if (narrow_word) word else pair, .value = source, .to_ty = cast.to_ty } } });
+            }
+        }
+    }
+    fn floatingBridge(b: Builder, original: ir.Instruction, symbols: [2][]const u8) !void {
+        const cast = original.kind.cast;
+        var widen: ir.CallInst = .{ .callee = symbols[0], .ret_ty = .fp128, .args = .empty };
+        try widen.args.append(b.allocator, .{ .ty = cast.from_ty, .value = cast.value });
+        const exact = try b.emit(.{ .call = widen });
+        var narrow: ir.CallInst = .{ .callee = symbols[1], .ret_ty = cast.to_ty, .args = .empty };
+        try narrow.args.append(b.allocator, .{ .ty = .fp128, .value = exact });
+        try b.block.instructions.append(b.allocator, .{ .result = original.result, .kind = .{ .call = narrow } });
+    }
     fn relation(b: Builder, source: ir.FcmpInst, symbol: []const u8, predicate: ir.IcmpPredicate) !ir.Value {
         // compiler-rt's CMP_RESULT is long on the selected x86-64 SysV ABI.
         var call: ir.CallInst = .{ .callee = symbol, .ret_ty = word, .args = .empty };
@@ -107,11 +139,15 @@ fn halfOperandSupported(value: ir.Value) bool {
 }
 
 fn conversion(cast: ir.CastInst) ?[]const u8 {
+    if (cast.op == .fptrunc and cast.from_ty == .double and cast.to_ty == .half) return "__truncdfhf2";
+    if (cast.op == .fpext and cast.from_ty == .half and cast.to_ty == .x86_fp80) return "__extendhfxf2";
+    if (cast.op == .fptrunc and cast.from_ty == .x86_fp80 and cast.to_ty == .half) return "__truncxfhf2";
     if (cast.to_ty == .fp128) {
         if (cast.op == .fpext) return switch (cast.from_ty) {
             .half => "__extendhftf2",
             .float => "__extendsftf2",
             .double => "__extenddftf2",
+            .x86_fp80 => "__extendxftf2",
             else => null,
         };
         if (cast.from_ty == .int) return switch (cast.op) {
@@ -135,6 +171,7 @@ fn conversion(cast: ir.CastInst) ?[]const u8 {
             .half => "__trunctfhf2",
             .float => "__trunctfsf2",
             .double => "__trunctfdf2",
+            .x86_fp80 => "__trunctfxf2",
             else => null,
         };
         if (cast.to_ty == .int) return switch (cast.op) {
@@ -156,7 +193,36 @@ fn conversion(cast: ir.CastInst) ?[]const u8 {
     return null;
 }
 
+fn extendedIntegerConversion(cast: ir.CastInst) ?[]const u8 {
+    if (cast.to_ty == .x86_fp80 and cast.from_ty == .int and cast.from_ty.int > 0 and cast.from_ty.int <= 128) return switch (cast.op) {
+        .sitofp => "__floattixf",
+        .uitofp => "__floatuntixf",
+        else => null,
+    };
+    if (cast.from_ty == .x86_fp80 and cast.to_ty == .int and cast.to_ty.int > 0 and cast.to_ty.int <= 128) return switch (cast.op) {
+        .fptosi => "__fixxfti",
+        .fptoui => "__fixunsxfti",
+        else => null,
+    };
+    return null;
+}
+
+fn floatingBridge(cast: ir.CastInst) ?[2][]const u8 {
+    if (cast.op == .fpext and cast.to_ty == .x86_fp80) return switch (cast.from_ty) {
+        .float => .{ "__extendsftf2", "__trunctfxf2" },
+        .double => .{ "__extenddftf2", "__trunctfxf2" },
+        else => null,
+    };
+    if (cast.op == .fptrunc and cast.from_ty == .x86_fp80) return switch (cast.to_ty) {
+        .float => .{ "__extendxftf2", "__trunctfsf2" },
+        .double => .{ "__extendxftf2", "__trunctfdf2" },
+        else => null,
+    };
+    return null;
+}
+
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    if (try @import("floating_signs.zig").legalize(allocator, function)) |signed| return signed;
     var candidate = Candidate.init(allocator, function);
     var serial: forms.TemporaryNames = .{};
     defer serial.deinit(allocator);
@@ -165,6 +231,34 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .fcmp and inst.kind.fcmp.operand_ty == .half and
+                halfOperandSupported(inst.kind.fcmp.lhs) and halfOperandSupported(inst.kind.fcmp.rhs))
+            {
+                try candidate.begin(&block, block_index, instruction_index);
+                var copy = inst;
+                copy.kind.fcmp.operand_ty = .float;
+                copy.kind.fcmp.lhs = try b.halfOperand(inst.kind.fcmp.lhs);
+                copy.kind.fcmp.rhs = try b.halfOperand(inst.kind.fcmp.rhs);
+                copy.metadata = null;
+                try block.instructions.append(allocator, copy);
+                continue;
+            }
+            if (!inst.removed and inst.result != null and inst.kind == .cast) if (floatingBridge(inst.kind.cast)) |symbols| {
+                if (!ir.identifiers.eql(function.name, symbols[0]) and !ir.identifiers.eql(function.name, symbols[1])) {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    // Binary128 exactly contains every finite source value.
+                    // Narrow once to the requested target without double rounding.
+                    try b.floatingBridge(inst, symbols);
+                    continue;
+                }
+            };
+            if (!inst.removed and inst.result != null and inst.kind == .cast) if (extendedIntegerConversion(inst.kind.cast)) |symbol| {
+                if (!ir.identifiers.eql(function.name, symbol)) {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    try b.extendedIntegerCast(inst, symbol);
+                    continue;
+                }
+            };
             if (!inst.removed and inst.result != null and inst.kind == .binary and inst.kind.binary.ty == .half and
                 negationSpelling(inst.kind.binary) and halfOperandSupported(inst.kind.binary.rhs))
             {

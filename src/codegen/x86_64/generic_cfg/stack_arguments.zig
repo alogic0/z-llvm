@@ -3,12 +3,14 @@
 //! SSE and indirect stack-pair envelopes stay separate.
 const std = @import("std");
 const ir = @import("../../../ir.zig");
+const sysv = @import("../sysv_abi.zig");
 
 pub const max_arguments = 32;
 pub const max_indirect_arguments = 16;
 pub const max_stack_words = max_arguments * 2;
 
 pub const Location = union(enum) {
+    sse: usize,
     register: usize,
     pair: usize,
     stack: usize,
@@ -36,7 +38,15 @@ fn integerLayout(items: anytype) ?Layout {
     if (items.len > max_arguments) return null;
     var result: Layout = .{ .count = items.len };
     var next_register: usize = 0;
+    var next_sse: usize = 0;
     for (items, 0..) |item, index| {
+        if (sysv.isScalarSseAbiType(item.ty) or sysv.isVector128AbiType(item.ty)) {
+            // SSE stack overflow remains a separate, closed contract.
+            if (item.abi_x87_memory or next_sse >= 8) return null;
+            result.locations[index] = .{ .sse = next_sse };
+            next_sse += 1;
+            continue;
+        }
         const width = words(item.ty) orelse return null;
         if (item.abi_x87_memory) {
             if (!item.ty.eql(.{ .int = 80 }) and !item.ty.eql(.{ .int = 128 })) return null;

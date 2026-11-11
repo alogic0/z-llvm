@@ -61,8 +61,8 @@ fn callForm(call: ir.CallInst) bool {
     if (!helpers.isDefaultOrFastcc(call.calling_conv) or call.callee_value != null or
         call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or
         call.operand_bundle != null or std.mem.startsWith(u8, call.callee, "llvm.")) return false;
-    // Only the existing direct integer/pointer stack layout participates.
-    if (call.ret_ty != .x86_fp80 and call.ret_ty != .void and call.ret_ty != .ptr and call.ret_ty != .int) return false;
+    if (call.ret_ty != .x86_fp80 and call.ret_ty != .void and call.ret_ty != .ptr and call.ret_ty != .int and
+        !sysv.isScalarSseAbiType(call.ret_ty) and !sysv.isVector128AbiType(call.ret_ty)) return false;
     if (call.ret_ty == .x86_fp80 and !advisory(call.ret_attrs)) return false;
     var envelope = call;
     if (call.ret_ty == .x86_fp80) envelope.ret_attrs = null;
@@ -73,7 +73,7 @@ fn callForm(call: ir.CallInst) bool {
             if (!advisory(arg.attrs)) return false;
             _ = value(arg.value) catch return false;
         } else {
-            if (arg.ty != .ptr and arg.ty != .int) return false;
+            if (arg.ty != .ptr and arg.ty != .int and !sysv.isScalarSseAbiType(arg.ty) and !sysv.isVector128AbiType(arg.ty)) return false;
             sysv.rejectUnsupportedCallArgAttrs(arg) catch return false;
         }
     }
@@ -152,6 +152,11 @@ fn eligible(function: ir.Function, context: ?*const machine.ReadOnlyModuleContex
                 for (p.incoming.items) |incoming| _ = value(incoming.value) catch return false;
                 found = true;
             },
+            .fcmp => |comparison| if (comparison.operand_ty == .x86_fp80) {
+                _ = value(comparison.lhs) catch return false;
+                _ = value(comparison.rhs) catch return false;
+                found = true;
+            },
             .call => |call| if (touches(inst)) {
                 if (!callForm(call)) return false;
                 found = true;
@@ -187,6 +192,14 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.kind == .fcmp and inst.kind.fcmp.operand_ty == .x86_fp80) {
+                try candidate.begin(&block, block_index, instruction_index);
+                const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial };
+                const lhs = try b.returnValue(inst.kind.fcmp.lhs);
+                const rhs = try b.returnValue(inst.kind.fcmp.rhs);
+                try @import("extended80_comparisons.zig").emit(allocator, function, &block, &serial, inst, lhs, rhs);
+                continue;
+            }
             var copy = inst;
             var changed = false;
             if (!inst.removed) switch (inst.kind) {
