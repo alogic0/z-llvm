@@ -8,8 +8,9 @@ const provenance = @import("provenance.zig");
 const elf = @import("object_contract.zig");
 const policy = @import("../distribution_headroom_policy.zig");
 const retained = @import("whole_compiler_reuse.zig");
+const resources = @import("whole_compiler_resources.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
-const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
+const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--self-cpu N] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -23,8 +24,12 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(code);
     }
     if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("{s}", .{usage});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "libc-file", "reuse-captured-objects", "timeout-ms", "input-ir" }, &.{ "profile-events", "runtime-checks" });
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "libc-file", "reuse-captured-objects", "self-cpu", "timeout-ms", "input-ir" }, &.{ "profile-events", "runtime-checks" });
     if (args.flag("runtime-checks") and args.get("input-ir") == null) return error.RuntimeChecksRequireCapturedInput;
+    if (args.get("self-cpu")) |cpu| {
+        _ = try resources.cpuIndex(cpu);
+        if (args.get("input-ir") != null) return error.SelfCpuRequiresWholeBuild;
+    }
     const output = try c.newOutput(try args.require("output-root"));
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("whole-compiler-diagnostic-v1"));
@@ -231,6 +236,16 @@ fn resolveProviders(c: *u.Context, config: []const u8, output: []const u8, repor
 }
 
 fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const u8, env: *std.process.Environ.Map, runner: *Runner, report: *u.Value) !void {
+    const self_cpu = args.get("self-cpu");
+    // Resource controls are explicit process launchers. They do not alter the
+    // source, target CPU, generated-frame guard or captured object contract.
+    if (self_cpu) |cpu| {
+        try u.put(c.a, report, "self_rebuild_cpu", u.n(try resources.cpuIndex(cpu)));
+        try u.put(c.a, report, "self_rebuild_cpu_launcher", try fileIdentity(c, resources.launcher));
+    }
+    const limits_path = try c.join(&.{ output, "process-limits.txt" });
+    try c.write(limits_path, try c.read("/proc/self/limits"));
+    try u.put(c.a, report, "inherited_process_limits", try fileIdentity(c, limits_path));
     const source = try c.join(&.{args.get("zig-source") orelse "../ziglang"});
     const zig = try c.join(&.{args.get("zig-emitter") orelse "../ziglang/build/stage4/bin/zig"});
     const original_config = try c.join(&.{args.get("config-h") orelse try c.join(&.{ source, "build/config.h" })});
@@ -332,9 +347,11 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     const rebuild_warm_env = try warmupEnvironment(c, rebuild, &rebuild_env);
     const rebuild_command = try buildArgs(c, candidate, source, config, rebuild);
     const rebuild_warm_command = try buildArgs(c, zig, source, config, rebuild);
-    try c.writeJson(try c.join(&.{ rebuild, "build-command.json" }), rebuild_command);
-    try c.writeJson(try c.join(&.{ rebuild, "warmup-command.json" }), try program.argv(c, rebuild_warm_command, &.{"--help"}));
-    if ((try timed(c, runner, try program.argv(c, rebuild_warm_command, &.{"--help"}), try c.join(&.{ output, "self-warmup" }), &rebuild_warm_env, .{ .timeout_ms = try timeout(args) })).code != 0) return;
+    const self_build_command = try resources.command(c.a, self_cpu, rebuild_command);
+    const self_warm_command = try resources.command(c.a, self_cpu, try program.argv(c, rebuild_warm_command, &.{"--help"}));
+    try c.writeJson(try c.join(&.{ rebuild, "build-command.json" }), self_build_command);
+    try c.writeJson(try c.join(&.{ rebuild, "warmup-command.json" }), self_warm_command);
+    if ((try timed(c, runner, self_warm_command, try c.join(&.{ output, "self-warmup" }), &rebuild_warm_env, .{ .timeout_ms = try timeout(args) })).code != 0) return;
     const rebuild_captures = try c.join(&.{ rebuild, "captures" });
     try c.mkdir(rebuild_captures);
     try local_env.put("ZLLVM_WHOLE_CAPTURE_ROOT", rebuild_captures);
@@ -344,7 +361,7 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     _ = local_env.swapRemove("ZLLVM_WHOLE_REUSE_ROOT");
     try local_env.put("ZIG_GLOBAL_CACHE_DIR", rebuild_global_cache);
     try saveEnvironment(c, &local_env, try c.join(&.{ rebuild, "hook-environment.json" }));
-    const rebuilt = try timed(c, runner, rebuild_command, try c.join(&.{ output, "self-build" }), &local_env, .{ .timeout_ms = try timeout(args) });
+    const rebuilt = try timed(c, runner, self_build_command, try c.join(&.{ output, "self-build" }), &local_env, .{ .timeout_ms = try timeout(args) });
     const rebuild_invocations = try collect(c, rebuild_captures);
     try u.put(c.a, report, "self_rebuild_invocations", rebuild_invocations);
     if (rebuilt.code != 0 or rebuild_invocations.array.items.len == 0) return;
@@ -362,6 +379,10 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try runner.observe(rebuilt_exe, &.{"version"}, 0, try c.fmt("{s}\n", .{try u.str(report.*, "zig_version")}), try c.join(&.{ output, "self-version" }), env);
     try behaviors(c, rebuild, source, rebuilt_exe, env, runner);
     try u.put(c.a, report, "self_rebuild_passed", u.b(true));
+    if (self_cpu != null) {
+        const recorded_launcher = try u.get(report.*, "self_rebuild_cpu_launcher");
+        if (!std.mem.eql(u8, try c.digest(resources.launcher), try u.str(recorded_launcher, "sha256"))) return error.SelfCpuLauncherChanged;
+    }
     try u.put(c.a, report, "failure_stage", u.s("none"));
     try u.put(c.a, report, "status", u.s("passed"));
 }

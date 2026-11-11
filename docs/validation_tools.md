@@ -186,6 +186,14 @@ self-rebuild command uses the new candidate as its frontend. Host-tool setup
 commands and emitter identity are retained separately and remain outside the
 local compiler/runtime object claim.
 
+`--self-cpu N` pins the self-build setup and actual frontend command to one
+Linux processor through the recorded `/usr/bin/taskset` launcher. The initial
+build keeps the caller's affinity, preserving exact captured-object reuse.
+Reports retain the launcher identity, effective commands and inherited process
+limits. Set any required main-stack allowance in the caller, for example with
+`prlimit --stack=1073741824:1073741824`. The target CPU remains `baseline`, and
+the generated-frame guard remains unchanged. Captured-IR mode rejects this option.
+
 `--reuse-captured-objects ROOT` permits the initial build or captured-IR replay
 to reuse completed local objects from a preceding runner root, including a run
 whose outer link failed. Input hash, backend hash, compiler source map, backend
