@@ -174,6 +174,23 @@ diagnostic without claiming a compiler build. All runs require new output
 directories. Admission and sampled runtime reserve use the existing serial
 space policy; the runner cancels its process group on a reserve violation.
 
+`--libc-file FILE` selects an explicit native libc installation for host provider
+libraries. The closed child environment receives a retained copy through
+`ZIG_LIBC`; original/effective configuration and CRT/library hashes verify after
+the run. This keeps the GNU target and baseline CPU while avoiding a mix of
+Zig's default glibc stubs and newer host LLVM/C++ dependencies. Warmup, initial
+build and self-rebuild use separate global cache roots; local caches and install
+roots are also separate between generations.
+
+`--reuse-captured-objects ROOT` permits the initial build or captured-IR replay
+to reuse completed local objects from a preceding runner root, including a run
+whose outer link failed. Input hash, backend hash, compiler source map, backend
+arguments, actual source command, profile/owners and ELF must validate. Input or
+argument misses execute the backend; changed or failed retained artifacts fail
+closed. Reuse chains are rejected. Reports distinguish delivery from backend
+execution, retain source commands and identify copied profiling measurements.
+The self-rebuild always executes the backend with reuse disabled.
+
 For the original 455-definition runtime input, add `--runtime-checks` to a
 captured-IR replay. The runner links the delivered local object and a separately
 compiled LLVM reference to `test/whole_compiler/runtime_completion_driver.c`,

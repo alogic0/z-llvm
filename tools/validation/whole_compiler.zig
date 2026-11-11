@@ -7,8 +7,9 @@ const reports = @import("whole_compiler_report.zig");
 const provenance = @import("provenance.zig");
 const elf = @import("object_contract.zig");
 const policy = @import("../distribution_headroom_policy.zig");
+const retained = @import("whole_compiler_reuse.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
-const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
+const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -22,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(code);
     }
     if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("{s}", .{usage});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "timeout-ms", "input-ir" }, &.{ "profile-events", "runtime-checks" });
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "libc-file", "reuse-captured-objects", "timeout-ms", "input-ir" }, &.{ "profile-events", "runtime-checks" });
     if (args.flag("runtime-checks") and args.get("input-ir") == null) return error.RuntimeChecksRequireCapturedInput;
     const output = try c.newOutput(try args.require("output-root"));
     var report = u.object(c.a);
@@ -99,6 +100,29 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     try u.put(c.a, report, "runner", try fileIdentity(c, "/proc/self/exe"));
     var env = try environment(c, output);
     if (args.flag("profile-events")) try env.put("ZLLVM_WHOLE_PROFILE_EVENTS", "1");
+    if (args.get("libc-file")) |path| {
+        const original = try c.join(&.{path});
+        const libc = try std.zig.LibCInstallation.parse(c.a, c.io, original, &@import("builtin").target);
+        const effective = try c.join(&.{ output, "native-libc.txt" });
+        try c.copy(original, effective);
+        try env.put("ZIG_LIBC", effective);
+        try u.put(c.a, report, "original_libc_config", try fileIdentity(c, original));
+        try u.put(c.a, report, "effective_libc_config", try fileIdentity(c, effective));
+        var inputs = u.array(c.a);
+        const crt = libc.crt_dir orelse return error.MissingLibcCrtDirectory;
+        const cc = libc.cc_dir orelse return error.MissingLibcCcDirectory;
+        if (!std.fs.path.isAbsolute(crt) or !std.fs.path.isAbsolute(cc)) return error.LibcPathsMustBeAbsolute;
+        for ([_][]const u8{ "crt1.o", "Scrt1.o", "crti.o", "crtn.o", "libc.so", "libc.so.6", "ld-linux-x86-64.so.2" }) |name| try u.add(&inputs, try fileIdentity(c, try c.join(&.{ crt, name })));
+        for ([_][]const u8{ "crtbegin.o", "crtend.o", "crtbeginS.o", "crtendS.o" }) |name| try u.add(&inputs, try fileIdentity(c, try c.join(&.{ cc, name })));
+        try u.put(c.a, report, "native_libc_inputs", inputs);
+    }
+    if (args.get("reuse-captured-objects")) |path| {
+        const root = try c.join(&.{path});
+        if (u.isWithin(output, root) or u.isWithin(root, output)) return error.ReuseRootMustBeIndependent;
+        try env.put("ZLLVM_WHOLE_REUSE_ROOT", root);
+        try u.put(c.a, report, "initial_build_reuse_root", u.s(root));
+        try u.put(c.a, report, "self_rebuild_backend_reuse", u.b(false));
+    }
     try saveEnvironment(c, &env, try c.join(&.{ output, "base-environment.json" }));
     const first = try freeSpace(c.io, output);
     if (first < policy.serial_reserve_floor_bytes + policy.serial_projected_peak_bytes) return error.InsufficientAdmissionSpace;
@@ -143,6 +167,12 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     }
     if (!std.mem.eql(u8, compiler_hash, try c.digest(compiler))) return error.BackendChangedDuringRun;
     if (!u.json.eql(source_snapshot, try provenance.files(c, source_scope))) return error.DiagnosticSourceChangedDuringRun;
+    for ([_][]const u8{ "original_libc_config", "effective_libc_config" }) |field| if (report.object.get(field)) |identity| {
+        if (!std.mem.eql(u8, try c.digest(try u.str(identity, "path")), try u.str(identity, "sha256"))) return error.LibcConfigChangedDuringRun;
+    };
+    if (report.object.get("native_libc_inputs")) |inputs| for (inputs.array.items) |identity| {
+        if (!std.mem.eql(u8, try c.digest(try u.str(identity, "path")), try u.str(identity, "sha256"))) return error.LibcProviderChangedDuringRun;
+    };
     try u.put(c.a, report, "source_and_backend_verified", u.b(true));
 }
 
@@ -154,6 +184,15 @@ fn buildArgs(c: *u.Context, zig: []const u8, source: []const u8, config: []const
 
 fn timed(c: *u.Context, runner: *Runner, command: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Runner.Options) !Runner.Result {
     return runner.run(try program.argv(c, &.{ "/usr/bin/time", "-f", "wall_seconds=%e\nmax_rss_kb=%M\nexit_status=%x", "-o", try c.fmt("{s}.time", .{stem}), "--" }, command), stem, env, options);
+}
+
+fn warmupEnvironment(c: *u.Context, output: []const u8, env: *const std.process.Environ.Map) !std.process.Environ.Map {
+    var warm = try env.clone(c.a);
+    const cache = try c.join(&.{ output, "warmup-global-cache" });
+    try c.mkdir(cache);
+    try warm.put("ZIG_GLOBAL_CACHE_DIR", cache);
+    try saveEnvironment(c, &warm, try c.join(&.{ output, "warmup-environment.json" }));
+    return warm;
 }
 
 fn resolveProviders(c: *u.Context, config: []const u8, output: []const u8, report: *u.Value) ![]const u8 {
@@ -216,7 +255,8 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try c.writeJson(try c.join(&.{ output, "build-command.json" }), command);
     try u.put(c.a, report, "status", u.s("blocked"));
     try u.put(c.a, report, "failure_stage", u.s("build-runner-warmup"));
-    const warm = try timed(c, runner, try program.argv(c, command, &.{"--help"}), try c.join(&.{ output, "warmup" }), env, .{ .timeout_ms = try timeout(args) });
+    const warm_env = try warmupEnvironment(c, output, env);
+    const warm = try timed(c, runner, try program.argv(c, command, &.{"--help"}), try c.join(&.{ output, "warmup" }), &warm_env, .{ .timeout_ms = try timeout(args) });
     if (warm.code != 0) return;
     const captures = try c.join(&.{ output, "captures" });
     try c.mkdir(captures);
@@ -280,12 +320,24 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try u.put(c.a, report, "failure_stage", u.s("self-rebuild"));
     const rebuild = try c.join(&.{ output, "self-rebuild" });
     try c.mkdir(rebuild);
+    var rebuild_env = try env.clone(c.a);
+    const rebuild_global_cache = try c.join(&.{ rebuild, "global-cache" });
+    try c.mkdir(rebuild_global_cache);
+    try rebuild_env.put("ZIG_GLOBAL_CACHE_DIR", rebuild_global_cache);
+    _ = rebuild_env.swapRemove("ZLLVM_WHOLE_REUSE_ROOT");
+    try saveEnvironment(c, &rebuild_env, try c.join(&.{ rebuild, "base-environment.json" }));
+    const rebuild_warm_env = try warmupEnvironment(c, rebuild, &rebuild_env);
     const rebuild_command = try buildArgs(c, candidate, source, config, rebuild);
-    if ((try timed(c, runner, try program.argv(c, rebuild_command, &.{"--help"}), try c.join(&.{ output, "self-warmup" }), env, .{ .timeout_ms = try timeout(args) })).code != 0) return;
+    if ((try timed(c, runner, try program.argv(c, rebuild_command, &.{"--help"}), try c.join(&.{ output, "self-warmup" }), &rebuild_warm_env, .{ .timeout_ms = try timeout(args) })).code != 0) return;
     const rebuild_captures = try c.join(&.{ rebuild, "captures" });
     try c.mkdir(rebuild_captures);
     try local_env.put("ZLLVM_WHOLE_CAPTURE_ROOT", rebuild_captures);
     try local_env.put("ZLLVM_MARKER_PATH", try c.join(&.{ rebuild, "hook.marker" }));
+    // Only the initial retry may reuse preceding complete local objects.
+    // The candidate's own compiler-module rebuild must execute the backend.
+    _ = local_env.swapRemove("ZLLVM_WHOLE_REUSE_ROOT");
+    try local_env.put("ZIG_GLOBAL_CACHE_DIR", rebuild_global_cache);
+    try saveEnvironment(c, &local_env, try c.join(&.{ rebuild, "hook-environment.json" }));
     const rebuilt = try timed(c, runner, rebuild_command, try c.join(&.{ output, "self-build" }), &local_env, .{ .timeout_ms = try timeout(args) });
     const rebuild_invocations = try collect(c, rebuild_captures);
     try u.put(c.a, report, "self_rebuild_invocations", rebuild_invocations);
@@ -410,6 +462,17 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     if (env.get("ZLLVM_WHOLE_PROFILE_EVENTS") != null) try command.append(c.a, try c.fmt("--profile-events={s}", .{events_path}));
     try command.append(c.a, input);
     try c.writeJson(try c.join(&.{ directory, "effective-argv.json" }), command.items);
+    if (env.get("ZLLVM_WHOLE_REUSE_ROOT")) |root| {
+        const replay = retained.tryReplay(c, root, compiler, directory, command.items, report) catch |err| {
+            try u.put(c.a, &report, "backend_executed", u.b(false));
+            try u.put(c.a, &report, "failure_stage", u.s("retained-object-verification"));
+            try u.put(c.a, &report, "reuse_error", u.s(@errorName(err)));
+            try c.writeJson(try c.join(&.{ directory, "report.json" }), report);
+            return report;
+        };
+        if (replay) |result| return result;
+    }
+    try u.put(c.a, &report, "backend_executed", u.b(true));
     var runner = Runner.init(c, directory);
     const result = try timed(c, &runner, command.items, try c.join(&.{ directory, "backend" }), env, .{ .timeout_ms = deadline, .stdout_file = try c.join(&.{ directory, "local.o" }), .group = group });
     try u.put(c.a, &report, "returncode", u.n(result.code));
