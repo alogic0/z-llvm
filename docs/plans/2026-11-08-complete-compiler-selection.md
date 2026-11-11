@@ -1,9 +1,17 @@
 # Complete compiler selection
 
 Status: resumed at the user's request after the validated performance deliveries
-at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `669fd097`,
-selecting 8,860/8,928 compiler definitions and 351/455 runtime definitions.
-Continue through all 68 remaining original compiler definitions.
+at `c19bdc66` and `0bf96594`. The latest accepted checkpoint is `516c7b43`,
+selecting 8,879/8,928 compiler definitions and 353/455 runtime definitions.
+Continue through all 49 remaining original compiler definitions.
+
+The [scalar math and integer checkpoint](../evidence/scalar_math_and_integer_boundaries.md)
+adds nineteen compiler and two runtime selections with complete census,
+independent production and event agreement. Both compiler builds preserve all
+96 prior native populations, 3,557 command outcomes and 1,461 artifact hashes.
+All seventeen integration gates pass. Continue implementing the remaining
+frontier; successor focused results receive no cumulative count credit until
+their own complete original-input acceptance.
 
 Baseline: accepted code `7080d454`, documentation `742e35fc`; compiler
 7,799/8,928, runtime 284/455. Preserve the original compiler input SHA-256

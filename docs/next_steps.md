@@ -1,25 +1,25 @@
 # Complete compiler selection resumed
 
 Continue the [all-8,928 plan](plans/2026-11-08-complete-compiler-selection.md)
-from the accepted [floating conversion/predicate checkpoint](evidence/floating_conversions_predicates.md)
-at `669fd097`: **8,860/8,928** compiler definitions and **351/455** runtime
-definitions. All 68 remaining original compiler definitions stay in scope. The
-complete current census identifies remaining floating/structured values and
+from the accepted [scalar math and integer checkpoint](evidence/scalar_math_and_integer_boundaries.md)
+at `516c7b43`: **8,879/8,928** compiler definitions and **353/455** runtime
+definitions. All 49 remaining original compiler definitions stay in scope. The
+complete current census identifies remaining math, structured values and
 storage boundaries for subsequent coherent groups. Use focused original-function and native checks during
 implementation; complete unchanged-input census and independent production
 replay accept counts at cohesive checkpoints. Revisit performance only when a
 required replay cannot finish.
 
-Batch 18 adds 22 compiler and twenty runtime selections with complete census,
+Batch 22 adds nineteen compiler and two runtime selections with complete census,
 independent production and event agreement, preserving every earlier success
-and owner. Debug/ReleaseSafe each pass 2,127 units, 63 structural and two profile
-checks; readiness and all 17 integration gates pass. Both complete 96-population
-native suites preserve 3,413 preceding outcomes and all 1,401 artifact hashes
-per build; all 216 new fault controls are detected. Source/binary bindings and
-all 4,375,366 compiler event rows audit successfully. Continue with store-only
-half storage, wide byte swaps, scalar vector choices, further conversions and
-math intrinsics; isolated results receive no cumulative acceptance credit
-until complete original-input replays.
+and owner. Debug/ReleaseSafe each pass 2,139 units, 63 structural and two profile
+checks; readiness and all 17 integration gates pass. Both complete 101-population
+native suites preserve 3,557 preceding outcomes and all 1,461 artifact hashes
+per build; all 270 new fault controls are detected. Source/binary bindings and
+all 4,397,032 compiler event rows audit successfully. Continue with half math,
+extended80 arithmetic, remainders, vector classification, wide counts and larger
+storage; isolated results receive no cumulative acceptance credit until complete
+original-input replays.
 
 Batch 08's [SSA/storage slice](evidence/ssa_transport_storage_slice.md) and
 selector snapshot-storage changes pass all 17 serial gates, all 79 native
