@@ -118,7 +118,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
         else => return err,
     };
     if (quad) |candidate| return candidate;
-    return @import("half_memory.zig").legalize(allocator, function, context);
+    if (try @import("half_memory.zig").legalize(allocator, function, context)) |candidate| return candidate;
+    return @import("extended80_payloads.zig").legalize(allocator, function, context);
 }
 
 fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {

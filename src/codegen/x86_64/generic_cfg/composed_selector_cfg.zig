@@ -184,6 +184,9 @@ fn fpSelectScratch(first: ?x86_64_types.XmmReg, second: ?x86_64_types.XmmReg) x8
 }
 
 pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic {
+    if (selector.machine.ret_ty == .x86_fp80) {
+        if (!ret.ty.eql(.{ .int = 128 })) return .{ .no_emitter = "composed-block-x87-return-carrier" };
+    }
     if (ret.ty == .void) {
         if (ret.value != null) return .{ .unsupported_value = "composed-block-void-ret-value" };
         try emitReturnEpilogue(selector);
@@ -246,6 +249,7 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
         },
         .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return .{ .unsupported_value = "composed-block-ret-value" },
     }
+    if (selector.machine.ret_ty == .x86_fp80) try selector_state.emitEflagsInstruction(selector, .i80_rax_rdx_st0, .clobber);
     try emitReturnEpilogue(selector);
     return null;
 }

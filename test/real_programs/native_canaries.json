@@ -2484,6 +2484,28 @@
       ],
       "observations": 139264,
       "stdout": "extended-float-conversion observations=139264 rounding=classes=wide=abi=live=stores=guards=preserved\n"
+    },
+    {
+      "population": "extended80_payload",
+      "prefix": "extended80-payload",
+      "fixture": "extended80_payload",
+      "functions": [
+        "extended80_payload_0",
+        "extended80_payload_1",
+        "extended80_payload_2",
+        "extended80_payload_3",
+        "extended80_payload_4",
+        "extended80_payload_5",
+        "extended80_payload_6",
+        "extended80_payload_7",
+        "extended80_incoming",
+        "extended80_return_load",
+        "extended80_return_phi",
+        "extended80_return_constant",
+        "extended80_call"
+      ],
+      "observations": 53248,
+      "stdout": "extended80-payload observations=53248 bits=storage=freeze=phi=live=stride=abi=page=guards=preserved\n"
     }
   ]
 }

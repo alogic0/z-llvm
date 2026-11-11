@@ -274,17 +274,23 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         // MOV leaves condition flags unchanged and supplies the SysV AL count.
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = 0 });
     }
+    const physical_return = if (call.abi_x87_return) ir.Type.x86_fp80 else call.ret_ty;
     if (indirect_target) |frame| {
         if (needs_alignment) return .{ .no_spill_envelope = "composed-block-indirect-frame" };
         const displacement = std.math.add(u32, try frame.byteOffset(), pushed_bytes) catch return .{ .no_spill_envelope = "composed-block-indirect-offset" };
         try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_rax = displacement });
-        try selector_state.emitEflagsInstruction(selector, .{ .indirect_call_rax = call.ret_ty }, .clobber);
+        try selector_state.emitEflagsInstruction(selector, .{ .indirect_call_rax = physical_return }, .clobber);
     } else if (transaction != null)
-        try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } }, .clobber)
+        try selector_state.emitEflagsInstruction(selector, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = physical_return } }, .clobber)
     else
-        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = call.ret_ty } });
+        try selector.machine.instructions.append(selector.allocator, .{ .direct_call = .{ .symbol = call.callee, .ret_ty = physical_return } });
     if (needs_alignment) try selector_frame.appendAddRsp(selector, 8);
     if (pushed_bytes != 0) try selector_frame.appendAddRsp(selector, pushed_bytes);
+    if (call.abi_x87_return) {
+        if (ret_bits != 128 or indirect_target != null) return .{ .no_emitter = "composed-block-x87-call-carrier" };
+        // Capture and pop even an unused result before another call can run.
+        try selector_state.emitEflagsInstruction(selector, .x87_st0_i80_rax_rdx, .preserve);
+    }
     if (result) |result_name| switch (ret_bits) {
         0 => return .{ .unsupported_value = "composed-block-void-call-result" },
         32 => {

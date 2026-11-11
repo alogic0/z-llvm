@@ -5,6 +5,7 @@ const sysv_abi = @import("sysv_abi.zig");
 const MachineFunction = machine_ir.MachineFunction;
 
 pub fn verifyFunction(function: MachineFunction) !void {
+    try @import("verify_x87.zig").verify(function);
     for (function.instructions.items) |instruction| switch (instruction) {
         .indirect_jump => |jump| {
             if (jump.targets.len == 0) return error.InvalidBranchTarget;
@@ -326,6 +327,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .ucomiss_xmm0_xmm1,
         .oltss_xmm0_xmm1_al,
         .fneg_x86_fp80_stack8_st0,
+        .i80_rax_rdx_st0,
+        .x87_st0_i80_rax_rdx,
         .fneg_fp128_xmm0,
         .sub_rsp_8,
         .add_rsp_8,
@@ -495,6 +498,8 @@ pub fn verifyFunction(function: MachineFunction) !void {
         // call has invalidated it; they do not all use an XMM0-specific opcode.
         if (returns_scalar_sse and xmm_defined_bits[0] >= (if (function.ret_ty == .half) @as(u16, 16) else if (function.ret_ty == .float) @as(u16, 32) else @as(u16, 64))) xmm0_defined = true;
         switch (instruction) {
+            .i80_rax_rdx_st0 => {},
+            .x87_st0_i80_rax_rdx => eax_defined = true,
             .linux_syscall, .register_snapshot_rdi => eax_defined = true,
             .indirect_jump => saw_terminator = true,
             .label => |label| {
@@ -729,7 +734,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                         .packed_f32x2 => if (xmm_defined_bits[0] < 64) return error.ReturnRegisterUndefined,
                         .split_f64x2 => if (xmm_defined_bits[0] < 64 or xmm_defined_bits[1] < 64) return error.ReturnRegisterUndefined,
                     }
-                } else if (!eax_defined) return error.ReturnRegisterUndefined;
+                } else if (function.ret_ty != .x86_fp80 and !eax_defined) return error.ReturnRegisterUndefined;
                 if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
                 saw_terminator = true;
                 eax_defined = function.ret_ty == .void;
@@ -1173,6 +1178,8 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .ucomiss_xmm0_xmm1,
         .oltss_xmm0_xmm1_al,
         .fneg_x86_fp80_stack8_st0,
+        .i80_rax_rdx_st0,
+        .x87_st0_i80_rax_rdx,
         .fneg_fp128_xmm0,
         .sub_rsp_8,
         .add_rsp_8,

@@ -124,6 +124,8 @@ pub fn instructionEffect(instruction: Instruction) Effect {
         else => {},
     }
     return switch (instruction) {
+        .i80_rax_rdx_st0 => .clobber,
+        .x87_st0_i80_rax_rdx => .preserve,
         .indirect_jump => .preserve,
         .linux_syscall, .register_snapshot_rdi => .clobber,
         .cmp_r8d_arg32, .cmp_ecx_arg32, .cmp_rcx_arg64, .cmp_ecx_imm32, .cmp_eax_imm32, .cmp_arg64_imm64, .cmp_arg16_imm16, .cmp_rdi_imm64, .cmp_rdx_rcx, .cmp_rdx_rdi, .cmp_rax_rdx, .test_eax_eax, .test_rax_rax, .test_rdx_rdx, .ucomisd, .ucomiss, .ucomisd_xmm1_xmm0, .ucomiss_xmm1_xmm0, .ucomiss_xmm0_xmm1, .cmp_arg8_imm8, .test_arg8, .test_arg32, .test_arg64 => .definition,

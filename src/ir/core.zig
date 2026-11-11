@@ -321,6 +321,9 @@ pub const IcmpPredicate = enum {
 };
 
 pub const Param = struct {
+    /// Private extended80 carrier: retain its aligned, memory-only x87 ABI.
+    /// Parsing never sets this field; it is not an LLVM attribute.
+    abi_x87_memory: bool = false,
     /// Private integer carrier: retain the non-i128 source ABI's separate words.
     /// Parsing never sets this field; it is not an LLVM attribute.
     abi_split_integer: bool = false,
@@ -759,6 +762,8 @@ pub const GepInst = struct {
 };
 
 pub const CallArg = struct {
+    /// Private memory-only x87 argument carrier, matching Param's field.
+    abi_x87_memory: bool = false,
     /// Set only by private integer-carrier legalization, like Param's field.
     abi_split_integer: bool = false,
     ty: Type,
@@ -777,6 +782,8 @@ pub const InlineAsm = struct {
 
 pub const CallInst = struct {
     ret_ty: Type,
+    // Private integer payload view; the physical result still occupies ST0.
+    abi_x87_return: bool = false,
     callee: []const u8,
     callee_value: ?Value = null,
     callee_function_ty: ?[]const u8 = null,

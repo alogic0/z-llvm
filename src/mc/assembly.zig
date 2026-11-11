@@ -1449,6 +1449,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .ucomiss_xmm0_xmm1 => try writer.writeAll("\tucomiss %xmm0, %xmm1\n"),
             .oltss_xmm0_xmm1_al => try writer.writeAll("\txorl %eax, %eax\n\tucomiss %xmm0, %xmm1\n\tseta %al\n"),
             .fneg_x86_fp80_stack8_st0 => try writer.writeAll("\tfldt 8(%rsp)\n\tfchs\n"),
+            .i80_rax_rdx_st0 => try writer.writeAll("\tpushq %rdx\n\tpushq %rax\n\tfldt (%rsp)\n\taddq $16, %rsp\n"),
+            .x87_st0_i80_rax_rdx => try writer.writeAll("\tpushq $0\n\tpushq $0\n\tfstpt (%rsp)\n\tpopq %rax\n\tpopq %rdx\n"),
             .fneg_fp128_xmm0 => try writer.writeAll("\tmovabsq $0x8000000000000000, %rax\n\tmovq %rax, %xmm1\n\tpslldq $8, %xmm1\n\txorps %xmm1, %xmm0\n"),
             .addsd_xmm1_xmm0 => try writer.writeAll("\taddsd %xmm1, %xmm0\n"),
             .sub_rsp_8 => try writer.writeAll("\tsubq $8, %rsp\n"),

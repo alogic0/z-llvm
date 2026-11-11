@@ -497,6 +497,12 @@ pub const Instruction = union(enum) {
     ucomiss_xmm0_xmm1,
     oltss_xmm0_xmm1_al,
     fneg_x86_fp80_stack8_st0,
+    /// Transfer the low80 RAX/RDX bits through a private16-byte stack temporary
+    /// into ST0. Net RSP delta0; ADD RSP clobbers arithmetic flags.
+    i80_rax_rdx_st0,
+    /// Pop ST0 into a zero-padded private16-byte temporary, then RAX/RDX.
+    /// Net RSP delta0; upper48 RDX bits are zero; flags are preserved.
+    x87_st0_i80_rax_rdx,
     fneg_fp128_xmm0,
     sub_rsp_8,
     add_rsp_8,

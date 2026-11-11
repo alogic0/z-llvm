@@ -38,6 +38,13 @@ fn integerLayout(items: anytype) ?Layout {
     var next_register: usize = 0;
     for (items, 0..) |item, index| {
         const width = words(item.ty) orelse return null;
+        if (item.abi_x87_memory) {
+            if (!item.ty.eql(.{ .int = 80 }) and !item.ty.eql(.{ .int = 128 })) return null;
+            result.stack_words = std.mem.alignForward(usize, result.stack_words, 2);
+            result.locations[index] = .{ .stack = result.stack_words };
+            result.stack_words += 2;
+            continue;
+        }
         const split_words = width == 2 and (item.ty.int != 128 or item.abi_split_integer);
         if (next_register + width <= 6) {
             result.locations[index] = if (width == 1) .{ .register = next_register } else .{ .pair = next_register };
@@ -65,6 +72,7 @@ pub fn callLayout(call: ir.CallInst) ?Layout {
         var register_words: usize = 0;
         var all_scalar = true;
         for (call.args.items) |arg| {
+            if (arg.abi_x87_memory) return null;
             register_words += words(arg.ty) orelse return null;
             all_scalar = all_scalar and scalar(arg.ty);
         }
