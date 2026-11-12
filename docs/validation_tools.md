@@ -28,6 +28,7 @@ remain in this repository.
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
+| Full pinned upstream behavior suite with named outcome comparison and optional local hook | `tools/run_upstream_behavior.zig` |
 | Audit a retained completed object against its command, owners, census and ELF | `tools/audit_captured_object.zig` |
 | Inventory global decoding and shared ELF placement without object credit | `tools/inspect_global_data.zig` / `inspect-global-data` |
 | Generate compiler global and runtime completion fixtures | `tools/generate_global_objects_canary.zig`, `tools/generate_runtime_frontier_canary.zig` |
@@ -57,6 +58,18 @@ existing proof/manifest paths. Candidate replay retains its explicit output
 replacement behavior. Historical Python helpers in ignored validation evidence
 remain historical records; they are not dependencies of the active workflow.
 No archives were made.
+
+`tools/run_upstream_behavior.zig` runs the unchanged pinned `test/behavior.zig`
+module in one explicitly selected mode (`Debug`, `ReleaseSafe`, `ReleaseFast`
+or `ReleaseSmall`) on x86_64 Linux GNU with CPU `baseline` and libc. Supply
+`--output-root`, `--compiler`, `--zig-source`, `--libc-file`, `--mode` and
+`--route llvm|local`. A local route also requires `--zllvm` and records every
+object invocation through the whole-compiler capture implementation. Compile
+and execution outcomes remain separate. `--reference-report` compares every
+named pass/skip outcome against a passed same-mode report. The default
+`--resources normal` inherits stack and CPU settings; `accepted` explicitly
+uses the historical CPU-0 / 1 GiB setup. `--test-filter` is diagnostic-only and
+sets `full_suite=false`. Every invocation requires a new output directory.
 
 Batch-08 fixture generation, research runs, oracle calibration and comparisons
 also use maintained Zig entry points. The retained `generate-native-pairs.py`,

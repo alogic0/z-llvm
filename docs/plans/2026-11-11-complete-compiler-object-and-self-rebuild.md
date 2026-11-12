@@ -1,8 +1,9 @@
 # Complete compiler objects, runtime and self-rebuild
 
 Date: 2026-11-11
-Status: complete at `b738377e`, backend implementation `e398030f`; all five
-milestones and cumulative validation pass. See the
+Status: milestones 1–5 complete at `b738377e`, backend implementation `e398030f`;
+follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The original
+five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
 [acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
 Baseline: accepted code `efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898`, documentation
@@ -326,6 +327,72 @@ thirteen scratch files. Use runner-owned cleanup within its documented scope.
 Create no archives or manual cleanup as part of this plan. Use streaming event
 audits and bounded diagnostic output for the large module. Revisit performance
 only when an observed required replay cannot finish, and retain its blocker.
+
+## Follow-up milestone 6: upstream behavior suite
+
+Run the unchanged pinned upstream `test/behavior.zig` suite with both retained
+compiler generations and the pinned reference on x86_64 Linux GNU, CPU
+`baseline`, in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall. Use upstream's
+test imports and runner; retain every test identity, pass, skip and failure.
+Record the exact libc/threading configuration and mirror it across routes.
+Do not silently filter failures or substitute a small sample for the full suite.
+
+First establish the reference and each candidate's normal `-fllvm` behavior.
+Then repeat candidate compilation with the local postopt object hook explicitly
+enabled. Every hook invocation must retain input/backend identities, actual
+process outcome, complete-object/owner/ELF checks and delivery provenance. Require
+at least the behavior module capture; a cache hit or runtime-only capture earns
+no behavior-module backend credit. Use separate caches and evidence roots for
+each generation, mode and route. Compare named test outcomes with the reference,
+including upstream's legitimate target-specific skips. A successful compiler
+invocation without execution does not establish behavior.
+
+## Follow-up milestone 7: close behavior failures
+
+Classify each failure as frontend, local selection, object/link, execution,
+test-harness or resource failure. Preserve the original failing invocation and
+derive the smallest reproducer. Repair cohesive families through existing shared
+contracts, with independent LLVM/native regressions and negative controls; never
+add case-name exceptions, fallback objects or blanket expected-failure waivers.
+Confirmed wrong-code and shared ABI/frame changes require immediate Tier 3.
+Rerun affected cases before repeating the complete matrix. Acceptance requires
+both generations to match the reference's complete named outcomes in all four
+modes through the local hook, with no unaccounted failures or missing captures.
+
+## Follow-up milestone 8: normal-resource self-rebuild
+
+Measure the final accepted compiler under inherited normal stack limits and
+normal CPU affinity before assuming that earlier resource failures still apply.
+Retain actual limits, affinity, largest frames/call chains, signals and outcomes.
+Use narrow frontend probes to diagnose excessive spill/frame growth. Repair the
+shared cause with regression coverage rather than raising the 8 MiB generated
+frame or 64 KiB stack-object guards, changing pinned upstream sources or hiding
+failures with single-CPU execution.
+
+Require a fresh unchanged-source self-rebuild with normal worker scheduling,
+without `--self-cpu` or a raised OS stack limit, complete compiler/runtime hook
+captures and a distinct rebuilt executable. Run version, the original behavior
+controls, the f80 regression and the full four-mode upstream behavior suite with
+that executable. Keep the CPU-0 / 1 GiB result as the historical accepted baseline
+until this stronger result passes. LLVM optimization and declared providers
+remain in scope; performance tuning and further LLVM removal are later work.
+
+Write successor evidence under
+`local-state/validations/compiler-behavior-completion-20261111/`, preserving the
+prior artifact seal and publication at `6253b063`. Mutable documentation leaves
+in the old manifest are authenticated against that committed publication and
+retained verbatim snapshots; do not rewrite historical manifests or acceptance.
+
+Follow-up completion requires cumulative validation appropriate to changed
+subsystems, exact source/binary/provider binding, updated documentation and a
+new evidence seal. Reuse unchanged gates only under the existing reuse policy.
+
+- [ ] Run the full reference and both candidate behavior matrices in all four modes.
+- [ ] Prove complete local-hook captures and matching named test outcomes.
+- [ ] Repair observed failures with focused regressions and required cumulative validation.
+- [ ] Diagnose and remove special CPU-affinity and main-stack requirements.
+- [ ] Prove fresh normal-resource self-rebuild and the rebuilt compiler's full behavior matrix.
+- [ ] Publish follow-up acceptance and seal successor evidence.
 
 ## Delivery checklist
 

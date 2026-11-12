@@ -3207,6 +3207,14 @@
       ],
       "observations": 1168,
       "stdout": "intrinsic-preservation observations=1168 live=aliases=memory=preserved\n"
+    },
+    {
+      "population": "phi_fp_literals",
+      "prefix": "phi-fp-literals",
+      "fixture": "phi_fp_literals",
+      "functions": ["phi_fp_literal32", "phi_fp_literal64"],
+      "observations": 66,
+      "stdout": "phi-fp-literals observations=66 snapshots=preserved\n"
     }
   ]
 }

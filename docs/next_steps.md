@@ -1,4 +1,12 @@
-# Compiler objects and self-rebuild complete
+# Upstream behavior and normal-resource self-rebuild
+
+The user authorized follow-up milestones 6–8 in the
+[compiler plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md):
+run the full pinned upstream Zig behavior suite with both compiler generations
+and the reference in all four modes; exercise and audit the local postopt hook;
+repair observed failures; and prove self-rebuild under normal stack and CPU
+settings. These follow-ups are active. Preserve the accepted five-milestone
+baseline below while collecting separate successor evidence.
 
 The [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
 is complete at accepted code `b738377e`, with backend implementation `e398030f`.
@@ -18,12 +26,12 @@ optimized IR and owner manifests match; every changed object has an individual
 review. The fixed prefix/cohort, ratchet 130, accepted-status file and frozen
 interfaces remain unchanged.
 
-This closes the planned object, link, startup, behavior and self-rebuild stages.
+This closes the original object, link, startup, behavior and self-rebuild stages.
 The tested self-build uses CPU 0 and a 1 GiB main stack, with the existing
 8 MiB generated-frame and 64 KiB stack-object guards. LLVM optimization and
 declared providers remain in use. Further work can reduce the frontend's stack
-requirements, extend configuration and runtime execution coverage, or measure
-performance under controlled conditions; these are separate follow-up scopes.
+requirements and extend behavior coverage under the active follow-up. Controlled
+performance measurements and further LLVM removal remain later scopes.
 Keep the accepted inputs, binaries, captures and sealed evidence as the baseline.
 
 The following checkpoints record the earlier acceptance history.

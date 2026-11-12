@@ -1296,6 +1296,12 @@ fn snapshotXmmPhiSources(
             else => {},
         };
         const incoming = phiIncomingFrom(phi, predecessor) orelse return .{ .unsupported_control_flow = "stage2-phi-incoming" };
+        // Literal-to-spill copies use an implicit XMM scratch after all named
+        // sources have been snapshotted. Its temporary contents have no value
+        // identity, so keep snapshots out of that register for the whole edge.
+        if (incoming.value == .fp) if (selector.phi_destinations.get(result_name)) |dst| {
+            if (dst == .spill_fp) unavailable[xmmRegIndex(.xmm0)] = true;
+        };
         if (selector_state.resolveValue(selector, incoming.value)) |source| switch (source) {
             .xmm => |fp| unavailable[xmmRegIndex(fp.reg)] = true,
             else => {},

@@ -578,7 +578,7 @@ fn runtimeObjectChecks(c: *u.Context, output: []const u8, invocation: u.Value, e
     return result;
 }
 
-fn collect(c: *u.Context, root: []const u8) !u.Value {
+pub fn collect(c: *u.Context, root: []const u8) !u.Value {
     var dir = try std.Io.Dir.cwd().openDir(c.io, root, .{ .iterate = true });
     defer dir.close(c.io);
     var it = dir.iterate();

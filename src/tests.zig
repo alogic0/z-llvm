@@ -18,6 +18,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_scalar_tests.zig");
     _ = @import("codegen/x86_64/sysv_abi.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_calls_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/composed_selector_cfg_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/source_guard/split_policy_tests.zig");
     _ = @import("selection_census.zig");
     _ = @import("codegen/x86_64/generic_cfg/narrow_freeze_tests.zig");

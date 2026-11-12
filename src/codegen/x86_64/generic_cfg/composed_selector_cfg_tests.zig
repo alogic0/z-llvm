@@ -415,6 +415,68 @@ test "composed selector executes captured multiway scalar phi shapes" {
     }
 }
 
+test "composed selector phi snapshots survive floating literal spill scratch" {
+    const input =
+        \\define float @phi_literal(float %x, i32 %which) {
+        \\entry:
+        \\  %condition = icmp eq i32 %which, 0
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %zero = phi float [ 0.0, %left ], [ 1.0, %right ]
+        \\  %first = phi float [ %x, %left ], [ %x, %right ]
+        \\  %second = phi float [ %x, %left ], [ %x, %right ]
+        \\  %sum = fadd float %first, %second
+        \\  %result = fadd float %sum, %zero
+        \\  ret float %result
+        \\}
+        \\define double @phi_literal64(double %x, i32 %which) {
+        \\entry:
+        \\  %condition = icmp eq i32 %which, 0
+        \\  br i1 %condition, label %left, label %right
+        \\left:
+        \\  br label %merge
+        \\right:
+        \\  br label %merge
+        \\merge:
+        \\  %zero = phi double [ 0.0, %left ], [ 1.0, %right ]
+        \\  %first = phi double [ %x, %left ], [ %x, %right ]
+        \\  %second = phi double [ %x, %left ], [ %x, %right ]
+        \\  %sum = fadd double %first, %second
+        \\  %result = fadd double %sum, %zero
+        \\  ret double %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items, 0..) |function, index| {
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        for ([_]f64{ 0.0, 0.25, 0.5, -0.25, 1024.0 }) |value| {
+            for (0..2) |which| {
+                if (index == 0) {
+                    const call: *const fn (f32, u32) callconv(.c) f32 = @ptrCast(mapping.ptr);
+                    try std.testing.expectEqual(@as(f32, @floatCast(value * 2 + @as(f64, @floatFromInt(which)))), call(@floatCast(value), @intCast(which)));
+                } else {
+                    const call: *const fn (f64, u32) callconv(.c) f64 = @ptrCast(mapping.ptr);
+                    try std.testing.expectEqual(value * 2 + @as(f64, @floatFromInt(which)), call(value, @intCast(which)));
+                }
+            }
+        }
+    }
+}
+
 test "composed selector executes reduced compare setcc test branch phi sequence" {
     const input =
         \\define i32 @compare_branch_phi(i32 %value) {
