@@ -568,7 +568,7 @@ pub fn verify(module: core.Module) !void {
                         switch (fcmp.operand_ty) {
                             .half, .float, .double, .x86_fp80, .fp128 => {},
                             .vector => |vector| switch (vector.elem_ty) {
-                                .half, .float, .double, .fp128 => {},
+                                .half, .float, .double, .x86_fp80, .fp128 => {},
                                 .int, .ptr => return error.TypeMismatch,
                             },
                             .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
@@ -1597,7 +1597,7 @@ fn verifySelectConditionType(cond_ty: core.Type, value_ty: core.Type) !void {
     if (cond_ty.vector.len != value_ty.vector.len) return error.SelectConditionTypeMismatch;
     switch (cond_ty.vector.elem_ty) {
         .int => |bits| if (bits == 1) return,
-        .half, .float, .double, .fp128, .ptr => {},
+        .half, .float, .double, .x86_fp80, .fp128, .ptr => {},
     }
     return error.SelectConditionTypeMismatch;
 }
@@ -1620,7 +1620,7 @@ fn verifyShuffleMask(vector_ty: core.Type, mask_ty: core.Type, mask: core.Value)
     if (vector_ty != .vector or mask_ty != .vector) return error.TypeMismatch;
     switch (mask_ty.vector.elem_ty) {
         .int => {},
-        .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
+        .half, .float, .double, .x86_fp80, .fp128, .ptr => return error.TypeMismatch,
     }
     switch (mask) {
         .vector => |text| try verifyShuffleMaskLiteral(vector_ty.vector.len * 2, mask_ty, text),
@@ -1787,7 +1787,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .half, .float, .double, .x86_fp80, .fp128 => {},
             .vector => |vector| switch (vector.elem_ty) {
-                .half, .float, .double, .fp128 => {},
+                .half, .float, .double, .x86_fp80, .fp128 => {},
                 .int, .ptr => return error.TypeMismatch,
             },
             .void, .int, .metadata, .ptr, .aggregate => return error.TypeMismatch,
@@ -1796,7 +1796,7 @@ fn verifyBinaryFlags(binary: core.BinaryInst) !void {
             .int => {},
             .vector => |vector| switch (vector.elem_ty) {
                 .int => {},
-                .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
+                .half, .float, .double, .x86_fp80, .fp128, .ptr => return error.TypeMismatch,
             },
             .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return error.TypeMismatch,
         },
@@ -1809,7 +1809,7 @@ fn verifyBinaryFastMathFlags(binary: core.BinaryInst) !void {
         .fadd, .fsub, .fmul, .fdiv, .frem => switch (binary.ty) {
             .half, .float, .double, .x86_fp80, .fp128 => {},
             .vector => |vector| switch (vector.elem_ty) {
-                .half, .float, .double, .fp128 => {},
+                .half, .float, .double, .x86_fp80, .fp128 => {},
                 .int, .ptr => return error.InvalidInstructionFlag,
             },
             .void, .int, .metadata, .ptr, .aggregate => return error.InvalidInstructionFlag,
@@ -1871,11 +1871,11 @@ fn verifyCast(cast: core.CastInst) !void {
                 if (from_vector.len != to_vector.len) return error.TypeMismatch;
                 const from_bits = switch (from_vector.elem_ty) {
                     .int => |bits| bits,
-                    .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
+                    .half, .float, .double, .x86_fp80, .fp128, .ptr => return error.TypeMismatch,
                 };
                 const to_bits = switch (to_vector.elem_ty) {
                     .int => |bits| bits,
-                    .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
+                    .half, .float, .double, .x86_fp80, .fp128, .ptr => return error.TypeMismatch,
                 };
                 switch (cast.op) {
                     .trunc => if (from_bits <= to_bits) return error.InvalidCast,
@@ -1930,12 +1930,12 @@ fn verifyVectorFloatToIntCast(cast: core.CastInst) !void {
     };
     if (from_vector.len != to_vector.len) return error.TypeMismatch;
     switch (from_vector.elem_ty) {
-        .half, .float, .double, .fp128 => {},
+        .half, .float, .double, .x86_fp80, .fp128 => {},
         .int, .ptr => return error.TypeMismatch,
     }
     switch (to_vector.elem_ty) {
         .int => {},
-        .half, .float, .double, .fp128, .ptr => return error.TypeMismatch,
+        .half, .float, .double, .x86_fp80, .fp128, .ptr => return error.TypeMismatch,
     }
 }
 
@@ -1977,6 +1977,7 @@ fn bitcastBits(ty: core.Type) ?u64 {
             .half => 16,
             .float => 32,
             .double => 64,
+            .x86_fp80 => 80,
             .fp128 => 128,
             .ptr => return null,
         }),
@@ -2144,6 +2145,7 @@ fn verifyAtomicMemoryAccessType(ty: core.Type) !void {
                 .half => 16,
                 .float => 32,
                 .double => 64,
+                .x86_fp80 => 80,
                 .fp128 => 128,
                 .ptr => unreachable,
             };
@@ -2176,7 +2178,7 @@ fn isFloatingScalar(ty: core.Type) bool {
 fn isFloatingOrFloatingVector(ty: core.Type) bool {
     return switch (ty) {
         .half, .float, .double, .x86_fp80, .fp128 => true,
-        .vector => |vector| vector.elem_ty == .half or vector.elem_ty == .float or vector.elem_ty == .double or vector.elem_ty == .fp128,
+        .vector => |vector| isFloatingScalar(vector.elem_ty.toType()),
         .void, .int, .metadata, .ptr, .aggregate => false,
     };
 }

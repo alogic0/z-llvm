@@ -52,7 +52,8 @@ pub const DataLayout = struct {
             .fp128 => 16,
             .ptr => byteWidth(try layout.pointerSizeBits()) orelse error.UnsupportedDataLayoutQuery,
             .aggregate => try layout.aggregateSizeBytes(ty),
-            .metadata, .vector => return error.UnsupportedDataLayoutQuery,
+            .vector => |vector| (try layout.vectorSizeBits(vector) + 7) / 8,
+            .metadata => return error.UnsupportedDataLayoutQuery,
         };
     }
 
@@ -72,7 +73,8 @@ pub const DataLayout = struct {
             .fp128 => 128,
             .ptr => try layout.pointerAbiAlignmentBits(),
             .aggregate => try layout.aggregateAlignmentBits(ty, .abi),
-            .metadata, .vector => return error.UnsupportedDataLayoutQuery,
+            .vector => |vector| (try layout.vectorAlignmentSpec(vector)).abi_bits,
+            .metadata => return error.UnsupportedDataLayoutQuery,
         };
     }
 
@@ -87,7 +89,8 @@ pub const DataLayout = struct {
             .fp128 => 128,
             .ptr => try layout.pointerPreferredAlignmentBits(),
             .aggregate => try layout.aggregateAlignmentBits(ty, .preferred),
-            .metadata, .vector => return error.UnsupportedDataLayoutQuery,
+            .vector => |vector| (try layout.vectorAlignmentSpec(vector)).preferred_bits,
+            .metadata => return error.UnsupportedDataLayoutQuery,
         };
     }
 
@@ -159,6 +162,41 @@ pub const DataLayout = struct {
 
     fn arrayElementStrideBytes(layout: DataLayout, element_ty: ir.Type) anyerror!u64 {
         return layout.typeAllocSizeBytes(element_ty);
+    }
+
+    fn vectorSizeBits(layout: DataLayout, vector: ir.VectorType) !u64 {
+        if (vector.len == 0) return error.UnsupportedDataLayoutQuery;
+        const element: u64 = switch (vector.elem_ty) {
+            .int => |bits| if (bits == 0) return error.UnsupportedDataLayoutQuery else bits,
+            .half => 16,
+            .float => 32,
+            .double => 64,
+            .x86_fp80 => 80,
+            .fp128 => 128,
+            .ptr => try layout.pointerSizeBits(),
+        };
+        return @as(u64, vector.len) * element;
+    }
+
+    fn vectorAlignmentSpec(layout: DataLayout, vector: ir.VectorType) !AlignmentSpec {
+        const bits = try layout.vectorSizeBits(vector);
+        var parts = std.mem.splitScalar(u8, layout.text, '-');
+        while (parts.next()) |part| {
+            if (part.len < 3 or part[0] != 'v') continue;
+            const colon = std.mem.indexOfScalar(u8, part, ':') orelse return error.InvalidDataLayout;
+            const width = try std.fmt.parseInt(u64, part[1..colon], 10);
+            var fields = std.mem.splitScalar(u8, part[colon + 1 ..], ':');
+            const abi = try std.fmt.parseInt(u16, fields.next() orelse return error.InvalidDataLayout, 10);
+            const preferred = if (fields.next()) |text| try std.fmt.parseInt(u16, text, 10) else abi;
+            if (fields.next() != null or abi < 8 or !std.math.isPowerOfTwo(abi) or
+                preferred < abi or !std.math.isPowerOfTwo(preferred)) return error.InvalidDataLayout;
+            if (width == bits) return .{ .abi_bits = abi, .preferred_bits = preferred };
+        }
+        // LLVM's natural vector alignment rounds the complete store size,
+        // without inserting each scalar element's allocation padding.
+        const bytes = try std.math.ceilPowerOfTwo(u64, (bits + 7) / 8);
+        const alignment = std.math.cast(u16, bytes * 8) orelse return error.UnsupportedDataLayoutQuery;
+        return .{ .abi_bits = alignment, .preferred_bits = alignment };
     }
 
     fn integerAlignmentSpec(layout: DataLayout, bits: u16) !AlignmentSpec {
@@ -260,6 +298,31 @@ fn nextAggregateField(fields: *AggregateFields) ?[]const u8 {
 
 fn parseTypeLiteral(text: []const u8) ?ir.Type {
     return @import("../ir/parser_types_values.zig").parseType(text) catch null;
+}
+
+test "fixed vectors use packed store sizes and whole-vector allocation alignment" {
+    const layout = try DataLayout.parse("e-p:64:64");
+    const cases = [_]struct { len: u32, element: ir.VectorElementType, store: u64, alloc: u64, align_bits: u16 }{
+        .{ .len = 1, .element = .x86_fp80, .store = 10, .alloc = 16, .align_bits = 128 },
+        .{ .len = 2, .element = .x86_fp80, .store = 20, .alloc = 32, .align_bits = 256 },
+        .{ .len = 3, .element = .x86_fp80, .store = 30, .alloc = 32, .align_bits = 256 },
+        .{ .len = 3, .element = .float, .store = 12, .alloc = 16, .align_bits = 128 },
+        .{ .len = 9, .element = .{ .int = 1 }, .store = 2, .alloc = 2, .align_bits = 16 },
+        .{ .len = 3, .element = .ptr, .store = 24, .alloc = 32, .align_bits = 256 },
+    };
+    for (cases) |case| {
+        const ty: ir.Type = .{ .vector = .{ .len = case.len, .elem_ty = case.element } };
+        try std.testing.expectEqual(case.store, try layout.typeStoreSizeBytes(ty));
+        try std.testing.expectEqual(case.alloc, try layout.typeAllocSizeBytes(ty));
+        try std.testing.expectEqual(case.align_bits, try layout.typeAbiAlignmentBits(ty));
+    }
+    const override = try DataLayout.parse("e-v160:128:256");
+    const extended: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .x86_fp80 } };
+    try std.testing.expectEqual(@as(u64, 32), try override.typeAllocSizeBytes(extended));
+    try std.testing.expectEqual(@as(u16, 128), try override.typeAbiAlignmentBits(extended));
+    try std.testing.expectEqual(@as(u16, 256), try override.typePreferredAlignmentBits(extended));
+    const malformed = try DataLayout.parse("e-v160:24");
+    try std.testing.expectError(error.InvalidDataLayout, malformed.typeAllocSizeBytes(extended));
 }
 
 test "aggregate fields advance by allocation size including scalar tail padding" {

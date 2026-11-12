@@ -18,10 +18,11 @@ const Shape = struct {
         return if (s.pointer) .ptr else .{ .int = s.bits };
     }
 };
-const Lanes = struct { ty: ir.Type, values: [16]ir.Value };
+const max_lanes = 64;
+const Lanes = struct { ty: ir.Type, values: [max_lanes]ir.Value };
 
 fn shape(ty: ir.Type) ?Shape {
-    if (ty != .vector or ty.vector.len == 0 or ty.vector.len > 16) return null;
+    if (ty != .vector or ty.vector.len == 0 or ty.vector.len > max_lanes) return null;
     if (ty.vector.elem_ty == .ptr) return .{ .len = ty.vector.len, .bits = 64, .pointer = true };
     if (ty.vector.elem_ty != .int or ty.vector.elem_ty.int == 0 or ty.vector.elem_ty.int > 128) return null;
     return .{ .len = ty.vector.len, .bits = ty.vector.elem_ty.int };
@@ -33,8 +34,8 @@ fn defined(value: ir.Value, ty: ir.Type) !ir.Value {
     return value;
 }
 fn constantLanes(value: ir.Value, ty: ir.Type) ?Lanes {
-    if (ty != .vector or ty.vector.len > 16) return null;
-    inline for (1..17) |count| if (ty.vector.len == count) {
+    if (ty != .vector or ty.vector.len > max_lanes) return null;
+    inline for (1..max_lanes + 1) |count| if (ty.vector.len == count) {
         const parsed = ir.vector_constant.parseFixed(count, value, ty.vector) orelse return null;
         var result: Lanes = .{ .ty = ty, .values = @splat(.poison) };
         for (parsed.lanes, 0..) |lane, i| result.values[i] = if (lane == .zero_initializer)

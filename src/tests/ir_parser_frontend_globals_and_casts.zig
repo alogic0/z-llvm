@@ -37,6 +37,47 @@ const simplifycfg = ir_common.simplifycfg;
 const slp_vectorizer = ir_common.slp_vectorizer;
 const sroa = ir_common.sroa;
 
+test "parser preserves quoted pointer global initializers with whitespace" {
+    const input =
+        \\@"source object" = internal global i32 7
+        \\@"pointer cell" = internal global ptr @"source object", align 8
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectEqualStrings("@\"source object\"", module.globals.items[1].initializer.scalar.named);
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.written());
+    for ([_][]const u8{ "@\"unterminated", "@\"name\" trailing", "@bare name", "@\"bad\\ZZ\"" }) |name| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "@bad = global ptr {s}\n", .{name});
+        defer std.testing.allocator.free(source);
+        try std.testing.expectError(error.UnsupportedGlobalVariable, ir.Module.parse(std.testing.allocator, source));
+    }
+}
+
+test "parser preserves typed vector splat global initializers" {
+    const input =
+        \\@nan = private constant <1 x float> splat (float 0x7FF8000000000000), align 4
+        \\@zeros = internal global <2 x double> zeroinitializer
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expectEqualStrings("splat (float 0x7FF8000000000000)", module.globals.items[0].initializer.scalar.vector);
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.written());
+    const invalid = "@bad = constant <2 x float> splat (i32 1)\n";
+    var bad = try ir.Module.parse(std.testing.allocator, invalid);
+    defer bad.deinit();
+    try std.testing.expectError(error.TypeMismatch, bad.verify());
+}
+
 test "verifier pointer vector casts require matching lanes and integer elements" {
     for ([_]u16{ 8, 64, 128 }) |bits| {
         const source = try std.fmt.allocPrint(

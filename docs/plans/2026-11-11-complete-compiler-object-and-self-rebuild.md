@@ -393,8 +393,9 @@ until this stronger result passes. LLVM optimization and declared providers
 remain in scope; performance tuning and further LLVM removal are later work.
 
 The retained normal-resource frontend probe fails with SIGSEGV under the
-inherited 46 MiB main-stack limit and CPU affinity 0–15. Diagnose that failure
-with a stack trace before assigning its precise cause. Isolated spill-home
+inherited 46 MiB main-stack limit and CPU affinity 0–15. Parent-launched debugger
+evidence identifies `Sema.analyzeBodyInner`'s stack-probing prologue touching below
+the main-stack mapping. Isolated spill-home
 coloring research reduces the large Sema frame but fails existing tests; it
 must not be adopted on selection or frame-size measurements alone.
 

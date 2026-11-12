@@ -108,6 +108,7 @@ fn vectorTotalBits(vector: ir.VectorType) ?u32 {
         .half => 16,
         .float => 32,
         .double, .ptr => 64,
+        .x86_fp80 => return null,
         .fp128 => 128,
     };
     return @as(u32, vector.len) * @as(u32, elem_bits);

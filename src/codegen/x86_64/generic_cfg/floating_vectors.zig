@@ -6,13 +6,14 @@ const machine = @import("../machine.zig");
 const sysv = @import("../sysv_abi.zig");
 const forms = @import("scalar_forms.zig");
 const addresses = @import("../symbol_address.zig");
-const Lanes = struct { ty: ir.Type, values: [16]ir.Value = @splat(.poison) };
+const max_lanes = 64;
+const Lanes = struct { ty: ir.Type, values: [max_lanes]ir.Value = @splat(.poison) };
 fn fp(ty: ir.Type) bool {
-    return ty == .vector and ty.vector.len > 0 and ty.vector.len <= 16 and
-        (ty.vector.elem_ty == .half or ty.vector.elem_ty == .float or ty.vector.elem_ty == .double or ty.vector.elem_ty == .fp128);
+    return ty == .vector and ty.vector.len > 0 and ty.vector.len <= max_lanes and
+        (ty.vector.elem_ty == .half or ty.vector.elem_ty == .float or ty.vector.elem_ty == .double or ty.vector.elem_ty == .x86_fp80 or ty.vector.elem_ty == .fp128);
 }
 fn width(ty: ir.Type) u16 {
-    return if (ty == .half) 16 else if (ty == .float) 32 else if (ty == .double) 64 else 128;
+    return if (ty == .half) 16 else if (ty == .float) 32 else if (ty == .double) 64 else if (ty == .x86_fp80) 80 else 128;
 }
 fn packedPair(ty: ir.Type) bool {
     return fp(ty) and ty.vector.len == 2 and ty.vector.elem_ty == .float;
@@ -67,12 +68,12 @@ fn needed(function: ir.Function) bool {
 }
 fn stable(value: ir.Value, ty: ir.Type) !ir.Value {
     if (value == .undef or value == .poison or value == .zero_initializer)
-        return .{ .fp = if (ty == .half) "0xH0000" else "0.000000e+00" };
+        return .{ .fp = if (ty == .half) "0xH0000" else if (ty == .x86_fp80) "0xK00000000000000000000" else "0.000000e+00" };
     if (value != .named and value != .fp) return error.UnsupportedFloatingVector;
     return value;
 }
 fn constants(value: ir.Value, ty: ir.Type) !Lanes {
-    inline for (1..17) |count| if (ty.vector.len == count) {
+    inline for (1..max_lanes + 1) |count| if (ty.vector.len == count) {
         const parsed = ir.vector_constant.parseFixed(count, value, ty.vector) orelse return error.UnsupportedFloatingVector;
         var result: Lanes = .{ .ty = ty };
         for (parsed.lanes, 0..) |lane, i| result.values[i] = try stable(lane.value(), ty.vector.elem_ty.toType());
@@ -166,14 +167,15 @@ pub fn legalize(a: std.mem.Allocator, function: ir.Function, context: ?*const ma
         var parts = std.mem.splitScalar(u8, layout, '-');
         while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return null;
     };
-    return expand(a, function) catch |err| switch (err) {
+    const layout = try @import("../../../target.zig").DataLayout.parse(if (context) |c| c.target_datalayout orelse "" else "");
+    return expand(a, function, layout) catch |err| switch (err) {
         error.UnsupportedFloatingVector, error.UnsupportedFloatingVectorAbi, error.UnsupportedFloatingVectorValue, error.UnsupportedFloatingVectorCast, error.UnsupportedFloatingVectorDefinition => blk: {
             break :blk null;
         },
         else => err,
     };
 }
-fn expand(a: std.mem.Allocator, function: ir.Function) !?ir.Function {
+fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../../target.zig").DataLayout) !?ir.Function {
     var vectors = std.StringHashMap(Lanes).init(a);
     defer vectors.deinit();
     var names: forms.TemporaryNames = .{};
@@ -218,7 +220,7 @@ fn expand(a: std.mem.Allocator, function: ir.Function) !?ir.Function {
                     const left = try b.lanes(x.lhs, x.lhs_ty);
                     const right = try b.lanes(x.rhs, x.rhs_ty);
                     var lanes: Lanes = .{ .ty = ty };
-                    inline for (1..17) |count| if (ty.vector.len == count) {
+                    inline for (1..max_lanes + 1) |count| if (ty.vector.len == count) {
                         const mask = ir.vector_constant.parseFixed(count, x.mask, x.mask_ty.vector) orelse return error.UnsupportedFloatingVector;
                         for (mask.lanes, 0..) |lane, i| {
                             const chosen = if (lane == .undef or lane == .poison or lane == .zero_initializer) 0 else try index(lane.value(), 2 * x.lhs_ty.vector.len);
@@ -249,7 +251,7 @@ fn expand(a: std.mem.Allocator, function: ir.Function) !?ir.Function {
                 .fcmp => |x| if (fp(x.operand_ty)) {
                     const left = try b.lanes(x.lhs, x.operand_ty);
                     const right = try b.lanes(x.rhs, x.operand_ty);
-                    var values: [16]ir.Value = undefined;
+                    var values: [max_lanes]ir.Value = undefined;
                     for (values[0..x.operand_ty.vector.len], 0..) |*value, i| {
                         var scalar = x;
                         scalar.operand_ty = x.operand_ty.vector.elem_ty.toType();
@@ -274,7 +276,7 @@ fn expand(a: std.mem.Allocator, function: ir.Function) !?ir.Function {
                     }
                     if (x.from_ty != .vector or x.to_ty != .vector or x.from_ty.vector.len != x.to_ty.vector.len) return error.UnsupportedFloatingVectorCast;
                     const count = x.from_ty.vector.len;
-                    var values: [16]ir.Value = undefined;
+                    var values: [max_lanes]ir.Value = undefined;
                     const source = if (fp(x.from_ty)) try b.lanes(x.value, x.from_ty) else null;
                     for (values[0..count], 0..) |*value, i| {
                         const input = if (source) |lanes| lanes.values[i] else try b.emit(.{ .extractelement = .{ .vector_ty = x.from_ty, .vector = x.value, .index_ty = .{ .int = 64 }, .index = .{ .int = @intCast(i) } } });
@@ -319,6 +321,14 @@ fn expand(a: std.mem.Allocator, function: ir.Function) !?ir.Function {
                         lanes.values[i] = try b.emit(.{ .select = scalar });
                     }
                     lanes_value = lanes;
+                },
+                .alloca => |x| if (fp(x.allocated_ty)) {
+                    if (!x.isSingleObject()) return error.UnsupportedFloatingVector;
+                    var copy = inst;
+                    copy.kind.alloca.allocated_ty = .{ .aggregate = try std.fmt.allocPrint(a, "[{d} x i8]", .{try layout.typeAllocSizeBytes(x.allocated_ty)}) };
+                    if (copy.kind.alloca.attrs == null) copy.kind.alloca.attrs = try std.fmt.allocPrint(a, "align {d}", .{(try layout.typeAbiAlignmentBits(x.allocated_ty)) / 8});
+                    try block.instructions.append(a, copy);
+                    continue;
                 },
                 .load => |x| if (fp(x.ty)) {
                     if (x.attrs.isBarrier() or x.ty_addrspace != null or x.ptr_addrspace != null or x.attrs.syncscope != null) return error.UnsupportedFloatingVector;

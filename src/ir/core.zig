@@ -64,6 +64,7 @@ pub const VectorElementType = union(enum) {
     half,
     float,
     double,
+    x86_fp80,
     fp128,
     ptr,
 
@@ -71,11 +72,12 @@ pub const VectorElementType = union(enum) {
         return switch (a) {
             .int => |bits| switch (b) {
                 .int => |other_bits| bits == other_bits,
-                .half, .float, .double, .fp128, .ptr => false,
+                .half, .float, .double, .x86_fp80, .fp128, .ptr => false,
             },
             .half => b == .half,
             .float => b == .float,
             .double => b == .double,
+            .x86_fp80 => b == .x86_fp80,
             .fp128 => b == .fp128,
             .ptr => b == .ptr,
         };
@@ -87,6 +89,7 @@ pub const VectorElementType = union(enum) {
             .half => .half,
             .float => .float,
             .double => .double,
+            .x86_fp80 => .x86_fp80,
             .fp128 => .fp128,
             .ptr => .ptr,
         };
@@ -98,6 +101,7 @@ pub const VectorElementType = union(enum) {
             .half => try writer.writeAll("half"),
             .float => try writer.writeAll("float"),
             .double => try writer.writeAll("double"),
+            .x86_fp80 => try writer.writeAll("x86_fp80"),
             .fp128 => try writer.writeAll("fp128"),
             .ptr => try writer.writeAll("ptr"),
         }

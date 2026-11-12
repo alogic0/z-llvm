@@ -35,7 +35,7 @@ pub fn lowerTypedReduce(self: anytype, instruction: air_export.TypedInstruction)
     if (summary.vector_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;
     const elem_bits = switch (vector_ty.elem_ty) {
         .int => |bits| bits,
-        .half, .float, .double, .fp128, .ptr => return air_model.LowerError.UnsupportedAir,
+        .half, .float, .double, .x86_fp80, .fp128, .ptr => return air_model.LowerError.UnsupportedAir,
     };
     if (summary.elem_bit_width != elem_bits) return air_model.LowerError.UnsupportedAir;
     if (vector_ty.len < 2 or vector_ty.len > 8) return air_model.LowerError.UnsupportedAir;
@@ -88,7 +88,7 @@ pub fn lowerTypedSplat(self: anytype, instruction: air_export.TypedInstruction) 
     if (summary.vector_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;
     const elem_bits = switch (vector_ty.elem_ty) {
         .int => |bits| bits,
-        .half, .float, .double, .fp128, .ptr => return air_model.LowerError.UnsupportedAir,
+        .half, .float, .double, .x86_fp80, .fp128, .ptr => return air_model.LowerError.UnsupportedAir,
     };
     if (summary.elem_bit_width != elem_bits) return air_model.LowerError.UnsupportedAir;
     if (!source.ty.ir_type.eql(vector_ty.elem_ty.toType())) return air_model.LowerError.UnsupportedAir;
@@ -137,7 +137,7 @@ pub fn lowerTypedShuffleOne(self: anytype, instruction: air_export.TypedInstruct
     if (summary.vector_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;
     const elem_bits = switch (vector_ty.elem_ty) {
         .int => |bits| bits,
-        .half, .float, .double, .fp128, .ptr => return air_model.LowerError.UnsupportedAir,
+        .half, .float, .double, .x86_fp80, .fp128, .ptr => return air_model.LowerError.UnsupportedAir,
     };
     if (summary.elem_bit_width != elem_bits) return air_model.LowerError.UnsupportedAir;
     if (summary.mask_len != vector_ty.len) return air_model.LowerError.UnsupportedAir;

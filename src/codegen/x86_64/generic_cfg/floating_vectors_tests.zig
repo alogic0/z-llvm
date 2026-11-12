@@ -23,6 +23,27 @@ fn executable(source: []const u8) ![]align(std.heap.page_size_min) u8 {
     return memory;
 }
 
+test "runtime x87 vectors keep packed ten byte lanes exact under wide scalarization" {
+    for ([_]u32{ 1, 3, 16, 64 }) |count| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "declare <{d} x x86_fp80> @llvm.fabs.v{d}f80(<{d} x x86_fp80>)\ndefine void @absolute(ptr %input, ptr %output) {{\nentry:\n %slot = alloca <{d} x x86_fp80>, align 16\n %v = load <{d} x x86_fp80>, ptr %input, align 1\n store <{d} x x86_fp80> %v, ptr %slot, align 1\n %again = load <{d} x x86_fp80>, ptr %slot, align 1\n %positive = call <{d} x x86_fp80> @llvm.fabs.v{d}f80(<{d} x x86_fp80> %again)\n store <{d} x x86_fp80> %positive, ptr %output, align 1\n ret void\n}}\n", .{ count, count, count, count, count, count, count, count, count, count, count });
+        defer std.testing.allocator.free(source);
+        const memory = try executable(source);
+        defer std.posix.munmap(memory);
+        const run: *const fn (*const u8, *u8) callconv(.c) void = @ptrCast(memory.ptr);
+        var input: [640]u8 = undefined;
+        var output: [656]u8 = @splat(165);
+        const payloads = [_]u80{ 0, 1 << 79, 1, 0x3fff8000000000000000, 0xbfff8000000000000000, 0xffff8000000000000000, 0xffffc000000000000123, 0xffff8000000000000001 };
+        for (0..payloads.len) |seed| {
+            for (0..count) |lane| std.mem.writeInt(u80, input[lane * 10 ..][0..10], payloads[(seed + lane) % payloads.len], .little);
+            @memset(&output, 165);
+            run(&input[0], &output[8]);
+            for (0..count) |lane| try std.testing.expectEqual(payloads[(seed + lane) % payloads.len] & ((@as(u80, 1) << 79) - 1), std.mem.readInt(u80, output[8 + lane * 10 ..][0..10], .little));
+            for (output[0..8]) |byte| try std.testing.expectEqual(@as(u8, 165), byte);
+            for (output[8 + count * 10 ..]) |byte| try std.testing.expectEqual(@as(u8, 165), byte);
+        }
+    }
+}
+
 test "runtime floating vectors shuffle wide payloads without changing NaNs zeros or store guards" {
     const source =
         \\define double @shuffle(double %a,double %b,double %c,double %d,ptr %out,double %live) {

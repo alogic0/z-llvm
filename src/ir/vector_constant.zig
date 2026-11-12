@@ -151,7 +151,7 @@ fn parseTypedLane(raw: []const u8, elem_ty: core.VectorElementType) ?Lane {
     if (std.mem.eql(u8, value, "null")) return if (elem_ty == .ptr) .null_value else null;
     return switch (elem_ty) {
         .int => .{ .int = std.fmt.parseInt(i128, value, 10) catch return null },
-        .half, .float, .double, .fp128 => .{ .fp = value },
+        .half, .float, .double, .x86_fp80, .fp128 => .{ .fp = value },
         .ptr => null,
     };
 }
@@ -165,6 +165,7 @@ fn elementTypeTextEql(text: []const u8, elem_ty: core.VectorElementType) bool {
         .half => std.mem.eql(u8, text, "half"),
         .float => std.mem.eql(u8, text, "float"),
         .double => std.mem.eql(u8, text, "double"),
+        .x86_fp80 => std.mem.eql(u8, text, "x86_fp80"),
         .fp128 => std.mem.eql(u8, text, "fp128"),
         .ptr => std.mem.eql(u8, text, "ptr"),
     };

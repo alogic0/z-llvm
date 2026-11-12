@@ -31,7 +31,9 @@ rewriting their manifests.
 Explicit local-hook behavior attempts expose further global syntax, wide integer,
 x87 vector, floating atomic, varargs and ReleaseSmall runtime boundaries. A
 normal-resource frontend probe still terminates with SIGSEGV under the inherited
-46 MiB main-stack limit and CPU affinity 0–15. Frame-allocation experiments remain
+46 MiB main-stack limit and CPU affinity 0–15. Parent-launched debugger evidence
+identifies `Sema.analyzeBodyInner`'s page-touching prologue at the failure, below
+the main-stack mapping. Frame-allocation experiments remain
 isolated: selecting the large Sema function does not outweigh failing existing
 tests. None of that prototype is accepted into the maintained backend.
 
@@ -40,3 +42,13 @@ Evidence is retained under
 The next implementation work closes the observed local-hook boundaries and
 reduces frame growth with executable regression coverage, followed by fresh
 compiler generations, the full behavior matrices and normal-resource self-rebuild.
+
+The next slice implements quoted global pointer initializers, floating vector
+global data and packed x87 vector lanes. Focused execution covers 1, 3, 16 and
+64 lanes, payload preservation, PHIs, comparison masks, aggregate layout and
+neighboring memory. The new nine-function `behavior_vectors` canary passes
+6,250 observations per execution and all 27 injected-failure controls with the
+ReleaseFast backend; the preceding backend rejects the fixture. The independent
+global syntax census now accepts all 5,686 records from the unchanged Debug
+capture. These are provisional results pending cumulative validation and do
+not close the remaining wide-integer, variadic or atomic boundaries.

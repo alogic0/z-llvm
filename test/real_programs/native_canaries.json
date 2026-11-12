@@ -2,6 +2,15 @@
   "schema": 1,
   "canaries": [
     {
+      "population": "behavior_vectors",
+      "codegen_args": ["--codegen-reachable"],
+      "prefix": "behavior-vectors",
+      "fixture": "behavior_vectors",
+      "functions": ["behavior_vector_nan", "behavior_vector_extended", "behavior_vector_nested", "behavior_vector_pointer", "behavior_vector_abs3", "behavior_vector_abs64", "behavior_vector_phi3", "behavior_vector_compare3", "behavior_vector_stack3"],
+      "observations": 6250,
+      "stdout": "behavior-vectors observations=6250 globals=payloads=packed-x87=phis=masks=guards=preserved\n"
+    },
+    {
       "population": "vector_graphs",
       "prefix": "vector-graphs",
       "fixture": "vector_graphs",

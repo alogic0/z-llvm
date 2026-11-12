@@ -173,6 +173,7 @@ pub fn parseVectorElementType(text: []const u8) !core.VectorElementType {
     if (std.mem.eql(u8, text, "half")) return .half;
     if (std.mem.eql(u8, text, "float")) return .float;
     if (std.mem.eql(u8, text, "double")) return .double;
+    if (std.mem.eql(u8, text, "x86_fp80")) return .x86_fp80;
     if (std.mem.eql(u8, text, "fp128")) return .fp128;
     if (text.len < 2 or text[0] != 'i') return error.UnsupportedType;
     const bits = try std.fmt.parseInt(u16, text[1..], 10);

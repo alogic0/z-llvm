@@ -214,6 +214,7 @@ fn negativeZeroForFneg(ty: core.Type) core.Value {
             .half => .{ .vector = "splat (half -0.000000e+00)" },
             .float => .{ .vector = "splat (float -0.000000e+00)" },
             .double => .{ .vector = "splat (double -0.000000e+00)" },
+            .x86_fp80 => .{ .vector = "splat (x86_fp80 0xK80000000000000000000)" },
             .fp128 => .{ .vector = "splat (fp128 -0.000000e+00)" },
             .int, .ptr => .{ .fp = "-0.000000e+00" },
         },

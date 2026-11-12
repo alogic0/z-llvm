@@ -224,6 +224,7 @@ fn scalarOrVectorSizeBytes(ty: ir.Type) ?u64 {
             .float => 4,
             .double => 8,
             .fp128 => 16,
+            .x86_fp80 => return null,
             .ptr => 8,
         }),
         .void, .int, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => null,

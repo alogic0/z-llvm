@@ -1,5 +1,6 @@
 const std = @import("std");
 const core = @import("core.zig");
+const identifiers = @import("identifiers.zig");
 const syntax = @import("parser_syntax.zig");
 const types_values = @import("parser_types_values.zig");
 const findAssignmentSeparator = syntax.findAssignmentSeparator;
@@ -132,9 +133,7 @@ pub fn parseGlobalAlias(line: []const u8) !core.GlobalAlias {
 }
 
 pub fn isSupportedGlobalIdentifier(text: []const u8) bool {
-    if (!std.mem.startsWith(u8, text, "@") or text.len == 1) return false;
-    if (text[1] == '"') return text.len >= 3 and text[text.len - 1] == '"';
-    return std.mem.indexOfAny(u8, text, " \t") == null;
+    return text.len > 1 and text[0] == '@' and identifiers.isValid(text[1..]);
 }
 
 pub fn parseGlobal(module: *core.Module, line: []const u8) !core.Global {
@@ -264,8 +263,15 @@ pub fn parseGlobalInitializer(allocator: std.mem.Allocator, ty: core.Type, text:
 
     if (ty == .aggregate and (std.mem.indexOfAny(u8, text, " \t") != null or @import("structure.zig").Fields.init(text) != null)) return .{ .@"opaque" = text };
     if (isSupportedConstantExpr(text)) return .{ .scalar = .{ .constant_expr = text } };
-    if (ty == .vector and std.mem.startsWith(u8, text, "<") and std.mem.endsWith(u8, text, ">")) {
-        return .{ .scalar = .{ .vector = text } };
+    if (ty == .vector) {
+        const value = try parseValue(text);
+        if (value == .vector or value == .zero_initializer or value == .undef or value == .poison)
+            return .{ .scalar = value };
+        return error.UnsupportedGlobalVariable;
+    }
+    if (ty == .ptr and text[0] == '@') {
+        if (!isSupportedGlobalIdentifier(text)) return error.UnsupportedGlobalVariable;
+        return .{ .scalar = .{ .named = text } };
     }
     if (std.mem.indexOfAny(u8, text, " \t") != null) return error.UnsupportedGlobalVariable;
     const value = try parseValue(text);

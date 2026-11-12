@@ -200,6 +200,18 @@ const Encoder = struct {
             }
             return .{ .size = alignment_bits / 8, .alignment = alignment_bits / 8 };
         }
+        if (ty == .vector) {
+            const scalar = ty.vector.elem_ty.toType();
+            if (scalar != .half and scalar != .float and scalar != .double and scalar != .x86_fp80 and scalar != .fp128)
+                return encoder.reject(.scalar_type, ty);
+            _ = try encoder.typeLayout(scalar, depth + 1);
+            const alignment_bits = try encoder.layout.typeAbiAlignmentBits(ty);
+            if (alignment_bits < 8 or alignment_bits / 8 > 4096) return encoder.reject(.scalar_alignment, ty);
+            return .{
+                .size = try encoder.checkedSize(try encoder.layout.typeAllocSizeBytes(ty)),
+                .alignment = alignment_bits / 8,
+            };
+        }
         if (ty != .aggregate) return encoder.reject(.scalar_type, ty);
         if (std.mem.startsWith(u8, trim(ty.aggregate), "[")) {
             const array = try arrayType(ty);
@@ -228,6 +240,10 @@ const Encoder = struct {
         // zero-filled allocation supplies that refinement without changing
         // defined neighboring cells or materializing a symbolic relocation.
         if (input == .zero_initializer or input == .undef or input == .poison) return;
+        if (ty == .vector) {
+            if (input != .vector) return encoder.reject(.scalar_type, ty);
+            return encoder.vector(ty, input.vector, offset, 0);
+        }
         if (ty.eql(.{ .int = 32 }) and (input == .constant_expr or input == .fp)) {
             // The parser's broad floating spelling recognizer may classify a
             // constant expression containing 'e' as .fp. Admit this structural
@@ -303,11 +319,27 @@ const Encoder = struct {
         });
     }
 
+    fn vector(encoder: *Encoder, ty: ir.Type, input: []const u8, offset: u32, depth: u8) anyerror!void {
+        const element = ty.vector.elem_ty.toType();
+        const stride = try encoder.layout.typeStoreSizeBytes(element);
+        const splat = std.mem.startsWith(u8, input, "splat (") and std.mem.endsWith(u8, input, ")");
+        if (!splat and (input.len < 2 or input[0] != '<' or input[input.len - 1] != '>')) return error.UnsupportedGlobalData;
+        var items: Fields = .{ .rest = if (splat) input[7 .. input.len - 1] else input[1 .. input.len - 1], .packed_type = false };
+        const repeated = if (splat) try typedField(items.next() orelse return error.UnsupportedGlobalData) else null;
+        for (0..ty.vector.len) |index| {
+            const item = repeated orelse try typedField(items.next() orelse return error.UnsupportedGlobalData);
+            if (!item.ty.eql(element)) return error.UnsupportedGlobalData;
+            try encoder.text(element, item.after, offset + @as(u32, @intCast(index * stride)), depth + 1);
+        }
+        if (items.next() != null) return error.UnsupportedGlobalData;
+    }
+
     fn text(encoder: *Encoder, ty: ir.Type, raw: []const u8, offset: u32, depth: u8) anyerror!void {
         if (depth >= 32) return error.UnsupportedGlobalData;
         const input = trim(raw);
         if (std.mem.eql(u8, input, "zeroinitializer") or std.mem.eql(u8, input, "undef") or std.mem.eql(u8, input, "poison")) return;
         const actual = try encoder.resolved(ty, depth);
+        if (actual == .vector) return encoder.vector(actual, input, offset, depth);
         if (actual == .ptr and std.mem.startsWith(u8, input, "blockaddress("))
             return encoder.value(actual, .{ .constant_expr = input }, offset);
         if (actual == .int or actual == .ptr or actual == .half or actual == .float or actual == .double or actual == .x86_fp80 or actual == .fp128) return encoder.value(actual, parser.parseValue(input) catch return error.UnsupportedGlobalData, offset);
@@ -418,6 +450,42 @@ pub fn decodeObserved(allocator: std.mem.Allocator, context: constants.ReadOnlyM
     return .{ .bytes = encoder.bytes, .relocations = try encoder.relocations.toOwnedSlice(allocator), .alignment = properties.alignment orelse layout.alignment, .local = properties.local, .visibility = properties.visibility, .tls = properties.tls };
 }
 
+test "global data floating vectors preserve packed lanes payloads and tail padding" {
+    const source =
+        \\@nan = constant <1 x float> splat (float 0x7FF8000000000000)
+        \\@extended = constant <3 x x86_fp80> <x86_fp80 0xK00000000000000000001, x86_fp80 0xK80000000000000000000, x86_fp80 0xK7FFF8000000000000001>
+        \\@nested = constant { i8, <3 x float>, i8 } { i8 7, <3 x float> <float 1.0, float -0.0, float 0x7FF0000020000000>, i8 9 }
+        \\@"source object" = global i64 7
+        \\@"pointer cell" = global ptr @"source object"
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: constants.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = null };
+    var nan = try decode(std.testing.allocator, context, module.globals.items[0]);
+    defer nan.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(u8, &.{ 0, 0, 192, 127 }, nan.bytes);
+    var extended = try decode(std.testing.allocator, context, module.globals.items[1]);
+    defer extended.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 32), extended.bytes.len);
+    try std.testing.expectEqual(@as(u32, 32), extended.alignment);
+    try std.testing.expectEqual(@as(u80, 1), std.mem.readInt(u80, extended.bytes[0..10], .little));
+    try std.testing.expectEqual(@as(u80, 1) << 79, std.mem.readInt(u80, extended.bytes[10..20], .little));
+    try std.testing.expectEqual(@as(u80, 0x7fff8000000000000001), std.mem.readInt(u80, extended.bytes[20..30], .little));
+    try std.testing.expectEqualSlices(u8, &.{ 0, 0 }, extended.bytes[30..]);
+    var nested = try decode(std.testing.allocator, context, module.globals.items[2]);
+    defer nested.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 48), nested.bytes.len);
+    try std.testing.expectEqual(@as(u8, 7), nested.bytes[0]);
+    try std.testing.expectEqual(@as(u32, 0x3f800000), std.mem.readInt(u32, nested.bytes[16..20], .little));
+    try std.testing.expectEqual(@as(u32, 0x80000000), std.mem.readInt(u32, nested.bytes[20..24], .little));
+    try std.testing.expectEqual(@as(u32, 0x7f800001), std.mem.readInt(u32, nested.bytes[24..28], .little));
+    try std.testing.expectEqual(@as(u8, 9), nested.bytes[32]);
+    var pointer = try decode(std.testing.allocator, context, module.globals.items[4]);
+    defer pointer.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("\"source object\"", pointer.relocations[0].address.symbol);
+}
+
 test "global data decodes the compiler terminal string with a literal backslash" {
     const source =
         \\@escape = constant [13 x i8] c"\1B[J\1B]9;4;0\1B\\\00"
@@ -464,7 +532,7 @@ test "global data refines poison cells while preserving defined neighbors and re
 }
 
 test "global data diagnostics identify a nested unsupported scalar layout" {
-    var module = try ir.Module.parse(std.testing.allocator, "@table = constant [1 x <2 x float>] zeroinitializer\n");
+    var module = try ir.Module.parse(std.testing.allocator, "@table = constant [1 x <2 x ptr>] zeroinitializer\n");
     defer module.deinit();
     var diagnostic: Diagnostic = .{};
     try std.testing.expectError(error.UnsupportedGlobalData, decodeObserved(std.testing.allocator, .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = null }, module.globals.items[0], &diagnostic));

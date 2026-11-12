@@ -9,7 +9,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
     switch (instruction.kind) {
         .binary => |binary| {
             state.addTag(1);
-            state.addTag(@intFromEnum(binary.op));
+            state.addTag(@backingInt(binary.op));
             state.addBool(binary.flags.nsw);
             state.addBool(binary.flags.nuw);
             state.addBool(binary.flags.exact);
@@ -21,7 +21,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
         },
         .cast => |cast| {
             state.addTag(2);
-            state.addTag(@intFromEnum(cast.op));
+            state.addTag(@backingInt(cast.op));
             state.addBool(cast.flags.nneg);
             state.addBool(cast.flags.nsw);
             state.addBool(cast.flags.nuw);
@@ -31,7 +31,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
         },
         .icmp => |icmp| {
             state.addTag(3);
-            state.addTag(@intFromEnum(icmp.predicate));
+            state.addTag(@backingInt(icmp.predicate));
             state.addBool(icmp.samesign);
             state.addType(icmp.operand_ty);
             state.addValue(icmp.lhs);
@@ -39,7 +39,7 @@ pub fn hash(instruction: ir.Instruction) u64 {
         },
         .fcmp => |fcmp| {
             state.addTag(7);
-            state.addTag(@intFromEnum(fcmp.predicate));
+            state.addTag(@backingInt(fcmp.predicate));
             state.addType(fcmp.operand_ty);
             state.addValue(fcmp.lhs);
             state.addValue(fcmp.rhs);
@@ -288,6 +288,7 @@ const HashState = struct {
                     .double => state.addTag(4),
                     .fp128 => state.addTag(5),
                     .ptr => state.addTag(6),
+                    .x86_fp80 => state.addTag(7),
                 }
             },
         }
