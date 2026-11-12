@@ -38,9 +38,9 @@ test "frame gap compaction executes rebased objects incoming words and biased pr
     });
     try @import("../verify.zig").verifyFunction(output);
     try compact.compact(&selector, module.functions.items[0]);
-    try std.testing.expectEqual(@as(u32, 72), selector.stack_frame_bytes);
-    try std.testing.expectEqual(@as(i32, 32), output.instructions.items[3].add_arg64_imm32.imm);
-    try std.testing.expectEqual(@as(u32, 96), output.instructions.items[9].load_stack_disp32_arg64.disp);
+    try std.testing.expectEqual(@as(u32, 56), selector.stack_frame_bytes);
+    try std.testing.expectEqual(@as(i32, 16), output.instructions.items[3].add_arg64_imm32.imm);
+    try std.testing.expectEqual(@as(u32, 80), output.instructions.items[9].load_stack_disp32_arg64.disp);
     try std.testing.expectEqual(FrameIndex.slot4, output.instructions.items[10].reload_rsp_rax);
     const bytes = try encode.encodeFunction(std.testing.allocator, output);
     defer std.testing.allocator.free(bytes);

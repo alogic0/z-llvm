@@ -31,6 +31,14 @@ failure and the remaining full-suite local-hook integer, variadic, atomic,
 assembly and ReleaseSmall boundaries before producing and accepting both final
 compiler generations.
 
+The active resource repair adopts explicit whole-object lifetime reuse and
+removes unused interior spill chunks for immediate cumulative validation. Its
+isolated 2,194-unit run and three-mode native regression pass, including branches,
+loops and full 8 KiB objects on a 64 KiB worker stack. The previous backend
+fails that regression with SIGSEGV. Complete the frozen Tier-3 run and fresh
+original compiler/runtime replays, then retry the unchanged normal-resource
+build and self-rebuild; the measured 479,000-byte Sema frame alone is no acceptance.
+
 The [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
 is complete at accepted code `b738377e`, with backend implementation `e398030f`.
 Complete census, independent production and balanced event audits establish

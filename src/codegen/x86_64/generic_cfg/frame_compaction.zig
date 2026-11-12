@@ -1,4 +1,4 @@
-//! Remove an unused trailing spill-reserve gap after lowering. Existing spill
+//! Remove unreferenced spill-reserve chunks after lowering. Existing spill
 //! homes and object extents remain distinct; object/incoming offsets are rebased
 //! by a multiple of 16. Opaque stack uses retain the original machine function.
 const std = @import("std");
@@ -7,12 +7,12 @@ const state = @import("composed_selector_state.zig");
 const machine = @import("../machine.zig");
 const FrameIndex = @import("../types.zig").FrameIndex;
 
-const Error = error{ OpaqueStackUse, InvalidStackDepth, UnusedGapReferenced, InvalidFrameSetup };
+const Error = error{ OpaqueStackUse, InvalidStackDepth, InvalidFrameSetup };
 const Rebase = struct {
     object_base: u32,
-    used: u32,
+    live: ?[]bool = null,
+    prefix: ?[]const u32 = null,
     delta: u32 = 0,
-    gap_start: u32 = 0,
 
     fn offset(r: *Rebase, value: anytype, depth: u32, extent: u32, indexed: bool) Error!void {
         const T = @typeInfo(@TypeOf(value)).pointer.child;
@@ -22,8 +22,23 @@ const Rebase = struct {
         if (indexed and normalized < r.object_base) return error.OpaqueStackUse;
         if (normalized < r.object_base) {
             const end = std.math.add(u32, normalized, extent) catch return error.OpaqueStackUse;
-            r.used = @max(r.used, @min(end, r.object_base));
-            if (r.delta != 0 and end > r.gap_start) return error.UnusedGapReferenced;
+            if (r.live) |live| {
+                const first = @min(normalized / 16, live.len);
+                const last = @min((@as(u64, end) + 15) / 16, live.len);
+                @memset(live[first..@intCast(last)], true);
+            }
+            if (r.prefix) |prefix| {
+                const chunk = normalized / 16;
+                const mapped = if (chunk + 1 < prefix.len) prefix[chunk] + normalized % 16 else normalized - r.delta;
+                // Every byte of a multi-chunk access must retain its displacement
+                // from the first byte. This also closes any accidental mismatch
+                // between the observation and rewrite scans.
+                const last = @min(end, r.object_base) - 1;
+                const last_chunk = last / 16;
+                const mapped_last = if (last_chunk + 1 < prefix.len) prefix[last_chunk] + last % 16 else last - r.delta;
+                if (mapped_last - mapped != last - normalized) return error.OpaqueStackUse;
+                value.* = std.math.cast(T, depth + mapped) orelse return error.OpaqueStackUse;
+            }
         } else if (r.delta != 0) value.* = std.math.cast(T, raw - r.delta) orelse return error.OpaqueStackUse;
     }
 
@@ -179,19 +194,27 @@ pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !v
         } else return;
     }
     if (reserved != old_frame) return;
-    // The first scan changes no displacement; it only records referenced bytes.
-    const used_bytes = std.math.mul(usize, selector.next_spill_slot, 8) catch return;
-    var analysis: Rebase = .{ .object_base = object_base, .used = std.math.cast(u32, used_bytes) orelse return };
+    // The final machine stream owns the exact accesses. Planned but never
+    // referenced homes need no physical storage. Keep complete 16-byte chunks
+    // so the mapping preserves every admitted access and stack alignment.
+    const live = try selector.allocator.alloc(bool, object_base / 16);
+    defer selector.allocator.free(live);
+    @memset(live, false);
+    var analysis: Rebase = .{ .object_base = object_base, .live = live };
     walk(&analysis, selector.machine.instructions.items[end..], old_frame) catch return;
-    if (analysis.used >= object_base or object_base - analysis.used < 65536) return;
-    const delta = (object_base - analysis.used) & ~@as(u32, 15);
+    const prefix = try selector.allocator.alloc(u32, live.len + 1);
+    defer selector.allocator.free(prefix);
+    prefix[0] = 0;
+    for (live, 0..) |used, i| prefix[i + 1] = prefix[i] + @as(u32, if (used) 16 else 0);
+    const delta = @as(u32, @intCast(live.len * 16)) - prefix[live.len];
+    if (delta < 65536) return;
     var candidate: std.ArrayList(machine.Instruction) = .empty;
     errdefer candidate.deinit(selector.allocator);
     try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[0..begin]);
     try appendAllocation(selector.allocator, &candidate, old_frame - delta);
     const body = candidate.items.len;
     try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[end..]);
-    var rebase: Rebase = .{ .object_base = object_base, .used = 0, .delta = delta, .gap_start = object_base - delta };
+    var rebase: Rebase = .{ .object_base = object_base, .prefix = prefix, .delta = delta };
     walk(&rebase, candidate.items[body..], old_frame) catch {
         candidate.deinit(selector.allocator);
         return;

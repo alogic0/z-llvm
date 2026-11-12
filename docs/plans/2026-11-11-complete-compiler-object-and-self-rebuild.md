@@ -449,6 +449,18 @@ growth; interior spill-reserve compaction and explicit stack-object lifetime
 reuse require independent proofs before adoption. The complete local-hook
 behavior matrix and final second generation remain open.
 
+The active resource slice now adopts whole-object lifetime reuse and interior
+unused spill-chunk removal for immediate Tier 3. Explicit lifetime starts and
+ends bound the object interference analysis across branches and loops; source
+IR, distinct referenced spill homes and ABI remain unchanged. Four new analysis
+controls, all 2,194 isolated units and the two-function `stack_lifetimes` native
+population pass, including all three modes and 27 injected faults. The old
+backend fails its 64 KiB worker-stack regression with actual SIGSEGV. The measured
+Sema frame falls to 479,000 bytes. Complete fresh cumulative validation and
+source-bound compiler/runtime replays before the next actual unchanged build
+and normal-resource self-rebuild. Neither this measurement nor the isolated
+regression closes milestone 8.
+
 ## Delivery checklist
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.

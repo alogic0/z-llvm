@@ -111,3 +111,15 @@ definitions, so these results remain research. Further extended-return ABI work
 selects the eight targeted Small-runtime functions; complete object and native
 ABI proofs remain necessary before adoption. Removing unreferenced interior
 spill-reserve chunks is also isolated pending semantic and resource proofs.
+
+The next resource slice adopts explicit stack-object lifetime reuse and removes
+unreferenced interior spill-reserve chunks for immediate Tier 3. It keeps every
+referenced spill home separate, colors only bounded whole objects with explicit
+start/end markers, and checks may-live states through branches and loops. Unknown
+markers and unsupported layouts retain the original function. The isolated
+candidate passes all 2,194 units and a new two-function native population in
+all three modes with 27 faults. Its complete 8 KiB objects execute on a fixed
+64 KiB pthread stack; the preceding backend fails there with actual SIGSEGV.
+The measured Sema frame is 479,000 bytes. These proofs authorize cumulative
+validation, not normal-resource self-rebuild acceptance. Compiler/runtime
+replays and both final generations remain required.

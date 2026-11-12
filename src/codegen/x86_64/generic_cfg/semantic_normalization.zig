@@ -34,6 +34,11 @@ pub fn normalize(allocator: std.mem.Allocator, source: ir.Function, context: ?*c
 pub fn normalizeProfiled(allocator: std.mem.Allocator, source: ir.Function, context: ?*const machine.ReadOnlyModuleContext, profile: ?*profiling.Profile) !Function {
     var function = source;
     {
+        const activity = profiling.activity(profile, "compact-explicit-stack-lifetimes");
+        defer activity.end();
+        if (try @import("stack_lifetimes.zig").legalize(allocator, function, context)) |compacted| function = compacted;
+    }
+    {
         const activity = profiling.activity(profile, "normalize-phi-values");
         defer activity.end();
         if (phi_values.requiresNormalization(function)) function = try phi_values.normalize(allocator, function);

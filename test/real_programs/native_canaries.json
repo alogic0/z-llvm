@@ -3232,6 +3232,15 @@
       "functions": ["frame_compact_abs64"],
       "observations": 646,
       "stdout": "frame-compaction observations=646 frame-budget=65536 payloads=guards=preserved\n"
+    },
+    {
+      "population": "stack_lifetimes",
+      "prefix": "stack-lifetimes",
+      "fixture": "stack_lifetimes",
+      "functions": ["lifetime_sequential", "lifetime_branches"],
+      "libraries": ["pthread"],
+      "observations": 192,
+      "stdout": "stack-lifetimes observations=192 stack=65536 full-objects=branches=loops=guards=preserved\n"
     }
   ]
 }
