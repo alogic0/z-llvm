@@ -31,12 +31,23 @@ behavior selection gains 99 definitions without loss but still rejects 236;
 that replay remains failed. The separate Small-runtime input emits all 503
 definitions and does not replace the fixed 455-definition corpus.
 
-Next, combine the independently exercised wide-switch, floating lane-math and
-promoted integer-vector ABI repairs. Complete independent small floating-vector
-ABI checks before adoption. Preserve the cumulative stack and machine-memory
-repairs, finish the remaining original behavior rejections, then build the final
-generations and complete both four-mode local-hook matrices and the
-normal-resource rebuild.
+The [expansion checkpoint](evidence/compiler_behavior_expansion_checkpoint_20261112.json)
+validates fifteen further populations at `c1c0ecee`: both 2,271-unit builds,
+eight readiness procedures, all 17 gates, both complete 167-population suites
+and all 3,592 required faults pass. Strict comparisons preserve all prior
+outcomes and owner/optimizer artifacts; individual full-module and execution
+proofs review the changed native, compiler and runtime objects. The original
+Debug input selects 7,733/7,874, with 141 failures and no complete object.
+
+Next, adopt the six independently exercised saturation, absolute-value,
+sign-extension preservation, vector-input and mixed-stack-call repairs. Both
+isolated 2,281-unit builds and six native populations per backend pass, with
+34 further original selections gained and none lost. The independent old-source
+sign-extension regression fails as expected; its repair needs fresh immediate
+Tier 3. Freeze the integrated source, validate all 173 native populations and
+original compiler/runtime objects, then close the remaining 107 Debug
+rejections. Build the final generations and complete both four-mode local-hook
+matrices and the normal-resource rebuild after the repairs are accepted.
 The existing resource and scalar checkpoints retain their separate scopes.
 The entries below retain the preceding checkpoint history.
 

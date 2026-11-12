@@ -289,3 +289,42 @@ native populations per backend build, gaining 78 original selections without
 loss and leaving 257 rejections. Its actual nonzero replay remains a failure.
 The final source-bound generations, complete named four-mode local-hook matrices
 and successor seal remain unaccepted.
+
+The [eight-family checkpoint](compiler_behavior_eight_families_checkpoint_20261112.json)
+accepts `ca38e3ee` with both 2,251-unit builds, eight readiness procedures,
+all 17 gates, both 152-population native suites and all 2,782 required faults.
+Every prior native outcome and artifact matches. Original compiler and fixed
+runtime objects are byte-identical to the preceding checkpoint. Debug behavior
+selection reaches 7,638/7,874, gaining 99 without loss; 236 rejections remain.
+
+The [expansion checkpoint](compiler_behavior_expansion_checkpoint_20261112.json)
+validates fifteen more populations at `c1c0ecee`. Both 2,271-unit builds, eight
+readiness procedures, all 17 gates, both 167-population native suites and all
+3,592 required faults pass. Every prior command outcome and owner/optimizer
+artifact matches. The strict comparisons retain their 30 changed-object
+failures per build. Individual reviews of ten unique object pairs establish
+unchanged data, symbol and relocation contracts; every changed function's
+before/after bytes match selections in its complete original module using the
+two retained sources. Complete LLVM/C native execution supplies semantic proof.
+
+Fresh original compiler production completes all 8,928 definitions with unchanged
+owners and passing ELF and balanced-event audits. Fifteen changed compiler
+function symbols have full-module before/after encoding proofs. Both complete
+455-definition runtime objects also preserve owners and pass their audits.
+Their twelve changed function symbols represent six complex helpers and aliases;
+60,000 exact records per object match LLVM and the prior accepted object,
+including zero signs and exact hidden-result stores. The separate unchanged
+503-definition Small runtime passes its own census, object and event audits.
+The frozen 3,570-file source is retained verbatim. Concurrent timings establish
+no controlled performance improvement.
+
+The original Debug behavior replay still fails: 7,733/7,874 definitions select,
+95 gained without loss, 141 rejected, no complete object. A new independent
+sign-extension probe also exposes a preexisting live-register clobber. Its
+isolated repair preserves the scratch destination through the existing shared
+contract. The next six-population batch passes both 2,281-unit builds and all
+component native checks, reaches 7,767 original selections without loss and
+retains 107 failures. Its maintained Zig generator reproduces all 43 fixtures
+and metadata exactly. Adopt it for fresh immediate Tier 3 before further
+failure-family research. Final compiler generations, both complete local-hook
+matrices and follow-up acceptance remain open.

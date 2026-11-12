@@ -6,8 +6,10 @@ follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-
 self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
 remainder error is repaired at `9cb21139`. Twenty behavior-family populations
 pass cumulative validation at `d9148ebc`; eight additional families pass at
-`ca38e3ee`. A further fifteen native populations are adopted for immediate
-cumulative validation, with 141 unchanged Debug rejections still open.
+`ca38e3ee`. Fifteen further native populations pass cumulative validation at
+`c1c0ecee`, with 141 unchanged Debug rejections still open. The next isolated
+six-population batch passes both 2,281-unit builds and reaches 107 rejections;
+adoption and its fresh cumulative validation are next.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -411,7 +413,7 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    comparisons and all 2,782 required faults pass. The complete original
    compiler and both fixed runtime objects are byte-identical to the preceding
    checkpoint. See the [eight-family record](../evidence/compiler_behavior_eight_families_checkpoint_20261112.json).
-4. **Adopted for immediate cumulative validation.** Combine the independently
+4. **Complete at `c1c0ecee`.** Combine the independently
    exercised wide-switch, floating lane-math, promoted integer-vector ABI,
    small floating-vector ABI, scalar floating minimum, absolute volatile
    pointer, constant integer-pair, 128-bit saturation and floating literal
@@ -425,25 +427,53 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    old newly supported constant signed-saturation rejection with a poison
    operand, retaining positive coverage for both literal operands. Keep failed
    prototype, reference-setup and old wrong-code receipts unchanged.
-5. Freeze the adopted canonical source, build both backend modes and run
+5. **Complete for the fifteen-population checkpoint.** Freeze the adopted
+   canonical source, build both backend modes and run
    immediate Tier 3, both complete 167-population native suites, all 3,592
    required fault controls and strict preservation against the accepted
    152-population checkpoint. Repeat both official unit builds, all eight
    readiness procedures and complete original compiler/runtime production.
    Audit every owner, event stream, ELF and changed function encoding before
    accepting this batch. Formatting and test-only source bridges authorize no
-   automatic object reuse. These cumulative checks remain open.
-6. Diagnose the remaining unchanged Debug rejections using their full original
-   context. The combined isolated replay selects 7,733/7,874 definitions, gaining
-   95 and losing none against the eight-family checkpoint; it returns nonzero,
-   retains 141 rejections and emits no complete behavior object. Classify odd
-   scalar saturation widths, vector argument/return fragments and remaining
-   instruction forms before choosing each next bounded repair. Preserve the
-   frozen Source/value-use contracts, call/stack guards and independent
-   execution proofs. The separate unchanged ReleaseSmall runtime input emits
-   all 503 definitions; retain its distinct provenance alongside the fixed
-   455-definition input. Selection gains cannot close the behavior milestone.
-7. Build the final two compiler generations from the accepted source under
+   automatic object reuse. Both unit builds pass 2,271 units. All prior command
+   outcomes and owner/optimizer artifacts match. Strict comparisons retain
+   their 30 changed-object failures per build; individual reviews prove ten
+   unique object pairs using both retained sources and independent execution.
+   Full-module encoding proofs also review all 15 changed compiler function
+   symbols and 12 runtime symbols; the six affected complex helpers match
+   60,000 exact LLVM records per object. See the
+   [expansion record](../evidence/compiler_behavior_expansion_checkpoint_20261112.json).
+6. Adopt the independently proved six-population batch: odd-width signed
+   saturation; sign-extension live-register preservation; 128-bit absolute
+   value; saturating shifts and scale-zero fixed multiplication; bounded input
+   vector fragments; and mixed scalar/SSE calls with existing physical stack
+   arguments. Preserve live aliases before writing a sign-extension scratch
+   destination through the existing clobber contract. The old source fails
+   its independent regression. Keep vector returns, unsupported layouts,
+   ordinary ninth-SSE arguments and existing call/stack limits closed.
+   The maintained Zig generator reproduces all 43 fixture files and 21
+   population entries exactly. Both isolated unit builds pass 2,281 tests;
+   all six component native populations pass both backend builds and detect
+   all 324 component faults. The unchanged Debug replay gains 34 and loses
+   none against `c1c0ecee`, selecting 7,767/7,874; actual nonzero, 107 failures
+   and no complete behavior object remain explicit.
+7. Freeze that adopted source and run fresh immediate Tier 3, both official
+   unit builds, all eight readiness procedures, all 17 integration gates,
+   both complete 173-population native suites, all 3,916 required faults and
+   strict preservation against the 167-population checkpoint. Repeat complete
+   original compiler/runtime production and review every changed object,
+   function encoding, owner, ELF and event stream. Keep the separate unchanged
+   503-definition Small-runtime input alongside the fixed 455 definitions.
+   Neither isolated component proofs nor formatting authorize object reuse.
+8. Diagnose the remaining unchanged Debug failures in their full original
+   context while cumulative runs use retained immutable sources. Inventory
+   the actual signature and instruction boundary before extending a family;
+   the current 107 failures do not establish a wide-vector-return frontier.
+   Preserve frozen Source/value-use contracts, 64 KiB stack objects, the 8 MiB
+   frame guard and all argument limits. Add independent execution and negative
+   controls for each bounded repair and repeat the required cumulative checks.
+   Selection gains cannot close the behavior milestone.
+9. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
    pinned reference, and audit every delivered hook object before publishing
