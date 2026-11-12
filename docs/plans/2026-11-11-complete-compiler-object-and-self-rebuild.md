@@ -428,18 +428,26 @@ Follow-up completion requires cumulative validation appropriate to changed
 subsystems, exact source/binary/provider binding, updated documentation and a
 new evidence seal. Reuse unchanged gates only under the existing reuse policy.
 
-- [ ] Run the full reference and both candidate behavior matrices in all four modes.
+- [x] Run the complete four-mode reference matrix.
+- [x] Build the first repaired generation and match all four normal-LLVM reference outcomes.
+- [ ] Produce the final second generation and complete both final candidate matrices.
 - [ ] Prove complete local-hook captures and matching named test outcomes.
 - [ ] Repair observed failures with focused regressions and required cumulative validation.
 - [ ] Diagnose and remove special CPU-affinity and main-stack requirements.
 - [ ] Prove fresh normal-resource self-rebuild and the rebuilt compiler's full behavior matrix.
 - [ ] Publish follow-up acceptance and seal successor evidence.
 
-The completed PHI and vector checkpoints remain accepted independently. The
-active compaction slice adds a 64 KiB worker-stack native regression whose old
-backend fails with SIGSEGV and whose LLVM/prototype executions pass. Complete
-the adopted slice's frozen validation before the fresh unchanged compiler build
-and normal-resource self-rebuild; retain all remaining behavior-suite failures.
+The completed PHI, vector and
+[frame checkpoints](../evidence/compiler_behavior_frame_checkpoint_20261111.json)
+remain accepted independently. Trailing-gap compaction passes its frozen Tier-3
+validation, fresh complete original compiler/runtime replays and the 64 KiB
+worker-stack regression. The newly built first generation matches all 2,097
+reference outcomes in all four normal LLVM modes and passes f80 layout checks.
+Normal-resource self-rebuild still fails with frontend SIGSEGV in Sema's
+stack-probing prologue. Keep this failed run and diagnose the remaining frame
+growth; interior spill-reserve compaction and explicit stack-object lifetime
+reuse require independent proofs before adoption. The complete local-hook
+behavior matrix and final second generation remain open.
 
 ## Delivery checklist
 

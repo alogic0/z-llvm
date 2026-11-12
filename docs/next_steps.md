@@ -20,10 +20,16 @@ The [vector checkpoint](evidence/compiler_behavior_vector_checkpoint_20261111.js
 accepts `a328d225`: quoted global references, floating vector data and packed x87
 lanes. Both 117-population native suites, all 17 integration gates and all 876
 fault controls pass, preserving every prior outcome and artifact. The local-hook
-Debug suite now reaches variadic parsing. Adopt the independently tested unused
-spill-reserve compaction, complete its cumulative checks, then build fresh compiler
-generations and test normal-resource self-rebuild. The remaining full-suite
-integer, variadic, atomic and ReleaseSmall boundaries remain active.
+Debug suite now reaches variadic parsing. The
+[frame checkpoint](evidence/compiler_behavior_frame_checkpoint_20261111.json)
+accepts trailing-gap compaction at `46c07b2d`: all 17 gates, both 118-population
+native suites, 930 required faults and fresh complete original compiler/runtime
+objects pass. The newly built first generation matches the full reference suite
+in all four normal LLVM modes and passes f80 layout checks. Normal-resource
+self-rebuild still fails in Sema's stack-probing prologue. Close that resource
+failure and the remaining full-suite local-hook integer, variadic, atomic,
+assembly and ReleaseSmall boundaries before producing and accepting both final
+compiler generations.
 
 The [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
 is complete at accepted code `b738377e`, with backend implementation `e398030f`.

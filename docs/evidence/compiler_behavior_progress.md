@@ -81,3 +81,33 @@ the preceding backend terminates with SIGSEGV, while the prototype and LLVM
 reference pass. Its three numbered faults cover the result and both surrounding
 guards. This resource regression supplements the stack-argument/rebasing unit
 controls; it does not establish the compiler's normal-resource rebuild.
+
+The [frame checkpoint](compiler_behavior_frame_checkpoint_20261111.json) accepts
+the trailing-gap compaction at `46c07b2d`. Both unit builds pass 2,190 units,
+64 structural and two profile checks. Eight readiness procedures, all 17
+integration gates and both 118-population native suites pass; all 930 required
+fault controls are detected. The strict native comparisons remain failed for
+six reviewed vector objects per build: each matches the independently executed
+prototype exactly. All 4,313 preceding outcomes, 360 optimizer artifacts,
+705 owner artifacts and the other 705 objects match. Both fixed runtime objects
+are complete, with unchanged owners; the two changed complex-arithmetic bodies
+also pass 24,650 independent observations per route and nine supplemental faults.
+
+Fresh production again emits the complete original compiler object with all
+8,928 definitions, unchanged owners, balanced events and a passing ELF audit.
+The unchanged compiler builds and starts. Its normal LLVM route now matches all
+2,097 reference test identities and outcomes in each of the four modes, and its
+f80 regression passes all nine observations. These results cover the new first
+generation. Normal-resource self-rebuild still fails with frontend SIGSEGV;
+a new debugger trace again identifies the Sema stack-probing prologue. No second
+generation or complete local-hook behavior matrix is accepted. The frozen
+3,425-file source has verified retained copies before this publication.
+
+Isolated follow-up work covers floating atomics, SysV variadic values, simple
+owned module-assembly aliases and live scalar-FP frame preservation. Its complete
+Debug behavior input parses and verifies, and four new native populations pass
+all three modes and their faults. Production still selects only 6,554 of 7,874
+definitions, so these results remain research. Further extended-return ABI work
+selects the eight targeted Small-runtime functions; complete object and native
+ABI proofs remain necessary before adoption. Removing unreferenced interior
+spill-reserve chunks is also isolated pending semantic and resource proofs.
