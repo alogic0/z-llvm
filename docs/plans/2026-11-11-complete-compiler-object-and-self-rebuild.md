@@ -2,7 +2,9 @@
 
 Date: 2026-11-11
 Status: milestones 1–5 complete at `b738377e`, backend implementation `e398030f`;
-follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The original
+follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-resource
+self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; a newly reproduced
+runtime remainder error and the complete local-hook matrices remain open. The original
 five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
 [acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
@@ -433,8 +435,9 @@ new evidence seal. Reuse unchanged gates only under the existing reuse policy.
 - [ ] Produce the final second generation and complete both final candidate matrices.
 - [ ] Prove complete local-hook captures and matching named test outcomes.
 - [ ] Repair observed failures with focused regressions and required cumulative validation.
-- [ ] Diagnose and remove special CPU-affinity and main-stack requirements.
-- [ ] Prove fresh normal-resource self-rebuild and the rebuilt compiler's full behavior matrix.
+- [x] Diagnose and remove special CPU-affinity and main-stack requirements at `ba05fef4`.
+- [x] Prove normal-resource self-rebuild and both normal-LLVM four-mode matrices at `ba05fef4`.
+- [ ] Repair the independently reproduced unsigned multiword remainder error and repeat affected production proofs.
 - [ ] Publish follow-up acceptance and seal successor evidence.
 
 The completed PHI, vector and
@@ -566,6 +569,55 @@ Adopt this bounded profitability change for immediate Tier 3. Preserve the
 the original inputs, and repeat the actual unchanged normal-resource build and
 self-rebuild. Smaller measured frames and the isolated regression do not close
 milestone 8.
+
+### Current checkpoint and remaining implementation order
+
+The [normal-resource checkpoint](../evidence/compiler_behavior_normal_resources_checkpoint_20261112.json)
+records the completed `ba05fef4` run. Both unit builds pass 2,202 units,
+64 structural and two profile checks; all eight readiness procedures, all
+17 integration gates, both 121-population native suites and all 1,092 required
+fault controls pass. Fresh original compiler/runtime production retains all
+8,928/455 definitions and owners, with balanced events and passing ELF audits.
+The frozen 3,441-file source is retained verbatim.
+
+The unchanged normal-resource build and self-rebuild return actual zero. The
+self-build executes the backend afresh and emits the original compiler IR and
+the same compiler object. Separate freshly linked generation paths contain the
+same 150,460,616-byte executable, SHA-256
+`7dd08529a7e28532b6743917e73d335d6e393a345bfa6e600ffde2f241a23928`.
+Each generation matches all 2,097 reference outcomes in each normal-LLVM mode
+and passes all nine f80 observations. Measured frontend resources are the
+unchanged 46 MiB main stack, 60 MiB worker stack and CPU affinity 0–15, with
+16 threads. The pinned executable raises its shell-inherited 8 MiB main-stack
+limit to its existing ELF stack request; this run adds no stack override.
+
+These resource results do not close the follow-up acceptance. A new independent
+C test exposes wrong unsigned multiword remainder output in the local runtime;
+the same original IR compiled by LLVM passes. The original accepted runtime
+object also fails this test, establishing a preexisting uncovered error. Retain
+the failed receipts and implement the following steps in order:
+
+1. Reduce the remainder failure to the actual shared lowering or machine-code
+   cause. Add independent unsigned division/remainder coverage across limb
+   boundaries, normalization shifts and numerator/denominator orderings. Keep
+   the original failing operands and LLVM reference proof.
+2. Repair that shared cause without helper-name exceptions, source changes,
+   fallback objects or relaxed guards. Run the focused controls and immediate
+   Tier 3, then repeat original runtime production, owner/event/ELF checks and
+   the independent arithmetic oracle against the new object.
+3. Finish and review the isolated behavior-family changes against the accepted
+   source. Preserve the cumulative lifetime, machine-memory and medium-frame
+   repairs. Admit each family only after both native builds, fault controls,
+   full original-input replay and exact preservation checks pass. Failed
+   prototype/reference runs remain diagnostic evidence.
+4. Build the final source-bound compiler generations, audit every local-hook
+   capture, and match the complete named reference outcomes in all four modes
+   for both generations. The completed normal-LLVM matrices cannot substitute
+   for these local-hook matrices.
+5. Repeat the normal-resource rebuild and affected final-generation checks when
+   their relevant code changes, bind all final artifacts to the committed source,
+   and publish the successor acceptance and seal. Keep the prior five-milestone
+   seal and all failed resource/arithmetic attempts unchanged.
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.

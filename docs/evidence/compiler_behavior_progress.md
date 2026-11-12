@@ -207,3 +207,32 @@ build. Its four recursive kernel activations fit a fixed 128 KiB worker stack;
 the preceding backend passes a leaf-only run and fails the recursive run with
 SIGSEGV. This authorizes adoption and fresh cumulative validation, followed by
 original-input production and an actual normal-resource self-rebuild.
+
+The [normal-resource checkpoint](compiler_behavior_normal_resources_checkpoint_20261112.json)
+records code `ba05fef4` after both 2,202-unit builds, eight readiness procedures,
+all 17 integration gates, both 121-population native suites and all 1,092
+required faults pass. Original compiler/runtime production remains complete,
+with unchanged owners, balanced events and passing ELF audits. Both strict
+native comparisons retain their nine changed-object failures; independent
+reviews identify only smaller frames in four unique functions. Every preceding
+command outcome and all optimizer/owner artifacts match. The frozen 3,441-file
+source is retained verbatim.
+
+The actual unchanged normal-resource self-rebuild now passes. Its frontend
+uses the unchanged 46 MiB main stack, 60 MiB worker stack, affinity 0–15 and
+16 threads. The self-build backend runs afresh, reproduces the original compiler
+IR and emits the same complete compiler object. Separate freshly linked first-
+and second-generation paths contain identical 150,460,616-byte executables,
+SHA-256 `7dd08529a7e28532b6743917e73d335d6e393a345bfa6e600ffde2f241a23928`.
+Both generations match all 2,097 reference outcomes in every normal LLVM mode
+and pass all nine f80 checks. There is no controlled performance claim.
+
+Final acceptance remains blocked. A new independent unsigned 256-bit remainder
+probe receives a wrong middle limb from the local `__umodei4`; LLVM's object
+from the same fixed runtime input returns the correct result. The original
+accepted runtime object fails identically, and this function's bytes did not
+change in the frame repairs. This is a preexisting uncovered arithmetic error,
+not a passing validation result. Preserve the failed receipts, identify and
+repair the shared cause, add unsigned normalization/limb regressions and run
+immediate Tier 3 and fresh runtime production. Isolated behavior research and
+both final complete local-hook matrices remain unaccepted.

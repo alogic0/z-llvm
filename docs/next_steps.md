@@ -8,6 +8,22 @@ repair observed failures; and prove self-rebuild under normal stack and CPU
 settings. These follow-ups are active. Preserve the accepted five-milestone
 baseline below while collecting separate successor evidence.
 
+The [normal-resource checkpoint](evidence/compiler_behavior_normal_resources_checkpoint_20261112.json)
+records a successful unchanged build and self-rebuild at `ba05fef4`, with a
+fresh backend execution for generation two. Both newly linked generations are
+byte-identical and each matches all 2,097 reference outcomes in all four normal
+LLVM modes and passes the nine f80 checks. No CPU or stack override is used.
+Both 121-population native suites, all 17 integration gates and all 1,092
+required faults pass against the frozen source.
+
+Next, fix the independently reproduced unsigned multiword remainder error in
+the local runtime. The original accepted runtime object also fails the new C
+oracle; LLVM's object from the same input passes. Add the missing regression,
+run immediate Tier 3 and fresh runtime production, then finish the isolated
+behavior families and both complete four-mode local-hook matrices. The resource
+checkpoint is scoped evidence; the arithmetic failure blocks final acceptance.
+The entries below retain the preceding checkpoint history.
+
 The [floating PHI checkpoint](evidence/compiler_behavior_progress.md) accepts
 `84f1ad7c`: all 17 integration gates, both 116-population native suites and all
 822 fault controls pass. The full reference behavior matrix passes; both old
