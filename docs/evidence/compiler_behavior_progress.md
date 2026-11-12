@@ -43,12 +43,34 @@ The next implementation work closes the observed local-hook boundaries and
 reduces frame growth with executable regression coverage, followed by fresh
 compiler generations, the full behavior matrices and normal-resource self-rebuild.
 
-The next slice implements quoted global pointer initializers, floating vector
-global data and packed x87 vector lanes. Focused execution covers 1, 3, 16 and
-64 lanes, payload preservation, PHIs, comparison masks, aggregate layout and
-neighboring memory. The new nine-function `behavior_vectors` canary passes
-6,250 observations per execution and all 27 injected-failure controls with the
-ReleaseFast backend; the preceding backend rejects the fixture. The independent
-global syntax census now accepts all 5,686 records from the unchanged Debug
-capture. These are provisional results pending cumulative validation and do
-not close the remaining wide-integer, variadic or atomic boundaries.
+The [vector checkpoint](compiler_behavior_vector_checkpoint_20261111.json)
+accepts code `a328d225`: quoted global pointer initializers, floating vector
+global data and packed x87 vector lanes. Execution covers 1, 3, 16 and 64 lanes,
+payloads, PHIs, comparison masks, aggregate layout and neighboring memory. All
+5,686 global records from the unchanged Debug capture parse. A fresh unchanged
+local-hook attempt retains a complete 455-definition runtime object and reaches
+variadic function parsing in the 7,874-definition behavior module. That attempt
+remains failed; the full behavior matrix is still open.
+
+Both unit builds pass 2,188 units, 64 structural and two profile checks. Eight
+readiness procedures, all 17 integration gates and both 117-population native
+suites pass. Each native build preserves all 4,277 prior outcomes and all 357
+optimizer, 699 owner and 705 object artifacts exactly. All 876 cumulative fault
+controls are detected. Both fixed runtime objects and owners match the PHI
+checkpoint, with independently balanced 455-function events and ELF audit.
+The fixed bundle identity, contracts, providers and historical seals remain.
+
+The new registry entry was moved to the tail after the frozen run to retain the
+previous prefix. All fixture contracts and compiler sources are identical; fresh
+strict registry and artifact comparisons pass in both builds. These independent
+population executions are reused for that ordering correction. The original
+frozen source has 3,420 authenticated copies under the successor evidence root,
+so later source edits do not invalidate its record. No performance claim is made.
+
+A separate frame-compaction prototype passes all 2,188 existing units, two new
+stack/rebasing controls, all 117 native populations and 432 fault controls. It
+reduces the measured Sema frame from 1,376,424 to 650,536 bytes while preserving
+spill homes and lifetimes. Nine cross-build literal-encoding differences match
+the maintained ReleaseFast backend exactly; six vector objects contain the
+reviewed frame reduction. Adoption and cumulative validation remain separate
+from this diagnostic result. A fresh normal-resource rebuild is still required.

@@ -374,6 +374,16 @@ the ReleaseSmall runtime's ABI/instruction forms. Retain exact failing inputs
 and extend shared parser/lowering/object contracts with independent execution
 and rejection controls. Do not normalize the accepted suite or filter cases.
 
+The [vector checkpoint](../evidence/compiler_behavior_vector_checkpoint_20261111.json)
+accepts code `a328d225` for quoted global references, floating vector data and
+packed x87 lanes. Both 117-population native suites, all 17 integration gates,
+2,188 units plus 64 structural/two profile checks per unit build and all 876
+fault controls pass. The unchanged Debug hook attempt reaches variadic parsing;
+its runtime object is complete, and its behavior object remains unproven. Keep
+the remaining wide-integer, variadic, floating atomic and Small-mode boundaries
+open. Registry ordering was corrected after the frozen run, with identical
+population contracts and fresh strict preservation comparisons.
+
 ## Follow-up milestone 8: normal-resource self-rebuild
 
 Measure the final accepted compiler under inherited normal stack limits and
@@ -398,6 +408,15 @@ evidence identifies `Sema.analyzeBodyInner`'s stack-probing prologue touching be
 the main-stack mapping. Isolated spill-home
 coloring research reduces the large Sema frame but fails existing tests; it
 must not be adopted on selection or frame-size measurements alone.
+
+Unused spill-reserve compaction is a separate tested candidate. It retains every
+spill home and interval, removes only an unreferenced gap, rebases owned-object
+and incoming-stack offsets, preserves temporary stack bias, alignment and page
+touching, and retains opaque cases unchanged. Its isolated proof passes all
+2,188 units, executable/negative stack controls, all 117 native populations and
+432 fault controls. Adopt the reviewed code, complete immediate Tier 3 and fresh
+source-bound compiler/runtime replays, then require the actual normal-resource
+build and self-rebuild before closing this milestone.
 
 Write successor evidence under
 `local-state/validations/compiler-behavior-completion-20261111/`, preserving the
