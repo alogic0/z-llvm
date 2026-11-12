@@ -46,9 +46,13 @@ pub fn parseType(text: []const u8) !core.Type {
         (trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']'))) return .{ .aggregate = trimmed };
     if (isSupportedNamedTypeName(trimmed)) return .{ .aggregate = trimmed };
     if (trimmed.len < 2 or trimmed[0] != 'i') return error.UnsupportedType;
-    const bits = try std.fmt.parseInt(u16, trimmed[1..], 10);
+    const bits = try std.fmt.parseInt(u32, trimmed[1..], 10);
     if (bits == 0) return error.UnsupportedType;
-    return .{ .int = bits };
+    if (bits > std.math.maxInt(u16)) {
+        if (bits > @import("wide_integers.zig").max_bits) return error.UnsupportedType;
+        return .{ .aggregate = trimmed };
+    }
+    return .{ .int = @intCast(bits) };
 }
 
 const ParsedLeadingType = struct {
@@ -210,7 +214,11 @@ pub fn parseValue(text: []const u8) !core.Value {
         return .{ .named = trimmed };
     }
     if (isFpLiteral(trimmed)) return .{ .fp = trimmed };
-    return .{ .int = try std.fmt.parseInt(i128, trimmed, 10) };
+    const value = std.fmt.parseInt(i128, trimmed, 10) catch |err| {
+        if (err == error.Overflow and @import("wide_integers.zig").decimal(trimmed)) return .{ .constant_expr = trimmed };
+        return err;
+    };
+    return .{ .int = value };
 }
 
 pub fn isSupportedConstantExpr(text: []const u8) bool {

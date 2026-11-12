@@ -34,6 +34,19 @@ pub fn main(init: std.process.Init) !void {
         const path = try c.join(&.{ "test/real_programs", try c.fmt("{s}{s}", .{ try u.str(canary, "fixture"), suffix }) });
         try u.put(c.a, &report, suffix, u.s(try c.digest(path)));
     }
+    if (canary.object.get("reference_fixture")) |value| {
+        const path = try c.join(&.{ "test/real_programs", try c.fmt("{s}.ll", .{value.string}) });
+        try u.put(c.a, &report, "reference_fixture", try u.toValue(c.a, .{ .path = path, .sha256 = try c.digest(path) }));
+        if (canary.object.get("reference_source")) |source| {
+            const source_path = try c.join(&.{ "test/real_programs", source.string });
+            try u.put(c.a, &report, "reference_source", try u.toValue(c.a, .{ .path = source_path, .sha256 = try c.digest(source_path) }));
+        }
+        try u.put(c.a, &report, "reference_scope", u.s("Explicit independent oracle fixture; original candidate IR is used unchanged for both local routes"));
+    }
+    if (canary.object.get("provider_fixture")) |provider| {
+        const path = try c.join(&.{ "test/real_programs", try c.fmt("{s}.ll", .{provider.string}) });
+        try u.put(c.a, &report, "provider_fixture", try u.toValue(c.a, .{ .path = path, .sha256 = try c.digest(path) }));
+    }
     var passed = true;
     for (modes) |mode| {
         const directory = try c.newOutput(try c.join(&.{ output, mode }));

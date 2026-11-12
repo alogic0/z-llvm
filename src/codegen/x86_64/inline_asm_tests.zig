@@ -1,4 +1,37 @@
 const std = @import("std");
+test "system assembly client request retains exact magic and closes malformed contracts" {
+    const forms = @import("inline_asm.zig");
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const text = try std.fmt.allocPrint(arena.allocator(),
+        "define i64 @request(i64 %r, i64 %d) {{\nentry:\n %out = call i64 asm sideeffect \"{s}\", \"{s}\"(i64 %r, i64 %d)\n ret i64 %out\n}}\n",
+        .{forms.client_request_template, forms.client_request_constraints});
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const call = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expect(forms.classify(call).? == .valgrind_client_request);
+    var bad = call;
+    bad.inline_asm.?.template = "rolq $$3, %rdi";
+    try std.testing.expect(forms.classify(bad) == null);
+    bad = call;
+    bad.inline_asm.?.constraints = "={rax},{rax},{rdx},~{memory},~{dirflag},~{fpsr},~{flags}";
+    try std.testing.expect(forms.classify(bad) == null);
+    bad = call;
+    bad.inline_asm.?.sideeffect = false;
+    try std.testing.expect(forms.classify(bad) == null);
+    bad = call;
+    bad.tail_kind = "musttail";
+    try std.testing.expect(forms.classify(bad) == null);
+    const machine = @import("machine.zig");
+    var output = machine.MachineFunction.init("magic", .void);
+    defer output.deinit(std.testing.allocator);
+    try output.instructions.appendSlice(std.testing.allocator, &.{.valgrind_client_request, .ret});
+    const bytes = try @import("../../mc/encoding.zig").encodeFunction(std.testing.allocator, output);
+    defer std.testing.allocator.free(bytes);
+    try std.testing.expectEqualSlices(u8, &.{0x48,0xc1,0xc7,3,0x48,0xc1,0xc7,13,0x48,0xc1,0xc7,61,0x48,0xc1,0xc7,51,0x48,0x87,0xdb,0xc3}, bytes);
+    try std.testing.expectEqual(@as(u32,19), @import("../../mc/encoding.zig").instructionSize(.valgrind_client_request));
+}
 const ir = @import("../../ir.zig");
 const asm_forms = @import("inline_asm.zig");
 const codegen = @import("../../codegen.zig");

@@ -6,7 +6,7 @@ const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const attrs = @import("intrinsic_attrs.zig");
 
-pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl };
+pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl, fshr };
 
 pub fn operation(call: ir.CallInst) ?Operation {
     if (!std.mem.startsWith(u8, call.callee, "llvm.") or call.ret_ty != .int or call.ret_ty.int == 0 or
@@ -20,7 +20,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
                 !(bits < 128 and (op == .abs or op == .ctlz or op == .ctpop or op == .cttz))) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
-            if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl) @as(usize, 3) else @as(usize, 1))) return null;
+            if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl or op == .fshr) @as(usize, 3) else @as(usize, 1))) return null;
             for (call.args.items, 0..) |arg, index| {
                 const expected: ir.Type = if (flag and index == 1) .{ .int = 1 } else call.ret_ty;
                 if (!arg.ty.eql(expected) or (arg.value != .named and arg.value != .int)) return null;
@@ -238,6 +238,22 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
             const tail = try b.select(try b.compare(.ne, reduced, .{ .int = 0 }), right, .{ .int = 0 });
             break :blk try b.binary(.@"or", left, tail);
         },
+        .fshr => blk: {
+            const rhs = try b.widen(bits, call.args.items[1].value);
+            const amount = call.args.items[2].value;
+            if (amount == .int) {
+                const shift = @mod(amount.int & ((@as(i128, 1) << @as(u7, @intCast(bits))) - 1), bits);
+                if (shift == 0) break :blk rhs;
+                break :blk try b.binary(.@"or", try b.binary(.shl, input, .{ .int = bits - shift }), try b.binary(.lshr, rhs, .{ .int = shift }));
+            }
+            const count = try b.widen(bits, amount);
+            const reduced = try b.binary(if (std.math.isPowerOfTwo(bits)) .@"and" else .urem, count, .{ .int = if (std.math.isPowerOfTwo(bits)) bits - 1 else bits });
+            const inverse = try b.binary(.@"and", try b.binary(.sub, .{ .int = bits }, reduced), .{ .int = b.wide.int - 1 });
+            const right = try b.binary(.lshr, rhs, reduced);
+            const left = try b.binary(.shl, input, inverse);
+            const head = try b.select(try b.compare(.ne, reduced, .{ .int = 0 }), left, .{ .int = 0 });
+            break :blk try b.binary(.@"or", right, head);
+        },
     };
     try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = if (bits == b.wide.int)
         .{ .binary = .{ .op = .add, .ty = b.wide, .lhs = value, .rhs = .{ .int = 0 } } }
@@ -268,6 +284,10 @@ test "integer bit intrinsic admission rejects unsupported signatures and semanti
         "call i16 @llvm.fshl.i16(i16 %value, i16 %value, i32 2)",
         "call i16 @llvm.fshl.i16(i16 %value, i16 %value, i16 65536)",
         "call i16 @llvm.fshl.i16(i16 %value, i16 %value)",
+        "call i16 @llvm.fshr.i16(i16 %value,i16 %value,i32 2)",
+        "call i16 @llvm.fshr.i16(i16 %value,i16 %value,i16 65536)",
+        "musttail call i16 @llvm.fshr.i16(i16 %value,i16 %value,i16 1)",
+        "call i128 @llvm.fshr.i128(i128 1,i128 2,i128 3)",
         "call i8 @llvm.bswap.i8(i8 1)",
     }) |source| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define i16 @probe(i16 %value, i1 %flag) {{\nentry:\n %result = {s}\n ret i16 %result\n}}\n", .{source});

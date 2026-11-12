@@ -6,6 +6,32 @@ const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const intrinsics = @import("integer_intrinsics.zig");
 
+test "right funnels execute scalar widths with full counts zero and live sources" {
+    for ([_]u16{ 1, 6, 8, 16, 23, 32, 33, 63, 64 }) |bits| for ([_]bool{ false, true }) |literal| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        const inputs = if (bits == 64) " %x = add i64 %a,0\n %y = add i64 %b,0\n %n = add i64 %count,0\n" else try std.fmt.allocPrint(a, " %x = trunc i64 %a to i{0d}\n %y = trunc i64 %b to i{0d}\n %n = trunc i64 %count to i{0d}\n", .{bits});
+        const finish = if (bits == 64) " %wide = add i64 %v,0\n" else try std.fmt.allocPrint(a, " %wide = zext i{d} %v to i64\n", .{bits});
+        const text = try std.fmt.allocPrint(a, "declare i{0d} @llvm.fshr.i{0d}(i{0d},i{0d},i{0d})\ndefine i64 @right(i64 %a,i64 %b,i64 %count,i64 %live) {{\nentry:\n{1s} %v = call i{0d} @llvm.fshr.i{0d}(i{0d} %x,i{0d} %y,i{0d} {2s})\n{3s} %r = xor i64 %wide,%live\n ret i64 %r\n}}\n", .{ bits, inputs, if (literal) "-1" else "%n", finish });
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const mask: u64 = @intCast((@as(u128, 1) << @as(u7, @intCast(bits))) - 1);
+        const samples = [_]u64{ 0, 1, mask, 0x8000000000000000, 0x123456789abcdef0, 0xfedcba9876543210 };
+        for (samples) |x| for (samples) |y| for ([_]u64{ 0, 1, bits - 1, bits, bits + 1, 63, 64, std.math.maxInt(u64) }) |count| {
+            const s: u7 = @intCast((if (literal) mask else count & mask) % bits);
+            const concatenated = (@as(u128, x & mask) << @as(u7, @intCast(bits))) | (y & mask);
+            const expected: u64 = @intCast((concatenated >> s) & mask);
+            const live = x ^ y ^ count;
+            try std.testing.expectEqual(expected ^ live, run(x, y, count, live));
+        };
+    };
+}
+
 test "integer frontier wide byte swaps reverse every byte and retain literal bits" {
     const values = [_]u128{ 0, 1, 0x8000000000000000, 0x80000000000000000000, 0x0123456789abcdeffedcba9876543210, 0xfedcba98765432100123456789abcdef, std.math.maxInt(u128) };
     for ([_]u16{ 80, 96, 112, 128 }) |bits| for ([_]bool{ false, true }) |literal| {
@@ -260,13 +286,106 @@ test "integer frontier rejects unimplemented widths flags and semantic envelopes
         "call signext i32 @llvm.abs.i32(i32 1, i1 true)",
         "call i16 @llvm.umul.fix.sat.i16(i16 1, i16 2, i32 1)",
         "call i16 @llvm.umul.fix.sat.i16(i16 1, i16 2, i16 0)",
-        "call i64 @llvm.ushl.sat.i64(i64 1, i64 0)",
-        "call i64 @llvm.ushl.sat.i64(i64 1, i64 64)",
-        "call i32 @llvm.ushl.sat.i32(i32 1, i32 1)",
+        "call fastcc i64 @llvm.ushl.sat.i64(i64 1, i64 0)",
+        "call i64 @llvm.ushl.sat.i64(i64 inreg 1, i64 64)",
+        "call i32 @llvm.ushl.sat.i32(i32 1, i64 1)",
     }) |instruction| {
         const source = try std.fmt.allocPrint(std.testing.allocator, "define void @decline(i1 %flag) {{\nentry:\n %value = {s}\n ret void\n}}\n", .{instruction});
         defer std.testing.allocator.free(source);
         var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try intrinsics.legalize(arena.allocator(), module.functions.items[0]) == null);
+    }
+}
+
+test "saturating shifts execute signed unsigned logical widths and live carriers" {
+    const a = std.testing.allocator;
+    for ([_]u16{ 1, 4, 8, 16, 25, 32, 33, 63, 64 }) |bits| for ([_]bool{ false, true }) |signed| for (0..3) |constant_side| {
+        const inputs = if (bits == 64) try a.dupe(u8, " %x = add i64 %input,0\n %n = add i64 %amount,0\n") else try std.fmt.allocPrint(a, " %x = trunc i64 %input to i{0d}\n %n = trunc i64 %amount to i{0d}\n", .{bits});
+        defer a.free(inputs);
+        const finish = if (bits == 64) try a.dupe(u8, " %wide = add i64 %v,0\n") else try std.fmt.allocPrint(a, " %wide = zext i{d} %v to i64\n", .{bits});
+        defer a.free(finish);
+        const text = try std.fmt.allocPrint(a, "declare i{0d} @llvm.{1s}.sat.i{0d}(i{0d},i{0d})\ndefine i64 @probe(i64 %input,i64 %amount,i64 %live) {{\nentry:\n{2s} %v = call i{0d} @llvm.{1s}.sat.i{0d}(i{0d} {3s},i{0d} {4s})\n{5s} %answer = xor i64 %wide,%live\n ret i64 %answer\n}}\n", .{ bits, if (signed) "sshl" else "ushl", inputs, if (constant_side == 1) "-1" else "%x", if (constant_side == 2) "0" else "%n", finish });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const code = executable(module) catch |err| {
+            std.debug.print("saturating shift bits={d} signed={} constant={d}\n", .{ bits, signed, constant_side });
+            return err;
+        };
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const sign: u64 = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+        const mask = (sign - 1) | sign;
+        for ([_]u64{ 0, 1, sign - 1, sign, sign +% 1, mask - 1, mask, 0x123456789abcdef0 }) |input| for (0..bits) |amount| {
+            const x = if (constant_side == 1) mask else input & mask;
+            const count: u7 = if (constant_side == 2) 0 else @intCast(amount);
+            const expected: u64 = if (signed) blk: {
+                const sx: i128 = if (x & sign != 0) @as(i128, x) - (@as(i128, 1) << @as(u7, @intCast(bits))) else x;
+                const min: i128 = -(@as(i128, 1) << @as(u7, @intCast(bits - 1)));
+                const result = std.math.clamp(sx << count, min, -min - 1);
+                break :blk @intCast(@as(u128, @bitCast(result)) & mask);
+            } else @intCast(@min(@as(u128, x) << count, mask));
+            const live: u64 = input ^ 0x9e3779b97f4a7c15;
+            try std.testing.expectEqual(expected ^ live, run(input, @intCast(amount), live));
+        };
+    };
+}
+
+test "saturating multiply scale zero executes full signed unsigned products and live values" {
+    const a = std.testing.allocator;
+    for ([_]u16{ 1, 4, 8, 16, 25, 32, 33, 63, 64 }) |bits| for ([_]bool{ false, true }) |signed| for (0..3) |constant_side| {
+        const inputs = if (bits == 64) try a.dupe(u8, " %x = add i64 %input,0\n %y = add i64 %other,0\n") else try std.fmt.allocPrint(a, " %x = trunc i64 %input to i{0d}\n %y = trunc i64 %other to i{0d}\n", .{bits});
+        defer a.free(inputs);
+        const finish = if (bits == 64) try a.dupe(u8, " %wide = add i64 %v,0\n") else try std.fmt.allocPrint(a, " %wide = zext i{d} %v to i64\n", .{bits});
+        defer a.free(finish);
+        const text = try std.fmt.allocPrint(a, "declare i{0d} @llvm.{1s}.fix.sat.i{0d}(i{0d},i{0d},i32 immarg)\ndefine i64 @probe(i64 %input,i64 %other,i64 %live) {{\nentry:\n{2s} %v = call i{0d} @llvm.{1s}.fix.sat.i{0d}(i{0d} {3s},i{0d} {4s},i32 0)\n{5s} %answer = xor i64 %wide,%live\n ret i64 %answer\n}}\n", .{ bits, if (signed) "smul" else "umul", inputs, if (constant_side == 1) "-1" else "%x", if (constant_side == 2) "-1" else "%y", finish });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const code = executable(module) catch |err| {
+            std.debug.print("saturating multiply bits={d} signed={} constant={d}\n", .{ bits, signed, constant_side });
+            return err;
+        };
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const sign: u64 = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+        const mask = (sign - 1) | sign;
+        const samples = [_]u64{ 0, 1, sign - 1, sign, sign +% 1, mask - 1, mask, 0x123456789abcdef0 };
+        for (samples) |input| for (samples) |other| {
+            const x = if (constant_side == 1) mask else input & mask;
+            const y = if (constant_side == 2) mask else other & mask;
+            const expected: u64 = if (signed) blk: {
+                const modulus = @as(i128, 1) << @as(u7, @intCast(bits));
+                const sx: i128 = if (x & sign != 0) @as(i128, x) - modulus else x;
+                const sy: i128 = if (y & sign != 0) @as(i128, y) - modulus else y;
+                const minimum = -@as(i128, sign);
+                const product = sx * sy;
+                break :blk @intCast(@as(u128, @bitCast(std.math.clamp(product, minimum, -minimum - 1))) & mask);
+            } else @intCast(@min(@as(u128, x) * y, mask));
+            const live = input ^ other ^ 0x9e3779b97f4a7c15;
+            try std.testing.expectEqual(expected ^ live, run(input, other, live));
+        };
+    };
+}
+
+test "saturating multiply retains nonzero scales and ABI envelopes closed" {
+    for ([_][]const u8{
+        "call i64 @llvm.smul.fix.sat.i64(i64 1,i64 2,i32 1)",
+        "call i64 @llvm.umul.fix.sat.i64(i64 1,i64 2,i32 %scale)",
+        "call i128 @llvm.smul.fix.sat.i128(i128 1,i128 2,i32 0)",
+        "call i8 @llvm.smul.fix.sat.i8(i8 inreg 1,i8 2,i32 0)",
+        "call fastcc i8 @llvm.smul.fix.sat.i8(i8 1,i8 2,i32 0)",
+        "call i8 @llvm.smul.fix.sat.i8(i8 256,i8 2,i32 0)",
+        "call i8 @llvm.smul.fix.sat.i8(i8 1,i8 2,i16 0)",
+    }) |instruction| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define void @probe(i32 %scale) {{\nentry:\n %v = {s}\n ret void\n}}\n", .{instruction});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();

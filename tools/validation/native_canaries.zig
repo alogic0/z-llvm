@@ -16,9 +16,25 @@ pub fn load(c: *u.Context) ![]u.Value {
             if (name.len == 0) return error.InvalidNativePopulation;
             for (name) |ch| if (!std.ascii.isAlphanumeric(ch) and ch != '_' and ch != '-') return error.InvalidNativePopulation;
         }
+        for ([_][]const u8{ "reference_fixture", "reference_source", "provider_fixture" }) |key| if (canary.object.get(key)) |value| {
+            if (value != .string or value.string.len == 0) return error.InvalidReferenceFixture;
+            for (value.string) |ch| if (!std.ascii.isAlphanumeric(ch) and ch != '_' and ch != '-' and ch != '.') return error.InvalidReferenceFixture;
+            if (std.mem.indexOf(u8, value.string, "..") != null) return error.InvalidReferenceFixture;
+        };
+        if (canary.object.contains("reference_source") and !canary.object.contains("reference_fixture")) return error.ReferenceSourceWithoutFixture;
+        if (canary.object.contains("provider_fixture")) {
+            if (canary.object.contains("provider_objects")) return error.ConflictingNativeProviders;
+            const exports = try u.stringSlice(c.a, try u.get(canary, "provider_exports"));
+            if (exports.len == 0) return error.EmptyNativeProviderExports;
+            var seen_exports = std.StringHashMap(void).init(c.a);
+            for (exports) |name| {
+                if (name.len == 0 or (try seen_exports.getOrPut(name)).found_existing or u.contains(try u.stringSlice(c.a, try u.get(canary, "functions")), name)) return error.InvalidNativeProviderExports;
+            }
+        } else if (canary.object.contains("provider_exports")) return error.NativeProviderExportsWithoutFixture;
         if (try u.json.integer(try u.get(canary, "observations")) <= 0) return error.InvalidNativeObservations;
         _ = try u.str(canary, "stdout");
         _ = try libraries(c, canary);
+        _ = try providerObjects(c, canary);
         if (canary.object.get("shared_object")) |shared| if (shared != .bool) return error.InvalidNativeSharedObject;
         var functions = std.StringHashMap(void).init(c.a);
         for (try u.stringSlice(c.a, try u.get(canary, "functions"))) |function| if (function.len == 0 or (try functions.getOrPut(function)).found_existing) return error.InvalidNativeFunctionSet;
@@ -58,19 +74,27 @@ pub fn variadic(runner: *Runner, directory: []const u8, zllvm: []const u8, env: 
     try runner.require(&.{ "cc", "-O2", "-no-pie", try c.join(&.{"test/real_programs/variadic_integer_driver.c"}), try c.join(&.{"test/real_programs/variadic_integer_shim.S"}), obj, "-o", exe }, try c.join(&.{ directory, "varargs-link" }), env);
     try runner.observe(exe, &.{}, 0, "integer-call-canary varargs_cases=16 heap_cases=6 al=0 pointers=preserved live=preserved\n", try c.join(&.{ directory, "varargs-run" }), env);
 }
-pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *const std.process.Environ.Map, mode: []const u8, report: *u.Value, canary: u.Value) !void {
+pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *const std.process.Environ.Map, mode: []const u8, report: *u.Value, registered: u.Value) !void {
     const c = runner.context;
+    const canary = try resolveProvider(runner, directory, zllvm, env, report, registered);
     const population = try u.str(canary, "population");
+    const providers = try providerObjects(c, canary);
+    if (providers.len != 0) try u.put(c.a, report, try c.fmt("{s}_provider_objects", .{population}), try u.get(canary, "provider_objects"));
     const prefix = try u.str(canary, "prefix");
     const shared = if (canary.object.get("shared_object")) |value| value.bool else false;
     const dependencies = try libraries(c, canary);
     const fixture = try c.join(&.{ "test/real_programs", try c.fmt("{s}.ll", .{try u.str(canary, "fixture")}) });
+    const reference_fixture = if (canary.object.get("reference_fixture")) |value| try c.join(&.{ "test/real_programs", try c.fmt("{s}.ll", .{value.string}) }) else fixture;
+    if (!std.mem.eql(u8, reference_fixture, fixture)) {
+        try u.put(c.a, report, try c.fmt("{s}_reference_fixture_sha256", .{population}), u.s(try c.digest(reference_fixture)));
+        if (canary.object.get("reference_source")) |source| try u.put(c.a, report, try c.fmt("{s}_reference_source_sha256", .{population}), u.s(try c.digest(try c.join(&.{ "test/real_programs", source.string }))));
+    }
     const driver = try c.join(&.{ "test/real_programs", try c.fmt("{s}_driver.c", .{try u.str(canary, "fixture")}) });
     const reference = try c.join(&.{ directory, try c.fmt("{s}-reference.o", .{prefix}) });
-    const reference_args = &.{ "clang-22", "-x", "ir", try llvmOpt(mode), "-c", fixture, "-o", reference };
+    const reference_args = &.{ "clang-22", "-x", "ir", try llvmOpt(mode), "-c", reference_fixture, "-o", reference };
     try runner.require(if (shared) try p.argv(c, reference_args, &.{"-fPIC"}) else reference_args, try c.join(&.{ directory, try c.fmt("{s}-reference-object", .{prefix}) }), env);
     const reference_exe = try c.join(&.{ directory, try c.fmt("{s}-reference", .{prefix}) });
-    try link(runner, driver, reference, reference_exe, shared, dependencies, env);
+    try link(runner, driver, reference, reference_exe, shared, dependencies, canary, env);
     try runner.observe(reference_exe, &.{}, 0, try u.str(canary, "stdout"), try c.join(&.{ directory, try c.fmt("{s}-reference-run", .{prefix}) }), env);
     const observations = try u.json.integer(try u.get(canary, "observations"));
     try u.increment(c.a, report, try c.fmt("{s}_reference_observations", .{population}), observations);
@@ -107,7 +131,7 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         try runner.require(try p.argv(c, &.{ zllvm, "--emit=selection-owner-manifest" }, arguments), owner_stem, env);
         try owners(c, try c.read(try c.fmt("{s}.stdout", .{owner_stem})), try u.stringSlice(c.a, try u.get(canary, "functions")));
         const exe = try c.join(&.{ directory, try c.fmt("{s}-{s}", .{ prefix, route }) });
-        try link(runner, driver, obj, exe, shared, dependencies, env);
+        try link(runner, driver, obj, exe, shared, dependencies, canary, env);
         try runner.observe(exe, &.{}, 0, try u.str(canary, "stdout"), try c.fmt("{s}-run", .{exe}), env);
         try u.increment(c.a, report, try c.fmt("{s}_local_observations", .{population}), observations);
         if (canary.object.get("guard_probe")) |guard| {
@@ -131,10 +155,62 @@ fn libraries(c: *u.Context, canary: u.Value) ![]const []const u8 {
     return names;
 }
 
-fn link(runner: *Runner, driver: []const u8, object: []const u8, exe: []const u8, shared: bool, dependencies: []const []const u8, env: *const std.process.Environ.Map) !void {
+fn resolveProvider(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *const std.process.Environ.Map, report: *u.Value, registered: u.Value) !u.Value {
+    const name = registered.object.get("provider_fixture") orelse return registered;
+    const c = runner.context;
+    const population = try u.str(registered, "population");
+    const prefix = try u.str(registered, "prefix");
+    const fixture = try c.join(&.{ "test/real_programs", try c.fmt("{s}.ll", .{name.string}) });
+    const source = try c.read(fixture);
+    const digest = try u.digestBytes(c.a, source);
+    const stem = try c.join(&.{ directory, try c.fmt("{s}-provider-object", .{prefix}) });
+    const owners_path = try c.join(&.{ directory, try c.fmt("{s}-provider-owners.tsv", .{prefix}) });
+    const emitted = try runner.run(&.{ zllvm, "--emit=obj", "--generic-cfg-selector", "--codegen-reachable", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{source.len + 1}), try c.fmt("--selection-owner-output={s}", .{owners_path}), fixture }, stem, env, .{ .timeout_ms = 900000 });
+    if (!emitted.completed or emitted.code != 0) return error.NativeProviderEmissionFailed;
+    const object = try c.join(&.{ directory, try c.fmt("{s}-provider.o", .{prefix}) });
+    try c.copy(try c.fmt("{s}.stdout", .{stem}), object);
+    if (!std.mem.eql(u8, digest, try c.digest(fixture))) return error.NativeProviderSourceChanged;
+    var resolved = registered;
+    resolved.object = try registered.object.clone(c.a);
+    try u.put(c.a, &resolved, "provider_objects", try u.toValue(c.a, .{.{ .path = object, .sha256 = try c.digest(object), .exports = try u.get(registered, "provider_exports") }}));
+    _ = try providerObjects(c, resolved);
+    try u.put(c.a, report, try c.fmt("{s}_provider_source", .{population}), try u.toValue(c.a, .{ .path = fixture, .sha256 = digest, .backend_sha256 = try c.digest(zllvm), .scope = "Fresh local backend object; no LLVM or retained-object fallback" }));
+    return resolved;
+}
+
+fn providerObjects(c: *u.Context, canary: u.Value) ![]const []const u8 {
+    const entries = canary.object.get("provider_objects") orelse return &.{};
+    const rows = try u.json.array(entries);
+    if (rows.len == 0) return error.EmptyNativeProviders;
+    var paths: std.ArrayList([]const u8) = .empty;
+    var seen = std.StringHashMap(void).init(c.a);
+    const kernels = try u.stringSlice(c.a, try u.get(canary, "functions"));
+    for (rows) |row| {
+        const path = try u.str(row, "path");
+        if (!std.fs.path.isAbsolute(path) or !std.mem.endsWith(u8, path, ".o") or (try seen.getOrPut(path)).found_existing) return error.InvalidNativeProvider;
+        if (!std.mem.eql(u8, try c.digest(path), try u.str(row, "sha256"))) return error.NativeProviderIdentityChanged;
+        const contract = try elf.parse(c.a, try c.read(path));
+        var definitions = std.StringHashMap(void).init(c.a);
+        for ((try u.get(contract, "symbols")).array.items) |symbol| {
+            const fields = symbol.array.items;
+            if (fields[3] != .string or fields[3].string.len == 0) continue;
+            if (u.contains(kernels, fields[0].string)) return error.NativeProviderDefinesKernel;
+            if (fields[1].integer & 15 == 2) try definitions.put(fields[0].string, {});
+        }
+        const exports = try u.stringSlice(c.a, try u.get(row, "exports"));
+        if (exports.len == 0) return error.EmptyNativeProviderExports;
+        for (exports) |name| if (!definitions.contains(name)) return error.MissingNativeProviderExport;
+        try paths.append(c.a, path);
+    }
+    return paths.items;
+}
+fn link(runner: *Runner, driver: []const u8, object: []const u8, exe: []const u8, shared: bool, dependencies: []const []const u8, canary: u.Value, env: *const std.process.Environ.Map) !void {
     const c = runner.context;
     const library = if (shared) try c.fmt("{s}.so", .{object}) else object;
     var flags: std.ArrayList([]const u8) = .empty;
+    const providers = try providerObjects(c, canary);
+    if (shared and providers.len != 0) return error.SharedNativeProvidersUnsupported;
+    try flags.appendSlice(c.a, providers);
     for (dependencies) |dependency| try flags.append(c.a, try c.fmt("-l{s}", .{dependency}));
     if (shared) try runner.require(try p.argv(c, try p.argv(c, &.{ "cc", "-shared", "-Wl,-z,noexecstack", object }, flags.items), &.{ "-o", library }), try c.fmt("{s}-shared-link", .{exe}), env);
     try runner.require(try p.argv(c, try p.argv(c, &.{ "cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, library }, flags.items), &.{ "-o", exe }), try c.fmt("{s}-link", .{exe}), env);

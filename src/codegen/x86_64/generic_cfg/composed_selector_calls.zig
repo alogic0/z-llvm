@@ -85,6 +85,7 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 }
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
+    if (call.va_arg) return .{ .no_emitter = "va-arg-requires-lowering" };
     if (call.native_query != null) return lowerNativeQuery(selector, result, call);
     if (call.abi_x87_return and ir.identifiers.eql(call.callee, "llvm.sqrt.f80")) {
         if (!call.ret_ty.eql(.{ .int = 128 }) or call.args.items.len != 1 or
@@ -600,6 +601,31 @@ fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
 }
 
 fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, operation: @import("../inline_asm.zig").Operation) !?Diagnostic {
+    if (operation == .valgrind_client_request) {
+        const name = result orelse return .{ .unsupported_value = "inline-asm-result" };
+        for (call.args.items) |arg| if (arg.value != .named) return .{ .no_emitter = "inline-asm-client-request-literal" };
+        if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+        if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+        var inputs = try ValueUseTransaction.begin(selector);
+        defer inputs.deinit();
+        const request = call.args.items[0];
+        const request_class = if (request.ty == .ptr) selector_state.valueRegisterClass(selector, request.value) orelse
+            return .{ .unsupported_value = "inline-asm-client-request-pointer" } else .gpr64;
+        _ = try inputs.register(.{
+            .source = request.value,
+            .expected = .{ .ty = request.ty, .register_class = request_class, .pointer_address_space = if (request.ty == .ptr) @as(?u32, 0) else null },
+            .form = if (request.ty == .ptr) (if (request_class == .stack_object) .stack_object_address else .pointer) else .gpr64, .destination = .rax,
+        });
+        _ = try inputs.register(.{ .source = call.args.items[1].value,
+            .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 }, .form = .gpr64, .destination = .{ .gpr64 = .rdx } });
+        try inputs.seal();
+        try inputs.prepare();
+        try inputs.materializeAll();
+        try inputs.commit();
+        try selector_state.emitEflagsInstruction(selector, .valgrind_client_request, .clobber);
+        try selector_state.bindResultLoc(selector, name, .{ .arg64 = .rdx });
+        return null;
+    }
     if (operation == .unsigned_divide) {
         const name = result orelse return .{ .unsupported_value = "inline-asm-result" };
         if (!call.ret_ty.eql(.{ .int = 128 })) return .{ .no_emitter = "inline-asm-divide-carrier" };
@@ -629,7 +655,7 @@ fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, ca
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
     switch (operation) {
-        .unsigned_divide => unreachable,
+        .unsigned_divide, .valgrind_client_request => unreachable,
         .linux_syscall => |count| {
             for (call.args.items[1..], 0..) |arg, index| {
                 if (try lowerDirectCallArg(selector, arg, try ArgReg.fromIndex(index))) |diagnostic| return diagnostic;

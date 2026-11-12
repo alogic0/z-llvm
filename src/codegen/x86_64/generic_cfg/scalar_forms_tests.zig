@@ -659,6 +659,51 @@ test "safe comparison forms canonicalize reversed and full width constants" {
     }
 }
 
+test "safe comparison forms execute two constant operands with live inputs" {
+    for ([_]u16{ 8, 16, 32, 64 }) |bits| {
+        const high = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+        const mask: u64 = if (bits == 64) std.math.maxInt(u64) else high * 2 - 1;
+        for ([_][2]u64{ .{ high, 3 }, .{ mask, mask }, .{ 65, 65 } }) |pair| {
+            const x = pair[0];
+            const y = pair[1];
+            for (std.enums.values(ir.IcmpPredicate)) |predicate| {
+                const text = try std.fmt.allocPrint(std.testing.allocator,
+                    "define i64 @constant_pair(i64 %live) {{\nentry:\n" ++
+                        "  %c = icmp {s} i{d} {d}, {d}\n" ++
+                        "  %w = zext i1 %c to i64\n" ++
+                        "  %r = xor i64 %w, %live\n  ret i64 %r\n}}\n",
+                    .{ @tagName(predicate), bits, x, y });
+                defer std.testing.allocator.free(text);
+                var module = try ir.Module.parse(std.testing.allocator, text);
+                defer module.deinit();
+                try module.verify();
+                const code = executable(module) catch |err| {
+                    std.debug.print("constant pair: {s}\n", .{text});
+                    return err;
+                };
+                defer std.posix.munmap(code);
+                const run: *const fn (u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                const expected = switch (predicate) {
+                    .eq => x == y,
+                    .ne => x != y,
+                    .ult => x < y,
+                    .ule => x <= y,
+                    .ugt => x > y,
+                    .uge => x >= y,
+                    .slt => (x ^ high) < (y ^ high),
+                    .sle => (x ^ high) <= (y ^ high),
+                    .sgt => (x ^ high) > (y ^ high),
+                    .sge => (x ^ high) >= (y ^ high),
+                };
+                for ([_]u64{ 0, 1, 0x8000000000000001, std.math.maxInt(u64) }) |live| {
+                    try std.testing.expectEqual(@as(u64, @intFromBool(expected)) ^ live, run(live));
+                }
+                try module.verify();
+            }
+        }
+    }
+}
+
 test "safe comparison forms preserve pointer order and layout boundaries" {
     const comparisons = @import("comparison_forms.zig");
     for ([_]ir.IcmpPredicate{ .ne, .ult, .ule, .ugt, .uge }) |predicate| {

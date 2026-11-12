@@ -726,16 +726,14 @@ pub fn verify(module: core.Module) !void {
                     try verifyBlockTarget(&ctx, condbr.else_target);
                 },
                 .@"switch" => |switch_term| {
-                    switch (switch_term.cond_ty) {
-                        .int => {},
-                        else => return error.SwitchConditionTypeMismatch,
-                    }
+                    if (@import("wide_integers.zig").width(switch_term.cond_ty) == null) return error.SwitchConditionTypeMismatch;
                     try ctx.verifyValue(switch_term.cond_ty, switch_term.cond, block_index, block.instructions.items.len);
                     try verifyBlockTarget(&ctx, switch_term.default_target);
                     for (switch_term.cases.items) |case| {
                         if (!case.value_ty.eql(switch_term.cond_ty)) return error.SwitchCaseTypeMismatch;
                         switch (case.value) {
                             .int => {},
+                            .constant_expr => |text| try verifyConstantExprValue(case.value_ty, text),
                             else => return error.InvalidSwitch,
                         }
                         try verifyBlockTarget(&ctx, case.target);
@@ -1001,6 +999,15 @@ fn isGlobalValueName(name: []const u8) bool {
 }
 
 fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, block_index: usize, instruction_index: usize) !void {
+    if (call.va_arg) {
+        if (call.callee.len != 0 or call.args.items.len != 1 or call.args.items[0].ty != .ptr or call.ret_ty == .void or
+            call.native_query != null or call.callee_value != null or call.callee_function_ty != null or
+            call.inline_asm != null or call.calling_conv != null or call.ret_attrs != null or
+            call.tail_kind != null or call.attrs != null or call.raw_args != null or call.operand_bundle != null)
+            return error.InvalidVaArg;
+        try verifyCallArg(ctx, call.args.items[0], block_index, instruction_index);
+        return;
+    }
     if (call.native_query != null) {
         if (!call.nativeQuerySignatureSupported()) return error.InvalidNativeQuery;
         for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
@@ -1013,7 +1020,19 @@ fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, blo
 
     if (call.inline_asm) |inline_asm| {
         if (!inline_asm.sideeffect and (inline_asm.has_memory_clobber or inline_asm.may_load or inline_asm.may_store)) return error.UnsupportedInlineAsm;
-        for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
+        for (call.args.items) |arg| {
+            const attrs = std.mem.trim(u8, arg.attrs orelse "", " \t");
+            if (abiPayload(attrs, "elementtype")) |payload| {
+                if (arg.ty != .ptr) return error.UnsupportedCallAttribute;
+                // This admission owns only the observed standalone attribute.
+                // Other argument facts must continue through their validators.
+                if (!std.mem.startsWith(u8, attrs, "elementtype(") or
+                    attrs.len != "elementtype(".len + payload.len + 1 or attrs[attrs.len - 1] != ')') return error.UnsupportedCallAttribute;
+                const element_ty = try parseType(payload);
+                if (element_ty == .void or element_ty == .metadata) return error.UnsupportedCallAttribute;
+                try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
+            } else try verifyCallArg(ctx, arg, block_index, instruction_index);
+        }
         return;
     }
 
@@ -1045,7 +1064,7 @@ fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, blo
     if (lookup.findFunction(call.callee)) |function| {
         if (!call.ret_ty.eql(function.ret_ty)) return error.CallSignatureMismatch;
         if (!callingConventionsMatch(call.calling_conv, function.calling_conv)) return error.CallSignatureMismatch;
-        if (call.args.items.len != function.params.items.len) {
+        if (if (function.is_varargs) call.args.items.len < function.params.items.len else call.args.items.len != function.params.items.len) {
             if (function.params.items.len == 0 and functionHasAttribute(lookup.module, function, "naked")) {
                 for (call.args.items) |arg| try verifyCallArg(ctx, arg, block_index, instruction_index);
                 return;
@@ -1053,7 +1072,7 @@ fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, blo
             return error.CallSignatureMismatch;
         }
         for (call.args.items, 0..) |arg, index| {
-            if (!arg.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
+            if (index < function.params.items.len and !arg.ty.eql(function.params.items[index].ty)) return error.CallSignatureMismatch;
             try verifyCallArg(ctx, arg, block_index, instruction_index);
         }
         return;
@@ -1406,6 +1425,11 @@ fn verifyDebugVariableLocationCall(module: core.Module, call: core.CallInst) !vo
 }
 
 fn verifyConstantExprValue(ty: core.Type, text: []const u8) anyerror!void {
+    if (@import("wide_integers.zig").decimal(text)) {
+        const bits = @import("wide_integers.zig").width(ty) orelse return error.TypeMismatch;
+        if (bits <= 128 or text.len > bits / 3 + 3) return error.TypeMismatch;
+        return;
+    }
     if (@import("structure.zig").Fields.init(text)) |values| {
         if (ty != .aggregate) return error.TypeMismatch;
         if (@import("structure.zig").Fields.init(ty.aggregate)) |types| {
@@ -1682,6 +1706,7 @@ fn verifyLiteralValueForType(ty: core.Type, text: []const u8) !void {
                 if (bits != 1) return error.TypeMismatch;
                 return;
             }
+            if (bits > 128 and @import("wide_integers.zig").decimal(text)) return;
             _ = try std.fmt.parseInt(i128, text, 10);
         },
         .half, .float, .double, .x86_fp80, .fp128 => {
@@ -1689,6 +1714,7 @@ fn verifyLiteralValueForType(ty: core.Type, text: []const u8) !void {
         },
         .ptr => {
             if (std.mem.startsWith(u8, text, "@") or std.mem.startsWith(u8, text, "%")) return;
+            if (std.mem.startsWith(u8, text, "inttoptr (") or std.mem.startsWith(u8, text, "getelementptr ")) return verifyConstantExprValue(ty, text);
             return error.TypeMismatch;
         },
         .void, .metadata, .aggregate, .vector => return error.TypeMismatch,
@@ -1839,6 +1865,12 @@ fn verifyCast(cast: core.CastInst) !void {
         },
         .fpext, .fptrunc => return verifyFloatWidthCast(cast),
         .sitofp, .uitofp => {
+            if (cast.from_ty == .vector or cast.to_ty == .vector) {
+                if (cast.from_ty != .vector or cast.to_ty != .vector or cast.from_ty.vector.len != cast.to_ty.vector.len or
+                    cast.from_ty.vector.elem_ty != .int or cast.from_ty.vector.elem_ty.int == 0 or
+                    floatBits(cast.to_ty.vector.elem_ty.toType()) == null) return error.InvalidCast;
+                return;
+            }
             switch (cast.from_ty) {
                 .int => {},
                 else => return error.InvalidCast,
@@ -1887,14 +1919,8 @@ fn verifyCast(cast: core.CastInst) !void {
         },
     }
 
-    const from_bits = switch (cast.from_ty) {
-        .int => |bits| bits,
-        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
-    };
-    const to_bits = switch (cast.to_ty) {
-        .int => |bits| bits,
-        .void, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate, .vector => return error.TypeMismatch,
-    };
+    const from_bits = @import("wide_integers.zig").width(cast.from_ty) orelse return error.TypeMismatch;
+    const to_bits = @import("wide_integers.zig").width(cast.to_ty) orelse return error.TypeMismatch;
     switch (cast.op) {
         .trunc => if (from_bits <= to_bits) return error.InvalidCast,
         .zext, .sext => if (from_bits >= to_bits) return error.InvalidCast,
@@ -2123,7 +2149,7 @@ fn verifyAtomicRmwOperationType(op: []const u8, ty: core.Type) !void {
         if (!isIntegerOrFloatingOrPointer(ty)) return error.InvalidAtomicMemory;
         return;
     }
-    if (std.mem.eql(u8, op, "fadd") or std.mem.eql(u8, op, "fsub")) {
+    if (std.mem.eql(u8, op, "fadd") or std.mem.eql(u8, op, "fsub") or std.mem.eql(u8, op, "fmax") or std.mem.eql(u8, op, "fmin")) {
         if (!isFloatingOrFloatingVector(ty)) return error.InvalidAtomicMemory;
         return;
     }

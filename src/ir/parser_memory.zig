@@ -321,7 +321,7 @@ pub fn parseFence(text: []const u8) !core.Instruction {
 }
 
 pub fn isSupportedAtomicRmwOp(op: []const u8) bool {
-    inline for (.{ "xchg", "add", "sub", "and", "nand", "or", "xor", "max", "min", "umax", "umin", "fadd", "fsub" }) |candidate| {
+    inline for (.{ "xchg", "add", "sub", "and", "nand", "or", "xor", "max", "min", "umax", "umin", "fadd", "fsub", "fmax", "fmin" }) |candidate| {
         if (std.mem.eql(u8, op, candidate)) return true;
     }
     return false;

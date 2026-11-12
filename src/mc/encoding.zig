@@ -174,6 +174,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
             .pop_arg => |reg| try encodePopArg(&bytes, allocator, reg),
             .push_rax => try bytes.append(allocator, 0x50),
             .cpuid_packed => try bytes.appendSlice(allocator, &.{ 0x53, 0x0f, 0xa2, 0x48, 0xc1, 0xe3, 32, 0x48, 0x09, 0xd8, 0x48, 0xc1, 0xe2, 32, 0x48, 0x09, 0xca, 0x5b }),
+            .valgrind_client_request => try bytes.appendSlice(allocator, &.{ 0x48, 0xc1, 0xc7, 3, 0x48, 0xc1, 0xc7, 13, 0x48, 0xc1, 0xc7, 61, 0x48, 0xc1, 0xc7, 51, 0x48, 0x87, 0xdb }),
             .xgetbv_eax => try bytes.appendSlice(allocator, &.{ 0x31, 0xc9, 0x0f, 0x01, 0xd0 }),
             .linux_syscall => |count| {
                 if (count > 6) return error.UnsupportedCodegenInstruction;
@@ -1971,6 +1972,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .linux_syscall => |count| if (count >= 4) 5 else 2,
         .register_snapshot_rdi => 78,
         .cpuid_packed => 18,
+        .valgrind_client_request => 19,
         .xgetbv_eax => 5,
         .label => 0,
         .mov_imm_eax => 5,

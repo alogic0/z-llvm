@@ -459,6 +459,9 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
     defer store_positions.deinit(allocator);
     var fixed_scalar_positions: std.ArrayList(usize) = .empty;
     defer fixed_scalar_positions.deinit(allocator);
+    const FpWrite = struct { position: usize, name: []const u8 };
+    var fixed_fp_writes: std.ArrayList(FpWrite) = .empty;
+    defer fixed_fp_writes.deinit(allocator);
 
     var simple_loop_backedge_values = NameSet.init(allocator);
     defer simple_loop_backedge_values.deinit();
@@ -533,6 +536,11 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
                 instruction.kind == .atomicrmw or instruction.kind == .cmpxchg)
                 try fixed_scalar_positions.append(allocator, position);
             if (instruction.kind == .store) try store_positions.append(allocator, position);
+            if (instruction.kind == .binary) {
+                const binary = instruction.kind.binary;
+                if ((binary.ty == .half or binary.ty == .float or binary.ty == .double) and binary.lhs == .named)
+                    try fixed_fp_writes.append(allocator, .{ .position = position, .name = binary.lhs.named });
+            }
             position += 1;
         }
         try terminator_positions.append(allocator, position);
@@ -612,6 +620,14 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
     // These actions preserve their actual clobbers on demand. Reserve space
     // without moving unaffected incoming arguments away from their ABI homes.
     try recordPreservationDemands(&plan, intervals.items, fixed_scalar_positions.items, .fixed_scalar);
+    // Scalar FP arithmetic writes the LHS's physical XMM home before result
+    // placement. A still-live LHS therefore needs a persistent spill even
+    // when every virtual interval fits the register budget.
+    for (fixed_fp_writes.items) |write| if (interval_indexes.get(write.name)) |index| {
+        const interval = intervals.items[index];
+        if (interval.end > write.position)
+            plan.preservation_spill_slots = @max(plan.preservation_spill_slots, selectorSpillSlotCount(interval));
+    };
     // Scalar results and their aliases may remain in RAX until their next use.
     // Stores also use RAX, so every instruction-produced scalar that survives
     // a store may need preservation even below peak register pressure.

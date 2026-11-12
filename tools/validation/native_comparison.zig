@@ -44,6 +44,18 @@ fn expectedFixtures(c: *u.Context, additions: []const u.Value) !std.StringHashMa
         const entry = try result.getOrPut(try c.fmt("{s}{s}", .{ try u.str(addition, "fixture"), suffix }));
         if (entry.found_existing) return error.DuplicateNativeAddition;
     };
+    for (additions) |addition| if (addition.object.get("reference_fixture")) |reference| {
+        const entry = try result.getOrPut(try c.fmt("{s}.ll", .{try u.json.text(reference)}));
+        if (entry.found_existing) return error.DuplicateNativeAddition;
+        if (addition.object.get("reference_source")) |source| {
+            const origin = try result.getOrPut(try u.json.text(source));
+            if (origin.found_existing) return error.DuplicateNativeAddition;
+        }
+    };
+    for (additions) |addition| if (addition.object.get("provider_fixture")) |provider| {
+        const entry = try result.getOrPut(try c.fmt("{s}.ll", .{try u.json.text(provider)}));
+        if (entry.found_existing) return error.DuplicateNativeAddition;
+    };
     return result;
 }
 pub fn compare(c: *u.Context, before_root: []const u8, after_root: []const u8, additions: []const u.Value, report: *u.Value) !void {

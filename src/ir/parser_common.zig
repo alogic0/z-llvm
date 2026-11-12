@@ -521,6 +521,11 @@ pub fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Functio
             const comma = findTopLevelComma(rest);
             const raw_param = if (comma) |index| rest[0..index] else rest;
             const param_text = std.mem.trim(u8, raw_param, " \t");
+            if (std.mem.eql(u8, param_text, "...")) {
+                if (comma != null) return error.InvalidParameter;
+                function.is_varargs = true;
+                return;
+            }
             const parsed_ty = try parseLeadingType(param_text);
             const after_type = std.mem.trim(u8, parsed_ty.after, " \t");
             var parts = after_type;

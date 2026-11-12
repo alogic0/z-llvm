@@ -483,7 +483,7 @@ test "generic cfg selector stage two rejects unsupported loop condition operands
         \\  br label %loop
         \\loop:
         \\  %sum = add i32 %a, %b
-        \\  %again = icmp ult i64 0, 1
+        \\  %again = icmp ult i64 poison, 1
         \\  br i1 %again, label %loop, label %exit
         \\exit:
         \\  ret i32 %sum

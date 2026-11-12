@@ -325,6 +325,9 @@ pub const IcmpPredicate = enum {
 };
 
 pub const Param = struct {
+    /// Private address of the incoming overflow-argument area, relative to
+    /// entry RSP after its return address. Never set by the parser.
+    abi_incoming_address: ?u32 = null,
     /// Private extended80 carrier: retain its aligned, memory-only x87 ABI.
     /// Parsing never sets this field; it is not an LLVM attribute.
     abi_x87_memory: bool = false,
@@ -790,6 +793,9 @@ pub const InlineAsm = struct {
 pub const NativeQuery = enum { cpuid, xgetbv };
 
 pub const CallInst = struct {
+    /// va_arg shares typed operand traversal with calls but is a distinct
+    /// source opcode. It is never emitted as a call or an external symbol.
+    va_arg: bool = false,
     /// Private exact instruction contract; the parser never creates this flag.
     native_query: ?NativeQuery = null,
     ret_ty: Type,
@@ -1031,6 +1037,7 @@ pub const BasicBlock = struct {
 };
 
 pub const Function = struct {
+    is_varargs: bool = false,
     name: []const u8,
     ret_ty: Type,
     linkage: FunctionLinkage = .default,

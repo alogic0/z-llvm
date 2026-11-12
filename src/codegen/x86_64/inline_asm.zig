@@ -8,7 +8,27 @@ pub const Operation = union(enum) {
     linux_syscall: u3,
     register_snapshot,
     unsigned_divide,
+    valgrind_client_request,
 };
+
+pub const client_request_template = " rolq  $$3,  %rdi ; rolq $$13, %rdi\\0A rolq  $$61, %rdi ; rolq $$51, %rdi\\0A xchgq %rbx, %rbx";
+pub const client_request_template_pointer = " rolq  $$3,    %rdi ; rolq $$13, %rdi\\0A rolq  $$61,   %rdi ; rolq $$51, %rdi\\0A xchgq %rbx, %rbx";
+pub const client_request_constraints = "={rdx},{rax},{rdx},~{cc},~{memory},~{dirflag},~{fpsr},~{flags}";
+pub const client_request_constraints_pointer = "={rdx},{rax},{rdx},~{memory},~{dirflag},~{fpsr},~{flags}";
+
+pub fn clientRequest(call: ir.CallInst) bool {
+    const assembly = call.inline_asm orelse return false;
+    if (!assembly.sideeffect or
+        (!std.mem.eql(u8, assembly.template, client_request_template) and !std.mem.eql(u8, assembly.template, client_request_template_pointer)) or
+        (!std.mem.eql(u8, assembly.constraints, client_request_constraints) and !std.mem.eql(u8, assembly.constraints, client_request_constraints_pointer)) or
+        !call.ret_ty.eql(.{ .int = 64 }) or call.args.items.len != 2 or call.callee_value != null or
+        call.callee_function_ty != null or call.calling_conv != null or call.raw_args != null or call.operand_bundle != null or call.ret_attrs != null) return false;
+    if (call.tail_kind) |tail| if (std.mem.eql(u8, tail, "musttail")) return false;
+    if (!call.args.items[0].ty.eql(.{ .int = 64 }) and call.args.items[0].ty != .ptr) return false;
+    if (!call.args.items[1].ty.eql(.{ .int = 64 })) return false;
+    for (call.args.items) |arg| if (arg.attrs != null) return false;
+    return true;
+}
 
 pub fn unsignedDivide(call: ir.CallInst) bool {
     const assembly = call.inline_asm orelse return false;
@@ -29,6 +49,7 @@ pub const syscall_inputs = [_][]const u8{ "{rax}", "{rdi}", "{rsi}", "{rdx}", "{
 pub const syscall_clobbers = "~{memory},~{rcx},~{r11},~{dirflag},~{fpsr},~{flags}";
 
 pub fn classify(call: ir.CallInst) ?Operation {
+    if (clientRequest(call)) return .valgrind_client_request;
     if (unsignedDivide(call)) return .unsigned_divide;
     const asm_value = call.inline_asm orelse return null;
     if (!asm_value.sideeffect or call.callee_value != null or call.callee_function_ty != null or

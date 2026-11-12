@@ -45,15 +45,63 @@ fn signedExtend(allocator: std.mem.Allocator, function: ir.Function, block: *ir.
 }
 
 fn fixedMultiply(call: ir.CallInst) bool {
-    if (!std.mem.eql(u8, call.callee, "llvm.umul.fix.sat.i16") or !call.ret_ty.eql(.{ .int = 16 }) or
-        !intrinsic_attrs.scalarIntegerCallSupported(call) or call.args.items.len != 3) return false;
+    if (!intrinsic_attrs.scalarIntegerCallSupported(call) or call.ret_ty.int > 64 or call.args.items.len != 3) return false;
+    var buffer: [64]u8 = undefined;
+    const named = for ([_][]const u8{ "umul", "smul" }) |name| {
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.fix.sat.i{d}", .{ name, call.ret_ty.int }) catch return false;
+        if (std.mem.eql(u8, call.callee, spelling)) break true;
+    } else false;
+    if (!named) return false;
+    const sem = @import("../../../analysis/integer_semantics.zig").Integer.init(call.ret_ty) orelse return false;
     for (call.args.items[0..2]) |arg| {
         if (!arg.ty.eql(call.ret_ty) or (arg.value != .named and arg.value != .int)) return false;
         if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return false;
-        if (arg.value == .int and (arg.value.int < -32768 or arg.value.int > 65535)) return false;
+        if (arg.value == .int and (arg.value.int < sem.signedMin() or arg.value.int > sem.unsignedMax())) return false;
     }
     const scale = call.args.items[2];
     return scale.ty.eql(.{ .int = 32 }) and scale.value == .int and scale.value.int == 0;
+}
+
+fn saturatingShift(call: ir.CallInst) ?bool {
+    if (!intrinsic_attrs.scalarIntegerCallSupported(call) or call.ret_ty.int == 0 or
+        call.ret_ty.int > 64 or call.args.items.len != 2) return null;
+    var buffer: [64]u8 = undefined;
+    const signed = for ([_][]const u8{ "ushl", "sshl" }, [_]bool{ false, true }) |name, sign| {
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.sat.i{d}", .{ name, call.ret_ty.int }) catch return null;
+        if (std.mem.eql(u8, call.callee, spelling)) break sign;
+    } else return null;
+    // Retain the established doubling expansion and its artifact contract.
+    if (!signed and call.ret_ty.int == 64 and call.args.items[1].value == .int and call.args.items[1].value.int == 1) return null;
+    const sem = @import("../../../analysis/integer_semantics.zig").Integer.init(call.ret_ty) orelse return null;
+    for (call.args.items) |arg| {
+        if (!arg.ty.eql(call.ret_ty) or (arg.value != .named and arg.value != .int)) return null;
+        if (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@")) return null;
+        if (arg.value == .int and (arg.value.int < sem.signedMin() or arg.value.int > sem.unsignedMax())) return null;
+    }
+    return signed;
+}
+
+fn expandSaturatingShift(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, inst: ir.Instruction, signed: bool) !void {
+    const call = inst.kind.call;
+    const bits = call.ret_ty.int;
+    const wide: ir.Type = .{ .int = if (bits <= 32) 64 else 128 };
+    const x = if (signed)
+        try signedExtend(allocator, function, block, serial, call.ret_ty, wide, call.args.items[0].value)
+    else
+        try extend(allocator, function, block, serial, call.ret_ty, wide, call.args.items[0].value);
+    const amount = try extend(allocator, function, block, serial, call.ret_ty, wide, call.args.items[1].value);
+    const valid = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = .ult, .operand_ty = wide, .lhs = amount, .rhs = .{ .int = bits } } });
+    // The LLVM intrinsic is poison for an out-of-range amount. Select zero
+    // privately so an unselected poison result never introduces a new trap.
+    const safe = try emit(allocator, function, block, serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = valid, .ty = wide, .true_value = amount, .false_value = .{ .int = 0 } } });
+    const shifted = try emit(allocator, function, block, serial, .{ .binary = .{ .op = .shl, .ty = wide, .lhs = x, .rhs = safe } });
+    const minimum: i128 = if (signed) -(@as(i128, 1) << @as(u7, @intCast(bits - 1))) else 0;
+    const maximum: i128 = if (signed) -minimum - 1 else (@as(i128, 1) << @as(u7, @intCast(bits))) - 1;
+    const below = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = .slt, .operand_ty = wide, .lhs = shifted, .rhs = .{ .int = minimum } } });
+    const lower = try emit(allocator, function, block, serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = below, .ty = wide, .true_value = .{ .int = minimum }, .false_value = shifted } });
+    const above = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = if (signed) .sgt else .ugt, .operand_ty = wide, .lhs = lower, .rhs = .{ .int = maximum } } });
+    const clamped = try emit(allocator, function, block, serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = above, .ty = wide, .true_value = .{ .int = maximum }, .false_value = lower } });
+    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = clamped, .to_ty = call.ret_ty } } });
 }
 
 fn operation(call: ir.CallInst) ?Operation {
@@ -122,17 +170,31 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .call) if (saturatingShift(inst.kind.call)) |signed| {
+                try candidate.begin(&block, block_index, instruction_index);
+                try expandSaturatingShift(allocator, function, &block, &serial, inst, signed);
+                continue;
+            };
             if (!inst.removed and inst.result != null and inst.kind == .call and fixedMultiply(inst.kind.call)) {
                 try candidate.begin(&block, block_index, instruction_index);
                 const call = inst.kind.call;
-                const wide: ir.Type = .{ .int = 64 };
-                const lhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);
-                const rhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[1].value);
-                // Scale zero is exact unsigned multiplication, so no rounding
-                // choice is involved. Its full product fits in32 bits.
+                const signed = std.mem.startsWith(u8, call.callee, "llvm.smul.");
+                const bits = call.ret_ty.int;
+                const wide: ir.Type = .{ .int = if (bits <= 32) 64 else 128 };
+                const lhs = if (signed) try signedExtend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value) else try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);
+                const rhs = if (signed) try signedExtend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[1].value) else try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[1].value);
+                // Scale zero is exact multiplication without rounding. A
+                // double-width carrier contains the complete signed/unsigned
+                // product before saturation, including i64's high half.
                 const product = try emit(allocator, function, &block, &serial, .{ .binary = .{ .op = .mul, .ty = wide, .lhs = lhs, .rhs = rhs } });
-                const overflow = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = .ugt, .operand_ty = wide, .lhs = product, .rhs = .{ .int = 65535 } } });
-                const clamped = try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = overflow, .ty = wide, .true_value = .{ .int = 65535 }, .false_value = product } });
+                const minimum: i128 = if (signed) -(@as(i128, 1) << @as(u7, @intCast(bits - 1))) else 0;
+                const maximum: i128 = if (signed) -minimum - 1 else (@as(i128, 1) << @as(u7, @intCast(bits))) - 1;
+                const lower = if (signed) blk: {
+                    const below = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = .slt, .operand_ty = wide, .lhs = product, .rhs = .{ .int = minimum } } });
+                    break :blk try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = below, .ty = wide, .true_value = .{ .int = minimum }, .false_value = product } });
+                } else product;
+                const overflow = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = if (signed) .sgt else .ugt, .operand_ty = wide, .lhs = lower, .rhs = .{ .int = maximum } } });
+                const clamped = try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = overflow, .ty = wide, .true_value = .{ .int = maximum }, .false_value = lower } });
                 try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = clamped, .to_ty = call.ret_ty } } });
                 continue;
             }

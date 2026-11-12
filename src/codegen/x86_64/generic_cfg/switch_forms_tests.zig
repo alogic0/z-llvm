@@ -102,6 +102,44 @@ test "switch forms retain duplicate PHI edges and private labels" {
         try std.testing.expectEqual(@as(u64, if (x == 0x8000000000000000) x + 7 else 55), run(x));
 }
 
+test "switch forms execute odd width and full pair discriminants without losing upper bits" {
+    for ([_]u16{33, 63, 65, 97, 127, 128}) |bits| {
+        const mask: u128 = if (bits == 128) std.math.maxInt(u128) else (@as(u128, 1) << @intCast(bits)) - 1;
+        const sign = @as(u128, 1) << @intCast(bits - 1);
+        const cases = [_]u128{0, 1, sign, sign + 7, mask};
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(std.testing.allocator);
+        try append(&text, "define i64 @probe(i128 %input, i64 %salt) {{\nentry:\n", .{});
+        if (bits != 128) try append(&text, " %narrow = trunc i128 %input to i{d}\n", .{bits});
+        try append(&text, " switch i{d} %{s}, label %fallback [\n", .{bits, if(bits == 128) "input" else "narrow"});
+        for (cases, 0..) |value, i| try append(&text, " i{d} {d}, label %c{d}\n", .{bits, if(bits == 128) @as(i128,@bitCast(value)) else @as(i128,@intCast(value)), i});
+        try append(&text, " ]\nfallback:\n %default = add i64 %salt, 99\n ret i64 %default\n", .{});
+        for (cases, 0..) |_, i| try append(&text, "c{d}:\n %r{d} = add i64 %salt, {d}\n ret i64 %r{d}\n", .{i,i,i,i});
+        try append(&text, "}}\n", .{});
+        var module = try ir.Module.parse(std.testing.allocator, text.items);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try forms.legalize(arena.allocator(), module.functions.items[0])).?;
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128,u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const salt: u64 = 0x123456789abcdef0;
+        for(cases,0..) |value,i| {
+            try std.testing.expectEqual(salt+i,run(value,salt));
+            try std.testing.expectEqual(salt+i,run(value | ~mask,salt));
+        }
+        for([_]u128{2, sign-1, sign+1, mask-1}) |value| try std.testing.expectEqual(salt+99,run(value,salt));
+        try std.testing.expect(module.functions.items[0].blocks.items[0].terminator.? == .@"switch");
+        try module.verify();
+    }
+}
+
 test "switch forms execute bounded large control flow" {
     for ([_]usize{ 129, 779, 1024 }) |count| {
         var text: std.ArrayList(u8) = .empty;

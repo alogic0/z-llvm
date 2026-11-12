@@ -19,6 +19,9 @@ test "call contracts admit exact direct scalar varargs and reject ABI changing f
     try module.verify();
     const original = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
     try std.testing.expect(abi.isSupportedPointerVariadicCall(original));
+    var no_fixed = original;
+    no_fixed.callee_function_ty = "(...)";
+    try std.testing.expect(abi.isSupportedPointerVariadicCall(no_fixed));
     for ([_]ir.Type{ .void, .ptr, .{ .int = 32 }, .{ .int = 64 } }) |ty| {
         var call = original;
         call.ret_ty = ty;
@@ -33,7 +36,7 @@ test "call contracts admit exact direct scalar varargs and reject ABI changing f
             3 => call.ret_attrs = "signext",
             4 => call.callee_function_ty = "(ptr, i32, ...)",
             5 => call.callee_function_ty = "(i32, ptr, ..., i32)",
-            6 => call.callee_function_ty = "(...)",
+            6 => call.callee_function_ty = "(..., ...)",
             7 => call.callee_function_ty = "(i32, ptr, double, ...)",
             8 => call.operand_bundle = "[ \"deopt\"() ]",
             9 => call.raw_args = "i32 7",

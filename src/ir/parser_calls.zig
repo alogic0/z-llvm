@@ -387,7 +387,9 @@ pub fn parseCallArg(text: []const u8) !core.CallArg {
     const attrs = std.mem.trim(u8, typed.after[0..value_start], " \t");
     const value_text = std.mem.trim(u8, typed.after[value_start..], " \t");
     if (attrs.len == 0 or value_text.len == 0) return error.InvalidCall;
-    if (std.mem.indexOfAny(u8, value_text, " \t") != null and !isSupportedConstantExpr(value_text)) {
+    const quoted_identifier = value_text.len > 1 and (value_text[0] == '@' or value_text[0] == '%') and
+        @import("identifiers.zig").isValid(value_text[1..]);
+    if (std.mem.indexOfAny(u8, value_text, " \t") != null and !isSupportedConstantExpr(value_text) and !quoted_identifier) {
         return error.UnsupportedCallAttribute;
     }
     return .{
@@ -441,17 +443,15 @@ pub fn callArgMayContainAttrs(text: []const u8) bool {
 }
 
 pub fn findTrailingValueStart(text: []const u8) ?usize {
-    var end = text.len;
-    while (end > 0 and (text[end - 1] == ' ' or text[end - 1] == '\t')) end -= 1;
-    if (end == 0) return null;
-
-    var index = end;
-    while (index > 0) {
-        const byte = text[index - 1];
-        if (byte == ' ' or byte == '\t') return index;
-        index -= 1;
+    var rest = std.mem.trim(u8, text, " \t");
+    var last: ?usize = null;
+    while (rest.len != 0) {
+        last = @intFromPtr(rest.ptr) - @intFromPtr(text.ptr);
+        const end = findTopLevelTokenEnd(rest) orelse return null;
+        if (end == 0) return null;
+        rest = std.mem.trimStart(u8, rest[end..], " \t");
     }
-    return 0;
+    return last;
 }
 
 pub fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {

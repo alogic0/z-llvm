@@ -140,6 +140,19 @@ pub fn requiresNarrowNormalization(function: ir.Function) bool {
     return false;
 }
 
+// The original compare action requires an SSA left operand. A closed integer
+// literal pair must use the private materialization before that action runs.
+pub fn requiresLiteralOperands(function: ir.Function) bool {
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.kind != .icmp) continue;
+        const cmp = inst.kind.icmp;
+        if (cmp.operand_ty != .int or cmp.operand_ty.int == 0 or cmp.operand_ty.int > 64) continue;
+        if (cmp.lhs == .int and cmp.rhs == .int and
+            validInteger(cmp.lhs, cmp.operand_ty.int) and validInteger(cmp.rhs, cmp.operand_ty.int)) return true;
+    };
+    return false;
+}
+
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
     var candidate = Candidate.init(allocator, function);
     var serial: forms.TemporaryNames = .{};
@@ -169,7 +182,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     cmp.predicate == .sle));
                 if ((!cmp.samesign or integer_form) and (integer_form or pointer_form) and needs_rewrite and
                     (pointer or bits >= 32 or cmp.samesign or needsNarrowNormalization(function, cmp)) and
-                    (cmp.lhs == .named or cmp.rhs == .named))
+                    (cmp.lhs == .named or cmp.rhs == .named or integer_form))
                 {
                     try candidate.begin(&block, block_index, instruction_index);
                     if (cmp.lhs != .named and cmp.rhs == .named) {

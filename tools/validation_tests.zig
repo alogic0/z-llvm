@@ -163,6 +163,84 @@ test "registry preservation rejects changed or missing prior entries and unappro
     try std.testing.expectError(error.RegistryAdditionChanged, native_comparison.registry(&f.c, old, current, &.{addition}));
 }
 
+test "native comparison inventories independent reference IR and source without waiving prior hashes" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    const before = try f.path("before");
+    const after = try f.path("after");
+    for ([_][]const u8{ before, after }) |root| {
+        try f.c.mkdir(root);
+        try f.c.writeJson(try f.c.join(&.{ root, "commands.json" }), [_]u.Value{});
+        try f.c.writeJson(try f.c.join(&.{ root, "report.json" }), .{ .status = "passed", .source_sha256 = "same", .fixture_sha256 = .{ .old = "old bytes" } });
+    }
+    const path = try f.c.join(&.{ after, "report.json" });
+    var changed = try f.c.load(path);
+    const fixtures = changed.object.getPtr("fixture_sha256").?;
+    const names = [_][]const u8{ "added.ll", "added_driver.c", "independent.ll", "independent.c", "provider.ll" };
+    for (names) |name| try u.put(f.c.a, fixtures, name, u.s(name));
+    const addition = try u.toValue(f.c.a, .{ .population = "added", .fixture = "added", .prefix = "added", .reference_fixture = "independent", .reference_source = "independent.c", .provider_fixture = "provider" });
+    try f.c.writeJson(path, changed);
+    var report = u.object(f.c.a);
+    try native_comparison.compare(&f.c, before, after, &.{addition}, &report);
+    _ = fixtures.object.orderedRemove("independent.c");
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.AddedNativeFixtureMissing, native_comparison.compare(&f.c, before, after, &.{addition}, &report));
+    try u.put(f.c.a, fixtures, "independent.c", u.s("independent.c"));
+    try u.put(f.c.a, fixtures, "old", u.s("changed prior file"));
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.PriorFixtureChanged, native_comparison.compare(&f.c, before, after, &.{addition}, &report));
+    try u.put(f.c.a, fixtures, "old", u.s("old bytes"));
+    try u.put(f.c.a, fixtures, "unrelated.c", u.s("unrelated"));
+    try f.c.writeJson(path, changed);
+    try std.testing.expectError(error.UnexpectedNativeFixture, native_comparison.compare(&f.c, before, after, &.{addition}, &report));
+}
+
+test "native reference registration requires a paired safe fixture before execution" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    var local = f.c;
+    local.root = f.directory;
+    try f.c.mkdir(try f.path("test/real_programs"));
+    const path = try f.path("test/real_programs/native_canaries.json");
+    var entry = try u.toValue(f.c.a, .{ .population = "one", .prefix = "one", .fixture = "one", .functions = .{"kernel"}, .observations = 1, .stdout = "ok\n", .reference_source = "reference.c" });
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectError(error.ReferenceSourceWithoutFixture, canaries.load(&local));
+    try u.put(f.c.a, &entry, "reference_fixture", u.s("reference"));
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectEqual(@as(usize, 1), (try canaries.load(&local)).len);
+    try u.put(f.c.a, &entry, "reference_fixture", u.s("../outside"));
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectError(error.InvalidReferenceFixture, canaries.load(&local));
+}
+
+test "native provider fixture registration rejects ambiguous sources and missing overlapping exports" {
+    var f: Fixture = undefined;
+    try f.init();
+    defer f.deinit();
+    var local = f.c;
+    local.root = f.directory;
+    try f.c.mkdir(try f.path("test/real_programs"));
+    const path = try f.path("test/real_programs/native_canaries.json");
+    var entry = try u.toValue(f.c.a, .{ .population = "one", .prefix = "one", .fixture = "one", .functions = .{"kernel"}, .observations = 1, .stdout = "ok\n", .provider_fixture = "runtime", .provider_exports = .{"helper"} });
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectEqual(@as(usize, 1), (try canaries.load(&local)).len);
+    try u.put(f.c.a, &entry, "provider_objects", u.array(f.c.a));
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectError(error.ConflictingNativeProviders, canaries.load(&local));
+    _ = entry.object.orderedRemove("provider_objects");
+    try u.put(f.c.a, &entry, "provider_exports", try u.toValue(f.c.a, .{"kernel"}));
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectError(error.InvalidNativeProviderExports, canaries.load(&local));
+    try u.put(f.c.a, &entry, "provider_exports", u.array(f.c.a));
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectError(error.EmptyNativeProviderExports, canaries.load(&local));
+    _ = entry.object.orderedRemove("provider_fixture");
+    try f.c.writeJson(path, .{ .schema = 1, .canaries = .{entry} });
+    try std.testing.expectError(error.NativeProviderExportsWithoutFixture, canaries.load(&local));
+}
+
 const candidates = @import("validation/candidates.zig");
 const facts = candidates.facts;
 const baseline = @import("validation/baseline.zig");

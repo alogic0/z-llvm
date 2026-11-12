@@ -293,6 +293,18 @@ fn bindStackParams(selector: *ComposedBlockSelector, function: ir.Function) !?Di
         // only the declared scalar width into our own persistent spill home.
         const offset: u32 = std.math.cast(u32, @as(usize, selector.stack_frame_bytes) + 8 + word_offset * 8) orelse
             return .{ .no_spill_envelope = "composed-block-stack-param-offset" };
+        if (param.abi_incoming_address) |relative| {
+            if (param.ty != .ptr) return .{ .no_emitter = "incoming-address-carrier-type" };
+            const address = std.math.add(u32, selector.stack_frame_bytes, relative) catch return .{ .no_spill_envelope = "incoming-address-overflow" };
+            const after_return = std.math.add(u32, address, 8) catch return .{ .no_spill_envelope = "incoming-address-overflow" };
+            try selector_state.clobberArgReg(selector, .rdi);
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = .rdi });
+            try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = .rdi, .imm = std.math.cast(i32, after_return) orelse return .{ .no_spill_envelope = "incoming-address-overflow" } } }, .write);
+            try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = .rdi });
+            if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic;
+            try selector.abi_pointer_params.put(param.name, {});
+            continue;
+        }
         const bits: u16 = if (param.ty == .ptr) 64 else param.ty.int;
         if (bits == 128) {
             const home = selector_state.allocatePairSpillSlots(selector, param.name) orelse

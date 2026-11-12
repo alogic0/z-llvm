@@ -6,6 +6,10 @@ const machine = @import("../machine.zig");
 const profiling = @import("../../../compilation_profile.zig");
 
 pub const Stage = enum {
+    @"limb_integers.zig.legalize",
+    @"client_request_literals.zig.legalize",
+    @"variadic_values.zig.legalize",
+    @"floating_atomics.zig.legalize",
     @"incoming_byval80.zig.legalize",
     @"aligned_stack.zig.legalize",
     @"floating_vectors.zig.legalize",
@@ -51,6 +55,9 @@ pub const Stage = enum {
     @"indirect_phi_slots.zig.legalizeAll",
     @"stack_addresses.zig.legalizeEscapingOffsets",
     @"hardware_queries.zig.legalize",
+    @"floating_payload_intrinsics.zig.legalize",
+    @"extended_sret_payloads.zig.legalize",
+    @"prefetch_hints.zig.legalize",
 };
 
 pub const Rewrite = struct {
@@ -83,6 +90,10 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
     defer attempt.end();
     const measured = attempt.allocator();
     const candidate = try switch (stage) {
+        .@"limb_integers.zig.legalize" => @import("limb_integers.zig").legalize(measured, function, context),
+        .@"client_request_literals.zig.legalize" => @import("client_request_literals.zig").legalize(measured, function),
+        .@"variadic_values.zig.legalize" => @import("variadic_values.zig").legalize(measured, function),
+        .@"floating_atomics.zig.legalize" => @import("floating_atomics.zig").legalize(measured, function),
         .@"incoming_byval80.zig.legalize" => @import("incoming_byval80.zig").legalize(measured, function, context),
         .@"aligned_stack.zig.legalize" => @import("aligned_stack.zig").legalize(measured, function, context),
         .@"floating_vectors.zig.legalize" => @import("floating_vectors.zig").legalize(measured, function, context),
@@ -128,13 +139,16 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
         .@"indirect_phi_slots.zig.legalizeAll" => @import("indirect_phi_slots.zig").legalizeAll(measured, function),
         .@"stack_addresses.zig.legalizeEscapingOffsets" => @import("stack_addresses.zig").legalizeEscapingOffsets(measured, function, context),
         .@"hardware_queries.zig.legalize" => @import("hardware_queries.zig").legalize(measured, function, context),
+        .@"floating_payload_intrinsics.zig.legalize" => @import("floating_payload_intrinsics.zig").legalize(measured, function),
+        .@"extended_sret_payloads.zig.legalize" => @import("extended_sret_payloads.zig").legalize(measured, function, context),
+        .@"prefetch_hints.zig.legalize" => @import("prefetch_hints.zig").legalize(measured, function),
     };
     attempt.outcome = if (candidate != null) .rewritten else .unchanged;
     return if (candidate) |rewritten| .{
         .function = rewritten,
         .retry_original = switch (stage) {
             .@"floating_vectors.zig.legalize" => true,
-            .@"comparison_forms.zig.legalize",
+            .@"comparison_forms.zig.legalize" => !@import("comparison_forms.zig").requiresLiteralOperands(function),
             .@"word_arithmetic.zig.legalize",
             .@"integer_forms.zig.legalize",
             .@"pair_arithmetic.zig.legalize",
@@ -159,6 +173,8 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
             else => false,
         },
         .retain_labels = switch (stage) {
+            .@"variadic_values.zig.legalize" => true,
+            .@"floating_atomics.zig.legalize" => true,
             .@"switch_phi_edges.zig.legalize", .@"switch_forms.zig.legalize" => true,
             else => false,
         },

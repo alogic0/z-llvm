@@ -32,12 +32,21 @@ fn needed(function: ir.Function) bool {
     var shuffle = false;
     var native_fp_cast = false;
     var unsupported_shuffle = false;
+    var owned_storage = false;
+    // A native vector may also be the physical carrier of a scalar quad
+    // parameter. Restrict this additional storage trigger to scalar boundaries;
+    // existing vector ABI rewrites retain their original activation rules.
+    var scalar_boundary = !fp(function.ret_ty);
+    for (function.params.items) |p| scalar_boundary = scalar_boundary and !fp(p.ty);
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed) continue;
         if (inst.resultType()) |ty| if (fp(ty)) {
             if (!sysv.isVector128AbiType(ty) and !packedPair(ty)) return true;
         };
         switch (inst.kind) {
+            .alloca => |x| {
+                owned_storage = owned_storage or fp(x.allocated_ty);
+            },
             .cast => |c| {
                 if ((c.op == .fptrunc or c.op == .fpext) and fp(c.from_ty) and fp(c.to_ty)) native_fp_cast = true;
                 if ((fp(c.from_ty) and c.to_ty == .vector and c.to_ty.vector.elem_ty == .int) or
@@ -64,7 +73,7 @@ fn needed(function: ir.Function) bool {
             else => {},
         }
     };
-    return (crossing and integer_binary) or unsupported_shuffle or (shuffle and !native_fp_cast);
+    return (crossing and integer_binary) or unsupported_shuffle or (shuffle and !native_fp_cast) or (owned_storage and scalar_boundary);
 }
 fn stable(value: ir.Value, ty: ir.Type) !ir.Value {
     if (value == .undef or value == .poison or value == .zero_initializer)

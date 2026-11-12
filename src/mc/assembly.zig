@@ -38,6 +38,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .push_rax => try writer.writeAll("\tpushq %rax\n"),
             .cpuid_packed => try writer.writeAll("\tpushq %rbx\n\tcpuid\n\tshlq $32, %rbx\n\torq %rbx, %rax\n\tshlq $32, %rdx\n\torq %rcx, %rdx\n\tpopq %rbx\n"),
             .xgetbv_eax => try writer.writeAll("\txorl %ecx, %ecx\n\txgetbv\n"),
+            .valgrind_client_request => try writer.writeAll("\trolq $3, %rdi\n\trolq $13, %rdi\n\trolq $61, %rdi\n\trolq $51, %rdi\n\txchgq %rbx, %rbx\n"),
             .linux_syscall => |count| {
                 if (count > 6) return error.UnsupportedCodegenInstruction;
                 if (count >= 4) try writer.writeAll("\tmovq %rcx, %r10\n");

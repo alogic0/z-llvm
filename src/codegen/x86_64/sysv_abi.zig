@@ -708,7 +708,7 @@ pub fn isSupportedPointerVariadicCall(call: ir.CallInst) bool {
         if (!call.args.items[fixed].ty.eql(expected)) return false;
         fixed += 1;
     }
-    if (!variadic or fixed == 0) return false;
+    if (!variadic) return false;
     for (call.args.items) |arg| {
         if (!(arg.ty == .ptr or arg.ty.eql(.{ .int = 32 }) or arg.ty.eql(.{ .int = 64 }))) return false;
         rejectUnsupportedCallArgAttrs(arg) catch return false;

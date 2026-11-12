@@ -18,9 +18,14 @@ fn needsRewrite(term: ir.SwitchTerminator) bool {
 }
 
 fn bitsValue(value: ir.Value, bits: u16) ?i128 {
-    if (value != .int or value.int < -(@as(i128, 1) << @as(u7, @intCast(bits - 1))) or
-        value.int >= (@as(i128, 1) << @as(u7, @intCast(bits)))) return null;
-    return value.int & ((@as(i128, 1) << @as(u7, @intCast(bits))) - 1);
+    if (bits == 0 or bits > 128) return null;
+    const mask: u128 = if (bits == 128) std.math.maxInt(u128) else (@as(u128, 1) << @as(u7, @intCast(bits))) - 1;
+    if (value == .int) {
+        if (bits < 128 and value.int < -(@as(i128, 1) << @as(u7, @intCast(bits - 1)))) return null;
+        if (value.int >= 0 and @as(u128, @intCast(value.int)) > mask) return null;
+        return @bitCast(@as(u128, @bitCast(value.int)) & mask);
+    }
+    return null;
 }
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Function {
@@ -31,7 +36,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         if (term != .@"switch" or !needsRewrite(term.@"switch")) continue;
         const sw = term.@"switch";
         const bits = sw.cond_ty.int;
-        if (bits == 0 or (bits > 32 and bits != 64) or sw.cases.items.len > planning.stage2_max_blocks) return null;
+        if (bits == 0 or bits > 128 or sw.cases.items.len > planning.stage2_max_blocks) return null;
         if (sw.cond != .named and bitsValue(sw.cond, bits) == null) return null;
         const fallback = function.blockIndex(sw.default_target) orelse return null;
         if (helpers.blockHasPhiIncomingFrom(function.blocks.items[fallback], block.name)) return null;
@@ -62,11 +67,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = try original.instructions.clone(allocator);
         const bits = sw.cond_ty.int;
-        const wide: ir.Type = .{ .int = if (bits <= 32) 32 else 64 };
+        const wide: ir.Type = .{ .int = if (bits <= 32) 32 else if (bits <= 64) 64 else 128 };
         var condition = sw.cond;
-        if (condition == .int or bits < 32) {
+        if (condition != .named or bits != wide.int) {
             const name = try forms.temporary(allocator, function, &serial);
-            const kind: @FieldType(ir.Instruction, "kind") = if (condition == .int)
+            const kind: @FieldType(ir.Instruction, "kind") = if (condition != .named)
                 .{ .binary = .{ .op = .add, .ty = wide, .lhs = .{ .int = bitsValue(condition, bits).? }, .rhs = .{ .int = 0 } } }
             else
                 .{ .cast = .{ .op = .zext, .from_ty = sw.cond_ty, .value = condition, .to_ty = wide } };

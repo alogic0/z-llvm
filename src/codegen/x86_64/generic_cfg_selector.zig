@@ -109,6 +109,14 @@ pub fn tryLowerObserved(
             break :blk try selectReady(allocator, machine, function, module_context, inspected, observer);
         };
         if (result == .selected) {
+            if (@import("generic_cfg/limb_integers.zig").privateReturnType(source.ret_ty)) |physical_return| {
+                if (!function.ret_ty.eql(physical_return)) return error.UnprovenLimbReturnAbi;
+                machine.ret_ty = physical_return;
+            }
+            if (@import("generic_cfg/integer_vectors.zig").privateAbiType(source.ret_ty)) |physical_return| {
+                if (!function.ret_ty.eql(physical_return)) return error.UnprovenVectorReturnAbi;
+                machine.ret_ty = physical_return;
+            }
             // Match recursive unwind order; labels must outlive the private IR.
             var i = pending_labels.items.len;
             while (i != 0) {
@@ -319,6 +327,7 @@ fn tryLowerComposedBlockFailClosed(
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "composed-block-unsupported-value" }),
             error.ValueUseForwardPlanMissing => unsupported(.{ .no_emitter = "value-use-forward-plan-missing" }),
+            error.UnsupportedLongDoubleAbi => unsupported(.{ .no_emitter = "composed-block-long-double-abi" }),
             else => err,
         };
     };
@@ -343,6 +352,7 @@ fn tryLowerComposedCfgFailClosed(
         return switch (err) {
             error.UnsupportedCodegenValue => unsupported(.{ .unsupported_value = "stage2-unsupported-value" }),
             error.ValueUseForwardPlanMissing => unsupported(.{ .no_emitter = "value-use-forward-plan-missing" }),
+            error.UnsupportedLongDoubleAbi => unsupported(.{ .no_emitter = "stage2-long-double-abi" }),
             else => err,
         };
     };

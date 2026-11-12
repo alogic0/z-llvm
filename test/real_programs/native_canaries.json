@@ -3267,6 +3267,344 @@
       "functions": ["destructive_shift16", "destructive_loop16", "destructive_shift32", "destructive_loop32", "destructive_shift64", "destructive_loop64", "destructive_bool_and", "destructive_bool_or"],
       "observations": 5856,
       "stdout": "scalar-destructive-live observations=5856 shifts=booleans=loop-phis=guards=preserved\n"
+    },
+    {
+      "population": "floating_atomics",
+      "fixture": "floating_atomics",
+      "prefix": "floating-atomics",
+      "observations": 4547,
+      "functions": [
+        "floating_atomic_add_32",
+        "floating_atomic_sub_32",
+        "floating_atomic_max_32",
+        "floating_atomic_min_32",
+        "floating_atomic_add_64",
+        "floating_atomic_sub_64",
+        "floating_atomic_max_64",
+        "floating_atomic_min_64"
+      ],
+      "stdout": "floating-atomics observations=4547 returned-bits=guards=preserved contention=linearized\n",
+      "libraries": [
+        "m",
+        "pthread"
+      ]
+    },
+    {
+      "population": "variadic_values",
+      "fixture": "variadic_values",
+      "prefix": "variadic-values",
+      "functions": [
+        "va_sum_u64",
+        "va_sum_f64",
+        "va_mixed",
+        "va_consume_record",
+        "va_copy_pair",
+        "va_unfixed",
+        "va_call_unfixed"
+      ],
+      "observations": 1248,
+      "stdout": "variadic-values observations=1248 gp=sse=overflow=copy=interop=preserved\n"
+    },
+    {
+      "population": "module_asm_aliases",
+      "fixture": "module_asm_aliases",
+      "prefix": "module-asm-aliases",
+      "functions": [
+        "module_alias_body"
+      ],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
+      "observations": 258,
+      "stdout": "module-asm-aliases observations=258 chains=binding=execution=preserved\n"
+    },
+    {
+      "population": "fp_frame_preservation",
+      "fixture": "fp_frame_preservation",
+      "prefix": "fp-frame-preservation",
+      "functions": [
+        "fp_frame_polynomial_64_32",
+        "fp_frame_polynomial_32_64",
+        "fp_frame_two_inputs",
+        "fp_frame_dead_input"
+      ],
+      "observations": 292,
+      "stdout": "fp-frame-preservation observations=292 live-inputs=cross-width=preserved\n"
+    },
+    {
+      "population": "extended_sret",
+      "fixture": "extended_sret",
+      "prefix": "extended-sret",
+      "functions": [
+        "sret_pair80",
+        "sret_pair128",
+        "sret_call80",
+        "sret_call128",
+        "sret_sign80",
+        "sret_sign128"
+      ],
+      "observations": 512,
+      "stdout": "extended-sret observations=512 natural-c=rax=payloads=guards=preserved\n"
+    },
+    {
+      "population": "client_requests",
+      "fixture": "client_requests",
+      "prefix": "client-requests",
+      "functions": [
+        "client_default_i64",
+        "client_pointer",
+        "client_live",
+        "client_literal",
+        "client_stack",
+        "client_flags"
+      ],
+      "observations": 640,
+      "stdout": "client-requests observations=640 magic=defaults=pointers=live-values=flags=guards=preserved\n"
+    },
+    {
+      "population": "integer_vector_abi",
+      "fixture": "integer_vector_abi",
+      "prefix": "integer-vector-abi",
+      "functions": [
+        "byte_mix",
+        "word_mix",
+        "byte_call",
+        "word_call",
+        "byte_spill8",
+        "word_loop"
+      ],
+      "observations": 4736,
+      "stdout": "integer-vector-abi observations=4736 byte=halfword=xmm=8-inputs=c-interop=loops=guards=preserved\n"
+    },
+    {
+      "population": "constant_compares",
+      "fixture": "constant_compares",
+      "prefix": "constant-compares",
+      "functions": [
+        "constant_cmp_8",
+        "constant_cmp_16",
+        "constant_cmp_32",
+        "constant_cmp_64"
+      ],
+      "observations": 1024,
+      "stdout": "constant-compares observations=1024 predicates=widths=sign-bits=live-inputs=guards=preserved\n"
+    },
+    {
+      "population": "limb_integers",
+      "fixture": "limb_integers",
+      "prefix": "limb-integers",
+      "functions": [
+        "wide_in140",
+        "wide_in495",
+        "wide_ret256",
+        "wide_outbound",
+        "wide_in200",
+        "wide_ret256_default"
+      ],
+      "observations": 15936,
+      "stdout": "limb-integers observations=15936 abi=split-words=hidden-return=rax=guard-pages=preserved\n"
+    },
+    {
+      "population": "pair_switches",
+      "fixture": "pair_switches",
+      "prefix": "pair-switches",
+      "functions": [
+        "pair_switch_33",
+        "pair_switch_63",
+        "pair_switch_65",
+        "pair_switch_97",
+        "pair_switch_127",
+        "pair_switch_128"
+      ],
+      "observations": 18432,
+      "stdout": "pair-switches observations=18432 upper-bits=odd-widths=pair-inputs=duplicate-phi-edges=live-values=guards=preserved\n"
+    },
+    {
+      "population": "limb_intrinsics",
+      "fixture": "limb_intrinsics",
+      "prefix": "limb-intrinsics",
+      "functions": [
+        "limb_intrinsics_140",
+        "limb_intrinsics_200",
+        "limb_intrinsics_256",
+        "limb_intrinsics_495"
+      ],
+      "observations": 49536,
+      "stdout": "limb-intrinsics observations=49536 counts=permutations=saturation=full-width-funnels=live-values=guards=preserved\n",
+      "reference_fixture": "limb_intrinsics_reference_v262",
+      "reference_source": "limb_intrinsics_reference_v262.c"
+    },
+    {
+      "population": "limb_overflow",
+      "fixture": "limb_overflow",
+      "prefix": "limb-overflow",
+      "functions": [
+        "limb_overflow_140",
+        "limb_overflow_200",
+        "limb_overflow_256",
+        "limb_overflow_495"
+      ],
+      "observations": 46992,
+      "stdout": "limb-overflow observations=46992 exact-width-results=signed-unsigned-flags=canonical-inputs=live-values=guards=preserved\n"
+    },
+    {
+      "population": "saturating_shifts",
+      "fixture": "saturating_shifts",
+      "prefix": "saturating-shifts",
+      "functions": [
+        "sat_shift_ushl_4",
+        "sat_shift_sshl_4",
+        "sat_shift_ushl_8",
+        "sat_shift_sshl_8",
+        "sat_shift_ushl_25",
+        "sat_shift_sshl_25",
+        "sat_shift_ushl_64",
+        "sat_shift_sshl_64"
+      ],
+      "observations": 20928,
+      "stdout": "saturating-shifts observations=20928 signed-unsigned=dynamic-counts=poison-select=live-values=guards=preserved\n"
+    },
+    {
+      "population": "saturating_multiply",
+      "fixture": "saturating_multiply",
+      "prefix": "saturating-multiply",
+      "functions": [
+        "sat_mul_umul_4",
+        "sat_mul_smul_4",
+        "sat_mul_umul_8",
+        "sat_mul_smul_8",
+        "sat_mul_umul_25",
+        "sat_mul_smul_25",
+        "sat_mul_umul_64",
+        "sat_mul_smul_64"
+      ],
+      "observations": 6144,
+      "stdout": "saturating-multiply observations=6144 signed-unsigned=full-products=live-values=guards=preserved\n"
+    },
+    {
+      "population": "packed_vector_memory",
+      "fixture": "packed_vector_memory",
+      "prefix": "packed-vector-memory",
+      "functions": [
+        "packed_memory_3_1",
+        "packed_memory_8_3",
+        "packed_memory_7_9",
+        "packed_memory_5_17",
+        "packed_memory_3_33"
+      ],
+      "observations": 3424,
+      "stdout": "packed-vector-memory observations=3424 odd-widths=exact-tails=guard-pages=canonical-padding=live-values=preserved\n"
+    },
+    {
+      "population": "small_vector_abi",
+      "fixture": "small_vector_abi",
+      "prefix": "small-vector-abi",
+      "functions": [
+        "small_add_c_2_8",
+        "small_relay_c_2_8",
+        "small_eight_c_2_8",
+        "small_add_c_4_8",
+        "small_relay_c_4_8",
+        "small_eight_c_4_8",
+        "small_add_c_8_8",
+        "small_relay_c_8_8",
+        "small_eight_c_8_8",
+        "small_add_c_2_16",
+        "small_relay_c_2_16",
+        "small_eight_c_2_16",
+        "small_add_c_4_16",
+        "small_relay_c_4_16",
+        "small_eight_c_4_16",
+        "small_add_c_2_32",
+        "small_relay_c_2_32",
+        "small_eight_c_2_32",
+        "small_add_fast_2_8",
+        "small_relay_fast_2_8",
+        "small_eight_fast_2_8",
+        "small_add_fast_4_8",
+        "small_relay_fast_4_8",
+        "small_eight_fast_4_8",
+        "small_add_fast_8_8",
+        "small_relay_fast_8_8",
+        "small_eight_fast_8_8",
+        "small_add_fast_2_16",
+        "small_relay_fast_2_16",
+        "small_eight_fast_2_16",
+        "small_add_fast_4_16",
+        "small_relay_fast_4_16",
+        "small_eight_fast_4_16",
+        "small_add_fast_2_32",
+        "small_relay_fast_2_32",
+        "small_eight_fast_2_32"
+      ],
+      "observations": 6720,
+      "stdout": "small-vector-abi observations=6720 c-fastcc=inbound-outbound=eight-xmm=mixed-gpr=exact-stores=guards=preserved\n"
+    },
+    {
+      "population": "vector_intrinsics",
+      "fixture": "vector_intrinsics",
+      "prefix": "vector-intrinsics",
+      "functions": [
+        "vector_intrinsics_16",
+        "vector_intrinsics_32",
+        "vector_intrinsics_64"
+      ],
+      "observations": 62400,
+      "stdout": "vector-intrinsics observations=62400 lane-flags=permutations=saturation=funnels=extrema=live-values=guards=preserved\n"
+    },
+    {
+      "population": "limb_divisions",
+      "fixture": "limb_divisions",
+      "prefix": "limb-divisions",
+      "functions": [
+        "limb_divisions_140",
+        "limb_divisions_200",
+        "limb_divisions_256",
+        "limb_divisions_495"
+      ],
+      "observations": 100224,
+      "stdout": "limb-divisions observations=100224 unsigned-signed=quotient-remainder=private-inputs=live-values=guards=preserved\n",
+      "libraries": [
+        "m"
+      ],
+      "provider_fixture": "compiler_runtime_division_provider",
+      "provider_exports": [
+        "__udivei4",
+        "__umodei4",
+        "__divei4",
+        "__modei4"
+      ]
+    },
+    {
+      "population": "floating_owned",
+      "prefix": "floating-owned",
+      "fixture": "floating_owned",
+      "functions": [
+        "owned_vector_f16x8",
+        "owned_vector_f32x4",
+        "owned_vector_f64x2",
+        "owned_vector_f32x3",
+        "owned_vector_f32x17"
+      ],
+      "observations": 14208,
+      "stdout": "floating-owned observations=14208 payloads=owned-storage=call-live=exact-memory=guards=preserved\n"
+    },
+    {
+      "population": "prefetch_hints",
+      "prefix": "prefetch-hints",
+      "fixture": "prefetch_hints",
+      "functions": [
+        "prefetch_data_0_0",
+        "prefetch_data_0_1",
+        "prefetch_data_0_2",
+        "prefetch_data_0_3",
+        "prefetch_data_1_0",
+        "prefetch_data_1_1",
+        "prefetch_data_1_2",
+        "prefetch_data_1_3"
+      ],
+      "observations": 1280,
+      "stdout": "prefetch-hints observations=1280 live-values=exact-stores=nonfaulting-addresses=guards=preserved\n"
     }
   ]
 }

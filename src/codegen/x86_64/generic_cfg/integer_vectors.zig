@@ -10,6 +10,27 @@ const integer = @import("../../../analysis/integer_semantics.zig").Integer;
 const abi = @import("../sysv_abi.zig");
 const xmm_carrier: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
 
+// Exact LLVM integer vector shapes use packed low XMM bits. Up to64-bit
+// shapes occupy an8-byte overflow slot; a private double preserves that ABI.
+// 128-bit shapes keep their existing two-double raw boundary. Sub-byte and
+// non-power-of-two lane counts remain separate, closed contracts.
+fn abiType(ty: ir.Type) ?ir.Type {
+    if (abi.isVector128AbiType(ty)) return ty;
+    return privateAbiType(ty);
+}
+pub fn privateAbiType(ty: ir.Type) ?ir.Type {
+    if (ty == .vector and ty.vector.elem_ty == .int) {
+        const n = ty.vector.len;
+        const bits = ty.vector.elem_ty.int;
+        if ((bits == 8 and (n == 2 or n == 4 or n == 8)) or
+            (bits == 16 and (n == 2 or n == 4)) or (bits == 32 and n == 2)) return .double;
+    }
+    if (ty == .vector and ty.vector.elem_ty == .int and
+        ((ty.vector.len == 16 and ty.vector.elem_ty.int == 8) or
+            (ty.vector.len == 8 and ty.vector.elem_ty.int == 16))) return xmm_carrier;
+    return null;
+}
+
 const Shape = struct {
     len: u32,
     bits: u16,
@@ -57,17 +78,38 @@ fn laneIndex(value: ir.Value, ty: ir.Type, len: u32) !usize {
 fn laneIntrinsic(allocator: std.mem.Allocator, call: ir.CallInst) !?[]const u8 {
     const s = shape(call.ret_ty) orelse return null;
     if (s.pointer) return null;
-    for ([_][]const u8{ "fshl", "bswap", "ctpop", "usub.sat" }, [_]usize{ 3, 1, 1, 2 }) |name, arity| {
+    const Kind = struct { name: []const u8, vectors: usize, extra: ?u16 = null };
+    const kinds = [_]Kind{
+        .{ .name = "fshl", .vectors = 3 },       .{ .name = "fshr", .vectors = 3 },            .{ .name = "bswap", .vectors = 1 },                     .{ .name = "ctpop", .vectors = 1 },
+        .{ .name = "bitreverse", .vectors = 1 }, .{ .name = "abs", .vectors = 1, .extra = 1 }, .{ .name = "ctlz", .vectors = 1, .extra = 1 },          .{ .name = "cttz", .vectors = 1, .extra = 1 },
+        .{ .name = "uadd.sat", .vectors = 2 },   .{ .name = "usub.sat", .vectors = 2 },        .{ .name = "sadd.sat", .vectors = 2 },                  .{ .name = "ssub.sat", .vectors = 2 },
+        .{ .name = "umin", .vectors = 2 },       .{ .name = "umax", .vectors = 2 },            .{ .name = "smin", .vectors = 2 },                      .{ .name = "smax", .vectors = 2 },
+        .{ .name = "ushl.sat", .vectors = 2 },   .{ .name = "sshl.sat", .vectors = 2 },        .{ .name = "umul.fix.sat", .vectors = 2, .extra = 32 }, .{ .name = "smul.fix.sat", .vectors = 2, .extra = 32 },
+    };
+    for (kinds) |kind| {
+        const name = kind.name;
+        const arity = kind.vectors + @intFromBool(kind.extra != null);
         const vector_name = try std.fmt.allocPrint(allocator, "llvm.{s}.v{d}i{d}", .{ name, s.len, s.bits });
         if (!std.mem.eql(u8, call.callee, vector_name)) continue;
+        // Existing byte swap/count/funnel paths keep their original width
+        // envelope. New lane operations use the proved scalar<=64 contracts.
+        if (s.bits > 64 and !std.mem.eql(u8, name, "fshl") and !std.mem.eql(u8, name, "bswap") and !std.mem.eql(u8, name, "ctpop") and !std.mem.eql(u8, name, "usub.sat")) return error.UnsupportedIntegerVector;
+        if (std.mem.eql(u8, name, "bswap") and s.bits % 16 != 0) return error.UnsupportedIntegerVector;
         if (call.args.items.len != arity or call.callee_value != null or call.callee_function_ty != null or
             call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null)
             return error.UnsupportedIntegerVector;
-        if (call.ret_attrs != null and !(std.mem.eql(u8, name, "ctpop") and
+        if (call.ret_attrs != null and !((std.mem.eql(u8, name, "ctpop") or std.mem.eql(u8, name, "ctlz") or std.mem.eql(u8, name, "cttz")) and
             @import("intrinsic_attrs.zig").matchesIntegerRange(call.ret_attrs, s.bits, 0, @as(u128, s.bits) + 1)))
             return error.UnsupportedIntegerVector;
         if (call.tail_kind) |tail| if (std.mem.eql(u8, tail, "musttail")) return error.UnsupportedIntegerVector;
-        for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null) return error.UnsupportedIntegerVector;
+        for (call.args.items[0..kind.vectors]) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null) return error.UnsupportedIntegerVector;
+        if (kind.extra) |bits| {
+            const arg = call.args.items[kind.vectors];
+            if (!arg.ty.eql(.{ .int = bits }) or arg.attrs != null or arg.value != .int) return error.UnsupportedIntegerVector;
+            if (bits == 1) {
+                if (arg.value.int != 0 and arg.value.int != 1) return error.UnsupportedIntegerVector;
+            } else if (arg.value.int != 0) return error.UnsupportedIntegerVector;
+        }
         return try std.fmt.allocPrint(allocator, "llvm.{s}.i{d}", .{ name, s.bits });
     }
     return null;
@@ -219,8 +261,12 @@ const Builder = struct {
     }
     fn fromAbi(b: Builder, value: ir.Value, ty: ir.Type) !Lanes {
         const s = shape(ty) orelse return error.UnsupportedIntegerVector;
-        if (!abi.isVector128AbiType(ty)) return error.UnsupportedIntegerVector;
-        const bits = try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = ty, .value = value, .to_ty = xmm_carrier } });
+        const incoming = abiType(ty) orelse return error.UnsupportedIntegerVector;
+        if (incoming == .double) {
+            const bits = try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = .double, .value = value, .to_ty = .{ .int = 64 } } });
+            return b.unpack(bits, .{ .int = 64 }, ty);
+        }
+        const bits = try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = incoming, .value = value, .to_ty = xmm_carrier } });
         var words: [2]ir.Value = undefined;
         for (&words, 0..) |*word, i| {
             const lane = try b.emit(.{ .extractelement = .{ .vector_ty = xmm_carrier, .vector = bits, .index_ty = .{ .int = 64 }, .index = .{ .int = @intCast(i) } } });
@@ -237,7 +283,8 @@ const Builder = struct {
     }
     fn toAbi(b: Builder, lanes_value: Lanes) !ir.Value {
         const s = shape(lanes_value.ty) orelse return error.UnsupportedIntegerVector;
-        if (!abi.isVector128AbiType(lanes_value.ty)) return error.UnsupportedIntegerVector;
+        const outgoing = abiType(lanes_value.ty) orelse return error.UnsupportedIntegerVector;
+        if (outgoing == .double) return b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = .{ .int = 64 }, .value = try b.pack(lanes_value), .to_ty = .double } });
         var vector: ir.Value = .poison;
         for (0..2) |word_index| {
             var word: ir.Value = .{ .int = 0 };
@@ -249,7 +296,7 @@ const Builder = struct {
             const fp = try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = .{ .int = 64 }, .value = word, .to_ty = .double } });
             vector = try b.emit(.{ .insertelement = .{ .vector_ty = xmm_carrier, .vector = vector, .value_ty = .double, .value = fp, .index_ty = .{ .int = 64 }, .index = .{ .int = @intCast(word_index) } } });
         }
-        return b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = xmm_carrier, .value = vector, .to_ty = lanes_value.ty } });
+        return b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = xmm_carrier, .value = vector, .to_ty = outgoing } });
     }
 };
 
@@ -266,8 +313,8 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
         var parts = std.mem.splitScalar(u8, layout, '-');
         while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return null;
     };
-    if (function.ret_ty == .vector and !abi.isVector128AbiType(function.ret_ty)) return null;
-    for (function.params.items) |param| if (param.ty == .vector and !abi.isVector128AbiType(param.ty)) return null;
+    if (function.ret_ty == .vector and abiType(function.ret_ty) == null) return null;
+    for (function.params.items) |param| if (param.ty == .vector and abiType(param.ty) == null) return null;
     // The native boundary bitcasts mark an already expanded private graph.
     // Leave these to vector selection instead of recursively unpacking them.
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
@@ -276,6 +323,15 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                 (inst.kind.cast.from_ty.eql(xmm_carrier) and shape(inst.kind.cast.to_ty) != null))) return null;
     };
     var result = function;
+    if (result.ret_ty == .vector) result.ret_ty = abiType(result.ret_ty).?;
+    var parameters_cloned = false;
+    for (function.params.items, 0..) |param, i| if (privateAbiType(param.ty)) |physical| {
+        if (!parameters_cloned) {
+            result.params = try function.params.clone(allocator);
+            parameters_cloned = true;
+        }
+        result.params.items[i].ty = physical;
+    };
     result.blocks = .empty;
     var vectors = std.StringHashMap(Lanes).init(allocator);
     defer vectors.deinit();
@@ -384,10 +440,22 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                         } });
                     } else {
                         const bits = s.len * s.bits;
-                        if (bits != 8 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return error.UnsupportedIntegerVector;
-                        const ty: ir.Type = .{ .int = @intCast(bits) };
-                        const packed_value = try b.emit(.{ .load = .{ .ty = ty, .ptr = load.ptr, .attrs = load.attrs } });
-                        lanes = try b.unpack(packed_value, ty, load.ty);
+                        if (bits == 8 or bits == 16 or bits == 32 or bits == 64 or bits == 128) {
+                            const ty: ir.Type = .{ .int = @intCast(bits) };
+                            const packed_value = try b.emit(.{ .load = .{ .ty = ty, .ptr = load.ptr, .attrs = load.attrs } });
+                            lanes = try b.unpack(packed_value, ty, load.ty);
+                        } else {
+                            if (bits > 128) return error.UnsupportedIntegerVector;
+                            const carrier: ir.Type = .{ .int = if (bits > 64) 128 else 64 };
+                            var packed_value: ir.Value = .{ .int = 0 };
+                            for (0..(bits + 7) / 8) |byte| {
+                                const loaded = try b.emit(.{ .load = .{ .ty = .{ .int = 8 }, .ptr = try b.address(load.ptr, byte), .attrs = .{ .@"align" = 1 } } });
+                                var part = try b.cast(.zext, .{ .int = 8 }, loaded, carrier);
+                                if (byte != 0) part = try b.binary(.shl, carrier, part, .{ .int = @intCast(byte * 8) });
+                                packed_value = if (byte == 0) part else try b.binary(.@"or", carrier, packed_value, part);
+                            }
+                            lanes = try b.unpack(packed_value, carrier, load.ty);
+                        }
                     }
                     value = lanes;
                 } else {
@@ -405,15 +473,23 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                         } } });
                     } else {
                         const bits = s.len * s.bits;
-                        if (bits != 8 and bits != 16 and bits != 32 and bits != 64 and bits != 128) return error.UnsupportedIntegerVector;
                         const carrier: ir.Type = .{ .int = if (bits > 64) 128 else 64 };
-                        const ty: ir.Type = .{ .int = @intCast(bits) };
-                        try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
-                            .ty = ty,
-                            .value = try b.cast(.trunc, carrier, try b.pack(lanes), ty),
-                            .ptr = store.ptr,
-                            .attrs = store.attrs,
-                        } } });
+                        if (bits == 8 or bits == 16 or bits == 32 or bits == 64 or bits == 128) {
+                            const ty: ir.Type = .{ .int = @intCast(bits) };
+                            try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{
+                                .ty = ty,
+                                .value = try b.cast(.trunc, carrier, try b.pack(lanes), ty),
+                                .ptr = store.ptr,
+                                .attrs = store.attrs,
+                            } } });
+                        } else {
+                            if (bits > 128) return error.UnsupportedIntegerVector;
+                            const packed_value = try b.pack(lanes);
+                            for (0..(bits + 7) / 8) |byte| {
+                                const part = if (byte == 0) packed_value else try b.binary(.lshr, carrier, packed_value, .{ .int = @intCast(byte * 8) });
+                                try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{ .ty = .{ .int = 8 }, .value = try b.cast(.trunc, carrier, part, .{ .int = 8 }), .ptr = try b.address(store.ptr, byte), .attrs = .{ .@"align" = 1 } } } });
+                            }
+                        }
                     }
                 } else {
                     handled = false;
@@ -566,17 +642,19 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                 } else if (try laneIntrinsic(allocator, call)) |callee| {
                     const s = shape(call.ret_ty).?;
                     var inputs: [3]Lanes = undefined;
-                    for (call.args.items, 0..) |arg, i| inputs[i] = try b.lanes(arg.value, arg.ty);
+                    for (call.args.items, 0..) |arg, i| if (arg.ty.eql(call.ret_ty)) {
+                        inputs[i] = try b.lanes(arg.value, arg.ty);
+                    };
                     var lanes: Lanes = .{ .ty = call.ret_ty, .values = @splat(.poison) };
                     for (lanes.values[0..s.len], 0..) |*lane, i| {
                         var scalar = call;
                         scalar.callee = callee;
                         scalar.ret_ty = s.scalar();
                         scalar.args = try call.args.clone(allocator);
-                        for (scalar.args.items, 0..) |*arg, j| {
+                        for (scalar.args.items, 0..) |*arg, j| if (arg.ty.eql(call.ret_ty)) {
                             arg.ty = s.scalar();
                             arg.value = try defined(inputs[j].values[i], s.scalar());
-                        }
+                        };
                         lane.* = try b.emit(.{ .call = scalar });
                     }
                     value = lanes;
@@ -586,7 +664,9 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                     copy.kind.call.args = try call.args.clone(allocator);
                     for (copy.kind.call.args.items) |*arg| if (shape(arg.ty) != null) {
                         arg.value = try b.toAbi(try b.lanes(arg.value, arg.ty));
+                        arg.ty = abiType(arg.ty) orelse return error.UnsupportedIntegerVector;
                     };
+                    if (shape(call.ret_ty) != null) copy.kind.call.ret_ty = abiType(call.ret_ty) orelse return error.UnsupportedIntegerVector;
                     try block.instructions.append(allocator, copy);
                     if (shape(call.ret_ty) != null) value = try b.fromAbi(.{ .named = inst.result orelse return error.UnsupportedIntegerVector }, call.ret_ty);
                 } else {
@@ -607,6 +687,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
         }
         if (block.terminator) |*term| if (term.* == .ret and shape(term.ret.ty) != null) {
             term.ret.value = try b.toAbi(try b.lanes(term.ret.value orelse return error.UnsupportedIntegerVector, term.ret.ty));
+            term.ret.ty = abiType(term.ret.ty) orelse return error.UnsupportedIntegerVector;
             changed = true;
         };
         try result.blocks.append(allocator, block);

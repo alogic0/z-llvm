@@ -102,6 +102,10 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
             if (param.attrs) |attrs| try writer.print(" {s}", .{names.text(attrs)});
             try writer.print(" %{s}", .{names.name(param.name)});
         }
+        if (function.is_varargs) {
+            if (function.params.items.len != 0) try writer.writeAll(", ");
+            try writer.writeAll("...");
+        }
         try writer.writeByte(')');
         if (function.attrs) |attrs| try writer.print(" {s}", .{names.text(attrs)});
         try writer.writeAll(" {\n");
@@ -342,6 +346,14 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
                         try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
                     },
                     .call => |call| {
+                        if (call.va_arg) {
+                            try writer.writeAll("va_arg ptr ");
+                            try names.value(call.args.items[0].value).format(writer);
+                            try writer.writeAll(", ");
+                            try call.ret_ty.format(writer);
+                            try printInstructionMetadata(names.optionalText(instruction.metadata), writer);
+                            continue;
+                        }
                         if (call.tail_kind) |tail_kind| try writer.print("{s} ", .{tail_kind});
                         try writer.writeAll("call ");
                         if (call.calling_conv) |calling_conv| try writer.print("{s} ", .{calling_conv});

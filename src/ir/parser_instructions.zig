@@ -54,6 +54,19 @@ pub fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !cor
     if (!std.mem.startsWith(u8, result_text, "%")) return error.InvalidValueName;
 
     const rhs_text = std.mem.trim(u8, line[eq_index + 1 ..], " \t");
+    if (std.mem.startsWith(u8, rhs_text, "va_arg ")) {
+        const body = std.mem.trim(u8, rhs_text["va_arg ".len..], " \t");
+        const comma = findTopLevelComma(body) orelse return error.InvalidInstruction;
+        const source = try parseLeadingType(body[0..comma]);
+        if (source.ty != .ptr) return error.InvalidInstruction;
+        const result_ty = try parseType(std.mem.trim(u8, body[comma + 1 ..], " \t"));
+        var args: std.ArrayList(core.CallArg) = .empty;
+        errdefer args.deinit(allocator);
+        try args.append(allocator, .{ .ty = .ptr, .value = try parseValue(std.mem.trim(u8, source.after, " \t")) });
+        return .{ .result = result_text[1..], .kind = .{ .call = .{
+            .va_arg = true, .ret_ty = result_ty, .callee = "", .args = args,
+        } } };
+    }
     if (std.mem.startsWith(u8, rhs_text, "call ")) return parseCall(allocator, result_text[1..], rhs_text);
     if (std.mem.startsWith(u8, rhs_text, "tail ") or std.mem.startsWith(u8, rhs_text, "musttail ") or std.mem.startsWith(u8, rhs_text, "notail ")) return parseCall(allocator, result_text[1..], rhs_text);
     if (std.mem.startsWith(u8, rhs_text, "invoke ") or std.mem.startsWith(u8, rhs_text, "callbr ")) return error.UnsupportedCallTerminator;

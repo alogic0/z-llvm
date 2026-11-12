@@ -81,6 +81,18 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
         const name = try c.fmt("{s}{s}", .{ try u.str(canary, "fixture"), suffix });
         try u.put(c.a, &fixtures, name, u.s(try c.digest(try c.join(&.{ "test/real_programs", name }))));
     };
+    for (registry) |canary| if (canary.object.get("reference_fixture")) |reference| {
+        const name = try c.fmt("{s}.ll", .{try u.json.text(reference)});
+        try u.put(c.a, &fixtures, name, u.s(try c.digest(try c.join(&.{ "test/real_programs", name }))));
+        if (canary.object.get("reference_source")) |source_value| {
+            const name_source = try u.json.text(source_value);
+            try u.put(c.a, &fixtures, name_source, u.s(try c.digest(try c.join(&.{ "test/real_programs", name_source }))));
+        }
+    };
+    for (registry) |canary| if (canary.object.get("provider_fixture")) |provider| {
+        const name = try c.fmt("{s}.ll", .{try u.json.text(provider)});
+        try u.put(c.a, &fixtures, name, u.s(try c.digest(try c.join(&.{ "test/real_programs", name }))));
+    };
     try u.put(c.a, report, "fixture_sha256", fixtures);
     var env = try c.cleanEnvironment();
     try env.put("ZIG_LOCAL_CACHE_DIR", try c.join(&.{ output, "frontend-cache" }));

@@ -23,6 +23,83 @@ fn executable(source: []const u8) ![]align(std.heap.page_size_min) u8 {
     return memory;
 }
 
+test "native width floating vector allocas activate private lane lowering" {
+    const a = std.testing.allocator;
+    inline for (.{ .{ "half", 16, 8 }, .{ "float", 32, 4 }, .{ "double", 64, 2 } }) |shape| {
+        const source = try std.fmt.allocPrint(
+            a,
+            "declare <{0d} x {1s}> @llvm.fabs.v{0d}f{2d}(<{0d} x {1s}>)\n" ++
+                "define void @owned_absolute(ptr %input, ptr %output) {{\nentry:\n" ++
+                " %slot = alloca <{0d} x {1s}>, align 16\n %value = load <{0d} x {1s}>, ptr %input, align 1\n" ++
+                " store <{0d} x {1s}> %value, ptr %slot, align 16\n %again = load <{0d} x {1s}>, ptr %slot, align 16\n" ++
+                " %absolute = call <{0d} x {1s}> @llvm.fabs.v{0d}f{2d}(<{0d} x {1s}> %again)\n" ++
+                " store <{0d} x {1s}> %absolute, ptr %output, align 1\n ret void\n}}\n",
+            .{ shape[2], shape[0], shape[1] },
+        );
+        defer a.free(source);
+        const memory = try executable(source);
+        defer std.posix.munmap(memory);
+        const run: *const fn (*const u8, *u8) callconv(.c) void = @ptrCast(memory.ptr);
+        var input: [18]u8 = @splat(0xa5);
+        var output: [32]u8 = @splat(0xa5);
+        for (0..64) |seed| {
+            for (input[1..17], 0..) |*byte, i| byte.* = @truncate(seed * 71 + i * 29);
+            const before = input;
+            @memset(&output, 0xa5);
+            run(&input[1], &output[3]);
+            for (0..16) |i| {
+                const expected = if (i % (shape[1] / 8) == shape[1] / 8 - 1) input[1 + i] & 0x7f else input[1 + i];
+                try std.testing.expectEqual(expected, output[3 + i]);
+            }
+            try std.testing.expectEqualSlices(u8, &before, &input);
+            for (output[0..3]) |byte| try std.testing.expectEqual(@as(u8, 0xa5), byte);
+            for (output[19..]) |byte| try std.testing.expectEqual(@as(u8, 0xa5), byte);
+        }
+    }
+}
+
+test "floating vector owned storage keeps dynamic objects and barrier loads closed" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{
+        "define void @dynamic(i64 %count,ptr %out) {\nentry:\n %slot = alloca <4 x float>, i64 %count, align 16\n %v = load <4 x float>,ptr %slot,align 16\n store <4 x float> %v,ptr %out,align 1\n ret void\n}\n",
+        "define void @barrier(ptr %input,ptr %out) {\nentry:\n %slot = alloca <4 x float>,align 16\n %v = load volatile <4 x float>,ptr %input,align 1\n store <4 x float> %v,ptr %slot,align 16\n ret void\n}\n",
+    }) |source| {
+        var module = try ir.Module.parse(a, source);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        try std.testing.expect((try vectors.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+        try module.verify();
+    }
+}
+
+test "owned vector activation preserves native quad argument payloads" {
+    const source =
+        \\define i128 @quad_bits(ptr %unused, fp128 %value) {
+        \\entry:
+        \\ %slot = alloca fp128, align 16
+        \\ store fp128 %value, ptr %slot, align 16
+        \\ %bits = bitcast fp128 %value to i128
+        \\ ret i128 %bits
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    var output = try compilation.select(std.testing.allocator, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+    defer output.deinit(std.testing.allocator);
+    try verify.verifyFunction(output);
+    const bytes = try encoding.encodeFunction(std.testing.allocator, output);
+    defer std.testing.allocator.free(bytes);
+    const memory = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..bytes.len], bytes);
+    const run: *const fn (?*anyopaque, f128) callconv(.c) u128 = @ptrCast(memory.ptr);
+    for ([_]u128{ 0, 1, @as(u128, 1) << 127, 0x7fff800000000000123456789abcdef0, 0xbfff13579bdf2468fedcba9876543210 }) |bits|
+        try std.testing.expectEqual(bits, run(null, @bitCast(bits)));
+}
+
 test "runtime x87 vectors keep packed ten byte lanes exact under wide scalarization" {
     for ([_]u32{ 1, 3, 16, 64 }) |count| {
         const source = try std.fmt.allocPrint(std.testing.allocator, "declare <{d} x x86_fp80> @llvm.fabs.v{d}f80(<{d} x x86_fp80>)\ndefine void @absolute(ptr %input, ptr %output) {{\nentry:\n %slot = alloca <{d} x x86_fp80>, align 16\n %v = load <{d} x x86_fp80>, ptr %input, align 1\n store <{d} x x86_fp80> %v, ptr %slot, align 1\n %again = load <{d} x x86_fp80>, ptr %slot, align 1\n %positive = call <{d} x x86_fp80> @llvm.fabs.v{d}f80(<{d} x x86_fp80> %again)\n store <{d} x x86_fp80> %positive, ptr %output, align 1\n ret void\n}}\n", .{ count, count, count, count, count, count, count, count, count, count, count });

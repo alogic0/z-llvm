@@ -465,6 +465,10 @@ pub fn emitCodegenModule(
     }
 
     var machines: std.ArrayList(codegen.x86_64.MachineFunction) = .empty;
+    var assembly_aliases = try @import("codegen/x86_64/module_asm_aliases.zig").parse(allocator, module);
+    defer if (assembly_aliases) |*aliases| aliases.deinit(allocator);
+    if (assembly_aliases != null and emit == .@"asm") return error.UnsupportedModuleAssembly;
+    const all_aliases = if (assembly_aliases) |aliases| aliases.aliases.items else module.aliases.items;
     defer {
         for (machines.items) |*machine| machine.deinit(allocator);
         machines.deinit(allocator);
@@ -487,7 +491,6 @@ pub fn emitCodegenModule(
         const scope = @import("compilation_profile.zig").enter(options.profile, .reachability);
         defer scope.end();
         if (emit == .@"asm") return error.UnsupportedReachableAssembly;
-        if (module.module_asm.items.len != 0) return error.UnsupportedModuleAssembly;
         var graph = try dependencies.Graph.build(allocator, module);
         defer graph.deinit();
         reachable = try graph.reachable();
@@ -497,6 +500,7 @@ pub fn emitCodegenModule(
         for (module.aliases.items) |alias| {
             if (reachable.?.contains(.alias, alias.name)) try selected_aliases.append(allocator, alias);
         }
+        if (assembly_aliases) |aliases| try selected_aliases.appendSlice(allocator, aliases.aliases.items[module.aliases.items.len..]);
         try stderr_writer.interface.print("summary zllvm-codegen-selection mode=reachable coverage={s} selected_globals={} selected_aliases={}\n", .{
             if (reachable.?.has_unknown) "conservative" else "complete",
             selected_globals.items.len,
@@ -506,18 +510,18 @@ pub fn emitCodegenModule(
     }
     const module_context: codegen.x86_64.ReadOnlyModuleContext = .{
         .globals = if (reachable != null) selected_globals.items else module.globals.items,
-        .aliases = if (reachable != null) selected_aliases.items else module.aliases.items,
+        .aliases = if (reachable != null) selected_aliases.items else all_aliases,
         .named_types = module.named_types.items,
         .target_datalayout = module.target_datalayout,
         .emit_all_globals = options.codegen_reachable,
-        .require_resolved_aliases = options.codegen_reachable,
+        .require_resolved_aliases = options.codegen_reachable or assembly_aliases != null,
         .functions = module.functions.items,
         .declarations = module.declarations.items,
     };
     var required = try @import("codegen/x86_64/direct_callees.zig").Queue.init(allocator, module.functions.items);
     defer required.deinit();
     for (module.functions.items, 0..) |function, index| {
-        const selected = if (reachable) |selection| selection.contains(.function, function.name) else shouldLowerCodegenFunction(module, function);
+        const selected = if (assembly_aliases != null) true else if (reachable) |selection| selection.contains(.function, function.name) else shouldLowerCodegenFunction(module, function);
         if (selected) try required.include(index);
     }
     var next_function: usize = 0;
@@ -625,7 +629,7 @@ pub fn emitCodegenModule(
     } else {
         const scope = @import("compilation_profile.zig").enter(options.profile, .object_write);
         defer scope.end();
-        try mc.elf.writeObjectWithModuleContext(allocator, machines.items, if (reachable != null) selected_aliases.items else module.aliases.items, module_context, stdout);
+        try mc.elf.writeObjectWithModuleContext(allocator, machines.items, if (reachable != null) selected_aliases.items else all_aliases, module_context, stdout);
         try stdout.flush();
     }
     try stdout.flush();

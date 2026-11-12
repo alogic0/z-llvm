@@ -19,6 +19,9 @@ pub const Instruction = union(enum) {
     // Reads all GPRs, writes 17 words through RDI (DWARF register order),
     // and defines RAX with the captured instruction pointer.
     register_snapshot_rdi,
+    /// Exact Valgrind request sequence: RAX request, RDX default/result.
+    /// Four RDI rotates preserve RDI; XCHG RBX,RBX preserves RBX. Flags clobber.
+    valgrind_client_request,
     /// EAX/ECX inputs; packed EAX:EBX in RAX and ECX:EDX in RDX.
     /// Preserves RBX and RSP; the packing operations clobber flags.
     cpuid_packed,
