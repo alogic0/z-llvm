@@ -489,6 +489,25 @@ native proofs do not establish its complete object or either final local-hook
 matrix. Continue bounded wide-integer and remaining instruction/ABI families;
 preserve the original input, named outcomes and rejection controls at adoption.
 
+The next resource slice adopts final machine spill-home reuse for immediate
+Tier 3. Exact loads and stores define indivisible overlapping access groups;
+CFG memory liveness bounds their closed intervals, including partial writes,
+backedges and dead stores. An independent cell-placement check rejects live
+overlap. Preserve alignment phase, incoming/outgoing stack bias and opaque
+escapes. Batched analysis retains the 64 MiB table limit; the Sema proof uses
+8,115,712 bytes and reduces its measured frame from 479,000 to 53,144 bytes.
+Choose this placement only when it saves another page beyond existing gap-only
+compaction; keep that compactor's smaller result otherwise.
+
+Six focused controls and all 2,201 isolated units pass. The new
+`stack_spill_homes` population keeps 16 values live across 512 ten-argument C
+calls on a 64 KiB pthread stack. Both backend builds pass all three modes,
+45,096 observations per execution and 27 injected faults each; the preceding
+backend fails with actual SIGSEGV while LLVM passes. A maintained Zig generator
+reproduces the 880,016-byte fixture exactly. Complete fresh cumulative validation,
+original compiler/runtime replays and the actual unchanged normal-resource
+self-rebuild before accepting this repair or closing milestone 8.
+
 ## Delivery checklist
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.

@@ -3241,6 +3241,15 @@
       "libraries": ["pthread"],
       "observations": 192,
       "stdout": "stack-lifetimes observations=192 stack=65536 full-objects=branches=loops=guards=preserved\n"
+    },
+    {
+      "population": "stack_spill_homes",
+      "prefix": "stack-spill-homes",
+      "fixture": "stack_spill_homes",
+      "functions": ["spill_waves"],
+      "libraries": ["pthread"],
+      "observations": 45096,
+      "stdout": "stack-spill-homes observations=45096 stack=65536 waves=512 live=16 calls=guards=preserved\n"
     }
   ]
 }

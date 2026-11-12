@@ -154,3 +154,21 @@ comparison slice passes all 2,202 units after replacing its newly supported
 constant-pair rejection input with an unsupported poison operand. Wide-integer
 limb lowering remains experimental. None of these research slices is accepted
 into the maintained backend by this checkpoint.
+
+The following resource slice adopts machine-memory spill-home reuse for
+immediate Tier 3. Six focused controls cover executable rebasing, loop liveness,
+overlapping widths, partial writes, outgoing bias, batch boundaries and closed
+escapes. All 2,201 isolated units pass. An independent placement check and the
+machine verifier accept a 53,144-byte Sema frame; its batched liveness table uses
+8,115,712 bytes. These are diagnostic proofs, not a successful compiler rebuild.
+
+The new `stack_spill_homes` population passes both backend builds in all three
+modes, including 45,096 independent observations per execution and all 27
+fault controls per build. LLVM passes its 64 KiB worker-stack oracle; the
+preceding backend fails there with actual SIGSEGV. The 512-wave Zig-generated
+fixture stays within the default input limit. The earlier oversized fixture
+failed setup and receives no selection or execution credit. The initial
+placement also failed an existing gap-compaction unit by producing a larger
+frame; the corrected choice keeps the smaller existing result, and the original
+expectation passes unchanged. Cumulative validation and new original-input
+compiler/runtime production remain required after adoption.

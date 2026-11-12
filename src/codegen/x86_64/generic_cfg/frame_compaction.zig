@@ -7,7 +7,7 @@ const state = @import("composed_selector_state.zig");
 const machine = @import("../machine.zig");
 const FrameIndex = @import("../types.zig").FrameIndex;
 
-const Error = error{ OpaqueStackUse, InvalidStackDepth, InvalidFrameSetup };
+pub const Error = error{ OpaqueStackUse, InvalidStackDepth, InvalidFrameSetup };
 const Rebase = struct {
     object_base: u32,
     live: ?[]bool = null,
@@ -74,12 +74,13 @@ fn adjustment(inst: machine.Instruction) ?struct { subtract: bool, bytes: u32 } 
     };
 }
 
-fn walk(r: *Rebase, code: []machine.Instruction, old_frame: u32) Error!void {
+pub fn walk(r: anytype, code: []machine.Instruction, old_frame: u32) Error!void {
     @setEvalBranchQuota(200000);
     var depth: u32 = 0;
     var index: usize = 0;
     while (index < code.len) : (index += 1) {
         const inst = &code[index];
+        if (@hasDecl(@typeInfo(@TypeOf(r)).pointer.child, "beginInstruction")) try r.beginInstruction(inst.*, index, depth);
         if (adjustment(inst.*)) |change| {
             if (!change.subtract and depth == 0 and change.bytes == old_frame) {
                 if (r.delta != 0) inst.* = .{ .add_rsp_imm32 = old_frame - r.delta };
@@ -207,6 +208,7 @@ pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !v
     prefix[0] = 0;
     for (live, 0..) |used, i| prefix[i + 1] = prefix[i] + @as(u32, if (used) 16 else 0);
     const delta = @as(u32, @intCast(live.len * 16)) - prefix[live.len];
+    if (try compactHomes(selector, old_frame, object_base, begin, end, delta)) return;
     if (delta < 65536) return;
     var candidate: std.ArrayList(machine.Instruction) = .empty;
     errdefer candidate.deinit(selector.allocator);
@@ -228,4 +230,35 @@ pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !v
     selector.machine.instructions.deinit(selector.allocator);
     selector.machine.instructions = candidate;
     selector.stack_frame_bytes = old_frame - delta;
+}
+
+fn compactHomes(selector: *state.ComposedBlockSelector, old_frame: u32, object_base: u32, begin: usize, end: usize, unused_delta: u32) !bool {
+    const homes = @import("machine_stack_homes.zig");
+    var arena = std.heap.ArenaAllocator.init(selector.allocator);
+    defer arena.deinit();
+    const mapping = (try homes.analyze(arena.allocator(), selector.machine.instructions.items[end..], old_frame, object_base)) orelse return false;
+    if (mapping.delta < 65536) return false;
+    // Keep the existing gap-only result whenever it is at least as compact.
+    // Require a further page of savings before paying for a changed placement.
+    if (mapping.delta <= unused_delta or mapping.delta - unused_delta < 4096) return false;
+    var candidate: std.ArrayList(machine.Instruction) = .empty;
+    errdefer candidate.deinit(selector.allocator);
+    try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[0..begin]);
+    try appendAllocation(selector.allocator, &candidate, old_frame - mapping.delta);
+    const body = candidate.items.len;
+    try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[end..]);
+    homes.rewrite(candidate.items[body..], old_frame, mapping) catch {
+        candidate.deinit(selector.allocator);
+        return false;
+    };
+    var checked = selector.machine.*;
+    checked.instructions = candidate;
+    @import("../verify.zig").verifyFunction(checked) catch {
+        candidate.deinit(selector.allocator);
+        return false;
+    };
+    selector.machine.instructions.deinit(selector.allocator);
+    selector.machine.instructions = candidate;
+    selector.stack_frame_bytes = old_frame - mapping.delta;
+    return true;
 }

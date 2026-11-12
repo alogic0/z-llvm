@@ -16,6 +16,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_frame_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/frame_compaction_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/stack_lifetimes_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/machine_stack_homes_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_state_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/composed_selector_scalar_tests.zig");
     _ = @import("codegen/x86_64/sysv_abi.zig");
