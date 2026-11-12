@@ -333,7 +333,7 @@ test "integer frontier rewrites preserve source ownership idempotence and alloca
 
 test "integer frontier rejects unimplemented widths flags and semantic envelopes" {
     for ([_][]const u8{
-        "call i48 @llvm.ssub.sat.i48(i48 1, i48 2)",
+        "call i51 @llvm.ssub.sat.i51(i51 1, i51 2)",
         "call i128 @llvm.ssub.sat.i128(i128 poison, i128 2)",
         "call fastcc i8 @llvm.ssub.sat.i8(i8 1, i8 2)",
         "musttail call i32 @llvm.scmp.i32.i32(i32 1, i32 2)",
@@ -347,7 +347,7 @@ test "integer frontier rejects unimplemented widths flags and semantic envelopes
         "call i128 @llvm.ctlz.i128(i128 0, i32 0)",
         "call range(i64 0, 129) i128 @llvm.ctlz.i128(i128 0, i1 false)",
         "call i128 @llvm.ctpop.i128(i128 0)",
-        "call i128 @llvm.abs.i128(i128 0, i1 true)",
+        "call i128 @llvm.abs.i128(i128 poison, i1 true)",
         "call i32 @llvm.abs.i32(i32 0, i1 %flag)",
         "call fastcc i64 @llvm.abs.i64(i64 1, i1 true)",
         "call signext i32 @llvm.abs.i32(i32 1, i1 true)",
@@ -444,7 +444,7 @@ test "saturating multiply retains nonzero scales and ABI envelopes closed" {
     for ([_][]const u8{
         "call i64 @llvm.smul.fix.sat.i64(i64 1,i64 2,i32 1)",
         "call i64 @llvm.umul.fix.sat.i64(i64 1,i64 2,i32 %scale)",
-        "call i128 @llvm.smul.fix.sat.i128(i128 1,i128 2,i32 0)",
+        "call i128 @llvm.smul.fix.sat.i128(i128 1,i128 2,i32 1)",
         "call i8 @llvm.smul.fix.sat.i8(i8 inreg 1,i8 2,i32 0)",
         "call fastcc i8 @llvm.smul.fix.sat.i8(i8 1,i8 2,i32 0)",
         "call i8 @llvm.smul.fix.sat.i8(i8 256,i8 2,i32 0)",
@@ -484,4 +484,215 @@ test "integer frontier wide counts and absolute values retain logical width bits
             try std.testing.expectEqual(expected, run(raw));
         }
     };
+}
+
+test "signed saturation covers proved odd scalar widths with exact logical signs" {
+    for (1..65) |width_value| {
+        const bits: u16 = @intCast(width_value);
+        if (bits == 51 or bits == 52) continue;
+        for ([_][]const u8{ "sadd.sat", "ssub.sat" }, 0..) |op, kind| for (0..4) |mode| {
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const a = arena.allocator();
+            const input = if (bits == 64) " %x = add i64 %a,0\n %y = add i64 %b,0\n" else try std.fmt.allocPrint(a, " %x = trunc i64 %a to i{0d}\n %y = trunc i64 %b to i{0d}\n", .{bits});
+            const output = if (bits == 64) " %wide = add i64 %v,0\n" else try std.fmt.allocPrint(a, " %wide = zext i{d} %v to i64\n", .{bits});
+            const text = try std.fmt.allocPrint(a, "declare i{0d} @llvm.{1s}.i{0d}(i{0d},i{0d})\ndefine i64 @odd_sat(i64 %a,i64 %b,i64 %live) {{\nentry:\n{2s} %v = call i{0d} @llvm.{1s}.i{0d}(i{0d} {3s},i{0d} {4s})\n{5s} %answer = xor i64 %wide,%live\n ret i64 %answer\n}}\n", .{ bits, op, input, if (mode == 1 or mode == 3) "-1" else "%x", if (mode == 2 or mode == 3) "1" else "%y", output });
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            const original = module.functions.items[0];
+            const view = (try intrinsics.legalize(a, original)).?;
+            try std.testing.expect((try intrinsics.legalize(a, view)) == null);
+            var private = module;
+            private.functions = try module.functions.clone(a);
+            private.functions.items[0] = view;
+            try private.verify();
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            const run: *const fn (u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+            const shift: u7 = @intCast(bits);
+            const sign: u128 = @as(u128, 1) << @as(u7, @intCast(bits - 1));
+            const modulus: u128 = @as(u128, 1) << shift;
+            const mask: u64 = @intCast(modulus - 1);
+            const samples = [_]u64{ 0, 1, mask, mask - 1, @intCast(sign), @intCast(sign - 1), 0x123456789abcdef0, 0xfedcba9876543210 };
+            for (samples) |left| for (samples) |right| {
+                const x: u128 = if (mode == 1 or mode == 3) mask else left & mask;
+                const y: u128 = if (mode == 2 or mode == 3) 1 else right & mask;
+                const sx: i128 = @as(i128, @intCast(x ^ sign)) - @as(i128, @intCast(sign));
+                const sy: i128 = @as(i128, @intCast(y ^ sign)) - @as(i128, @intCast(sign));
+                const sum = if (kind == 0) sx + sy else sx - sy;
+                const lower = -@as(i128, @intCast(sign));
+                const clamp = @min(@max(sum, lower), @as(i128, @intCast(sign - 1)));
+                const raw: u64 = @intCast(@as(u128, @bitCast(clamp)) & mask);
+                const salt = left ^ right ^ 0xabcd0123456789ef;
+                try std.testing.expectEqual(raw ^ salt, run(left, right, salt));
+            };
+            try module.verify();
+            try std.testing.expectEqual(@as(usize, 5), original.blocks.items[0].instructions.items.len);
+        };
+    }
+}
+
+test "sign extension preserves six live argument registers and full-width source aliases" {
+    for (0..6) |index| for ([_]bool{ false, true }) |branch| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        var text: std.Io.Writer.Allocating = .init(a);
+        try text.writer.print("define i64 @sign_live(i64 %a0,i64 %a1,i64 %a2,i64 %a3,i64 %a4,i64 %a5) {{\nentry:\n %narrow = trunc i64 %a{d} to i32\n %wide = sext i32 %narrow to i64\n", .{index});
+        if (branch) try text.writer.writeAll(" %condition = icmp eq i64 %a0,0\n br i1 %condition,label %left,label %right\nleft:\n br label %join\nright:\n br label %join\njoin:\n %carried = phi i64 [%wide,%left],[%wide,%right]\n");
+        for (0..6) |i| {
+            const last = if (i == 0) (if (branch) "%carried" else "%wide") else try std.fmt.allocPrint(a, "%r{d}", .{i - 1});
+            try text.writer.print(" %r{d} = xor i64 {s},%a{d}\n", .{ i, last, i });
+        }
+        try text.writer.writeAll(" ret i64 %r5\n}\n");
+        var module = try ir.Module.parse(std.testing.allocator, text.written());
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u64{ 0, 1, 0x80000000, 0xffffffff, 0x12345678fedcba98, 0xfedcba9876543210 }) |sample| {
+            var values: [6]u64 = undefined;
+            for (&values, 0..) |*value, i| value.* = sample ^ (@as(u64, @intCast(i)) *% 0xabcd0123456789ef);
+            const narrow: i32 = @bitCast(@as(u32, @truncate(values[index])));
+            var expected: u64 = @bitCast(@as(i64, narrow));
+            for (values) |value| expected ^= value;
+            try std.testing.expectEqual(expected, run(values[0], values[1], values[2], values[3], values[4], values[5]));
+        }
+    };
+}
+
+test "pair absolute values preserve minimum semantics full literals and live words" {
+    const samples = [_]u128{ 0, 1, 0xffffffffffffffff, 0x10000000000000000, 0x7fffffffffffffffffffffffffffffff, 0x80000000000000000000000000000000, 0xfffffffffffffffffffffffffffffffe, std.math.maxInt(u128), 0x123456789abcdef0fedcba9876543210 };
+    for ([_]bool{ false, true }) |poison_min| for (0..samples.len + 1) |mode| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        const operand = if (mode == 0) "%x" else try std.fmt.allocPrint(a, "{d}", .{@as(i128, @bitCast(samples[mode - 1]))});
+        const text = try std.fmt.allocPrint(a, "declare i128 @llvm.abs.i128(i128,i1)\ndefine i128 @absolute(i128 %x,i64 %salt) {{\nentry:\n %v = call i128 @llvm.abs.i128(i128 {s},i1 {s})\n %wide = zext i64 %salt to i128\n %r = xor i128 %v,%wide\n ret i128 %r\n}}\n", .{ operand, if (poison_min) "true" else "false" });
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        const view = (try intrinsics.legalize(a, original)).?;
+        try std.testing.expect((try intrinsics.legalize(a, view)) == null);
+        var private = module;
+        private.functions = try module.functions.clone(a);
+        private.functions.items[0] = view;
+        try private.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128, u64) callconv(.c) u128 = @ptrCast(code.ptr);
+        for (samples) |sample| {
+            const value = if (mode == 0) sample else samples[mode - 1];
+            if (poison_min and value == @as(u128, 1) << 127) continue;
+            const expected = if (value >> 127 != 0) 0 -% value else value;
+            const salt: u64 = @truncate(sample ^ 0xabcdef0123456789);
+            try std.testing.expectEqual(expected ^ salt, run(sample, salt));
+        }
+        try std.testing.expectEqual(@as(usize, 3), original.blocks.items[0].instructions.items.len);
+        try module.verify();
+    };
+}
+
+test "pair extended saturation keeps exact double-width arithmetic and live words" {
+    const samples = [_]u128{ 0, 1, 2, 0xffffffffffffffff, 0x10000000000000000, 0x7fffffffffffffffffffffffffffffff, 0x80000000000000000000000000000000, std.math.maxInt(u128), 0x123456789abcdef0fedcba9876543210 };
+    for ([_][]const u8{ "ushl.sat", "sshl.sat", "umul.fix.sat", "smul.fix.sat" }, 0..) |op, kind| for (0..4) |mode| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        const multiply = kind >= 2;
+        const text = try std.fmt.allocPrint(a, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndeclare i128 @llvm.{0s}.i128(i128,i128{1s})\ndefine i128 @pair_extended(i128 %x,i128 %y,i64 %salt) {{\nentry:\n %n = and i128 %y,127\n %v = call i128 @llvm.{0s}.i128(i128 {2s},i128 {3s}{4s})\n %mix = xor i128 %v,%y\n %word = zext i64 %salt to i128\n %r = xor i128 %mix,%word\n ret i128 %r\n}}\n", .{ op, if (multiply) ",i32" else "", if (mode == 1 or mode == 3) "-1" else "%x", if (mode == 2 or mode == 3) (if (multiply) "-1" else "3") else (if (multiply) "%y" else "%n"), if (multiply) ",i32 0" else "" });
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        const view = (try intrinsics.legalize(a, original)).?;
+        try std.testing.expect((try intrinsics.legalize(a, view)) == null);
+        var private = module;
+        private.functions = try module.functions.clone(a);
+        private.functions.items[0] = view;
+        try private.verify();
+        const code = try pairExtendedExecutable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128, u128, u64) callconv(.c) u128 = @ptrCast(code.ptr);
+        for (samples) |x| for (samples) |y| {
+            const left = if (mode == 1 or mode == 3) std.math.maxInt(u128) else x;
+            const right = if (mode == 2 or mode == 3) (if (multiply) std.math.maxInt(u128) else @as(u128, 3)) else (if (multiply) y else y & 127);
+            const signed = kind == 1 or kind == 3;
+            const expected: u128 = if (signed) blk: {
+                const sx: i256 = @as(i128, @bitCast(left));
+                const sy: i256 = @as(i128, @bitCast(right));
+                const wide = if (multiply) sx * sy else sx << @as(u8, @intCast(right));
+                const limit = @min(@max(wide, std.math.minInt(i128)), std.math.maxInt(i128));
+                break :blk @bitCast(@as(i128, @intCast(limit)));
+            } else blk: {
+                const wide = if (multiply) @as(u256, left) * @as(u256, right) else @as(u256, left) << @as(u8, @intCast(right));
+                break :blk @intCast(@min(wide, std.math.maxInt(u128)));
+            };
+            const salt: u64 = @truncate(x ^ y);
+            try std.testing.expectEqual(expected ^ y ^ salt, run(x, y, salt));
+        };
+        try module.verify();
+    };
+}
+test "pair extended saturation retains scale call and operand rejection boundaries" {
+    for ([_][]const u8{
+        "call i128 @llvm.smul.fix.sat.i128(i128 %x,i128 %y,i32 1)",
+        "call i128 @llvm.umul.fix.sat.i128(i128 %x,i128 %y,i64 0)",
+        "musttail call i128 @llvm.ushl.sat.i128(i128 %x,i128 %y)",
+        "call fastcc i128 @llvm.sshl.sat.i128(i128 %x,i128 %y)",
+        "call i128 @llvm.ushl.sat.i128(i128 inreg %x,i128 %y)",
+        "call i128 @llvm.sshl.sat.i128(i128 %x,i64 1)",
+    }) |call| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define void @closed(i128 %x,i128 %y) {{\nentry:\n %v = {s}\n ret void\n}}\n", .{call});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try intrinsics.legalize(arena.allocator(), module.functions.items[0])) == null);
+    }
+}
+
+fn pairExtendedExecutable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
+    const function = module.functions.items[0];
+    var output = machine.MachineFunction.init(function.name, function.ret_ty);
+    defer output.deinit(std.testing.allocator);
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items, .declarations = module.declarations.items };
+    const selected = try selector.tryLowerWithContext(std.testing.allocator, &output, function, &context);
+    if (selected == .unsupported) std.debug.print("pair extended: {s}\n", .{selected.unsupported.detail()});
+    try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+    try verify.verifyFunction(output);
+    const code = try encoding.encodeFunction(std.testing.allocator, output);
+    defer std.testing.allocator.free(code);
+    const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    @memcpy(memory[0..code.len], code);
+    return memory;
+}
+
+test "pair extended saturation keeps unknown and incompatible limb layouts closed" {
+    var module = try ir.Module.parse(std.testing.allocator, "declare i128 @llvm.ushl.sat.i128(i128,i128)\ndefine i128 @layout_closed(i128 %x,i128 %y) {\nentry:\n %v = call i128 @llvm.ushl.sat.i128(i128 %x,i128 %y)\n ret i128 %v\n}\n");
+    defer module.deinit();
+    for ([_]?[]const u8{ null, "e-i64:64-n8:16:32:64-S128", "e-i64:64-i128:64-n8:16:32:64-S128", "E-i64:64-i128:128-n8:16:32:64-S128" }) |layout| {
+        var output = machine.MachineFunction.init("layout_closed", .{ .int = 128 });
+        defer output.deinit(std.testing.allocator);
+        const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .aliases = module.aliases.items, .target_datalayout = layout, .functions = module.functions.items, .declarations = module.declarations.items };
+        const result = try selector.tryLowerWithContext(std.testing.allocator, &output, module.functions.items[0], &context);
+        try std.testing.expect(result == .unsupported);
+        try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);
+    }
+}
+
+test "pair fixed multiply formerly closed literal form executes its exact result" {
+    const text = "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndeclare i128 @llvm.smul.fix.sat.i128(i128,i128,i32)\ndefine i128 @literal_pair_product() {\nentry:\n %v = call i128 @llvm.smul.fix.sat.i128(i128 1,i128 2,i32 0)\n ret i128 %v\n}\n";
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try pairExtendedExecutable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn () callconv(.c) i128 = @ptrCast(code.ptr);
+    try std.testing.expectEqual(@as(i128, 2), run());
+    try module.verify();
 }

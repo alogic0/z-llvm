@@ -16,7 +16,7 @@ pub fn operation(call: ir.CallInst) ?Operation {
     inline for (std.meta.tags(Operation)) |op| {
         const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
         if (std.mem.eql(u8, call.callee, name)) {
-            if (bits > 64 and op != .bswap and !(bits == 128 and (op == .ctlz or op == .cttz or op == .fshl)) and
+            if (bits > 64 and op != .bswap and !(bits == 128 and (op == .ctlz or op == .cttz or op == .fshl or op == .abs)) and
                 !(bits < 128 and (op == .abs or op == .ctlz or op == .ctpop or op == .cttz))) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
@@ -91,6 +91,22 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
     const call = inst.kind.call;
     const bits = call.ret_ty.int;
     const b: Builder = .{ .allocator = allocator, .function = function, .block = block, .serial = serial, .wide = .{ .int = if (op == .ctpop or bits >= 32) 64 else 32 } };
+    if (bits == 128 and op == .abs) {
+        var p = b;
+        p.wide = .{ .int = 128 };
+        const operand = call.args.items[0].value;
+        const input = if (operand == .int)
+            try @import("binary128_arithmetic.zig").materializeIntegerArgument(allocator, function, block, serial, .{ .op = .uitofp, .from_ty = p.wide, .value = operand, .to_ty = .fp128 })
+        else
+            operand;
+        // INT_MIN wraps for the false flag; that same result refines the true
+        // flag's poison case without adding a trap or changing a live source.
+        const sign = try p.binary(.ashr, input, .{ .int = 127 });
+        const absolute = try p.binary(.sub, try p.binary(.xor, input, sign), sign);
+        try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .binary = .{ .op = .@"or", .ty = p.wide, .lhs = absolute, .rhs = .{ .int = 0 } } } });
+        return;
+    }
+
     if (bits > 64 and bits < 128 and op != .bswap) {
         const pair: ir.Type = .{ .int = 128 };
         const word: ir.Type = .{ .int = 64 };

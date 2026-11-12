@@ -485,7 +485,7 @@ test "integer vector lane expansion rejects unsupported memory ABI and indices" 
         "define void @f(ptr %p) {\nentry:\n %v = load <4 x i32>, ptr addrspace(1) %p\n ret void\n}\n",
         "define <2 x i128> @f(<2 x i128> %v) {\nentry:\n ret <2 x i128> %v\n}\n",
         "define i32 @f(ptr %p, i128 %index) {\nentry:\n %v = load <4 x i32>, ptr %p\n %r = extractelement <4 x i32> %v, i128 %index\n ret i32 %r\n}\n",
-        "declare void @callee(<8 x i32>)\ndefine void @f(ptr %p) {\nentry:\n %v = load <8 x i32>, ptr %p\n call void @callee(<8 x i32> %v)\n ret void\n}\n",
+        "declare <8 x i32> @callee(<8 x i32>)\ndefine void @f(ptr %p) {\nentry:\n %v = load <8 x i32>, ptr %p\n %unproved = call <8 x i32> @callee(<8 x i32> %v)\n ret void\n}\n",
     }) |source| {
         var module = try ir.Module.parse(std.testing.allocator, source);
         defer module.deinit();
@@ -565,4 +565,162 @@ test "integer vector graphs retain forward PHI identities and typed pointer lane
     try private.verify();
     try module.verify();
     try std.testing.expect(module.functions.items[0].blocks.items[1].instructions.items[1].kind.phi.ty == .vector);
+}
+
+fn vectorInputCode(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
+    const m = @import("../machine.zig");
+    const select = @import("../generic_cfg_selector.zig");
+    const source = module.functions.items[0];
+    var machine = m.MachineFunction.init(source.name, source.ret_ty);
+    defer machine.deinit(std.testing.allocator);
+    const context: m.ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items, .declarations = module.declarations.items };
+    const result = try select.tryLowerWithContext(std.testing.allocator, &machine, source, &context);
+    if (result == .unsupported) std.debug.print("vector inputs: {s}\n", .{result.unsupported.detail()});
+    try std.testing.expect(result == .selected);
+    try @import("../verify.zig").verifyFunction(machine);
+    const code = try @import("../../../mc/encoding.zig").encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(code);
+    const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    @memcpy(memory[0..code.len], code);
+    return memory;
+}
+fn vectorInputText(a: std.mem.Allocator, n: u32, bits: u16, pointer: bool) ![]const u8 {
+    var text: std.Io.Writer.Allocating = .init(a);
+    const scalar = if (pointer) "ptr" else try std.fmt.allocPrint(a, "i{d}", .{bits});
+    try text.writer.print("define i64 @fragment_probe(i64 %p0,i64 %p1,i64 %p2,i64 %p3,i64 %p4,i64 %p5,<{d} x {s}> %v,i64 %salt) {{\nentry:\n %s0 = xor i64 %salt,%p0\n", .{ n, scalar });
+    for (1..6) |i| try text.writer.print(" %s{d} = xor i64 %s{d},%p{d}\n", .{ i, i - 1, i });
+    for (0..n) |i| {
+        try text.writer.print(" %lane{0d} = extractelement <{1d} x {2s}> %v,i64 {0d}\n", .{ i, n, scalar });
+        if (pointer) try text.writer.print(" %word{0d} = ptrtoint ptr %lane{0d} to i64\n", .{i}) else if (bits == 64) try text.writer.print(" %word{0d} = add i64 %lane{0d},0\n", .{i}) else try text.writer.print(" %word{0d} = zext i{1d} %lane{0d} to i64\n", .{ i, bits });
+        const previous = if (i == 0) "%s5" else try std.fmt.allocPrint(a, "%r{d}", .{i - 1});
+        try text.writer.print(" %mix{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %mix{0d},%word{0d}\n", .{ i, previous });
+    }
+    try text.writer.print(" ret i64 %r{d}\n}}\n", .{n - 1});
+    return a.dupe(u8, text.written());
+}
+test "fragment vector inputs preserve split XMM words and six live GP prefixes" {
+    const Carrier = @Vector(2, u64);
+    inline for ([_][2]u16{ .{ 32, 8 }, .{ 64, 8 }, .{ 16, 16 }, .{ 32, 16 }, .{ 64, 16 }, .{ 8, 32 }, .{ 16, 32 }, .{ 32, 32 }, .{ 4, 64 }, .{ 8, 64 }, .{ 16, 64 } }) |dimensions| {
+        const n = dimensions[0];
+        const bits = dimensions[1];
+        const pieces = n * bits / 128;
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        const text = try vectorInputText(a, n, bits, false);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        const view = (try forms.legalize(a, original, null)).?;
+        try std.testing.expectEqual(@as(usize, 7 + pieces), view.params.items.len);
+        var private = module;
+        private.functions = try module.functions.clone(a);
+        private.functions.items[0] = view;
+        try private.verify();
+        try std.testing.expect((try forms.legalize(a, view, null)) == null);
+        const code = try vectorInputCode(module);
+        defer std.posix.munmap(code);
+        for (0..16) |seed| {
+            var words: [8]Carrier = undefined;
+            var bytes: [128]u8 = undefined;
+            for (&bytes, 0..) |*byte, i| byte.* = @truncate((i + seed * 31) *% 173 ^ 0xa5);
+            for (words[0..pieces], 0..) |*word, i| word.* = .{ std.mem.readInt(u64, bytes[i * 16 ..][0..8], .little), std.mem.readInt(u64, bytes[i * 16 + 8 ..][0..8], .little) };
+            var prefix: [6]u64 = undefined;
+            for (&prefix, 0..) |*value, i| value.* = @as(u64, @intCast(seed + i)) *% 0x9e3779b97f4a7c15;
+            const salt: u64 = @as(u64, @intCast(seed)) *% 0xf06dea67e461de5b;
+            var expected = salt;
+            for (prefix) |value| expected ^= value;
+            for (0..n) |i| {
+                var lane: u64 = 0;
+                for (0..bits / 8) |j| lane |= @as(u64, bytes[i * (bits / 8) + j]) << @as(u6, @intCast(j * 8));
+                expected = (expected *% 1099511628211) ^ lane;
+            }
+            const result = if (pieces == 2) blk: {
+                const run: *const fn (u64, u64, u64, u64, u64, u64, Carrier, Carrier, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                break :blk run(prefix[0], prefix[1], prefix[2], prefix[3], prefix[4], prefix[5], words[0], words[1], salt);
+            } else if (pieces == 4) blk: {
+                const run: *const fn (u64, u64, u64, u64, u64, u64, Carrier, Carrier, Carrier, Carrier, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                break :blk run(prefix[0], prefix[1], prefix[2], prefix[3], prefix[4], prefix[5], words[0], words[1], words[2], words[3], salt);
+            } else blk: {
+                const run: *const fn (u64, u64, u64, u64, u64, u64, Carrier, Carrier, Carrier, Carrier, Carrier, Carrier, Carrier, Carrier, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                break :blk run(prefix[0], prefix[1], prefix[2], prefix[3], prefix[4], prefix[5], words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], salt);
+            };
+            try std.testing.expectEqual(expected, result);
+        }
+        try std.testing.expectEqual(@as(usize, 8), original.params.items.len);
+        try std.testing.expectEqual(@as(u32, n), original.params.items[6].ty.vector.len);
+        try module.verify();
+    }
+}
+test "fragment vector inputs preserve scalarized GP lanes and incoming stack words" {
+    inline for ([_][3]u16{ .{ 3, 8, 0 }, .{ 3, 16, 0 }, .{ 3, 64, 0 }, .{ 5, 32, 0 }, .{ 3, 64, 1 } }) |dimensions| {
+        const n = dimensions[0];
+        const bits = dimensions[1];
+        const pointer = dimensions[2] != 0;
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        const text = try vectorInputText(a, n, bits, pointer);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        const view = (try forms.legalize(a, original, null)).?;
+        try std.testing.expectEqual(@as(usize, 7 + n), view.params.items.len);
+        var private = module;
+        private.functions = try module.functions.clone(a);
+        private.functions.items[0] = view;
+        try private.verify();
+        try std.testing.expect((try forms.legalize(a, view, null)) == null);
+        const code = try vectorInputCode(module);
+        defer std.posix.munmap(code);
+        for (0..32) |seed| {
+            var values: [5]u64 = undefined;
+            for (&values, 0..) |*value, i| value.* = if (pointer) 0x1000 + (seed + i) * 64 else @as(u64, @intCast(seed + i)) *% 0xf06dea67e461de5b;
+            const prefix = [_]u64{ 0x123456789abcdef0, 0xfedcba9876543210, 0x1122334455667788, 0xabcd0123456789ef, 0x87654321fedcba98, 0x1020304050607080 };
+            const salt: u64 = @as(u64, @intCast(seed)) *% 0x9e3779b97f4a7c15;
+            var expected = salt;
+            for (prefix) |value| expected ^= value;
+            const mask: u64 = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << bits) - 1;
+            for (values[0..n]) |value| expected = (expected *% 1099511628211) ^ (value & mask);
+            const result = if (n == 3) blk: {
+                const run: *const fn (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                break :blk run(prefix[0], prefix[1], prefix[2], prefix[3], prefix[4], prefix[5], values[0], values[1], values[2], salt);
+            } else blk: {
+                const run: *const fn (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                break :blk run(prefix[0], prefix[1], prefix[2], prefix[3], prefix[4], prefix[5], values[0], values[1], values[2], values[3], values[4], salt);
+            };
+            try std.testing.expectEqual(expected, result);
+        }
+        try std.testing.expectEqual(@as(usize, 8), original.params.items.len);
+        try module.verify();
+    }
+}
+
+test "fragment vector inputs retain unproved returns layouts and ABI facts closed" {
+    for ([_][]const u8{
+        "define <4 x i64> @closed(<4 x i64> %v) {\nentry:\n ret <4 x i64> %v\n}\n",
+        "define <3 x i8> @closed(<3 x i8> %v) {\nentry:\n ret <3 x i8> %v\n}\n",
+        "define void @closed(<64 x i64> %v) {\nentry:\n ret void\n}\n",
+        "define void @closed(<3 x i9> %v) {\nentry:\n ret void\n}\n",
+        "define void @closed(<4 x i64> inreg %v) {\nentry:\n ret void\n}\n",
+        "define void @closed(<4 x i64> %v,...) {\nentry:\n ret void\n}\n",
+    }) |text| {
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+    var module = try ir.Module.parse(std.testing.allocator, "define i64 @ninth_fragment(double %prefix,<64 x i16> %v) {\nentry:\n %bits = bitcast double %prefix to i64\n %lane = extractelement <64 x i16> %v,i64 63\n %word = zext i16 %lane to i64\n %answer = xor i64 %word,%bits\n ret i64 %answer\n}\n");
+    defer module.deinit();
+    const m = @import("../machine.zig");
+    var output = m.MachineFunction.init("ninth_fragment", .{ .int = 64 });
+    defer output.deinit(std.testing.allocator);
+    const outcome = @import("../generic_cfg_selector.zig").tryLower(std.testing.allocator, &output, module.functions.items[0]) catch |err| {
+        try std.testing.expectEqual(error.UnsupportedVectorAbi, err);
+        return;
+    };
+    try std.testing.expect(outcome == .unsupported);
 }

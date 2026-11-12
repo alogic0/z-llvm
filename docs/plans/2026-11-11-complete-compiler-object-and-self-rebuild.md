@@ -7,9 +7,9 @@ self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
 remainder error is repaired at `9cb21139`. Twenty behavior-family populations
 pass cumulative validation at `d9148ebc`; eight additional families pass at
 `ca38e3ee`. Fifteen further native populations pass cumulative validation at
-`c1c0ecee`, with 141 unchanged Debug rejections still open. The next isolated
-six-population batch passes both 2,281-unit builds and reaches 107 rejections;
-adoption and its fresh cumulative validation are next.
+`c1c0ecee`, with 141 unchanged Debug rejections still open. The next
+six-population batch is adopted for immediate cumulative validation; both
+isolated 2,281-unit builds pass and 107 original Debug rejections remain.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -443,7 +443,8 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    symbols and 12 runtime symbols; the six affected complex helpers match
    60,000 exact LLVM records per object. See the
    [expansion record](../evidence/compiler_behavior_expansion_checkpoint_20261112.json).
-6. Adopt the independently proved six-population batch: odd-width signed
+6. **Adopted for immediate cumulative validation.** Integrate the independently
+   proved six-population batch: odd-width signed
    saturation; sign-extension live-register preservation; 128-bit absolute
    value; saturating shifts and scale-zero fixed multiplication; bounded input
    vector fragments; and mixed scalar/SSE calls with existing physical stack

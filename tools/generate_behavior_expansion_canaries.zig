@@ -1,4 +1,4 @@
-//! Deterministically generate fifteen behavior-frontier native populations.
+//! Deterministically generate twenty-one behavior-frontier native populations.
 //! --output-root NEW; optional --verify-root DIR checks fixtures and registry.
 const std = @import("std");
 const u = @import("validation/common.zig");
@@ -20,7 +20,13 @@ pub fn main(init: std.process.Init) !void {
     try u.add(&entries, try floatingLiterals(&c, target));
     try u.add(&entries, try pairVectorSaturation(&c, target));
     try u.add(&entries, try pairLiteralExtrema(&c, target));
-    if (entries.array.items.len != 15) return error.ExpectedFifteenPopulations;
+    try u.add(&entries, try oddSaturation(&c, target));
+    try u.add(&entries, try signExtensionLive(&c, target));
+    try u.add(&entries, try pairAbsolute(&c, target));
+    try u.add(&entries, try pairExtendedSaturation(&c, target));
+    try u.add(&entries, try vectorInputFragments(&c, target));
+    try u.add(&entries, try mixedStackArguments(&c, target));
+    if (entries.array.items.len != 21) return error.ExpectedTwentyOnePopulations;
     try c.writeJson(try c.join(&.{ target, "native_canaries.json" }), try u.toValue(c.a, .{ .schema = 1, .canaries = entries }));
     var files = std.StringHashMap(void).init(c.a);
     for (entries.array.items) |entry| {
@@ -28,7 +34,7 @@ pub fn main(init: std.process.Init) !void {
         if (entry.object.get("reference_fixture")) |reference| try files.put(try c.fmt("{s}.ll", .{reference.string}), {});
         if (entry.object.get("reference_source")) |source| try files.put(source.string, {});
     }
-    if (files.count() != 31) return error.ExpectedThirtyOneFixtureFiles;
+    if (files.count() != 43) return error.ExpectedFortyThreeFixtureFiles;
     if (args.get("verify-root")) |root| {
         var names = files.keyIterator();
         while (names.next()) |name| if (!std.mem.eql(u8, try c.digest(try c.join(&.{ target, name.* })), try c.digest(try c.join(&.{ root, name.* })))) return c.fail("generated fixture differs: {s}", .{name.*});
@@ -42,7 +48,7 @@ pub fn main(init: std.process.Init) !void {
             if (matches != 1) return error.GeneratedPopulationMissingOrDuplicated;
         }
     }
-    try c.print("behavior-expansion fixtures: 15 populations, 31 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
+    try c.print("behavior-expansion fixtures: 21 populations, 43 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
 }
 fn wideSwitch(c: *u.Context, target: []const u8) !u.Value {
     var text: std.Io.Writer.Allocating = .init(c.a);
@@ -358,4 +364,258 @@ fn pairLiteralExtrema(c: *u.Context, target: []const u8) !u.Value {
     try c.write(try c.join(&.{ target, "pair_literal_extrema.ll" }), text.written());
     try c.write(try c.join(&.{ target, "pair_literal_extrema_driver.c" }), driver.written());
     return u.toValue(c.a, .{ .population = "pair_literal_extrema", .fixture = "pair_literal_extrema", .prefix = "pair-literal-extrema", .functions = functions, .observations = 8192, .stdout = "pair-literal-extrema observations=8192 unsigned-minmax=left-right-full-width-literals=llvm-c-local-interop=guards=preserved\n" });
+}
+
+fn replaceFixtureText(c: *u.Context, data: []const u8, old: []const u8, new: []const u8) ![]const u8 {
+    const at = std.mem.indexOf(u8, data, old) orelse return error.ExpectedFixtureTemplateAnchor;
+    return c.fmt("{s}{s}{s}", .{ data[0..at], new, data[at + old.len ..] });
+}
+
+fn oddSaturation(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var ir: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try ir.writer.writeAll("target triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_oddSaturation_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for (1..65) |bits| {
+        if (bits == 51 or bits == 52) continue;
+        for ([_][]const u8{ "sadd.sat", "ssub.sat" }, 0..) |op, kind| {
+            const name = try c.fmt("odd_saturation_{d}_{d}", .{ bits, kind });
+            try u.add(&functions, u.s(name));
+            try ir.writer.print("declare i{0d} @llvm.{1s}.i{0d}(i{0d},i{0d})\ndefine i64 @{2s}(ptr %out,i64 %a,i64 %b,i64 %salt) {{\nentry:\n", .{ bits, op, name });
+            if (bits == 64) try ir.writer.writeAll(" %x = add i64 %a,0\n %y = add i64 %b,0\n") else try ir.writer.print(" %x = trunc i64 %a to i{0d}\n %y = trunc i64 %b to i{0d}\n", .{bits});
+            for (0..4) |mode| {
+                try ir.writer.print(" %v{2d} = call i{0d} @llvm.{1s}.i{0d}(i{0d} {3s},i{0d} {4s})\n", .{ bits, op, mode, if (mode == 1 or mode == 3) "-1" else "%x", if (mode == 2 or mode == 3) "1" else "%y" });
+                if (bits == 64) try ir.writer.print(" %wide{0d} = add i64 %v{0d},0\n", .{mode}) else try ir.writer.print(" %wide{1d} = zext i{0d} %v{1d} to i64\n", .{ bits, mode });
+                try ir.writer.print(" %r{0d} = xor i64 %wide{0d},%salt\n %p{0d} = getelementptr i8,ptr %out,i64 {1d}\n store i64 %r{0d},ptr %p{0d},align 1\n", .{ mode, mode * 8 });
+            }
+            try ir.writer.writeAll(" %live = xor i64 %salt,90\n ret i64 %live\n}\n");
+            try driver.writer.print("extern uint64_t {s}(void *,uint64_t,uint64_t,uint64_t);\n", .{name});
+            try table.writer.print("{{{d},{d},{s}}},\n", .{ bits, kind, name });
+        }
+    }
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "odd_saturation.ll" }), ir.written());
+    try c.write(try c.join(&.{ fixtures, "odd_saturation_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{
+        .population = "odd_saturation",
+        .fixture = "odd_saturation",
+        .prefix = "odd-saturation",
+        .functions = functions,
+        .observations = 55552,
+        .stdout = "odd-saturation observations=55552 all-proved-widths=logical-signs=literal-modes=live-values=exact-stores=guard-page=preserved\n",
+    });
+    return entry;
+}
+
+fn signExtensionLive(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_signExtensionLive_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]bool{ false, true }) |branch| for (0..6) |index| {
+        const id = @as(usize, if (branch) 6 else 0) + index;
+        const body = try c.fmt("sign_extension_body_{d}", .{id});
+        const provider = try c.fmt("sign_extension_provider_{d}", .{id});
+        const probe = try c.fmt("sign_extension_probe_{d}", .{id});
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define i64 @{s}(i64 %a0,i64 %a1,i64 %a2,i64 %a3,i64 %a4,i64 %a5) noinline {{\nentry:\n %narrow = trunc i64 %a{d} to i32\n %wide = sext i32 %narrow to i64\n", .{ body, index });
+        if (branch) try text.writer.writeAll(" %condition = icmp eq i64 %a0,0\n br i1 %condition,label %left,label %right\nleft:\n br label %join\nright:\n br label %join\njoin:\n %carried = phi i64 [%wide,%left],[%wide,%right]\n");
+        for (0..6) |i| {
+            const previous = if (i == 0) (if (branch) "%carried" else "%wide") else try c.fmt("%r{d}", .{i - 1});
+            try text.writer.print(" %mix{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %mix{0d},%a{0d}\n", .{ i, previous });
+        }
+        try text.writer.print(" ret i64 %r5\n}}\ndeclare i64 @{s}(i64,i64,i64,i64,i64,i64)\ndefine i64 @{s}(ptr %out,ptr %input,i64 %salt) {{\nentry:\n", .{ provider, probe });
+        for (0..6) |i| try text.writer.print(" %p{0d} = getelementptr i8,ptr %input,i64 {1d}\n %a{0d} = load i64,ptr %p{0d},align 1\n", .{ i, i * 8 });
+        try text.writer.print(" %local = call i64 @{s}(i64 %a0,i64 %a1,i64 %a2,i64 %a3,i64 %a4,i64 %a5)\n %external = call i64 @{s}(i64 %a0,i64 %a1,i64 %a2,i64 %a3,i64 %a4,i64 %a5)\n store i64 %local,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 8\n store i64 %external,ptr %next,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ body, provider });
+        try driver.writer.print("extern uint64_t {s}(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t);\nextern uint64_t {s}(void *,const void *,uint64_t);\nuint64_t {s}(uint64_t a0,uint64_t a1,uint64_t a2,uint64_t a3,uint64_t a4,uint64_t a5){{uint64_t args[]={{a0,a1,a2,a3,a4,a5}};return model(args,{d});}}\n", .{ body, probe, provider, index });
+        try table.writer.print("{{{d},{s},{s}}},\n", .{ index, body, probe });
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "sign_extension_live.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "sign_extension_live_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "sign_extension_live", .fixture = "sign_extension_live", .prefix = "sign-extension-live", .functions = functions, .observations = 21504, .stdout = "sign-extension-live observations=21504 six-gp-sources=full-width-aliases=phi-edges=llvm-c-local-interop=exact-stores=guard-pages=preserved\n" });
+    return entry;
+}
+
+fn pairAbsolute(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var driver: []const u8 = try c.read(try c.join(&.{"tools/templates/behavior_pairLiteralExtrema_core.c"}));
+    const begin = std.mem.indexOf(u8, driver, "static __attribute__((noinline)) u128 model(") orelse return error.ModelMissing;
+    const end = std.mem.indexOf(u8, driver, "static u128 sample(") orelse return error.SampleMissing;
+    driver = try c.fmt("{s}static __attribute__((noinline)) u128 model(u128 a,u128 b,unsigned op){{(void)op;u128 absolute=(a>>127)?(u128)0-a:a;return absolute^b;}}\n{s}", .{ driver[0..begin], driver[end..] });
+    driver = try replaceFixtureText(c, driver, "  memcpy(ap,&a,16);", "  if((cases[slot].op&1)&&a==((u128)1<<127))a++;\n  memcpy(ap,&a,16);");
+    driver = try replaceFixtureText(c, driver, "pair-saturation slot=", "pair-absolute slot=");
+    driver = try replaceFixtureText(c, driver, "pair-literal-extrema observations=%zu unsigned-minmax=left-right-full-width-literals=llvm-c-local-interop=guards=preserved", "pair-absolute observations=%zu minimum-false-flag=defined-true-flag=full-width-values=live-words=llvm-c-local-interop=guards=preserved");
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var declarations: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target triple = \"x86_64-unknown-linux-gnu\"\ndeclare i128 @llvm.abs.i128(i128,i1)\n");
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]bool{ false, true }) |fast| for ([_]bool{ false, true }) |flag| {
+        const id: usize = @as(usize, if (fast) 2 else 0) + @as(usize, if (flag) 1 else 0);
+        const body = try c.fmt("pair_absolute_body_{d}", .{id});
+        const provider = try c.fmt("pair_absolute_provider_{d}", .{id});
+        const probe = try c.fmt("pair_absolute_probe_{d}", .{id});
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define {0s}i128 @{1s}(i128 %a,i128 %b) noinline {{\nentry:\n %v = call i128 @llvm.abs.i128(i128 %a,i1 {2s})\n %r = xor i128 %v,%b\n ret i128 %r\n}}\ndeclare i128 @{3s}(i128,i128)\ndefine i64 @{4s}(ptr %out,ptr %ap,ptr %bp,i64 %salt) {{\nentry:\n %a = load i128,ptr %ap,align 1\n %b = load i128,ptr %bp,align 1\n %local = call {0s}i128 @{1s}(i128 %a,i128 %b)\n %external = call i128 @{3s}(i128 %a,i128 %b)\n store i128 %local,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 16\n store i128 %external,ptr %next,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ if (fast) "fastcc " else "", body, if (flag) "true" else "false", provider, probe });
+        try declarations.writer.print("extern u128 {s}(u128,u128);\nextern uint64_t {s}(void *,const void *,const void *,uint64_t);\nu128 {s}(u128 a,u128 b){{return model(a,b,{d});}}\n", .{ body, probe, provider, id });
+        try table.writer.print("{{{d},{s},{s}}},\n", .{ id, body, probe });
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try c.write(try c.join(&.{ fixtures, "pair_absolute.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "pair_absolute_driver.c" }), try c.fmt("{s}{s}{s}", .{ driver, declarations.written(), table.written() }));
+    const entry = try u.toValue(c.a, .{ .population = "pair_absolute", .fixture = "pair_absolute", .prefix = "pair-absolute", .functions = functions, .observations = 8192, .stdout = "pair-absolute observations=8192 minimum-false-flag=defined-true-flag=full-width-values=live-words=llvm-c-local-interop=guards=preserved\n" });
+    return entry;
+}
+
+fn pairExtendedSaturation(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var driver: []const u8 = try c.read(try c.join(&.{"tools/templates/behavior_pairLiteralExtrema_core.c"}));
+    const begin = std.mem.indexOf(u8, driver, "static __attribute__((noinline)) u128 model(") orelse return error.ModelMissing;
+    const end = std.mem.indexOf(u8, driver, "static u128 sample(") orelse return error.SampleMissing;
+    driver = try c.fmt("{s}{s}\n{s}", .{ driver[0..begin], try c.read(try c.join(&.{"tools/templates/behavior_pairExtendedSaturation_core.c"})), driver[end..] });
+    driver = try replaceFixtureText(c, driver, "pair-saturation slot=", "pair-extended slot=");
+    driver = try replaceFixtureText(c, driver, "count!=4||observations!=8192", "count!=8||observations!=16384");
+    driver = try replaceFixtureText(c, driver, "pair-literal-extrema observations=%zu unsigned-minmax=left-right-full-width-literals=llvm-c-local-interop=guards=preserved", "pair-extended observations=%zu signed-unsigned-shifts=full-products=scale-zero=live-words=llvm-c-local-interop=guards=preserved");
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var declarations: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    const pair_operations = [_][]const u8{ "ushl.sat", "sshl.sat", "umul.fix.sat", "smul.fix.sat" };
+    for (pair_operations, 0..) |op, id| try text.writer.print("declare i128 @llvm.{s}.i128(i128,i128{s})\n", .{ op, if (id >= 2) ",i32 immarg" else "" });
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]bool{ false, true }) |fast| for (pair_operations, 0..) |op, kind| {
+        const id: usize = @as(usize, if (fast) 4 else 0) + kind;
+        const body = try c.fmt("pair_extended_body_{d}", .{id});
+        const provider = try c.fmt("pair_extended_provider_{d}", .{id});
+        const probe = try c.fmt("pair_extended_probe_{d}", .{id});
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define {0s}i128 @{1s}(i128 %a,i128 %b) noinline {{\nentry:\n %n = and i128 %b,127\n %v = call i128 @llvm.{2s}.i128(i128 %a,i128 {3s}{4s})\n %r = xor i128 %v,%b\n ret i128 %r\n}}\ndeclare i128 @{5s}(i128,i128)\ndefine i64 @{6s}(ptr %out,ptr %ap,ptr %bp,i64 %salt) {{\nentry:\n %a = load i128,ptr %ap,align 1\n %b = load i128,ptr %bp,align 1\n %local = call {0s}i128 @{1s}(i128 %a,i128 %b)\n %external = call i128 @{5s}(i128 %a,i128 %b)\n store i128 %local,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 16\n store i128 %external,ptr %next,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ if (fast) "fastcc " else "", body, op, if (kind >= 2) "%b" else "%n", if (kind >= 2) ",i32 0" else "", provider, probe });
+        try declarations.writer.print("extern u128 {s}(u128,u128);\nextern uint64_t {s}(void *,const void *,const void *,uint64_t);\nu128 {s}(u128 a,u128 b){{return model(a,b,{d});}}\n", .{ body, probe, provider, id });
+        try table.writer.print("{{{d},{s},{s}}},\n", .{ id, body, probe });
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try c.write(try c.join(&.{ fixtures, "pair_extended_saturation.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "pair_extended_saturation_driver.c" }), try c.fmt("{s}{s}{s}", .{ driver, declarations.written(), table.written() }));
+    const entry = try u.toValue(c.a, .{ .population = "pair_extended_saturation", .fixture = "pair_extended_saturation", .prefix = "pair-extended", .functions = functions, .observations = 16384, .stdout = "pair-extended observations=16384 signed-unsigned-shifts=full-products=scale-zero=live-words=llvm-c-local-interop=guards=preserved\n" });
+    return entry;
+}
+
+fn vectorInputFragments(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    const prefixes = [_]u64{ 0x123456789abcdef0, 0xfedcba9876543210, 0x1122334455667788, 0xabcd0123456789ef, 0x87654321fedcba98, 0x1020304050607080 };
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_vectorInputFragments_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    const shapes = [_][3]u16{ .{ 32, 8, 0 }, .{ 64, 8, 0 }, .{ 16, 16, 0 }, .{ 32, 16, 0 }, .{ 64, 16, 0 }, .{ 8, 32, 0 }, .{ 16, 32, 0 }, .{ 32, 32, 0 }, .{ 4, 64, 0 }, .{ 8, 64, 0 }, .{ 16, 64, 0 }, .{ 3, 8, 0 }, .{ 3, 16, 0 }, .{ 3, 64, 0 }, .{ 5, 32, 0 }, .{ 3, 64, 1 } };
+    for (shapes, 0..) |shape, index| for ([_]bool{ false, true }) |fast| {
+        const n = shape[0];
+        const bits = shape[1];
+        const pointer = shape[2] != 0;
+        const scalar = if (pointer) "ptr" else try c.fmt("i{d}", .{bits});
+        const scalarized = n == 3 or n == 5;
+        const parts: usize = if (scalarized) n else n * bits / 128;
+        const id = index * 2 + @as(usize, if (fast) 1 else 0);
+        const cc = if (fast) "fastcc " else "";
+        const body = try c.fmt("vector_input_body_{d}", .{id});
+        const provider = try c.fmt("vector_input_provider_{d}", .{id});
+        const probe = try c.fmt("vector_input_probe_{d}", .{id});
+        const direct = try c.fmt("vector_input_direct_{d}", .{id});
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define {0s}i64 @{1s}(i64 %p0,i64 %p1,i64 %p2,i64 %p3,i64 %p4,i64 %p5,<{2d} x {3s}> %v,i64 %salt) noinline {{\nentry:\n %s0 = xor i64 %salt,%p0\n", .{ cc, body, n, scalar });
+        for (1..6) |i| try text.writer.print(" %s{d} = xor i64 %s{d},%p{d}\n", .{ i, i - 1, i });
+        for (0..n) |i| {
+            try text.writer.print(" %lane{0d} = extractelement <{1d} x {2s}> %v,i64 {0d}\n", .{ i, n, scalar });
+            if (pointer) try text.writer.print(" %word{0d} = ptrtoint ptr %lane{0d} to i64\n", .{i}) else if (bits == 64) try text.writer.print(" %word{0d} = add i64 %lane{0d},0\n", .{i}) else try text.writer.print(" %word{0d} = zext i{1d} %lane{0d} to i64\n", .{ i, bits });
+            const previous = if (i == 0) "%s5" else try c.fmt("%r{d}", .{i - 1});
+            try text.writer.print(" %mix{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %mix{0d},%word{0d}\n", .{ i, previous });
+        }
+        try text.writer.print(" ret i64 %r{d}\n}}\ndeclare i64 @{s}(i64,i64,i64,i64,i64,i64,<{d} x {s}>,i64)\ndefine i64 @{s}(ptr %out,ptr %input,i64 %salt) {{\nentry:\n %v = load <{d} x {s}>,ptr %input,align 1\n %local = call {s}i64 @{s}(", .{ n - 1, provider, n, scalar, probe, n, scalar, cc, body });
+        for (prefixes) |value| try text.writer.print("i64 {d},", .{value});
+        try text.writer.print("<{d} x {s}> %v,i64 %salt)\n %external = call i64 @{s}(", .{ n, scalar, provider });
+        for (prefixes) |value| try text.writer.print("i64 {d},", .{value});
+        try text.writer.print("<{d} x {s}> %v,i64 %salt)\n store i64 %local,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 8\n store i64 %external,ptr %next,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ n, scalar });
+        var declaration: std.Io.Writer.Allocating = .init(c.a);
+        var invocation: std.Io.Writer.Allocating = .init(c.a);
+        try declaration.writer.writeAll("uint64_t p0,uint64_t p1,uint64_t p2,uint64_t p3,uint64_t p4,uint64_t p5,");
+        try invocation.writer.writeAll("prefix[0],prefix[1],prefix[2],prefix[3],prefix[4],prefix[5],");
+        for (0..parts) |i| {
+            try declaration.writer.print("{s} v{d},", .{ if (scalarized) "uint64_t" else "Carrier", i });
+            try invocation.writer.print("v[{d}],", .{i});
+        }
+        try declaration.writer.writeAll("uint64_t salt");
+        try invocation.writer.writeAll("salt");
+        try driver.writer.print("extern uint64_t {s}({s});\nextern uint64_t {s}(void *,const void *,uint64_t);\nuint64_t {s}({s}){{uint64_t pre[]={{p0,p1,p2,p3,p4,p5}};unsigned char raw[128];", .{ body, declaration.written(), probe, provider, declaration.written() });
+        for (0..parts) |i| try driver.writer.print("memcpy(raw+{d},&v{d},{d});", .{ if (scalarized) i * (bits / 8) else i * 16, i, if (scalarized) bits / 8 else 16 });
+        try driver.writer.print("return digest(raw,{d},{d},pre,salt);}}\nstatic uint64_t {s}(const unsigned char *input,uint64_t salt){{{s} v[{d}];", .{ n, bits, direct, if (scalarized) "uint64_t" else "Carrier", parts });
+        for (0..parts) |i| if (scalarized) {
+            const mask = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+            try driver.writer.print("v[{d}]=word(input+{d},{d})|((salt^UINT64_C(0xabcd0123456789ef))&~UINT64_C({d}));", .{ i, i * (bits / 8), bits / 8, mask });
+        } else {
+            try driver.writer.print("memcpy(&v[{d}],input+{d},16);", .{ i, i * 16 });
+        };
+        try driver.writer.print("return {s}({s});}}\n", .{ body, invocation.written() });
+        try table.writer.print("{{{d},{d},{d},{s},{s}}},\n", .{ n, bits, @as(u8, if (pointer) 1 else 0), direct, probe });
+    };
+    try text.writer.writeAll("declare void @vector_input_void_provider(<8 x i32>)\ndefine void @vector_input_void_probe(ptr %p) {\nentry:\n %v = load <8 x i32>,ptr %p,align 1\n call void @vector_input_void_provider(<8 x i32> %v)\n ret void\n}\n");
+    try u.add(&functions, u.s("vector_input_void_probe"));
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "vector_input_fragments.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "vector_input_fragments_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "vector_input_fragments", .fixture = "vector_input_fragments", .prefix = "vector-input-fragments", .functions = functions, .observations = 14464, .stdout = "vector-input-fragments observations=14464 ccc-fastcc=split-xmm=scalar-gp=live-prefixes=stack-words=llvm-c-local-interop=void-call=guard-pages=preserved\n" });
+    return entry;
+}
+
+fn mixedStackArguments(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    const prefix = [_]u64{ 0x123456789abcdef0, 0xfedcba9876543210, 0x1122334455667788, 0xabcd0123456789ef, 0x87654321fedcba98, 0x1020304050607080, 0xf1379bdf2468ace0 };
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_mixedStackArguments_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]bool{ false, true }) |fast| for ([_][]const u8{ "float", "double", "<2 x double>" }, 0..) |ty, kind| {
+        const id = @as(usize, if (fast) 3 else 0) + kind;
+        const cc = if (fast) "fastcc " else "";
+        const cty = if (kind == 0) "float" else if (kind == 1) "double" else "Carrier";
+        const provider = try c.fmt("mixed_stack_provider_{d}", .{id});
+        const probe = try c.fmt("mixed_stack_probe_{d}", .{id});
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("declare {s}i64 @{s}(i64,i64,i64,i64,i64,i64,i64,{s},i128,i64)\ndefine i64 @{s}(ptr %input,i64 %fpbits,i64 %salt) {{\nentry:\n %pair = load i128,ptr %input,align 1\n", .{ cc, provider, ty, probe });
+        if (kind == 0) try text.writer.writeAll(" %low = trunc i64 %fpbits to i32\n %fp = bitcast i32 %low to float\n") else if (kind == 1) try text.writer.writeAll(" %fp = bitcast i64 %fpbits to double\n") else try text.writer.writeAll(" %fp = load <2 x double>,ptr %input,align 1\n");
+        try text.writer.print(" %result = call {s}i64 @{s}(", .{ cc, provider });
+        for (prefix) |word| try text.writer.print("i64 {d},", .{word});
+        try text.writer.print("{s} %fp,i128 %pair,i64 %salt)\n ret i64 %result\n}}\n", .{ty});
+        try driver.writer.print("extern uint64_t {s}(const void *,uint64_t,uint64_t);\nuint64_t {s}(uint64_t p0,uint64_t p1,uint64_t p2,uint64_t p3,uint64_t p4,uint64_t p5,uint64_t p6,{s} fp,u128 pair,uint64_t salt){{uint64_t pre[]={{p0,p1,p2,p3,p4,p5,p6}},raw[2]={{0,0}};memcpy(raw,&fp,sizeof fp);calls++;return model(pre,pair,raw[0],raw[1],salt);}}\n", .{ probe, provider, cty });
+        try table.writer.print("{{{d},{s}}},\n", .{ kind, probe });
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "mixed_stack_arguments.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "mixed_stack_arguments_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "mixed_stack_arguments", .fixture = "mixed_stack_arguments", .prefix = "mixed-stack-arguments", .functions = functions, .observations = 6144, .stdout = "mixed-stack-arguments observations=6144 ccc-fastcc=scalar-fp-vector128=stack-gp128=alignment-holes=live-suffixes=llvm-c-interop=guard-pages=preserved\n" });
+    return entry;
 }

@@ -39,12 +39,13 @@ outcomes and owner/optimizer artifacts; individual full-module and execution
 proofs review the changed native, compiler and runtime objects. The original
 Debug input selects 7,733/7,874, with 141 failures and no complete object.
 
-Next, adopt the six independently exercised saturation, absolute-value,
-sign-extension preservation, vector-input and mixed-stack-call repairs. Both
+The six independently exercised saturation, absolute-value, sign-extension
+preservation, vector-input and mixed-stack-call repairs are adopted for
+immediate cumulative validation. Both
 isolated 2,281-unit builds and six native populations per backend pass, with
 34 further original selections gained and none lost. The independent old-source
 sign-extension regression fails as expected; its repair needs fresh immediate
-Tier 3. Freeze the integrated source, validate all 173 native populations and
+Tier 3. Next, freeze the integrated source, validate all 173 native populations and
 original compiler/runtime objects, then close the remaining 107 Debug
 rejections. Build the final generations and complete both four-mode local-hook
 matrices and the normal-resource rebuild after the repairs are accepted.

@@ -276,6 +276,39 @@ const Builder = struct {
             try b.copy(alias, s.scalar(), source);
         }
     }
+    fn fromFragments(b: Builder, pieces: []const ir.Value, ty: ir.Type) !Lanes {
+        const s = shape(ty) orelse return error.UnsupportedIntegerVector;
+        const plan = inputParts(ty) orelse return error.UnsupportedIntegerVector;
+        if (pieces.len != plan.count) return error.UnsupportedIntegerVector;
+        var result: Lanes = .{ .ty = ty, .values = @splat(.poison) };
+        if (plan.scalar) {
+            for (pieces, 0..) |piece, i| result.values[i] = try b.cast(if (s.pointer) .inttoptr else .trunc, plan.physical, piece, s.scalar());
+        } else {
+            const chunk: ir.Type = .{ .vector = .{ .len = @intCast(plan.lanes_per_piece), .elem_ty = ty.vector.elem_ty } };
+            for (pieces, 0..) |piece, i| {
+                const typed = try b.cast(.bitcast, plan.physical, piece, abiType(chunk).?);
+                const decoded = try b.fromAbi(typed, chunk);
+                @memcpy(result.values[i * plan.lanes_per_piece ..][0..plan.lanes_per_piece], decoded.values[0..plan.lanes_per_piece]);
+            }
+        }
+        return result;
+    }
+    fn toFragments(b: Builder, input_lanes: Lanes) ![]ir.Value {
+        const s = shape(input_lanes.ty) orelse return error.UnsupportedIntegerVector;
+        const plan = inputParts(input_lanes.ty) orelse return error.UnsupportedIntegerVector;
+        const result = try b.allocator.alloc(ir.Value, plan.count);
+        if (plan.scalar) {
+            for (result, 0..) |*piece, i| piece.* = try b.cast(if (s.pointer) .ptrtoint else .zext, s.scalar(), try defined(input_lanes.values[i], s.scalar()), plan.physical);
+        } else {
+            const chunk: ir.Type = .{ .vector = .{ .len = @intCast(plan.lanes_per_piece), .elem_ty = input_lanes.ty.vector.elem_ty } };
+            for (result, 0..) |*piece, i| {
+                var part: Lanes = .{ .ty = chunk, .values = @splat(.poison) };
+                @memcpy(part.values[0..plan.lanes_per_piece], input_lanes.values[i * plan.lanes_per_piece ..][0..plan.lanes_per_piece]);
+                piece.* = try b.cast(.bitcast, abiType(chunk).?, try b.toAbi(part), plan.physical);
+            }
+        }
+        return result;
+    }
     fn fromAbi(b: Builder, value: ir.Value, ty: ir.Type) !Lanes {
         const s = shape(ty) orelse return error.UnsupportedIntegerVector;
         const incoming = abiType(ty) orelse return error.UnsupportedIntegerVector;
@@ -334,7 +367,11 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
         while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return null;
     };
     if (function.ret_ty == .vector and abiType(function.ret_ty) == null) return null;
-    for (function.params.items) |param| if (param.ty == .vector and abiType(param.ty) == null) return null;
+    var has_fragment_parameters = false;
+    for (function.params.items) |param| if (param.ty == .vector and abiType(param.ty) == null) {
+        if (inputParts(param.ty) == null or function.is_varargs or param.abi_x87_memory or param.abi_split_integer or param.abi_incoming_address != null or !fragmentAttrs(param.attrs)) return null;
+        has_fragment_parameters = true;
+    };
     // The native boundary bitcasts mark an already expanded private graph.
     // Leave these to vector selection instead of recursively unpacking them.
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
@@ -344,19 +381,40 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
     };
     var result = function;
     if (result.ret_ty == .vector) result.ret_ty = abiType(result.ret_ty).?;
-    var parameters_cloned = false;
-    for (function.params.items, 0..) |param, i| if (privateAbiType(param.ty)) |physical| {
-        if (!parameters_cloned) {
-            result.params = try function.params.clone(allocator);
-            parameters_cloned = true;
+    var fragments = std.StringHashMap([]ir.Value).init(allocator);
+    defer fragments.deinit();
+    var serial: forms.TemporaryNames = .{};
+    defer serial.deinit(allocator);
+    if (has_fragment_parameters) result.params = .empty;
+    var parameters_cloned = has_fragment_parameters;
+    for (function.params.items, 0..) |param, i| {
+        if (inputParts(param.ty)) |plan| {
+            const pieces = try allocator.alloc(ir.Value, plan.count);
+            for (pieces) |*piece| {
+                var physical = param;
+                physical.ty = plan.physical;
+                physical.attrs = null;
+                physical.name = try forms.temporary(allocator, function, &serial);
+                piece.* = .{ .named = physical.name };
+                try result.params.append(allocator, physical);
+            }
+            try fragments.put(param.name, pieces);
+        } else if (has_fragment_parameters) {
+            var physical = param;
+            physical.ty = privateAbiType(param.ty) orelse param.ty;
+            try result.params.append(allocator, physical);
+        } else if (privateAbiType(param.ty)) |physical| {
+            if (!parameters_cloned) {
+                result.params = try function.params.clone(allocator);
+                parameters_cloned = true;
+            }
+            result.params.items[i].ty = physical;
         }
-        result.params.items[i].ty = physical;
-    };
+    }
     result.blocks = .empty;
     var vectors = std.StringHashMap(Lanes).init(allocator);
     defer vectors.deinit();
-    var serial: forms.TemporaryNames = .{};
-    defer serial.deinit(allocator);
+
     // PHI inputs may name any later vector producer. Give every lane a stable
     // private identity before traversal, then define those identities at each
     // producer. Backedges never depend on which block is visited first.
@@ -374,7 +432,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
         block.instructions = .empty;
         const b: Builder = .{ .allocator = allocator, .function = function, .block = &block, .serial = &serial, .vectors = &vectors };
         if (block_index == 0) for (function.params.items) |param| if (shape(param.ty) != null) {
-            try vectors.put(param.name, try b.fromAbi(.{ .named = param.name }, param.ty));
+            try vectors.put(param.name, if (fragments.get(param.name)) |pieces| try b.fromFragments(pieces, param.ty) else try b.fromAbi(.{ .named = param.name }, param.ty));
             changed = true;
         };
         for (original.instructions.items) |inst| {
@@ -681,11 +739,38 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                 } else if (hasVectorCall(call)) {
                     if (call.callee_value != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.tail_kind != null or std.mem.startsWith(u8, call.callee, "llvm.")) return error.UnsupportedIntegerVector;
                     var copy = inst;
-                    copy.kind.call.args = try call.args.clone(allocator);
-                    for (copy.kind.call.args.items) |*arg| if (shape(arg.ty) != null) {
-                        arg.value = try b.toAbi(try b.lanes(arg.value, arg.ty));
-                        arg.ty = abiType(arg.ty) orelse return error.UnsupportedIntegerVector;
-                    };
+                    var fragment_arguments = false;
+                    for (call.args.items) |arg| fragment_arguments = fragment_arguments or inputParts(arg.ty) != null;
+                    if (fragment_arguments) {
+                        if (call.callee_function_ty != null or call.va_arg or call.native_query != null) return error.UnsupportedIntegerVector;
+                        copy.kind.call.args = .empty;
+                        for (call.args.items) |arg| {
+                            if (inputParts(arg.ty)) |plan| {
+                                if (arg.abi_x87_memory or arg.abi_split_integer or !fragmentAttrs(arg.attrs)) return error.UnsupportedIntegerVector;
+                                const pieces = try b.toFragments(try b.lanes(arg.value, arg.ty));
+                                for (pieces) |piece| {
+                                    var physical = arg;
+                                    physical.ty = plan.physical;
+                                    physical.value = piece;
+                                    physical.attrs = null;
+                                    try copy.kind.call.args.append(allocator, physical);
+                                }
+                            } else {
+                                var physical = arg;
+                                if (shape(arg.ty) != null) {
+                                    physical.value = try b.toAbi(try b.lanes(arg.value, arg.ty));
+                                    physical.ty = abiType(arg.ty) orelse return error.UnsupportedIntegerVector;
+                                }
+                                try copy.kind.call.args.append(allocator, physical);
+                            }
+                        }
+                    } else {
+                        copy.kind.call.args = try call.args.clone(allocator);
+                        for (copy.kind.call.args.items) |*arg| if (shape(arg.ty) != null) {
+                            arg.value = try b.toAbi(try b.lanes(arg.value, arg.ty));
+                            arg.ty = abiType(arg.ty) orelse return error.UnsupportedIntegerVector;
+                        };
+                    }
                     if (shape(call.ret_ty) != null) copy.kind.call.ret_ty = abiType(call.ret_ty) orelse return error.UnsupportedIntegerVector;
                     try block.instructions.append(allocator, copy);
                     if (shape(call.ret_ty) != null) value = try b.fromAbi(.{ .named = inst.result orelse return error.UnsupportedIntegerVector }, call.ret_ty);
@@ -728,3 +813,21 @@ const VectorUse = struct {
         if (shape(ty) != null) v.found.* = true;
     }
 };
+
+const InputParts = struct { count: usize, lanes_per_piece: usize, physical: ir.Type, scalar: bool };
+fn inputParts(ty: ir.Type) ?InputParts {
+    const s = shape(ty) orelse return null;
+    if (abiType(ty) != null) return null;
+    if ((s.len == 3 and (s.pointer or s.bits == 8 or s.bits == 16 or s.bits == 64)) or (s.len == 5 and !s.pointer and s.bits == 32))
+        return .{ .count = s.len, .lanes_per_piece = 1, .physical = .{ .int = 64 }, .scalar = true };
+    if (s.pointer or (s.bits != 8 and s.bits != 16 and s.bits != 32 and s.bits != 64) or !std.math.isPowerOfTwo(s.len)) return null;
+    const total = s.len * s.bits;
+    if (total <= 128 or total > 1024) return null;
+    return .{ .count = total / 128, .lanes_per_piece = 128 / s.bits, .physical = xmm_carrier, .scalar = false };
+}
+fn fragmentAttrs(attrs: ?[]const u8) bool {
+    const text = attrs orelse return true;
+    var words = std.mem.tokenizeAny(u8, text, " \t\r\n");
+    while (words.next()) |word| if (!std.mem.eql(u8, word, "noundef")) return false;
+    return true;
+}

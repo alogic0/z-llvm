@@ -201,7 +201,8 @@ fn operation(call: ir.CallInst) ?Operation {
         } else if (op == .ssub_sat or op == .sadd_sat) {
             if (call.args.items.len != 2) return null;
             switch (bits) {
-                8, 16, 32, 64, 96 => {},
+                1...64 => if (bits == 51 or bits == 52) return null,
+                96 => {},
                 else => return null,
             }
         } else if (op == .scmp) {
@@ -227,6 +228,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .call) if (pairExtendedOperation(inst.kind.call)) |op| {
+                try candidate.begin(&block, block_index, instruction_index);
+                try expandPairExtended(allocator, function, &block, &serial, inst, op);
+                continue;
+            };
             if (!inst.removed and inst.result != null and inst.kind == .call) if (pairOperation(inst.kind.call)) |op| {
                 try candidate.begin(&block, block_index, instruction_index);
                 try expandPair(allocator, function, &block, &serial, inst, op);
@@ -389,4 +395,52 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         try candidate.finishBlock(block);
     }
     return candidate.finish();
+}
+
+const PairExtendedOperation = enum { ushl, sshl, umul, smul };
+fn pairExtendedOperation(call: ir.CallInst) ?PairExtendedOperation {
+    if (!call.ret_ty.eql(.{ .int = 128 }) or !intrinsic_attrs.scalarIntegerCallSupported(call)) return null;
+    var buffer: [64]u8 = undefined;
+    for (std.enums.values(PairExtendedOperation)) |op| {
+        const multiply = op == .umul or op == .smul;
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.{s}sat.i128", .{ @tagName(op), if (multiply) "fix." else "" }) catch return null;
+        if (!std.mem.eql(u8, call.callee, spelling)) continue;
+        if (call.args.items.len != (if (multiply) @as(usize, 3) else 2)) return null;
+        for (call.args.items[0..2]) |arg| if (!arg.ty.eql(call.ret_ty) or (arg.value != .named and arg.value != .int) or (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@"))) return null;
+        if (multiply) {
+            const scale = call.args.items[2];
+            if (!scale.ty.eql(.{ .int = 32 }) or scale.value != .int or scale.value.int != 0) return null;
+        }
+        return op;
+    }
+    return null;
+}
+fn expandPairExtended(a: std.mem.Allocator, f: ir.Function, block: *ir.BasicBlock, names: *forms.TemporaryNames, inst: ir.Instruction, op: PairExtendedOperation) !void {
+    const narrow: ir.Type = .{ .int = 128 };
+    const wide: ir.Type = .{ .int = 256 };
+    const boolean: ir.Type = .{ .int = 1 };
+    const multiply = op == .umul or op == .smul;
+    const signed = op == .sshl or op == .smul;
+    var inputs: [2]ir.Value = undefined;
+    for (&inputs, inst.kind.call.args.items[0..2], 0..) |*input, arg, index| {
+        const stable = if (arg.value == .int) try @import("binary128_arithmetic.zig").materializeIntegerArgument(a, f, block, names, .{ .op = .uitofp, .from_ty = narrow, .value = arg.value, .to_ty = .fp128 }) else arg.value;
+        input.* = try emit(a, f, block, names, .{ .cast = .{ .op = if (signed and (multiply or index == 0)) .sext else .zext, .from_ty = narrow, .value = stable, .to_ty = wide } });
+    }
+    const value = if (multiply) try emit(a, f, block, names, .{ .binary = .{ .op = .mul, .ty = wide, .lhs = inputs[0], .rhs = inputs[1] } }) else blk: {
+        const valid = try emit(a, f, block, names, .{ .icmp = .{ .predicate = .ult, .operand_ty = wide, .lhs = inputs[1], .rhs = .{ .int = 128 } } });
+        const safe = try emit(a, f, block, names, .{ .select = .{ .cond_ty = boolean, .cond = valid, .ty = wide, .true_value = inputs[1], .false_value = .{ .int = 0 } } });
+        break :blk try emit(a, f, block, names, .{ .binary = .{ .op = .shl, .ty = wide, .lhs = inputs[0], .rhs = safe } });
+    };
+    const minimum: ir.Value = .{ .int = if (signed) std.math.minInt(i128) else 0 };
+    const maximum: ir.Value = if (signed) .{ .int = std.math.maxInt(i128) } else blk: {
+        const ones = try @import("binary128_arithmetic.zig").materializeIntegerArgument(a, f, block, names, .{ .op = .uitofp, .from_ty = narrow, .value = .{ .int = -1 }, .to_ty = .fp128 });
+        break :blk try emit(a, f, block, names, .{ .cast = .{ .op = .zext, .from_ty = narrow, .value = ones, .to_ty = wide } });
+    };
+    const lower = if (signed) blk: {
+        const below = try emit(a, f, block, names, .{ .icmp = .{ .predicate = .slt, .operand_ty = wide, .lhs = value, .rhs = minimum } });
+        break :blk try emit(a, f, block, names, .{ .select = .{ .cond_ty = boolean, .cond = below, .ty = wide, .true_value = minimum, .false_value = value } });
+    } else value;
+    const above = try emit(a, f, block, names, .{ .icmp = .{ .predicate = if (signed) .sgt else .ugt, .operand_ty = wide, .lhs = lower, .rhs = maximum } });
+    const result = try emit(a, f, block, names, .{ .select = .{ .cond_ty = boolean, .cond = above, .ty = wide, .true_value = maximum, .false_value = lower } });
+    try block.instructions.append(a, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = result, .to_ty = narrow } } });
 }

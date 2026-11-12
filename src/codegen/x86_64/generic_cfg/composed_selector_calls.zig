@@ -440,7 +440,9 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     defer register_args.deinit(selector.allocator);
     var has_x87_memory = false;
     for (call.args.items) |arg| has_x87_memory = has_x87_memory or arg.abi_x87_memory;
-    const memory_layout = if (has_x87_memory) stack_arguments.callLayout(call) orelse
+    const physical_layout = stack_arguments.callLayout(call);
+    const has_stack_arguments = if (physical_layout) |layout| layout.stack_words != 0 else false;
+    const memory_layout = if (has_x87_memory or has_stack_arguments) physical_layout orelse
         return .{ .no_emitter = "composed-block-mixed-x87-layout" } else null;
     var register_call = call;
     if (memory_layout) |layout| {
@@ -614,10 +616,10 @@ fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, ca
         _ = try inputs.register(.{
             .source = request.value,
             .expected = .{ .ty = request.ty, .register_class = request_class, .pointer_address_space = if (request.ty == .ptr) @as(?u32, 0) else null },
-            .form = if (request.ty == .ptr) (if (request_class == .stack_object) .stack_object_address else .pointer) else .gpr64, .destination = .rax,
+            .form = if (request.ty == .ptr) (if (request_class == .stack_object) .stack_object_address else .pointer) else .gpr64,
+            .destination = .rax,
         });
-        _ = try inputs.register(.{ .source = call.args.items[1].value,
-            .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 }, .form = .gpr64, .destination = .{ .gpr64 = .rdx } });
+        _ = try inputs.register(.{ .source = call.args.items[1].value, .expected = .{ .ty = .{ .int = 64 }, .register_class = .gpr64 }, .form = .gpr64, .destination = .{ .gpr64 = .rdx } });
         try inputs.seal();
         try inputs.prepare();
         try inputs.materializeAll();

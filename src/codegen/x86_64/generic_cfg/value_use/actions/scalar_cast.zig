@@ -297,6 +297,8 @@ pub fn executeSignExtendScratch(
         .r8 => .r9,
         .r9 => .r8,
     };
+    // Preserve every live scalar and pair alias before the destination write.
+    try selector_state.clobberArgReg(transaction.selector, destination);
     try transaction.selector.machine.instructions.append(
         transaction.selector.allocator,
         .{ .movsxd_arg32_arg64 = .{ .dst = destination, .src = source } },
