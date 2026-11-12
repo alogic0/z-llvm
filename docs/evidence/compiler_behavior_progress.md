@@ -172,3 +172,27 @@ placement also failed an existing gap-compaction unit by producing a larger
 frame; the corrected choice keeps the smaller existing result, and the original
 expectation passes unchanged. Cumulative validation and new original-input
 compiler/runtime production remain required after adoption.
+
+The [machine-home checkpoint](compiler_behavior_machine_homes_checkpoint_20261112.json)
+accepts `ee87c488` after fresh cumulative validation: both 2,200-unit builds,
+64 structural/two profile checks each, eight readiness procedures, all 17 gates,
+both 120-population native suites and all 1,038 required faults pass. Both strict
+comparisons retain all 4,385 prior outcomes. Their 18 changed objects per build
+remain recorded as failures, with independent reviews identifying only smaller
+frames in three functions; every other function symbol in those objects matches.
+Complete original compiler/runtime objects retain their owners and pass ELF and
+balanced-event audits. Additional complex and real/quad math oracles cover all
+seven changed runtime bodies, with 18 supplemental faults. The frozen 3,436-file
+source is retained verbatim. No controlled performance claim is made.
+
+The resulting first generation builds, starts, passes the original controls and
+f80 regression, and matches all 2,097 reference outcomes in each normal LLVM
+mode. Actual normal-resource self-rebuild still fails with worker SIGSEGV in
+`InternPool.zigTypeTag`'s probing prologue. The unchanged worker stack is 60 MiB.
+A checked reconstruction records 1,213 owned frames, 1,210 direct call edges and
+two indirect edges: 480 `genBodyDebugScope` frames and 481 `genBody` frames occupy
+59,288,024 bytes, before other active frames. A frontend-only probe passes but
+changes code-generation demand. Keep that result separate from the failed full
+build, and retain the historical CPU-0/1 GiB acceptance. The next isolated repair
+will measure medium-frame compaction and prove a recursive worker-stack case;
+milestones 6–8 and both final local-hook matrices remain open.

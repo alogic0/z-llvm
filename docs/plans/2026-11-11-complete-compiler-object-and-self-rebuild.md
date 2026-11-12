@@ -510,6 +510,44 @@ self-rebuild before accepting this repair or closing milestone 8.
 
 ## Delivery checklist
 
+The [machine-home checkpoint](../evidence/compiler_behavior_machine_homes_checkpoint_20261112.json)
+now accepts code `ee87c488` after both 2,200-unit builds, all eight readiness
+procedures, all 17 integration gates, both 120-population native suites and
+all 1,038 required fault controls pass. Strict native comparisons retain all
+4,385 prior outcomes and remain failed for 18 reviewed objects per build;
+each difference contains only the documented frame reductions. Fresh original
+compiler/runtime objects are complete, with unchanged owners and passing event
+and ELF audits. The frozen 3,436-file source is retained verbatim.
+
+The new first generation matches all 2,097 reference outcomes in each normal
+LLVM mode and passes all nine f80 checks. Normal-resource self-rebuild still
+fails, now in a worker's `InternPool.zigTypeTag` probing prologue. The unchanged
+upstream worker stack is 60 MiB; CPU affinity remains 0–15 and the inherited
+main-stack limit remains 46 MiB. A checked reconstruction contains 1,213 owned
+frames, 1,210 verified direct call edges and two recorded indirect edges.
+Repeated `genBodyDebugScope` and `genBody` frames account for 59,288,024 bytes;
+241 `lowerBlock` frames add 3,129,144 bytes. A frontend-only probe succeeds but
+changes emission demand, so it cannot close the full rebuild.
+
+Continue with this measured worker-stack boundary. First determine whether
+existing unused-gap compaction can safely cover the medium frames below its
+64 KiB activation threshold. That threshold is a profitability heuristic,
+separate from the unchanged 64 KiB stack-object and 8 MiB frame guards. Preserve
+the existing access/rebasing proof, minimum worthwhile savings, owned objects,
+alignment and outgoing arguments. Add a recursive worker-stack regression,
+complete the required cumulative validation and original-input replays, then
+repeat the actual normal-resource self-rebuild. Do not infer success from
+smaller frames alone. Both final generations and the complete local-hook matrix
+remain open.
+
+Separately preserved behavior research now selects 7,415/7,874 original Debug
+definitions. Bounded limb arithmetic and expanded switch widths have independent
+execution proofs; additional wide intrinsics remain provisional. LLVM 22 rejects
+the new full-width dynamic-funnel reference fixture before candidate execution.
+Keep that failure and distinguish available JIT/oracle proofs from complete
+native population acceptance. None of these isolated research sources is adopted
+by the machine-home checkpoint.
+
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.
 - [x] Emit and validate the complete original compiler object, retaining all 8,928 selections.
