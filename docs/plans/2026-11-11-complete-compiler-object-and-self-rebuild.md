@@ -4,7 +4,8 @@ Date: 2026-11-11
 Status: milestones 1–5 complete at `b738377e`, backend implementation `e398030f`;
 follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-resource
 self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
-remainder error is repaired at `9cb21139`. The complete local-hook matrices and
+remainder error is repaired at `9cb21139`. Twenty behavior-family populations
+pass cumulative validation at `d9148ebc`. The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
@@ -438,7 +439,7 @@ new evidence seal. Reuse unchanged gates only under the existing reuse policy.
 - [ ] Repair observed failures with focused regressions and required cumulative validation.
 - [x] Diagnose and remove special CPU-affinity and main-stack requirements at `ba05fef4`.
 - [x] Prove normal-resource self-rebuild and both normal-LLVM four-mode matrices at `ba05fef4`.
-- [ ] Repair the independently reproduced unsigned multiword remainder error and repeat affected production proofs.
+- [x] Repair the independently reproduced unsigned multiword remainder error and repeat affected production proofs at `9cb21139`.
 - [ ] Publish follow-up acceptance and seal successor evidence.
 
 The completed PHI, vector and
@@ -606,7 +607,7 @@ the failed receipts and implement the following steps in order:
    fallback objects or relaxed guards. Run the focused controls and immediate
    Tier 3, then repeat original runtime production, owner/event/ELF checks and
    the independent arithmetic oracle against the new object.
-3. Finish and review the isolated behavior-family changes against the accepted
+3. **In progress; first batch validated at `d9148ebc`.** Finish and review the isolated behavior-family changes against the accepted
    source. Preserve the cumulative lifetime, machine-memory and medium-frame
    repairs. Admit each family only after both native builds, fault controls,
    full original-input replay and exact preservation checks pass. Failed
@@ -638,6 +639,34 @@ fresh builds; Debug padding/debug-file differences remain recorded. This bridge
 does not relax the automatic compiler-object reuse guard. Retain the failed old
 unit receipts. Final generations and the complete local-hook matrix still need
 fresh evidence after the behavior-family changes.
+
+The [behavior-boundary checkpoint](../evidence/compiler_behavior_boundaries_checkpoint_20261112.json)
+validates the first twenty-family batch at `d9148ebc`. Both unit builds pass
+2,243 units, 64 structural and two profile checks. All eight readiness procedures,
+17 integration gates, both 142-population native suites and all 2,242 required
+fault controls pass. Strict native comparisons preserve every preceding command
+outcome and every preceding object, owner and optimizer artifact byte-for-byte.
+The complete original compiler and runtime objects retain all owners and pass
+event and ELF audits. Fifteen compiler function symbols change through the
+owned-vector-storage activation; separate selections with the complete original
+module reproduce all thirty before/after function encodings exactly. The frozen
+3,505-file source is retained. This checkpoint does not establish final rebuilt
+compiler behavior or close either complete local-hook matrix.
+
+Continue step 3 with the isolated six-family combination: boolean vector
+constants, wide multiplication and saturation, native-width volatile access,
+bounded direct-call capacity, larger vector storage/array strides and odd-width
+literal extensions. Both 2,249-unit builds and all seven new native populations
+pass, including 189 faults per backend build. Its unchanged 7,874-definition
+Debug input gains 78 selections without losing any prior identity, reaching
+7,617 selections with **257 rejections still open**. Its replay returns actual
+one and emits no complete object. Preserve that failure and close the remaining
+families before claiming the complete suite. A separate ordered floating
+add/multiply reduction slice gains ten selections with independent five-format
+native proofs; it remains separate until a combined replay passes. Review and
+adopt proven deltas through the same source, guard and cumulative-validation
+requirements, then return to steps 4–5 for final generations, both complete
+four-mode local-hook matrices and the normal-resource rebuild.
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.

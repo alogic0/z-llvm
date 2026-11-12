@@ -248,3 +248,27 @@ not a passing validation result. Preserve the failed receipts, identify and
 repair the shared cause, add unsigned normalization/limb regressions and run
 immediate Tier 3 and fresh runtime production. Isolated behavior research and
 both final complete local-hook matrices remain unaccepted.
+
+The [scalar-liveness checkpoint](compiler_behavior_scalar_liveness_checkpoint_20261112.json)
+repairs the unsigned remainder failure at `9cb21139`. Named shifts and boolean
+operations now preserve live accumulator sources through the existing transfer
+contract. Complete runtime production passes the independent arithmetic oracle,
+and the cumulative checks recorded in that checkpoint pass. Final generations
+and complete local-hook behavior matrices remain open.
+
+The [behavior-boundary checkpoint](compiler_behavior_boundaries_checkpoint_20261112.json)
+validates twenty further native populations at `d9148ebc`: both 2,243-unit builds,
+eight readiness procedures, all 17 integration gates, both 142-population native
+suites and all 2,242 required fault controls pass. Every prior native command
+outcome, object, ownership artifact and optimizer artifact matches exactly.
+Fresh complete original compiler/runtime objects retain all owners and pass ELF
+and balanced-event audits. The fifteen changed compiler function symbols are
+traced to the new owned-vector-storage activation; independent selections using
+the full original module reproduce their before/after encodings exactly.
+
+The canonical Debug behavior input still has 335 rejected definitions. An
+isolated six-family combination passes both 2,249-unit builds and seven new
+native populations per backend build, gaining 78 original selections without
+loss and leaving 257 rejections. Its actual nonzero replay remains a failure.
+The final source-bound generations, complete named four-mode local-hook matrices
+and successor seal remain unaccepted.
