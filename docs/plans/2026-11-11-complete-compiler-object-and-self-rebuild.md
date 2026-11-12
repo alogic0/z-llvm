@@ -461,6 +461,34 @@ source-bound compiler/runtime replays before the next actual unchanged build
 and normal-resource self-rebuild. Neither this measurement nor the isolated
 regression closes milestone 8.
 
+The [lifetime checkpoint](../evidence/compiler_behavior_lifetimes_checkpoint_20261112.json)
+now accepts code `8b38e8cd`: both unit builds, all eight readiness procedures,
+all 17 integration gates, both 119-population native suites and all 984 required
+fault controls pass. All 4,349 prior native command outcomes and their objects,
+owners and optimizer artifacts match exactly. Fresh original compiler/runtime
+objects are complete, with unchanged owners, balanced events and passing ELF
+audits. The new first generation matches all 2,097 reference outcomes in each
+normal LLVM mode and passes all nine f80 observations.
+
+The fresh normal-resource self-rebuild still fails with frontend SIGSEGV.
+Parent-launched debugger evidence now places the fault in the stack-probing
+prologue of `InternPool.Key.hash64`; the cumulative active stack still exceeds
+the inherited 46 MiB limit. Keep this failed result and both compiler generations
+separate. A checked reconstruction contains 207 owned frames with all 206 call
+edges matching the executable; 95 Sema frames account for 45,505,000 bytes.
+Next, prove any further frame repair through final machine memory accesses and
+CFG liveness. Preserve overlapping access groups, partial
+writes, alignment, live objects, call arguments and every opaque escape; do not
+revive the failing SSA-interval prototype. Run the required cumulative validation
+and original-input replays before another actual normal-resource self-rebuild.
+
+Behavior research remains provisional: exact Valgrind client requests,
+byte/halfword XMM arguments, extended return payloads and constant comparisons
+raise the unchanged Debug behavior input to 7,196/7,874 selections. Independent
+native proofs do not establish its complete object or either final local-hook
+matrix. Continue bounded wide-integer and remaining instruction/ABI families;
+preserve the original input, named outcomes and rejection controls at adoption.
+
 ## Delivery checklist
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.

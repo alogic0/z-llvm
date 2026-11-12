@@ -123,3 +123,34 @@ all three modes with 27 faults. Its complete 8 KiB objects execute on a fixed
 The measured Sema frame is 479,000 bytes. These proofs authorize cumulative
 validation, not normal-resource self-rebuild acceptance. Compiler/runtime
 replays and both final generations remain required.
+
+The [lifetime checkpoint](compiler_behavior_lifetimes_checkpoint_20261112.json)
+accepts `8b38e8cd` after fresh cumulative validation: both 2,194-unit builds,
+64 structural/two profile checks each, eight readiness procedures, all 17 gates,
+both 119-population native suites and all 984 required fault controls pass.
+The strict native comparisons pass with all 4,349 preceding command outcomes,
+363 optimizer artifacts, 711 owner artifacts and 717 objects unchanged per
+build. Both complete runtime objects retain all 455 owners; the two changed
+complex bodies pass the independent oracle and supplemental faults. The fresh
+original compiler object contains all 8,928 definitions with unchanged owners,
+balanced events and a passing ELF audit. Its frozen 3,430-file source is retained
+verbatim before this publication. Timing under concurrent load makes no
+performance claim.
+
+The resulting first generation builds and starts, passes the original controls
+and f80 regression, and matches all 2,097 reference outcomes in each of the four
+normal LLVM modes. Its normal-resource self-rebuild still fails with SIGSEGV.
+The latest debugger trace identifies `InternPool.Key.hash64`'s probing prologue
+at the bottom of the inherited 46 MiB stack. The Sema frame reduction therefore
+does not close the cumulative stack problem. A retained stack snapshot supports
+the call-chain diagnosis: 207 owned frames and 206 checked call edges, including
+95 Sema frames occupying 45,505,000 bytes. No final second generation or complete
+local-hook behavior matrix is accepted.
+
+Separately preserved research reaches 7,196/7,874 selections on the unchanged
+Debug behavior input. Exact Valgrind magic, extended sret payloads, byte/halfword
+XMM ABI values and constant comparisons have independent native proofs. The
+comparison slice passes all 2,202 units after replacing its newly supported
+constant-pair rejection input with an unsupported poison operand. Wide-integer
+limb lowering remains experimental. None of these research slices is accepted
+into the maintained backend by this checkpoint.
