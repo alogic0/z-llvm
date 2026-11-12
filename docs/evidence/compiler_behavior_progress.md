@@ -196,3 +196,14 @@ changes code-generation demand. Keep that result separate from the failed full
 build, and retain the historical CPU-0/1 GiB acceptance. The next isolated repair
 will measure medium-frame compaction and prove a recursive worker-stack case;
 milestones 6–8 and both final local-hook matrices remain open.
+
+The medium-frame candidate reuses the existing unused-gap proof: analyze frames
+from 32 KiB and require 8 KiB of gap savings. No new liveness or alias rule is
+introduced. A targeted checked export reduces `genBodyDebugScope` to 24,456
+bytes. All 2,202 isolated units pass, including two new executable/closed-case
+controls. The new `medium_stack_frames` native population passes both backend
+builds in all three modes with 64 observations per execution and 27 faults per
+build. Its four recursive kernel activations fit a fixed 128 KiB worker stack;
+the preceding backend passes a leaf-only run and fails the recursive run with
+SIGSEGV. This authorizes adoption and fresh cumulative validation, followed by
+original-input production and an actual normal-resource self-rebuild.

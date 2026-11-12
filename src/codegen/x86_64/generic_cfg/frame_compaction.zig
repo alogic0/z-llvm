@@ -1,6 +1,6 @@
-//! Remove unreferenced spill-reserve chunks after lowering. Existing spill
-//! homes and object extents remain distinct; object/incoming offsets are rebased
-//! by a multiple of 16. Opaque stack uses retain the original machine function.
+//! Compact final frames using unused chunks or checked spill-home reuse.
+//! Owned object extents, alignment, incoming arguments and temporary outgoing
+//! stack bias are preserved. Opaque uses retain the original machine function.
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const state = @import("composed_selector_state.zig");
@@ -165,7 +165,7 @@ fn appendAllocation(a: std.mem.Allocator, code: *std.ArrayList(machine.Instructi
 }
 
 pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !void {
-    if (selector.stack_frame_bytes < 65536) return;
+    if (selector.stack_frame_bytes < 32768) return;
     const old_frame = selector.stack_frame_bytes;
     if (old_frame % 16 != 8) return;
     var object_base = old_frame - 8;
@@ -209,7 +209,7 @@ pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !v
     for (live, 0..) |used, i| prefix[i + 1] = prefix[i] + @as(u32, if (used) 16 else 0);
     const delta = @as(u32, @intCast(live.len * 16)) - prefix[live.len];
     if (try compactHomes(selector, old_frame, object_base, begin, end, delta)) return;
-    if (delta < 65536) return;
+    if (delta < 8192) return;
     var candidate: std.ArrayList(machine.Instruction) = .empty;
     errdefer candidate.deinit(selector.allocator);
     try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[0..begin]);

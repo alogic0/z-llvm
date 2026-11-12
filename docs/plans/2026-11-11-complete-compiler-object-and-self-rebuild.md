@@ -548,6 +548,25 @@ Keep that failure and distinguish available JIT/oracle proofs from complete
 native population acceptance. None of these isolated research sources is adopted
 by the machine-home checkpoint.
 
+The isolated worker-stack repair now passes all 2,202 units and both backend
+builds of a new recursive native regression. Existing gap compaction reduces
+`genBodyDebugScope` from 63,528 to 24,456 bytes by removing 39,072 unreferenced
+bytes. Consider frames from 32 KiB and require at least 8 KiB of unused-gap
+savings; the memory-home policy and stack-object/frame guards remain intact.
+Two new controls exercise medium-frame rebasing, incoming words, outgoing bias
+and closed opaque cases. The native population keeps 16 values live around
+48 ten-argument calls and four recursive activations on a fixed 128 KiB stack.
+Its frame falls from 44,744 to 7,400 bytes. LLVM and both candidate builds pass
+all three modes and 27 faults each; the preceding backend passes its leaf case
+and fails the recursive case with actual SIGSEGV. A maintained Zig generator
+reproduces the 74,928-byte fixture exactly.
+
+Adopt this bounded profitability change for immediate Tier 3. Preserve the
+120-population prefix, run fresh complete compiler/runtime production against
+the original inputs, and repeat the actual unchanged normal-resource build and
+self-rebuild. Smaller measured frames and the isolated regression do not close
+milestone 8.
+
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.
 - [x] Emit and validate the complete original compiler object, retaining all 8,928 selections.
