@@ -16,12 +16,18 @@ LLVM modes and passes the nine f80 checks. No CPU or stack override is used.
 Both 121-population native suites, all 17 integration gates and all 1,092
 required faults pass against the frozen source.
 
-Next, fix the independently reproduced unsigned multiword remainder error in
-the local runtime. The original accepted runtime object also fails the new C
-oracle; LLVM's object from the same input passes. Add the missing regression,
-run immediate Tier 3 and fresh runtime production, then finish the isolated
-behavior families and both complete four-mode local-hook matrices. The resource
-checkpoint is scoped evidence; the arithmetic failure blocks final acceptance.
+The [scalar-liveness checkpoint](evidence/compiler_behavior_scalar_liveness_checkpoint_20261112.json)
+repairs that unsigned multiword remainder error at `9cb21139`. All 17 gates,
+both 122-population native suites, strict preservation comparisons, 1,162
+required faults and fresh complete original compiler/runtime objects pass.
+Both corrected unit builds pass 2,204 tests; the test-only source bridge is
+explicit and does not authorize automatic object reuse.
+
+Next, adopt the proven behavior families while preserving the cumulative stack
+and machine-memory repairs. Run immediate cumulative validation, finish the
+remaining original behavior rejections, then build the final generations and
+complete both four-mode local-hook matrices and the normal-resource rebuild.
+The existing resource and scalar checkpoints retain their separate scopes.
 The entries below retain the preceding checkpoint history.
 
 The [floating PHI checkpoint](evidence/compiler_behavior_progress.md) accepts

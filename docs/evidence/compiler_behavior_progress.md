@@ -1,5 +1,17 @@
 # Upstream behavior and resource follow-up
 
+The current [scalar-liveness checkpoint](compiler_behavior_scalar_liveness_checkpoint_20261112.json)
+repairs the unsigned remainder error at `9cb21139`. Both 2,204-unit builds,
+all 17 integration gates, both 122-population native suites, strict preservation
+comparisons and all 1,162 required fault controls pass. Fresh original production
+retains all 8,928 compiler and 455 runtime definitions, owners, balanced events
+and valid ELF objects. The compiler object is unchanged; the expanded runtime
+oracle checks 641 unsigned division/remainder cases and the formerly wrong input.
+A separate test-only bridge records the corrected historical stream expectation
+without changing the automatic object-reuse policy. The final generations and
+complete four-mode local-hook matrices remain open. Earlier entries below retain
+their checkpoint scopes and failures.
+
 The follow-up milestones in the [compiler plan](../plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
 remain open. The [PHI checkpoint](compiler_behavior_phi_checkpoint_20261111.json)
 accepts the narrow repair at `84f1ad7c`; it does not establish a repaired compiler

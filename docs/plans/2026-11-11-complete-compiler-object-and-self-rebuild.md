@@ -3,8 +3,9 @@
 Date: 2026-11-11
 Status: milestones 1–5 complete at `b738377e`, backend implementation `e398030f`;
 follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-resource
-self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; a newly reproduced
-runtime remainder error and the complete local-hook matrices remain open. The original
+self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
+remainder error is repaired at `9cb21139`. The complete local-hook matrices and
+final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
 [acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
@@ -597,11 +598,11 @@ the same original IR compiled by LLVM passes. The original accepted runtime
 object also fails this test, establishing a preexisting uncovered error. Retain
 the failed receipts and implement the following steps in order:
 
-1. Reduce the remainder failure to the actual shared lowering or machine-code
+1. **Complete at `9cb21139`.** Reduce the remainder failure to the actual shared lowering or machine-code
    cause. Add independent unsigned division/remainder coverage across limb
    boundaries, normalization shifts and numerator/denominator orderings. Keep
    the original failing operands and LLVM reference proof.
-2. Repair that shared cause without helper-name exceptions, source changes,
+2. **Complete at `9cb21139`.** Repair that shared cause without helper-name exceptions, source changes,
    fallback objects or relaxed guards. Run the focused controls and immediate
    Tier 3, then repeat original runtime production, owner/event/ELF checks and
    the independent arithmetic oracle against the new object.
@@ -618,6 +619,25 @@ the failed receipts and implement the following steps in order:
    their relevant code changes, bind all final artifacts to the committed source,
    and publish the successor acceptance and seal. Keep the prior five-milestone
    seal and all failed resource/arithmetic attempts unchanged.
+
+The [scalar-liveness checkpoint](../evidence/compiler_behavior_scalar_liveness_checkpoint_20261112.json)
+closes steps 1–2. Named shifts and boolean operations destroyed live accumulator
+sources before later uses and PHI edges; both now use the existing liveness-aware
+preservation contract. The independent runtime oracle covers 641 cases across
+five widths and all four unsigned helpers. Both complete 455-definition runtime
+objects pass 21,792 observations per route and 14 faults per build. All 17 gates,
+both 122-population native suites, strict prior-artifact comparisons and all
+1,162 required faults pass. The original 8,928-definition compiler object and
+owners are byte-identical to the preceding checkpoint; events and ELF pass.
+
+Both corrected unit suites pass 2,204 units, 64 structural and two profile checks.
+The sole post-production source change corrects an old unit that expected the
+wrong destructive stream while marking its source live. Its separate source
+bridge preserves every defined function, object and TLS storage byte in both
+fresh builds; Debug padding/debug-file differences remain recorded. This bridge
+does not relax the automatic compiler-object reuse guard. Retain the failed old
+unit receipts. Final generations and the complete local-hook matrix still need
+fresh evidence after the behavior-family changes.
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.
