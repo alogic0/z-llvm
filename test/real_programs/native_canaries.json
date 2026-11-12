@@ -5,7 +5,16 @@
       "population": "vector_graphs",
       "prefix": "vector-graphs",
       "fixture": "vector_graphs",
-      "functions": ["vector_graph_phi8", "vector_graph_parallel", "vector_graph_wide", "vector_graph_repack", "vector_graph_pointers", "vector_graph_freeze", "vector_graph_intrinsics", "vector_graph_ctpop6"],
+      "functions": [
+        "vector_graph_phi8",
+        "vector_graph_parallel",
+        "vector_graph_wide",
+        "vector_graph_repack",
+        "vector_graph_pointers",
+        "vector_graph_freeze",
+        "vector_graph_intrinsics",
+        "vector_graph_ctpop6"
+      ],
       "observations": 1024,
       "stdout": "vector-graphs observations=1024 phi=wide=pointer=intrinsics=guards=preserved\n"
     },
@@ -13,7 +22,17 @@
       "population": "vector_masks",
       "prefix": "vector-masks",
       "fixture": "vector_masks",
-      "functions": ["vector_mask_compare16", "vector_mask_compare8", "vector_mask_unpack16", "vector_mask_nibbles", "vector_mask_reverse128", "vector_mask_three", "vector_mask_live", "vector_mask_reverse8", "vector_mask_returned8"],
+      "functions": [
+        "vector_mask_compare16",
+        "vector_mask_compare8",
+        "vector_mask_unpack16",
+        "vector_mask_nibbles",
+        "vector_mask_reverse128",
+        "vector_mask_three",
+        "vector_mask_live",
+        "vector_mask_reverse8",
+        "vector_mask_returned8"
+      ],
       "observations": 2304,
       "stdout": "vector-masks observations=2304 bits=lanes=roundtrips=clobbers=guards=preserved\n"
     },
@@ -21,7 +40,20 @@
       "population": "call_values",
       "prefix": "call-values",
       "fixture": "call_values",
-      "functions": ["call_values_ignore_i32", "call_values_ignore_i64", "call_values_ignore_ptr", "call_values_undef_i32", "call_values_poison_i64", "call_values_undef_i64", "call_values_poison_ptr", "call_values_undef_ptr", "call_values_init_body", "call_values_init", "call_values_capture", "call_values_is_null"],
+      "functions": [
+        "call_values_ignore_i32",
+        "call_values_ignore_i64",
+        "call_values_ignore_ptr",
+        "call_values_undef_i32",
+        "call_values_poison_i64",
+        "call_values_undef_i64",
+        "call_values_poison_ptr",
+        "call_values_undef_ptr",
+        "call_values_init_body",
+        "call_values_init",
+        "call_values_capture",
+        "call_values_is_null"
+      ],
       "observations": 4096,
       "stdout": "call-values observations=4096 defined-results=live-values=promises=guards=preserved\n"
     },
@@ -29,7 +61,16 @@
       "population": "samesign_comparisons",
       "prefix": "samesign-comparisons",
       "fixture": "samesign_comparisons",
-      "functions": ["samesign_byte_named", "samesign_byte_negative", "samesign_half_named", "samesign_i21_literal", "samesign_i37_literal", "samesign_signed_word", "samesign_dirty_byte", "samesign_signed_named"],
+      "functions": [
+        "samesign_byte_named",
+        "samesign_byte_negative",
+        "samesign_half_named",
+        "samesign_i21_literal",
+        "samesign_i37_literal",
+        "samesign_signed_word",
+        "samesign_dirty_byte",
+        "samesign_signed_named"
+      ],
       "observations": 8192,
       "stdout": "samesign-comparisons observations=8192 widths=immediates=defined-domain=aliases=guards=preserved\n"
     },
@@ -37,7 +78,15 @@
       "population": "pointer_freeze",
       "prefix": "pointer-freeze",
       "fixture": "pointer_freeze",
-      "functions": ["pointer_freeze_arg", "pointer_freeze_gep", "pointer_freeze_phi", "pointer_freeze_calls", "pointer_freeze_stack", "pointer_freeze_array", "pointer_freeze_readonly"],
+      "functions": [
+        "pointer_freeze_arg",
+        "pointer_freeze_gep",
+        "pointer_freeze_phi",
+        "pointer_freeze_calls",
+        "pointer_freeze_stack",
+        "pointer_freeze_array",
+        "pointer_freeze_readonly"
+      ],
       "observations": 1792,
       "stdout": "pointer-freeze observations=1792 pointers=aliases=phis=calls=stack=readonly=guards=preserved\n"
     },
@@ -46,8 +95,16 @@
       "prefix": "narrow-freeze",
       "fixture": "narrow_freeze",
       "functions": [
-        "freeze_alias3", "freeze_alias8", "freeze_alias10", "freeze_alias16", "freeze_alias31",
-        "freeze_load8", "freeze_calls16", "freeze_phi8", "freeze_branch1", "freeze_parameter8"
+        "freeze_alias3",
+        "freeze_alias8",
+        "freeze_alias10",
+        "freeze_alias16",
+        "freeze_alias31",
+        "freeze_load8",
+        "freeze_calls16",
+        "freeze_phi8",
+        "freeze_branch1",
+        "freeze_parameter8"
       ],
       "observations": 2560,
       "stdout": "narrow-freeze observations=2560 bits=aliases=branches=phis=calls=guards=preserved\n"
@@ -56,25 +113,54 @@
       "population": "checked_multiply",
       "prefix": "checked-multiply",
       "fixture": "checked_multiply",
-      "functions": ["checked_select24", "checked_binary40", "checked_rhs_high", "checked_spill_high", "checked_signed120", "checked_alias56", "checked_calls48", "checked_phi12"],
+      "functions": [
+        "checked_select24",
+        "checked_binary40",
+        "checked_rhs_high",
+        "checked_spill_high",
+        "checked_signed120",
+        "checked_alias56",
+        "checked_calls48",
+        "checked_phi12"
+      ],
       "observations": 2048,
       "stdout": "checked-multiply observations=2048 literals=overflow=aliases=calls=phis=guards=preserved\n"
     },
     {
       "population": "quoted_symbols",
-      "codegen_args": ["--codegen-reachable"],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
       "prefix": "quoted-symbols",
       "fixture": "quoted_symbols",
-      "functions": ["quoted_four", "quoted_eight", "quoted_initializer", "quoted_literal", "quoted_call", "quoted_mutate", "quoted_phi"],
+      "functions": [
+        "quoted_four",
+        "quoted_eight",
+        "quoted_initializer",
+        "quoted_literal",
+        "quoted_call",
+        "quoted_mutate",
+        "quoted_phi"
+      ],
       "observations": 1024,
       "stdout": "quoted-symbols observations=1024 tables=escapes=aliases=initializers=offsets=phis=guards=preserved\n"
     },
     {
       "population": "symbolic_call",
-      "codegen_args": ["--codegen-reachable"],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
       "prefix": "symbolic-call",
       "fixture": "symbolic_call",
-      "functions": ["symbolic_direct", "symbolic_indirect", "symbolic_negative", "symbolic_stack", "symbolic_live", "symbolic_write", "symbolic_read"],
+      "functions": [
+        "symbolic_direct",
+        "symbolic_indirect",
+        "symbolic_negative",
+        "symbolic_stack",
+        "symbolic_live",
+        "symbolic_write",
+        "symbolic_read"
+      ],
       "observations": 1152,
       "stdout": "symbolic-call observations=1152 addresses=aliases=stack=syscalls=live=phis=spills=preserved\n"
     },
@@ -82,7 +168,14 @@
       "population": "comparison_facts",
       "prefix": "comparison-facts",
       "fixture": "comparison_facts",
-      "functions": ["same_direct", "same_swapped", "same_phi", "same_call", "same_load", "same_pressure"],
+      "functions": [
+        "same_direct",
+        "same_swapped",
+        "same_phi",
+        "same_call",
+        "same_load",
+        "same_pressure"
+      ],
       "observations": 3584,
       "stdout": "comparison-facts observations=3584 same-sign=boundaries=aliases=calls=phis=spills=preserved\n"
     },
@@ -90,7 +183,16 @@
       "population": "syscall_facts",
       "prefix": "syscall-facts",
       "fixture": "syscall_facts",
-      "functions": ["sysfact0", "sysfact1", "sysfact2", "sysfact3", "sysfact4", "sysfact5", "sysfact6", "sysfact_live"],
+      "functions": [
+        "sysfact0",
+        "sysfact1",
+        "sysfact2",
+        "sysfact3",
+        "sysfact4",
+        "sysfact5",
+        "sysfact6",
+        "sysfact_live"
+      ],
       "observations": 1152,
       "stdout": "syscall-facts observations=1152 arity=0-6 arguments=memory=errors=live=phis=preserved\n"
     },
@@ -98,7 +200,14 @@
       "population": "register_pressure",
       "prefix": "register-pressure",
       "fixture": "register_pressure",
-      "functions": ["pressure_i32_48", "pressure_i32_96", "pressure_i32_288", "pressure_i64_48", "pressure_i64_96", "pressure_i64_288"],
+      "functions": [
+        "pressure_i32_48",
+        "pressure_i32_96",
+        "pressure_i32_288",
+        "pressure_i64_48",
+        "pressure_i64_96",
+        "pressure_i64_288"
+      ],
       "observations": 768,
       "stdout": "register-pressure observations=768 values=48,96,288 widths=32,64 calls=phis=aliases=preserved\n"
     },
@@ -106,7 +215,23 @@
       "population": "integer_bit_intrinsics",
       "prefix": "integer-bit-intrinsics",
       "fixture": "integer_bit_intrinsics",
-      "functions": ["bit_pop32", "bit_pop16", "bit_pop64", "bit_funnel64", "bit_funnel16", "bit_funnel6", "bit_cttz37", "bit_cttz23", "bit_ctlz23", "bit_ctlz8", "bit_abs25", "bit_abs29", "bit_bswap48", "bit_extrema64", "bit_overflow64"],
+      "functions": [
+        "bit_pop32",
+        "bit_pop16",
+        "bit_pop64",
+        "bit_funnel64",
+        "bit_funnel16",
+        "bit_funnel6",
+        "bit_cttz37",
+        "bit_cttz23",
+        "bit_ctlz23",
+        "bit_ctlz8",
+        "bit_abs25",
+        "bit_abs29",
+        "bit_bswap48",
+        "bit_extrema64",
+        "bit_overflow64"
+      ],
       "observations": 7680,
       "stdout": "integer-bit-intrinsics observations=7680 widths=counts=facts=aliases=calls=preserved\n"
     },
@@ -114,26 +239,47 @@
       "population": "relative_load",
       "prefix": "relative-load",
       "fixture": "relative_load",
-      "functions": ["relative_load", "relative_load_live"],
+      "functions": [
+        "relative_load",
+        "relative_load_live"
+      ],
       "observations": 512,
       "stdout": "relative-load observations=512 signed=base=live=preserved\n"
     },
     {
       "population": "tls_address",
-      "codegen_args": ["--codegen-reachable"],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
       "prefix": "tls-address",
       "fixture": "tls_address",
-      "functions": ["tls_address_counter", "tls_address_alias", "tls_address_offset", "tls_address_update", "tls_address_double", "tls_address_choose"],
+      "functions": [
+        "tls_address_counter",
+        "tls_address_alias",
+        "tls_address_offset",
+        "tls_address_update",
+        "tls_address_double",
+        "tls_address_choose"
+      ],
       "observations": 2560,
       "stdout": "tls-address observations=2560 threads=5 initialization=alignment=aliases=live=phi=preserved\n"
     },
     {
       "population": "tls_address_shared",
-      "codegen_args": ["--codegen-reachable"],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
       "prefix": "tls-address-shared",
       "fixture": "tls_address",
       "shared_object": true,
-      "functions": ["tls_address_counter", "tls_address_alias", "tls_address_offset", "tls_address_update", "tls_address_double", "tls_address_choose"],
+      "functions": [
+        "tls_address_counter",
+        "tls_address_alias",
+        "tls_address_offset",
+        "tls_address_update",
+        "tls_address_double",
+        "tls_address_choose"
+      ],
       "observations": 2560,
       "stdout": "tls-address observations=2560 threads=5 initialization=alignment=aliases=live=phi=preserved\n"
     },
@@ -155,7 +301,13 @@
       "population": "call_attributes",
       "prefix": "call-attributes",
       "fixture": "call_attributes",
-      "functions": ["attributes_copy", "attributes_move", "attributes_write", "attributes_range32", "attributes_range64"],
+      "functions": [
+        "attributes_copy",
+        "attributes_move",
+        "attributes_write",
+        "attributes_range32",
+        "attributes_range64"
+      ],
       "observations": 2465,
       "stdout": "call-attributes observations=2465 ranges=wrapped calls=preserved overlap=checked guards=preserved\n"
     },
@@ -163,7 +315,15 @@
       "population": "runtime_memory",
       "prefix": "runtime-memory",
       "fixture": "runtime_memory",
-      "functions": ["runtime_memory_f32", "runtime_memory_f64", "runtime_memory_returned", "runtime_memory_pressure", "runtime_memory_memset", "runtime_memory_allocation", "runtime_memory_nneg"],
+      "functions": [
+        "runtime_memory_f32",
+        "runtime_memory_f64",
+        "runtime_memory_returned",
+        "runtime_memory_pressure",
+        "runtime_memory_memset",
+        "runtime_memory_allocation",
+        "runtime_memory_nneg"
+      ],
       "observations": 1411,
       "stdout": "runtime-memory observations=1411 widths=exact aliases=preserved allocation-errors=checked guards=preserved\n"
     },
@@ -171,7 +331,13 @@
       "population": "vector_fp_casts",
       "prefix": "vector-fp-casts",
       "fixture": "vector_fp_casts",
-      "functions": ["vector_cast_narrow", "vector_cast_widen", "vector_cast_phi", "vector_cast_pressure", "vector_cast_partial"],
+      "functions": [
+        "vector_cast_narrow",
+        "vector_cast_widen",
+        "vector_cast_phi",
+        "vector_cast_pressure",
+        "vector_cast_partial"
+      ],
       "observations": 1280,
       "stdout": "vector-fp-casts observations=1280 rounding=special-values=checked aliases=phi=calls=preserved memory=guarded\n"
     },
@@ -179,7 +345,14 @@
       "population": "packed_globals",
       "prefix": "packed-globals",
       "fixture": "packed_globals",
-      "functions": ["packed_address", "packed_cell", "packed_nested", "packed_i24", "packed_fp80", "packed_store"],
+      "functions": [
+        "packed_address",
+        "packed_cell",
+        "packed_nested",
+        "packed_i24",
+        "packed_fp80",
+        "packed_store"
+      ],
       "observations": 768,
       "stdout": "packed-globals observations=768 layout=relocations=strides=mutation=checked\n"
     },
@@ -187,7 +360,18 @@
       "population": "parallel_transfer",
       "prefix": "parallel-transfer",
       "fixture": "parallel_transfer",
-      "functions": ["parallel_copy_swap", "parallel_fill_rotate", "parallel_move_swap", "parallel_call_swap", "parallel_call_fanout", "parallel_call_mixed", "parallel_phi_rotate", "parallel_global_base", "parallel_global_stride", "parallel_left_ops"],
+      "functions": [
+        "parallel_copy_swap",
+        "parallel_fill_rotate",
+        "parallel_move_swap",
+        "parallel_call_swap",
+        "parallel_call_fanout",
+        "parallel_call_mixed",
+        "parallel_phi_rotate",
+        "parallel_global_base",
+        "parallel_global_stride",
+        "parallel_left_ops"
+      ],
       "observations": 8192,
       "stdout": "parallel-transfer observations=8192 cycles=2,3 fanout=checked aliases=checked phi=checked calls=checked memory=guarded\n"
     },
@@ -195,7 +379,26 @@
       "population": "checked_scalar",
       "prefix": "checked-scalar",
       "fixture": "checked_scalar",
-      "functions": ["checked_scalar_33_uadd", "checked_scalar_33_usub", "checked_scalar_33_umul", "checked_scalar_33_sadd", "checked_scalar_33_ssub", "checked_scalar_33_smul", "checked_scalar_39_uadd", "checked_scalar_39_usub", "checked_scalar_39_umul", "checked_scalar_39_sadd", "checked_scalar_39_ssub", "checked_scalar_39_smul", "checked_scalar_63_uadd", "checked_scalar_63_usub", "checked_scalar_63_umul", "checked_scalar_63_sadd", "checked_scalar_63_ssub", "checked_scalar_63_smul"],
+      "functions": [
+        "checked_scalar_33_uadd",
+        "checked_scalar_33_usub",
+        "checked_scalar_33_umul",
+        "checked_scalar_33_sadd",
+        "checked_scalar_33_ssub",
+        "checked_scalar_33_smul",
+        "checked_scalar_39_uadd",
+        "checked_scalar_39_usub",
+        "checked_scalar_39_umul",
+        "checked_scalar_39_sadd",
+        "checked_scalar_39_ssub",
+        "checked_scalar_39_smul",
+        "checked_scalar_63_uadd",
+        "checked_scalar_63_usub",
+        "checked_scalar_63_umul",
+        "checked_scalar_63_sadd",
+        "checked_scalar_63_ssub",
+        "checked_scalar_63_smul"
+      ],
       "observations": 18432,
       "stdout": "checked-scalar observations=18432 widths=33,39,63 overflow=checked calls=preserved\n"
     },
@@ -203,7 +406,13 @@
       "population": "vector_abi",
       "prefix": "vector-abi",
       "fixture": "vector_abi",
-      "functions": ["vector_abi_rotate", "vector_abi_mix", "vector_abi_pressure", "vector_abi_sret", "vector_abi_nested"],
+      "functions": [
+        "vector_abi_rotate",
+        "vector_abi_mix",
+        "vector_abi_pressure",
+        "vector_abi_sret",
+        "vector_abi_nested"
+      ],
       "observations": 2560,
       "stdout": "vector-abi observations=2560 xmm=128 arguments=1-8 calls=preserved storage=checked\n"
     },
@@ -211,7 +420,11 @@
       "population": "indirect_branches",
       "prefix": "indirect-branches",
       "fixture": "indirect_branches",
-      "functions": ["indirect_branch_mutable", "indirect_branch_loop", "indirect_branch_packed"],
+      "functions": [
+        "indirect_branch_mutable",
+        "indirect_branch_loop",
+        "indirect_branch_packed"
+      ],
       "observations": 3072,
       "stdout": "indirect-branches observations=3072 mutable=checked packed=checked loop=checked calls=preserved\n"
     },
@@ -219,7 +432,14 @@
       "population": "aligned_stack",
       "prefix": "aligned-stack",
       "fixture": "aligned_stack",
-      "functions": ["aligned_stack_32", "aligned_stack_64", "aligned_stack_128", "aligned_stack_256", "aligned_stack_1024", "aligned_stack_4096"],
+      "functions": [
+        "aligned_stack_32",
+        "aligned_stack_64",
+        "aligned_stack_128",
+        "aligned_stack_256",
+        "aligned_stack_1024",
+        "aligned_stack_4096"
+      ],
       "observations": 6144,
       "stdout": "aligned-stack observations=6144 alignment=32-4096 disjoint=checked calls=preserved\n"
     },
@@ -227,7 +447,16 @@
       "population": "integer_vectors",
       "prefix": "integer-vectors",
       "fixture": "integer_vectors",
-      "functions": ["integer_vector_find8", "integer_vector_find16", "integer_vector_first16", "integer_vector_count16", "integer_vector_arithmetic", "integer_vector_shuffle", "integer_vector_update", "integer_vector_build_loop"],
+      "functions": [
+        "integer_vector_find8",
+        "integer_vector_find16",
+        "integer_vector_first16",
+        "integer_vector_count16",
+        "integer_vector_arithmetic",
+        "integer_vector_shuffle",
+        "integer_vector_update",
+        "integer_vector_build_loop"
+      ],
       "observations": 132608,
       "stdout": "integer-vectors observations=132608 masks=exhaustive lanes=checked calls=preserved\n"
     },
@@ -235,7 +464,16 @@
       "population": "checked_pair",
       "prefix": "checked-pair",
       "fixture": "checked_pair",
-      "functions": ["checked_pair_uadd", "checked_pair_usub", "checked_pair_sadd", "checked_pair_ssub", "checked_pair_smul3", "checked_pair_umul3", "checked_pair_smul_billion", "checked_pair_umul_billion"],
+      "functions": [
+        "checked_pair_uadd",
+        "checked_pair_usub",
+        "checked_pair_sadd",
+        "checked_pair_ssub",
+        "checked_pair_smul3",
+        "checked_pair_umul3",
+        "checked_pair_smul_billion",
+        "checked_pair_umul_billion"
+      ],
       "observations": 8192,
       "stdout": "checked-pair observations=8192 widths=128 overflow=checked calls=preserved\n"
     },
@@ -243,7 +481,13 @@
       "population": "pair_memory",
       "prefix": "pair-memory",
       "fixture": "pair_memory",
-      "functions": ["pair_memory_capture", "pair_memory_overlap", "pair_memory_phi", "pair_memory_literal", "pair_memory_stack_capture"],
+      "functions": [
+        "pair_memory_capture",
+        "pair_memory_overlap",
+        "pair_memory_phi",
+        "pair_memory_literal",
+        "pair_memory_stack_capture"
+      ],
       "observations": 5376,
       "stdout": "pair-memory observations=5376 unaligned=checked overlap=checked calls=checked phi=checked\n"
     },
@@ -308,7 +552,17 @@
       "population": "system_assembly",
       "prefix": "system-assembly",
       "fixture": "system_assembly",
-      "functions": ["system_call0", "system_call1", "system_call2", "system_call3", "system_call4", "system_call5", "system_call6", "system_pressure", "system_snapshot"],
+      "functions": [
+        "system_call0",
+        "system_call1",
+        "system_call2",
+        "system_call3",
+        "system_call4",
+        "system_call5",
+        "system_call6",
+        "system_pressure",
+        "system_snapshot"
+      ],
       "observations": 1152,
       "stdout": "system-assembly observations=1152 syscall-arity=0-6 live=preserved snapshot=bounded\n"
     },
@@ -1943,7 +2197,9 @@
         "constant_pointer_negative",
         "constant_pointer_output"
       ],
-      "codegen_args": ["--codegen-reachable"],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
       "observations": 96,
       "stdout": "constant-pointer-memory observations=96 flags=aliases=negative=dynamic=live=guards=preserved\n"
     },
@@ -2042,7 +2298,12 @@
       "population": "runtime_storage",
       "prefix": "runtime-storage",
       "fixture": "runtime_storage",
-      "functions": ["runtime_storage_33", "runtime_storage_4096", "runtime_storage_nested", "runtime_storage_pair_array"],
+      "functions": [
+        "runtime_storage_33",
+        "runtime_storage_4096",
+        "runtime_storage_nested",
+        "runtime_storage_pair_array"
+      ],
       "observations": 512,
       "stdout": "runtime-storage observations=512 lengths=padding=clobbers=guards=preserved\n"
     },
@@ -2050,7 +2311,13 @@
       "population": "integer_memory",
       "prefix": "integer-memory",
       "fixture": "integer_memory",
-      "functions": ["integer_memory_24", "integer_memory_40", "integer_memory_56", "integer_memory_65", "integer_memory_96"],
+      "functions": [
+        "integer_memory_24",
+        "integer_memory_40",
+        "integer_memory_56",
+        "integer_memory_65",
+        "integer_memory_96"
+      ],
       "observations": 1280,
       "stdout": "integer-memory observations=1280 exact=padding=clobbers=guards=preserved\n"
     },
@@ -2058,7 +2325,15 @@
       "population": "undefined_selects",
       "prefix": "undefined-selects",
       "fixture": "undefined_selects",
-      "functions": ["undefined_select_1", "undefined_select_8", "undefined_select_16", "undefined_select_32", "undefined_select_64", "undefined_select_128", "undefined_select_pointer"],
+      "functions": [
+        "undefined_select_1",
+        "undefined_select_8",
+        "undefined_select_16",
+        "undefined_select_32",
+        "undefined_select_64",
+        "undefined_select_128",
+        "undefined_select_pointer"
+      ],
       "observations": 896,
       "stdout": "undefined-selects observations=896 defined=conditions=clobbers=guards=preserved\n"
     },
@@ -2066,7 +2341,13 @@
       "population": "large_cfg",
       "prefix": "large-cfg",
       "fixture": "large_cfg",
-      "functions": ["large_cfg_chain_64", "large_cfg_chain_32", "large_cfg_labels_64", "large_cfg_labels_32", "large_cfg_switch"],
+      "functions": [
+        "large_cfg_chain_64",
+        "large_cfg_chain_32",
+        "large_cfg_labels_64",
+        "large_cfg_labels_32",
+        "large_cfg_switch"
+      ],
       "observations": 2624,
       "stdout": "large-cfg observations=2624 chain=20976 switch=1025 labels=406 clobbers=guards=preserved\n"
     },
@@ -2074,7 +2355,25 @@
       "population": "indirect_phi_slots",
       "prefix": "indirect-phi-slots",
       "fixture": "indirect_phi_slots",
-      "functions": ["indirect_phi_integer_1", "indirect_phi_integer_2", "indirect_phi_integer_8", "indirect_phi_integer_16", "indirect_phi_integer_24", "indirect_phi_integer_32", "indirect_phi_integer_40", "indirect_phi_integer_56", "indirect_phi_integer_64", "indirect_phi_integer_65", "indirect_phi_integer_96", "indirect_phi_integer_128", "indirect_phi_floating_16", "indirect_phi_floating_32", "indirect_phi_floating_64", "indirect_phi_pointer_64", "indirect_phi_inactive_poison"],
+      "functions": [
+        "indirect_phi_integer_1",
+        "indirect_phi_integer_2",
+        "indirect_phi_integer_8",
+        "indirect_phi_integer_16",
+        "indirect_phi_integer_24",
+        "indirect_phi_integer_32",
+        "indirect_phi_integer_40",
+        "indirect_phi_integer_56",
+        "indirect_phi_integer_64",
+        "indirect_phi_integer_65",
+        "indirect_phi_integer_96",
+        "indirect_phi_integer_128",
+        "indirect_phi_floating_16",
+        "indirect_phi_floating_32",
+        "indirect_phi_floating_64",
+        "indirect_phi_pointer_64",
+        "indirect_phi_inactive_poison"
+      ],
       "observations": 2176,
       "stdout": "indirect-phi-slots observations=2176 targets=parallel=poison=clobbers=guards=preserved\n"
     },
@@ -2082,7 +2381,12 @@
       "population": "large_frame",
       "prefix": "large-frame",
       "fixture": "large_frame",
-      "functions": ["large_frame_2m", "large_frame_4m", "large_frame_7m", "large_frame_probe"],
+      "functions": [
+        "large_frame_2m",
+        "large_frame_4m",
+        "large_frame_7m",
+        "large_frame_probe"
+      ],
       "observations": 64,
       "guard_probe": true,
       "stdout": "large-frame observations=64 objects=2m=4m=7m pages=clobbers=live=guards=preserved\n"
@@ -2091,7 +2395,51 @@
       "population": "integer_intrinsic_frontier",
       "prefix": "integer-intrinsic-frontier",
       "fixture": "integer_intrinsic_frontier",
-      "functions": ["frontier_ssub8", "frontier_ssub8_left", "frontier_ssub8_right", "frontier_sadd8", "frontier_sadd8_left", "frontier_sadd8_right", "frontier_ssub16", "frontier_ssub16_left", "frontier_ssub16_right", "frontier_sadd16", "frontier_sadd16_left", "frontier_sadd16_right", "frontier_ssub32", "frontier_ssub32_left", "frontier_ssub32_right", "frontier_sadd32", "frontier_sadd32_left", "frontier_sadd32_right", "frontier_ssub64", "frontier_ssub64_left", "frontier_ssub64_right", "frontier_sadd64", "frontier_sadd64_left", "frontier_sadd64_right", "frontier_ssub96", "frontier_ssub96_left", "frontier_ssub96_right", "frontier_sadd96", "frontier_sadd96_left", "frontier_sadd96_right", "frontier_scmp32", "frontier_scmp32_left", "frontier_ctlz128", "frontier_ctlz128_poison", "frontier_abs32", "frontier_abs64", "frontier_abs32_ignored", "frontier_abs64_ignored", "frontier_mul_sat16", "frontier_mul_sat16_left", "frontier_mul_sat16_right", "frontier_ushl64_one", "frontier_ushl64_one_constant"],
+      "functions": [
+        "frontier_ssub8",
+        "frontier_ssub8_left",
+        "frontier_ssub8_right",
+        "frontier_sadd8",
+        "frontier_sadd8_left",
+        "frontier_sadd8_right",
+        "frontier_ssub16",
+        "frontier_ssub16_left",
+        "frontier_ssub16_right",
+        "frontier_sadd16",
+        "frontier_sadd16_left",
+        "frontier_sadd16_right",
+        "frontier_ssub32",
+        "frontier_ssub32_left",
+        "frontier_ssub32_right",
+        "frontier_sadd32",
+        "frontier_sadd32_left",
+        "frontier_sadd32_right",
+        "frontier_ssub64",
+        "frontier_ssub64_left",
+        "frontier_ssub64_right",
+        "frontier_sadd64",
+        "frontier_sadd64_left",
+        "frontier_sadd64_right",
+        "frontier_ssub96",
+        "frontier_ssub96_left",
+        "frontier_ssub96_right",
+        "frontier_sadd96",
+        "frontier_sadd96_left",
+        "frontier_sadd96_right",
+        "frontier_scmp32",
+        "frontier_scmp32_left",
+        "frontier_ctlz128",
+        "frontier_ctlz128_poison",
+        "frontier_abs32",
+        "frontier_abs64",
+        "frontier_abs32_ignored",
+        "frontier_abs64_ignored",
+        "frontier_mul_sat16",
+        "frontier_mul_sat16_left",
+        "frontier_mul_sat16_right",
+        "frontier_ushl64_one",
+        "frontier_ushl64_one_constant"
+      ],
       "observations": 11264,
       "stdout": "integer-intrinsic-frontier observations=11264 signed=wide=poison=clobbers=live=guards=preserved\n"
     },
@@ -2099,7 +2447,19 @@
       "population": "flag_pair_values",
       "prefix": "flag-pair-values",
       "fixture": "flag_pair_values",
-      "functions": ["flag_pair_overflow8", "flag_pair_overflow16", "flag_pair_overflow32", "flag_pair_overflow64", "flag_pair_overflow128", "flag_pair_atomic8", "flag_pair_atomic16", "flag_pair_atomic32", "flag_pair_atomic64", "flag_pair_select", "flag_pair_freeze"],
+      "functions": [
+        "flag_pair_overflow8",
+        "flag_pair_overflow16",
+        "flag_pair_overflow32",
+        "flag_pair_overflow64",
+        "flag_pair_overflow128",
+        "flag_pair_atomic8",
+        "flag_pair_atomic16",
+        "flag_pair_atomic32",
+        "flag_pair_atomic64",
+        "flag_pair_select",
+        "flag_pair_freeze"
+      ],
       "observations": 11264,
       "stdout": "flag-pair-values observations=11264 pairs=parallel=atomic=freeze=clobbers=guards=preserved\n"
     },
@@ -2107,7 +2467,21 @@
       "population": "integer_freeze_values",
       "prefix": "integer-freeze-values",
       "fixture": "integer_freeze_values",
-      "functions": ["freeze_values_33_alias", "freeze_values_40_alias", "freeze_values_48_alias", "freeze_values_56_alias", "freeze_values_63_alias", "freeze_values_65_bits", "freeze_values_65_signed", "freeze_values_65_poison", "freeze_values_65_constant", "freeze_values_96_bits", "freeze_values_96_signed", "freeze_values_96_poison", "freeze_values_96_constant"],
+      "functions": [
+        "freeze_values_33_alias",
+        "freeze_values_40_alias",
+        "freeze_values_48_alias",
+        "freeze_values_56_alias",
+        "freeze_values_63_alias",
+        "freeze_values_65_bits",
+        "freeze_values_65_signed",
+        "freeze_values_65_poison",
+        "freeze_values_65_constant",
+        "freeze_values_96_bits",
+        "freeze_values_96_signed",
+        "freeze_values_96_poison",
+        "freeze_values_96_constant"
+      ],
       "observations": 6656,
       "stdout": "integer-freeze-values observations=6656 alias=wide=stable=clobbers=guards=preserved\n"
     },
@@ -2115,7 +2489,13 @@
       "population": "atomic_storage_views",
       "prefix": "atomic-storage-views",
       "fixture": "atomic_storage_views",
-      "functions": ["atomic_storage_8", "atomic_storage_16", "atomic_storage_32", "atomic_storage_64", "atomic_storage_pointer"],
+      "functions": [
+        "atomic_storage_8",
+        "atomic_storage_16",
+        "atomic_storage_32",
+        "atomic_storage_64",
+        "atomic_storage_pointer"
+      ],
       "observations": 2560,
       "stdout": "atomic-storage-views observations=2560 ordering=volatile=width=pointer=clobbers=guards=preserved\n"
     },
@@ -3212,16 +3592,31 @@
       "population": "phi_fp_literals",
       "prefix": "phi-fp-literals",
       "fixture": "phi_fp_literals",
-      "functions": ["phi_fp_literal32", "phi_fp_literal64"],
+      "functions": [
+        "phi_fp_literal32",
+        "phi_fp_literal64"
+      ],
       "observations": 66,
       "stdout": "phi-fp-literals observations=66 snapshots=preserved\n"
     },
     {
       "population": "behavior_vectors",
-      "codegen_args": ["--codegen-reachable"],
+      "codegen_args": [
+        "--codegen-reachable"
+      ],
       "prefix": "behavior-vectors",
       "fixture": "behavior_vectors",
-      "functions": ["behavior_vector_nan", "behavior_vector_extended", "behavior_vector_nested", "behavior_vector_pointer", "behavior_vector_abs3", "behavior_vector_abs64", "behavior_vector_phi3", "behavior_vector_compare3", "behavior_vector_stack3"],
+      "functions": [
+        "behavior_vector_nan",
+        "behavior_vector_extended",
+        "behavior_vector_nested",
+        "behavior_vector_pointer",
+        "behavior_vector_abs3",
+        "behavior_vector_abs64",
+        "behavior_vector_phi3",
+        "behavior_vector_compare3",
+        "behavior_vector_stack3"
+      ],
       "observations": 6250,
       "stdout": "behavior-vectors observations=6250 globals=payloads=packed-x87=phis=masks=guards=preserved\n"
     },
@@ -3229,7 +3624,9 @@
       "population": "frame_compaction",
       "prefix": "frame-compaction",
       "fixture": "frame_compaction",
-      "functions": ["frame_compact_abs64"],
+      "functions": [
+        "frame_compact_abs64"
+      ],
       "observations": 646,
       "stdout": "frame-compaction observations=646 frame-budget=65536 payloads=guards=preserved\n"
     },
@@ -3237,8 +3634,13 @@
       "population": "stack_lifetimes",
       "prefix": "stack-lifetimes",
       "fixture": "stack_lifetimes",
-      "functions": ["lifetime_sequential", "lifetime_branches"],
-      "libraries": ["pthread"],
+      "functions": [
+        "lifetime_sequential",
+        "lifetime_branches"
+      ],
+      "libraries": [
+        "pthread"
+      ],
       "observations": 192,
       "stdout": "stack-lifetimes observations=192 stack=65536 full-objects=branches=loops=guards=preserved\n"
     },
@@ -3246,8 +3648,12 @@
       "population": "stack_spill_homes",
       "prefix": "stack-spill-homes",
       "fixture": "stack_spill_homes",
-      "functions": ["spill_waves"],
-      "libraries": ["pthread"],
+      "functions": [
+        "spill_waves"
+      ],
+      "libraries": [
+        "pthread"
+      ],
       "observations": 45096,
       "stdout": "stack-spill-homes observations=45096 stack=65536 waves=512 live=16 calls=guards=preserved\n"
     },
@@ -3255,8 +3661,12 @@
       "population": "medium_stack_frames",
       "prefix": "medium-stack-frames",
       "fixture": "medium_stack_frames",
-      "functions": ["medium_spill"],
-      "libraries": ["pthread"],
+      "functions": [
+        "medium_spill"
+      ],
+      "libraries": [
+        "pthread"
+      ],
       "observations": 64,
       "stdout": "medium-stack-frames observations=64 recursion=3 stack=131072 wave-live=16 guards=preserved\n"
     },
@@ -3264,7 +3674,16 @@
       "population": "scalar_destructive_live",
       "prefix": "scalar-destructive-live",
       "fixture": "scalar_destructive_live",
-      "functions": ["destructive_shift16", "destructive_loop16", "destructive_shift32", "destructive_loop32", "destructive_shift64", "destructive_loop64", "destructive_bool_and", "destructive_bool_or"],
+      "functions": [
+        "destructive_shift16",
+        "destructive_loop16",
+        "destructive_shift32",
+        "destructive_loop32",
+        "destructive_shift64",
+        "destructive_loop64",
+        "destructive_bool_and",
+        "destructive_bool_or"
+      ],
       "observations": 5856,
       "stdout": "scalar-destructive-live observations=5856 shifts=booleans=loop-phis=guards=preserved\n"
     },
@@ -3605,6 +4024,228 @@
       ],
       "observations": 1280,
       "stdout": "prefetch-hints observations=1280 live-values=exact-stores=nonfaulting-addresses=guards=preserved\n"
+    },
+    {
+      "population": "vector_bool_constants",
+      "prefix": "vector-bool-constants",
+      "fixture": "vector_bool_constants",
+      "functions": [
+        "bool_constants_2",
+        "bool_constants_3",
+        "bool_constants_4",
+        "bool_constants_7",
+        "bool_constants_8",
+        "bool_constants_16",
+        "bool_constants_32",
+        "bool_constants_64"
+      ],
+      "observations": 107136,
+      "stdout": "vector-bool-constants observations=107136 literal-lanes=splats=live-masks=exact-stores=guard-pages=preserved\n"
+    },
+    {
+      "population": "limb_multiply",
+      "fixture": "limb_multiply",
+      "prefix": "limb-multiply",
+      "functions": [
+        "limb_multiply_140",
+        "limb_multiply_200",
+        "limb_multiply_256",
+        "limb_multiply_495"
+      ],
+      "observations": 102912,
+      "stdout": "limb-multiply observations=102912 modular-products=signed-unsigned-flags=base256-oracle=guard-pages=live-values=preserved\n"
+    },
+    {
+      "population": "limb_saturation",
+      "fixture": "limb_saturation",
+      "prefix": "limb-saturation",
+      "functions": [
+        "limb_saturation_140",
+        "limb_saturation_200",
+        "limb_saturation_256",
+        "limb_saturation_495"
+      ],
+      "observations": 264704,
+      "stdout": "limb-saturation observations=264704 signed-unsigned-limits=minmax=scale-zero-products=defined-shifts=guard-pages=preserved\n"
+    },
+    {
+      "population": "volatile_native",
+      "fixture": "volatile_native",
+      "prefix": "volatile-native",
+      "functions": [
+        "volatile_native_8",
+        "volatile_native_16",
+        "volatile_native_32",
+        "volatile_native_64",
+        "volatile_native_ptr"
+      ],
+      "observations": 2160,
+      "stdout": "volatile-native observations=2160 single-step-events=unused-loads=unspecified-store=exact-widths=preserved\n"
+    },
+    {
+      "population": "direct_capacity",
+      "fixture": "direct_capacity",
+      "prefix": "direct-capacity",
+      "functions": [
+        "direct_capacity_32_40",
+        "direct_capacity_call_32_40",
+        "direct_capacity_32_64",
+        "direct_capacity_call_32_64",
+        "direct_capacity_64_40",
+        "direct_capacity_call_64_40",
+        "direct_capacity_64_64",
+        "direct_capacity_call_64_64"
+      ],
+      "observations": 1792,
+      "stdout": "direct-capacity observations=1792 incoming-outgoing=40-and-64=constants=permutations=live-values=guards=preserved\n"
+    },
+    {
+      "population": "vector_storage",
+      "fixture": "vector_storage",
+      "prefix": "vector-storage",
+      "functions": [
+        "vector_storage_16_32",
+        "vector_storage_17_32",
+        "vector_storage_3_64",
+        "vector_storage_64_64"
+      ],
+      "observations": 214016,
+      "stdout": "vector-storage observations=214016 alignment=nonaliasing=array-strides=live-objects=guard-pages=preserved\n"
+    },
+    {
+      "population": "integer_literal_casts",
+      "fixture": "integer_literal_casts",
+      "prefix": "integer-literal-casts",
+      "functions": [
+        "integer_literal_casts"
+      ],
+      "observations": 23936,
+      "stdout": "literal-casts observations=23936 odd-width-source-bits=native-destinations=live-values=guard-pages=preserved\n"
+    },
+    {
+      "population": "floating_reductions",
+      "fixture": "floating_reductions",
+      "prefix": "floating-reductions",
+      "functions": [
+        "floating_reduce_16_2_add",
+        "floating_reduce_16_2_mul",
+        "floating_reduce_16_3_add",
+        "floating_reduce_16_3_mul",
+        "floating_reduce_16_4_add",
+        "floating_reduce_16_4_mul",
+        "floating_reduce_32_2_add",
+        "floating_reduce_32_2_mul",
+        "floating_reduce_32_3_add",
+        "floating_reduce_32_3_mul",
+        "floating_reduce_32_4_add",
+        "floating_reduce_32_4_mul",
+        "floating_reduce_64_2_add",
+        "floating_reduce_64_2_mul",
+        "floating_reduce_64_3_add",
+        "floating_reduce_64_3_mul",
+        "floating_reduce_64_4_add",
+        "floating_reduce_64_4_mul",
+        "floating_reduce_80_2_add",
+        "floating_reduce_80_2_mul",
+        "floating_reduce_80_3_add",
+        "floating_reduce_80_3_mul",
+        "floating_reduce_80_4_add",
+        "floating_reduce_80_4_mul",
+        "floating_reduce_128_2_add",
+        "floating_reduce_128_2_mul",
+        "floating_reduce_128_3_add",
+        "floating_reduce_128_3_mul",
+        "floating_reduce_128_4_add",
+        "floating_reduce_128_4_mul"
+      ],
+      "observations": 13440,
+      "stdout": "floating-reductions observations=13440 ordered-add-mul=all-five-formats=rounding=signed-zeros=exact-tails=guard-pages=preserved\n"
+    },
+    {
+      "population": "floating_minmax",
+      "fixture": "floating_minmax",
+      "prefix": "floating-minmax",
+      "functions": [
+        "floating_minmax_16_2_min",
+        "floating_minmax_16_2_max",
+        "floating_minmax_16_3_min",
+        "floating_minmax_16_3_max",
+        "floating_minmax_16_4_min",
+        "floating_minmax_16_4_max",
+        "floating_minmax_32_2_min",
+        "floating_minmax_32_2_max",
+        "floating_minmax_32_3_min",
+        "floating_minmax_32_3_max",
+        "floating_minmax_32_4_min",
+        "floating_minmax_32_4_max",
+        "floating_minmax_64_2_min",
+        "floating_minmax_64_2_max",
+        "floating_minmax_64_3_min",
+        "floating_minmax_64_3_max",
+        "floating_minmax_64_4_min",
+        "floating_minmax_64_4_max",
+        "floating_minmax_80_2_min",
+        "floating_minmax_80_2_max",
+        "floating_minmax_80_3_min",
+        "floating_minmax_80_3_max",
+        "floating_minmax_80_4_min",
+        "floating_minmax_80_4_max",
+        "floating_minmax_128_2_min",
+        "floating_minmax_128_2_max",
+        "floating_minmax_128_3_min",
+        "floating_minmax_128_3_max",
+        "floating_minmax_128_4_min",
+        "floating_minmax_128_4_max"
+      ],
+      "libraries": [
+        "m"
+      ],
+      "observations": 11520,
+      "stdout": "floating-minmax observations=11520 all-five-formats=pinned-nan-contract=signed-zeros=exact-tails=guard-pages=preserved\n"
+    },
+    {
+      "population": "floating_mixed_zeros",
+      "fixture": "floating_minmax_mixed_zeros",
+      "prefix": "floating-mixed-zeros",
+      "functions": [
+        "floating_minmax_16_2_min",
+        "floating_minmax_16_2_max",
+        "floating_minmax_16_3_min",
+        "floating_minmax_16_3_max",
+        "floating_minmax_16_4_min",
+        "floating_minmax_16_4_max",
+        "floating_minmax_32_2_min",
+        "floating_minmax_32_2_max",
+        "floating_minmax_32_3_min",
+        "floating_minmax_32_3_max",
+        "floating_minmax_32_4_min",
+        "floating_minmax_32_4_max",
+        "floating_minmax_64_2_min",
+        "floating_minmax_64_2_max",
+        "floating_minmax_64_3_min",
+        "floating_minmax_64_3_max",
+        "floating_minmax_64_4_min",
+        "floating_minmax_64_4_max",
+        "floating_minmax_80_2_min",
+        "floating_minmax_80_2_max",
+        "floating_minmax_80_3_min",
+        "floating_minmax_80_3_max",
+        "floating_minmax_80_4_min",
+        "floating_minmax_80_4_max",
+        "floating_minmax_128_2_min",
+        "floating_minmax_128_2_max",
+        "floating_minmax_128_3_min",
+        "floating_minmax_128_3_max",
+        "floating_minmax_128_4_min",
+        "floating_minmax_128_4_max"
+      ],
+      "reference_fixture": "floating_minmax_zero_reference",
+      "reference_source": "floating_minmax_mixed_zeros_driver.c",
+      "libraries": [
+        "m"
+      ],
+      "observations": 11520,
+      "stdout": "floating-minmax observations=11520 all-five-formats=pinned-nan-contract=signed-zeros=exact-tails=guard-pages=preserved\n"
     }
   ]
 }

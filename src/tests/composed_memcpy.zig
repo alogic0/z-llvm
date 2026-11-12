@@ -88,11 +88,14 @@ test "composed memcpy reserves staging for dying pointer arithmetic" {
 }
 
 test "composed memcpy memory transfers reject barriers address spaces and vector neighbors" {
+    // Native scalar volatility is now admitted; wider/vector access contracts
+    // remain independent and closed. The native canary counts every access.
+    try check("define void @native_volatile(ptr %d) {\nentry:\n store volatile i8 42,ptr %d,align 1\n ret void\n}\n", null);
     const variants = [_]struct { body: []const u8, detail: []const u8 }{
         .{ .body = "%v = load volatile <16 x i8>, ptr %s, align 1", .detail = "composed-block-load-barrier" },
         .{ .body = "%v = load <16 x i8>, ptr addrspace(1) %s, align 1", .detail = "composed-block-byte-vector-addrspace" },
         .{ .body = "%v = load i8, ptr addrspace(1) %s, align 1", .detail = "composed-block-byte-load-addrspace" },
-        .{ .body = "store volatile i8 42, ptr %d, align 1", .detail = "composed-block-store-barrier" },
+        .{ .body = "store volatile i128 42, ptr %d, align 1", .detail = "composed-block-store-barrier" },
         .{ .body = "store i8 42, ptr addrspace(1) %d, align 1", .detail = "composed-block-byte-store-addrspace" },
         .{ .body = "%v = load <32 x i8>, ptr %s, align 1", .detail = "UnsupportedCodegenValue" },
         .{ .body = "%v = load <16 x i8>, ptr %s, align 1\n store volatile <16 x i8> %v, ptr %d, align 1", .detail = "composed-block-store-barrier" },

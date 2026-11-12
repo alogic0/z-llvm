@@ -110,7 +110,10 @@ fn queryDepth(context: ?*const machine.ReadOnlyModuleContext, dl: target.DataLay
             .double => 64,
             else => return null,
         };
-        if (bits == 0 or bits > 64 or vector.len == 0 or vector.len > 16 or vector.len * bits > 128) return null;
+        // A memory layout does not grant a vector register ABI. Larger local
+        // vectors use the existing bounded, rounded interior-stack authority.
+        // At most64 native-width lanes require512 bytes and512-byte alignment.
+        if (bits == 0 or bits > 64 or vector.len == 0 or vector.len > 64) return null;
         if (context) |ctx| if (ctx.target_datalayout) |text| {
             var parts = std.mem.splitScalar(u8, text, '-');
             while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return null;

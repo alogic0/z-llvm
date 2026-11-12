@@ -1,4 +1,14 @@
 const std = @import("std");
+
+test "native volatile memory retains exact scalar width and closes unsupported shapes" {
+    const atomics = @import("composed_selector_atomic.zig");
+    for ([_]u16{ 8, 16, 32, 64 }) |bits| try std.testing.expect(atomics.supportedMemoryAccess(.{ .int = bits }, .{ .is_volatile = true, .@"align" = 1 }));
+    try std.testing.expect(atomics.supportedMemoryAccess(.ptr, .{ .is_volatile = true, .@"align" = 1 }));
+    for ([_]u16{ 1, 13, 24, 128 }) |bits| try std.testing.expect(!atomics.supportedMemoryAccess(.{ .int = bits }, .{ .is_volatile = true }));
+    try std.testing.expect(!atomics.supportedMemoryAccess(.double, .{ .is_volatile = true }));
+    try std.testing.expect(!atomics.supportedMemoryAccess(.{ .int = 32 }, .{ .is_volatile = true, .syncscope = "syncscope(\"singlethread\")" }));
+    try std.testing.expect(!atomics.supportedMemoryAccess(.{ .int = 64 }, .{ .is_volatile = true, .atomic_ordering = "seq_cst", .@"align" = 1 }));
+}
 const ir = @import("../../../ir.zig");
 const machine = @import("../machine.zig");
 const selector = @import("../generic_cfg_selector.zig");

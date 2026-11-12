@@ -89,6 +89,10 @@ test "aggregate storage layouts include nested packed fields and reject incomple
         .{ .text = "[32 x i64]", .bytes = 256, .alignment = 8 },
         .{ .text = "{ <2 x i64> }", .bytes = 16, .alignment = 16 },
         .{ .text = "[4 x <4 x i32>]", .bytes = 64, .alignment = 16 },
+        .{ .text = "{ <4 x i64> }", .bytes = 32, .alignment = 32 },
+        .{ .text = "[3 x <3 x i64>]", .bytes = 96, .alignment = 32 },
+        .{ .text = "[2 x <17 x i32>]", .bytes = 256, .alignment = 128 },
+        .{ .text = "{ i8, <64 x double>, i16 }", .bytes = 1536, .alignment = 512 },
         .{ .text = "[8192 x i64]", .bytes = 65536, .alignment = 8 },
         .{ .text = "[524288 x i64]", .bytes = 4194304, .alignment = 8 },
         .{ .text = "[0 x i8]", .bytes = 0, .alignment = 1 },
@@ -97,7 +101,7 @@ test "aggregate storage layouts include nested packed fields and reject incomple
         .{ .text = "<{ i8, half, float, double, fp128 }>", .bytes = 31, .alignment = 1 },
     };
     for (cases) |case| try std.testing.expectEqualDeep(storage.Layout{ .bytes = case.bytes, .alignment = case.alignment }, storage.query(&context, .{ .aggregate = case.text }).?);
-    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[524289 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <4 x i64> }" }) |text|
+    for ([_][]const u8{ "%Cycle", "%Duplicate", "%Missing", "{ i64, %Missing }", "{ i64, }", "{ i64 } junk", "{ i64", "[524289 x i64]", "[4294967295 x i128]", "<{ i8, ptr addrspace(1) }>", "{ <65 x i64> }", "{ <2 x i65> }", "[8193 x <64 x i64>]" }) |text|
         try std.testing.expect(storage.query(&context, .{ .aggregate = text }) == null);
     context.target_datalayout = "e-a:64";
     try std.testing.expectEqualDeep(storage.Layout{ .bytes = 8, .alignment = 8 }, storage.query(&context, .{ .aggregate = "{ i8 }" }).?);

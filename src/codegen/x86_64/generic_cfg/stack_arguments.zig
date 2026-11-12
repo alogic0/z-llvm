@@ -5,7 +5,10 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const sysv = @import("../sysv_abi.zig");
 
-pub const max_arguments = 32;
+// The pinned behavior corpus needs forty direct arguments. Retain a bounded
+// 64-entry layout: at most128 integer words/1024 incoming or outgoing bytes.
+// Indirect calls retain their independent sixteen-argument envelope.
+pub const max_arguments = 64;
 pub const max_indirect_arguments = 16;
 pub const max_stack_words = max_arguments * 2;
 
@@ -123,7 +126,7 @@ test "integer stack ABI aligns pairs after scalar stack slots and retains indire
     try std.testing.expectEqual(@as(usize, 2), layout.locations[7].stack);
     try std.testing.expectEqual(@as(usize, 4), layout.locations[8].stack);
     try std.testing.expectEqual(@as(usize, 5), layout.stack_words);
-    var many: [33]ir.CallArg = @splat(.{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
+    var many: [65]ir.CallArg = @splat(.{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
     call.args = .fromOwnedSlice(many[0..32]);
     try std.testing.expectEqual(@as(usize, 26), callLayout(call).?.stack_words);
     call.callee_value = .{ .named = "target" };
@@ -131,6 +134,12 @@ test "integer stack ABI aligns pairs after scalar stack slots and retains indire
     call.args.items = many[0..16];
     try std.testing.expectEqual(@as(usize, 10), callLayout(call).?.stack_words);
     call.callee_value = null;
+    call.args.items = many[0..64];
+    try std.testing.expectEqual(@as(usize, 58), callLayout(call).?.stack_words);
+    for (&many) |*arg| arg.ty = .{ .int = 128 };
+    const pairs = callLayout(call).?;
+    try std.testing.expectEqual(@as(usize, 122), pairs.stack_words);
+    try std.testing.expectEqual(@as(usize, 120), pairs.locations[63].stack);
     call.args.items = &many;
     try std.testing.expect(callLayout(call) == null);
 }

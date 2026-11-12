@@ -56,7 +56,7 @@ pub fn inspectCmpxchg(cmp: core_ir.CmpxchgInst) ?Diagnostic {
 }
 
 pub fn supportedMemoryAccess(ty: ir.Type, attrs: core_ir.MemoryAttrs) bool {
-    if (!attrs.isAtomic()) return !attrs.is_volatile and attrs.syncscope == null;
+    if (!attrs.isAtomic()) return attrs.syncscope == null and (!attrs.is_volatile or width(ty) != null);
     return aligned(ty, attrs.@"align") and supportedScope(attrs.syncscope);
 }
 

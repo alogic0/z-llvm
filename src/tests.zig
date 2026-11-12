@@ -8,6 +8,7 @@ comptime { _ = @import("codegen/x86_64/generic_cfg/variadic_values_tests.zig"); 
 comptime { _ = @import("codegen/x86_64/generic_cfg/floating_atomics_tests.zig"); }
 
 comptime {
+    _ = @import("ir/vector_constant.zig");
     _ = @import("codegen/x86_64/generic_cfg/prefetch_hints_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/half_classification.zig");
     _ = @import("codegen/x86_64/generic_cfg/floating_remainders.zig");

@@ -104,6 +104,7 @@ pub fn lowerAlloca(selector: *ComposedBlockSelector, result: ?[]const u8, alloca
 
 pub fn lowerLoad(selector: *ComposedBlockSelector, result: ?[]const u8, load: ir.LoadInst) !?Diagnostic {
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
+    if (load.attrs.is_volatile and (load.ty_addrspace != null or load.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-load-barrier" };
     if (!@import("composed_selector_atomic.zig").supportedMemoryAccess(load.ty, load.attrs)) return .{ .no_emitter = "composed-block-load-barrier" };
     if (load.attrs.atomic_ordering) |ordering| {
         if (!std.mem.eql(u8, ordering, "acquire") and
@@ -201,7 +202,16 @@ fn ordinaryLoadValueUseDiagnostic(
 }
 
 pub fn lowerStore(selector: *ComposedBlockSelector, store: ir.StoreInst) !?Diagnostic {
-    if (store.value == .undef or store.value == .poison) return null;
+    if (store.attrs.is_volatile and (store.ty_addrspace != null or store.ptr_addrspace != null)) return .{ .no_emitter = "composed-block-store-barrier" };
+    if (store.value == .undef or store.value == .poison) {
+        if (!store.attrs.is_volatile) return null;
+        // An unspecified value still owns its volatile write event. Select a
+        // concrete value and retain the complete access and its attributes.
+        if (@import("composed_selector_atomic.zig").width(store.ty) == null) return .{ .no_emitter = "composed-block-store-barrier" };
+        var concrete = store;
+        concrete.value = if (store.ty == .ptr) .null_value else .{ .int = 0 };
+        return lowerStore(selector, concrete);
+    }
     if (!@import("composed_selector_atomic.zig").supportedMemoryAccess(store.ty, store.attrs)) return .{ .no_emitter = "composed-block-store-barrier" };
     if (store.attrs.atomic_ordering) |ordering| {
         if (std.mem.eql(u8, ordering, "seq_cst")) return @import("composed_selector_atomic.zig").lowerSequentialStore(selector, store);

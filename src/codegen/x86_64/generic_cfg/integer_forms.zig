@@ -130,7 +130,20 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     try finish(allocator, &block, inst, wide, value.ty, answer);
                     continue;
                 },
-                .cast => |cast| if (cast.op == .trunc and cast.from_ty.eql(.{ .int = 128 }) and cast.to_ty.eql(.{ .int = 52 }) and
+                .cast => |cast| if (cast.op == .zext and integer(cast.from_ty) and integer(cast.to_ty) and
+                    cast.from_ty.int < cast.to_ty.int and cast.value == .int and operand(cast.value, cast.from_ty.int) and
+                    cast.from_ty.int != 1 and cast.from_ty.int != 8 and cast.from_ty.int != 16 and cast.from_ty.int != 32 and
+                    (cast.to_ty.int == 8 or cast.to_ty.int == 16 or cast.to_ty.int == 32 or cast.to_ty.int == 64))
+                {
+                    // LLVM literals carry the source-width bit pattern. In
+                    // particular zext i3 -4 is4, not a sign-extended word.
+                    const semantics = @import("../../../analysis/integer_semantics.zig").Integer.init(cast.from_ty).?;
+                    try candidate.begin(&block, block_index, instruction_index);
+                    var copy = inst;
+                    copy.kind = .{ .binary = .{ .op = .add, .ty = cast.to_ty, .lhs = .{ .int = @intCast(semantics.unsigned(cast.value.int)) }, .rhs = .{ .int = 0 } } };
+                    try block.instructions.append(allocator, copy);
+                    continue;
+                } else if (cast.op == .trunc and cast.from_ty.eql(.{ .int = 128 }) and cast.to_ty.eql(.{ .int = 52 }) and
                     (cast.value == .int or (cast.value == .named and !std.mem.startsWith(u8, cast.value.named, "@"))))
                 {
                     try candidate.begin(&block, block_index, instruction_index);

@@ -41,6 +41,24 @@ test "address flow named struct fields use complete padded and packed layouts" {
     }
 }
 
+test "address flow array elements preserve padded vector strides and wrapping indices" {
+    const Case = struct { ty: []const u8, stride: u64 };
+    for ([_]Case{ .{ .ty = "<3 x i64>", .stride = 32 }, .{ .ty = "<17 x i32>", .stride = 128 }, .{ .ty = "<64 x double>", .stride = 512 }, .{ .ty = "{ i8, i64 }", .stride = 16 } }) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @element(ptr %p,i64 %index) {{\nentry:\n %q = getelementptr [3 x {s}],ptr %p,i64 0,i64 %index\n %bits = ptrtoint ptr %q to i64\n ret i64 %bits\n}}\n", .{case.ty});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u64{ 0, 1, std.math.maxInt(u64) - 3 }) |base| for ([_]u64{ 0, 1, 2, 0x8000000000000000, std.math.maxInt(u64) }) |index|
+            try std.testing.expectEqual(base +% index *% case.stride, run(base, index));
+        try module.verify();
+        try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[0].kind.gep.source_ty == .aggregate);
+    }
+}
+
 test "packed structures compose runtime strides and nested member offsets" {
     for ([_][]const u8{ "<{ i8, { i8, i64 }, i16 }>", "{ i8, { i8, i64 }, i16 }" }, [_]u64{ 19, 32 }, [_]u64{ 9, 16 }) |body, stride, offset| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @field(ptr %p, i64 %index) {{\nentry:\n %q = getelementptr {s}, ptr %p, i64 %index, i32 1, i32 1\n %bits = ptrtoint ptr %q to i64\n ret i64 %bits\n}}\n", .{body});

@@ -79,9 +79,9 @@ fn tupleBits(ty: ir.Type) ?u16 {
 }
 fn checkedKind(a: std.mem.Allocator, call: ir.CallInst) !?CheckedKind {
     const bits = tupleBits(call.ret_ty) orelse return null;
-    for ([_][]const u8{ "uadd", "usub", "sadd", "ssub" }, 0..) |name, i| {
+    for ([_][]const u8{ "uadd", "usub", "sadd", "ssub", "umul", "smul" }, 0..) |name, i| {
         if (std.mem.eql(u8, call.callee, try std.fmt.allocPrint(a, "llvm.{s}.with.overflow.i{d}", .{ name, bits })))
-            return .{ .bits = bits, .op = if (i % 2 == 0) .add else .sub, .signed = i >= 2 };
+            return .{ .bits = bits, .op = if (i >= 4) .mul else if (i % 2 == 0) .add else .sub, .signed = i == 2 or i == 3 or i == 5 };
     }
     return null;
 }
@@ -220,6 +220,12 @@ const Builder = struct {
         return result;
     }
     fn arithmetic(b: Builder, op: ir.BinaryOp, x: Parts, y: Parts) !Parts {
+        if (op == .mul) {
+            const product = try b.productWords(x, y, false);
+            var result: Parts = .{ .bits = x.bits };
+            @memcpy(result.values[0..result.count()], product[0..result.count()]);
+            return result;
+        }
         var result: Parts = .{ .bits = x.bits };
         var carry: ir.Value = .{ .int = 0 };
         for (result.values[0..result.count()], 0..) |*v, i| {
@@ -235,6 +241,70 @@ const Builder = struct {
             }
         }
         return result;
+    }
+    fn productWords(b: Builder, x: Parts, y: Parts, comptime full: bool) ![2 * max_words]ir.Value {
+        const pair: ir.Type = .{ .int = 128 };
+        const count = x.count();
+        const output_count = if (full) count * 2 else count;
+        var output: [2 * max_words]ir.Value = @splat(.{ .int = 0 });
+        // Each cell is x*y + prior_word + carry. Its maximum is
+        // (2^64-1)^2 + 2*(2^64-1) = 2^128-1, so the pair sum is exact.
+        for (0..count) |i| {
+            var carry: ir.Value = .{ .int = 0 };
+            for (0..count) |j| {
+                const at = i + j;
+                if (at >= output_count) break;
+                const product = try b.binary(.mul, pair, try b.cast(.zext, word, x.values[i], pair), try b.cast(.zext, word, y.values[j], pair));
+                const first = try b.binary(.add, pair, product, try b.cast(.zext, word, output[at], pair));
+                const sum = try b.binary(.add, pair, first, try b.cast(.zext, word, carry, pair));
+                output[at] = try b.cast(.trunc, pair, sum, word);
+                carry = try b.cast(.trunc, pair, try b.binary(.lshr, pair, sum, .{ .int = 64 }), word);
+            }
+            if (full) output[i + count] = carry;
+        }
+        return output;
+    }
+    fn checkedMultiply(b: Builder, x: Parts, y: Parts, signed: bool) !OverflowTuple {
+        var left = x;
+        var right = y;
+        const negative: ir.Value = if (signed) try b.cmp(.ne, try b.sign(x), try b.sign(y)) else .{ .int = 0 };
+        if (signed) {
+            const zero: Parts = .{ .bits = x.bits };
+            var nx = try b.arithmetic(.sub, zero, x);
+            var ny = try b.arithmetic(.sub, zero, y);
+            try b.normalize(&nx);
+            try b.normalize(&ny);
+            const sx = try b.cmp(.ne, try b.sign(x), .{ .int = 0 });
+            const sy = try b.cmp(.ne, try b.sign(y), .{ .int = 0 });
+            for (0..x.count()) |i| {
+                left.values[i] = try b.choose(sx, nx.values[i], x.values[i]);
+                right.values[i] = try b.choose(sy, ny.values[i], y.values[i]);
+            }
+        }
+        const product = try b.productWords(left, right, true);
+        var value: Parts = .{ .bits = x.bits };
+        @memcpy(value.values[0..value.count()], product[0..value.count()]);
+        try b.normalize(&value);
+        if (signed) {
+            const zero: Parts = .{ .bits = value.bits };
+            var negated = try b.arithmetic(.sub, zero, value);
+            try b.normalize(&negated);
+            for (0..value.count()) |i| value.values[i] = try b.choose(negative, negated.values[i], value.values[i]);
+        }
+        const top = @as(usize, (x.bits - 1) / 64);
+        const sign_bit: u64 = @as(u64, 1) << @as(u6, @intCast((x.bits - 1) % 64));
+        var greater: ir.Value = .{ .int = 0 };
+        for (0..x.count() * 2) |i| {
+            const limit: ir.Value = if (signed) blk: {
+                const positive: u64 = if (i < top) std.math.maxInt(u64) else if (i == top) sign_bit - 1 else 0;
+                const magnitude: u64 = if (i == top) sign_bit else 0;
+                break :blk try b.choose(negative, .{ .int = magnitude }, .{ .int = positive });
+            } else .{ .int = if (i < top) std.math.maxInt(u64) else if (i == top) mask(x.bits) else 0 };
+            const eq = try b.cmp(.eq, product[i], limit);
+            const gt = try b.cmp(.ugt, product[i], limit);
+            greater = try b.emit(.{ .select = .{ .cond_ty = boolean, .cond = eq, .ty = boolean, .true_value = greater, .false_value = gt } });
+        }
+        return .{ .value = value, .flag = greater };
     }
     fn division(b: Builder, op: ir.BinaryOp, x: Parts, y: Parts) !Parts {
         const signed = op == .sdiv or op == .srem;
@@ -280,6 +350,7 @@ const Builder = struct {
         for (call.args.items) |arg| if (!arg.ty.eql(ty) or !advisory(arg.attrs) or arg.abi_x87_memory or arg.abi_split_integer) return error.UnsupportedLimbInteger;
         const x = try b.get(call.args.items[0].value, ty);
         const y = try b.get(call.args.items[1].value, ty);
+        if (kind.op == .mul) return b.checkedMultiply(x, y, kind.signed);
         var result = try b.arithmetic(kind.op, x, y);
         try b.normalize(&result);
         const flag = if (kind.signed) blk: {
@@ -353,6 +424,18 @@ const Builder = struct {
         if (zero_flag) try args.append(b.a, .{ .ty = boolean, .value = .{ .int = 0 } });
         return b.emit(.{ .call = .{ .callee = name, .ret_ty = word, .args = args } });
     }
+    fn saturationLimit(b: Builder, bits: u16, signed: bool, negative: ir.Value) !Parts {
+        var limit: Parts = .{ .bits = bits };
+        const sign_bit = @as(u64, 1) << @as(u6, @intCast((bits - 1) % 64));
+        for (limit.values[0..limit.count()], 0..) |*part, i| {
+            const top = i + 1 == limit.count();
+            part.* = if (signed)
+                try b.choose(negative, .{ .int = if (top) sign_bit else 0 }, .{ .int = if (top) sign_bit - 1 else std.math.maxInt(u64) })
+            else
+                .{ .int = if (top) mask(bits) else std.math.maxInt(u64) };
+        }
+        return limit;
+    }
     fn intrinsic(b: Builder, call: ir.CallInst) !?Parts {
         if (!wide(call.ret_ty) or call.callee_value != null or call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null) return null;
         if (call.tail_kind) |kind| if (std.mem.eql(u8, kind, "musttail")) return null;
@@ -364,6 +447,10 @@ const Builder = struct {
             .{ .name = "uadd.sat", .arity = 2, .flag = false },   .{ .name = "usub.sat", .arity = 2, .flag = false },
             .{ .name = "sadd.sat", .arity = 2, .flag = false },   .{ .name = "ssub.sat", .arity = 2, .flag = false },
             .{ .name = "fshl", .arity = 3, .flag = false },       .{ .name = "fshr", .arity = 3, .flag = false },
+            .{ .name = "umin", .arity = 2, .flag = false }, .{ .name = "umax", .arity = 2, .flag = false },
+            .{ .name = "smin", .arity = 2, .flag = false }, .{ .name = "smax", .arity = 2, .flag = false },
+            .{ .name = "ushl.sat", .arity = 2, .flag = false }, .{ .name = "sshl.sat", .arity = 2, .flag = false },
+            .{ .name = "umul.fix.sat", .arity = 3, .flag = false }, .{ .name = "smul.fix.sat", .arity = 3, .flag = false },
         };
         const kind = for (kinds) |k| {
             if (std.mem.eql(u8, call.callee, try std.fmt.allocPrint(b.a, "llvm.{s}.i{d}", .{ k.name, bits }))) break k;
@@ -373,7 +460,11 @@ const Builder = struct {
         if (!advisory(call.ret_attrs) and !(count_kind and @import("intrinsic_attrs.zig").matchesIntegerRange(call.ret_attrs, bits, 0, @as(u128, bits) + 1))) return null;
         for (call.args.items, 0..) |arg, i| {
             if (!advisory(arg.attrs) or arg.abi_x87_memory or arg.abi_split_integer) return null;
-            if (kind.flag and i + 1 == kind.arity) {
+            if (std.mem.endsWith(u8, kind.name, "mul.fix.sat") and i == 2) {
+                // Only the observed scale0 integer multiplication is admitted;
+                // fractional scaling and rounding retain their closed boundary.
+                if (!arg.ty.eql(.{ .int = 32 }) or arg.value != .int or arg.value.int != 0) return null;
+            } else if (kind.flag and i + 1 == kind.arity) {
                 if (!arg.ty.eql(boolean) or arg.value != .int or (arg.value.int != 0 and arg.value.int != 1)) return null;
             } else if (!arg.ty.eql(call.ret_ty)) return null;
         }
@@ -385,6 +476,34 @@ const Builder = struct {
             for (signs.values[0..signs.count()]) |*v| v.* = sign_fill;
             try b.normalize(&signs);
             result = try b.arithmetic(.sub, try b.arithmetic(.xor, x, signs), signs);
+        } else if (std.mem.eql(u8, kind.name, "umin") or std.mem.eql(u8, kind.name, "umax") or
+            std.mem.eql(u8, kind.name, "smin") or std.mem.eql(u8, kind.name, "smax"))
+        {
+            const y = try b.get(call.args.items[1].value, call.ret_ty);
+            const signed = kind.name[0] == 's';
+            const maximum = kind.name[1] == 'm' and kind.name[2] == 'a';
+            const choose_x = try b.comparison(if (signed) (if (maximum) .sgt else .slt) else (if (maximum) .ugt else .ult), x, y);
+            for (result.values[0..result.count()], 0..) |*part, i| part.* = try b.choose(choose_x, x.values[i], y.values[i]);
+        } else if (std.mem.endsWith(u8, kind.name, "mul.fix.sat")) {
+            const y = try b.get(call.args.items[1].value, call.ret_ty);
+            const signed = kind.name[0] == 's';
+            const checked_value = try b.checkedMultiply(x, y, signed);
+            const negative: ir.Value = if (signed) try b.cmp(.ne, try b.sign(x), try b.sign(y)) else .{ .int = 0 };
+            const limit = try b.saturationLimit(bits, signed, negative);
+            for (result.values[0..result.count()], 0..) |*part, i| part.* = try b.choose(checked_value.flag, limit.values[i], checked_value.value.values[i]);
+        } else if (std.mem.eql(u8, kind.name, "ushl.sat") or std.mem.eql(u8, kind.name, "sshl.sat")) {
+            const amount = try b.get(call.args.items[1].value, call.ret_ty);
+            const signed = kind.name[0] == 's';
+            result = try b.shifted(.shl, x, amount);
+            try b.normalize(&result);
+            var restored = try b.shifted(if (signed) .ashr else .lshr, result, amount);
+            try b.normalize(&restored);
+            const overflow = try b.comparison(.ne, restored, x);
+            const negative: ir.Value = if (signed) try b.cmp(.ne, try b.sign(x), .{ .int = 0 }) else .{ .int = 0 };
+            const limit = try b.saturationLimit(bits, signed, negative);
+            // LLVM22 defines counts>=width as poison. Compare only defined
+            // counts in the execution oracle; this graph chooses a refinement.
+            for (result.values[0..result.count()], 0..) |*part, i| part.* = try b.choose(overflow, limit.values[i], part.*);
         } else if (count_kind) {
             if (std.mem.eql(u8, kind.name, "ctpop")) {
                 var sum: ir.Value = .{ .int = 0 };

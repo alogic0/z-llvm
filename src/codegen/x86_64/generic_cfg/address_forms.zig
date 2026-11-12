@@ -70,6 +70,23 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                     changed = true;
                     continue;
                 }
+                // A bounded array uses its element allocation stride, including
+                // vector tail padding. The next iteration owns byte scaling.
+                if (gep.ptr_addrspace == null and gep.indices.items.len == 2 and
+                    gep.indices.items[0].ty.eql(.{ .int = 64 }) and gep.indices.items[0].value.eql(.{ .int = 0 }) and
+                    gep.indices.items[1].ty.eql(.{ .int = 64 }) and
+                    (gep.indices.items[1].value == .int or gep.indices.items[1].value == .named))
+                {
+                    if (arrayElement(context, gep.source_ty)) |element| {
+                        var copy = inst;
+                        copy.kind.gep.source_ty = element;
+                        copy.kind.gep.indices = .empty;
+                        try copy.kind.gep.indices.append(allocator, gep.indices.items[1]);
+                        try block.instructions.append(allocator, copy);
+                        changed = true;
+                        continue;
+                    }
+                }
                 if (gep.ptr_addrspace == null and gep.indices.items.len == 1 and
                     !gep.source_ty.eql(.{ .int = 8 }) and gep.indices.items[0].ty.eql(.{ .int = 64 }) and
                     (gep.indices.items[0].value == .int or gep.indices.items[0].value == .named))
@@ -148,4 +165,35 @@ fn isByteArray(context: ?*const machine.ReadOnlyModuleContext, ty: ir.Type) bool
     _ = storage.query(context, ty) orelse return false;
     const element = storage.query(context, .{ .int = 8 }) orelse return false;
     return element.bytes == 1;
+}
+
+fn arrayElement(context: ?*const machine.ReadOnlyModuleContext, original: ir.Type) ?ir.Type {
+    _ = storage.query(context, original) orelse return null;
+    var ty = original;
+    for (0..32) |_| {
+        if (ty != .aggregate) return null;
+        const text = std.mem.trim(u8, ty.aggregate, " \t\r\n");
+        if (text.len == 0) return null;
+        if (text[0] == '%') {
+            const ctx = context orelse return null;
+            var body: ?[]const u8 = null;
+            for (ctx.named_types) |named| if (ir.identifiers.eql(named.name, text[1..])) {
+                if (body != null) return null;
+                body = named.body;
+            };
+            ty = @import("../../../ir/parser_types_values.zig").parseType(body orelse return null) catch return null;
+            continue;
+        }
+        if (text.len < 2 or text[0] != '[' or text[text.len - 1] != ']') return null;
+        var tokens = std.mem.tokenizeAny(u8, text[1 .. text.len - 1], " \t\r\n");
+        _ = std.fmt.parseUnsigned(u32, tokens.next() orelse return null, 10) catch return null;
+        if (!std.mem.eql(u8, tokens.next() orelse return null, "x")) return null;
+        const element = @import("../../../ir/parser_types_values.zig").parseType(tokens.rest()) catch return null;
+        // The existing byte-array path separately proves the byte stride.
+        // In particular i8:16 layouts cannot use ordinary one-byte GEPs.
+        if (element.eql(.{ .int = 8 })) return null;
+        _ = storage.query(context, element) orelse return null;
+        return element;
+    }
+    return null;
 }

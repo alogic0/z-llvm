@@ -5,6 +5,92 @@ const encoding = @import("../../../mc/encoding.zig");
 const verify = @import("../verify.zig");
 const vectors = @import("floating_vectors.zig");
 
+test "floating minmax reductions retain scalar maxnum owners and exact sign bit views" {
+    for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
+        for ([_]usize{ 2, 3, 4 }) |count| for ([_][]const u8{ "fmin", "fmax" }) |op| {
+            const text = try std.fmt.allocPrint(std.testing.allocator,
+                "declare {0s} @llvm.maxnum.f{3d}({0s},{0s})\ndeclare {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}(<{2d} x {0s}>)\ndefine void @reduce(ptr %out,ptr %in) {{\nentry:\n %v = load <{2d} x {0s}>,ptr %in,align 1\n %r = call {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}(<{2d} x {0s}> %v)\n store {0s} %r,ptr %out,align 1\n ret void\n}}\n", .{ ty, op, count, bits });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const source = module.functions.items[0];
+            const view = (try vectors.legalize(arena.allocator(), source, null)).?;
+            try std.testing.expect(try vectors.legalize(arena.allocator(), view, null) == null);
+            var private = module;
+            private.functions = try module.functions.clone(arena.allocator());
+            private.functions.items[0] = view;
+            try private.verify();
+            var calls: usize = 0;
+            var negations: usize = 0;
+            for (view.blocks.items) |block| for (block.instructions.items) |inst| {
+                if (inst.kind == .call) {
+                    const call = inst.kind.call;
+                    const spelling = try std.fmt.allocPrint(arena.allocator(), "llvm.maxnum.f{d}", .{bits});
+                    try std.testing.expectEqualStrings(spelling, call.callee);
+                    try std.testing.expect(call.ret_ty.eql(source.blocks.items[0].instructions.items[1].kind.call.ret_ty));
+                    try std.testing.expectEqual(@as(usize, 2), call.args.items.len);
+                    calls += 1;
+                }
+                if (inst.kind == .binary and inst.kind.binary.op == .xor) negations += 1;
+            };
+            try std.testing.expectEqual(count - 1, calls);
+            try std.testing.expectEqual(if (std.mem.eql(u8, op, "fmin")) 3 * (count - 1) else @as(usize, 0), negations);
+            try std.testing.expect(source.ret_ty.eql(view.ret_ty));
+            try std.testing.expectEqual(source.params.items.len, view.params.items.len);
+            for (source.params.items, view.params.items) |original, replacement| {
+                try std.testing.expectEqualStrings(original.name, replacement.name);
+                try std.testing.expect(original.ty.eql(replacement.ty));
+                try std.testing.expectEqual(original.attrs, replacement.attrs);
+            }
+            try std.testing.expect(source.blocks.items[0].instructions.items[1].kind == .call);
+            try module.verify();
+        };
+    }
+}
+
+test "floating reductions preserve ordered scalar steps seed and source identities" {
+    for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
+        for ([_]usize{ 2, 3, 4 }) |count| for ([_][]const u8{ "fadd", "fmul" }) |op| {
+            const text = try std.fmt.allocPrint(std.testing.allocator,
+                "declare {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}({0s},<{2d} x {0s}>)\ndefine void @reduce(ptr %out,ptr %in,ptr %seed) {{\nentry:\n %v = load <{2d} x {0s}>,ptr %in,align 1\n %s = load {0s},ptr %seed,align 1\n %r = call {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}({0s} %s,<{2d} x {0s}> %v)\n store {0s} %r,ptr %out,align 1\n ret void\n}}\n", .{ ty, op, count, bits });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const source = module.functions.items[0];
+            const view = (try vectors.legalize(arena.allocator(), source, null)).?;
+            try std.testing.expect(try vectors.legalize(arena.allocator(), view, null) == null);
+            var private = module;
+            private.functions = try module.functions.clone(arena.allocator());
+            private.functions.items[0] = view;
+            try private.verify();
+            var steps: usize = 0;
+            var previous: ?[]const u8 = null;
+            for (view.blocks.items) |block| for (block.instructions.items) |inst| {
+                if (inst.kind != .binary) continue;
+                const binary = inst.kind.binary;
+                if (binary.op != .fadd and binary.op != .fmul) continue;
+                try std.testing.expectEqual(if (std.mem.eql(u8, op, "fadd")) ir.BinaryOp.fadd else .fmul, binary.op);
+                try std.testing.expect(binary.ty.eql(source.blocks.items[0].instructions.items[1].kind.load.ty));
+                try std.testing.expect(!binary.fp_flags.any());
+                if (previous) |name| try std.testing.expectEqualStrings(name, binary.lhs.named)
+                else try std.testing.expectEqualStrings("s", binary.lhs.named);
+                previous = inst.result;
+                steps += 1;
+            };
+            try std.testing.expectEqual(count, steps);
+            try std.testing.expectEqualStrings("r", source.blocks.items[0].instructions.items[2].result.?);
+            try std.testing.expect(source.blocks.items[0].instructions.items[2].kind == .call);
+            try module.verify();
+        };
+    }
+}
+
 fn executable(source: []const u8) ![]align(std.heap.page_size_min) u8 {
     var module = try ir.Module.parse(std.testing.allocator, source);
     defer module.deinit();

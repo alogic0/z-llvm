@@ -4,6 +4,20 @@ const limb = @import("limb_integers.zig");
 const machine = @import("../machine.zig");
 const layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
 
+test "bounded limb fixed point saturation keeps fractional and dynamic scales closed" {
+    for ([_][]const u8{ "umul", "smul" }) |op| for ([_][]const u8{ "1", "%scale" }) |scale| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            "declare i140 @llvm.{0s}.fix.sat.i140(i140,i140,i32)\ndefine i64 @f(ptr %xp,i32 %scale) {{\nentry:\n %x = load i140,ptr %xp,align 1\n %r = call i140 @llvm.{0s}.fix.sat.i140(i140 %x,i140 %x,i32 {1s})\n %low = trunc i140 %r to i64\n ret i64 %low\n}}\n", .{ op, scale });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout };
+        try std.testing.expect(try limb.legalize(arena.allocator(), module.functions.items[0], &context) == null);
+    };
+}
+
 test "bounded limb division keeps source immutable and verifies its runtime call ABI" {
     for ([_]u16{ 129, 140, 200, 256, 495, 512 }) |bits| for ([_][]const u8{ "udiv", "urem", "sdiv", "srem" }) |op| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "declare void @__udivei4(ptr,ptr,ptr,i64)\ndeclare void @__umodei4(ptr,ptr,ptr,i64)\ndeclare void @__divei4(ptr,ptr,ptr,i64)\ndeclare void @__modei4(ptr,ptr,ptr,i64)\ndefine i64 @divide(ptr %out,ptr %xp,ptr %yp,i64 %live) {{\nentry:\n %x = load i{0d},ptr %xp,align 1\n %y = load i{0d},ptr %yp,align 1\n %z = {1s} i{0d} %x,%y\n store i{0d} %z,ptr %out,align 1\n %a = trunc i{0d} %x to i64\n %b = trunc i{0d} %y to i64\n %c = xor i64 %a,%b\n %r = xor i64 %c,%live\n ret i64 %r\n}}\n", .{ bits, op });
@@ -91,12 +105,12 @@ test "bounded limb integers execute exact tails carry borrow and cross word shif
     inline for ([_]u16{ 129, 140, 200, 256, 495, 512 }) |bits| {
         const U = @Int(.unsigned, bits);
         const S = @Int(.signed, bits);
-        for ([_][]const u8{ "add", "sub", "and", "or", "xor", "shl", "lshr", "ashr" }, 0..) |op, oi| {
+        for ([_][]const u8{ "add", "sub", "and", "or", "xor", "shl", "lshr", "ashr", "mul" }, 0..) |op, oi| {
             const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @limbs(ptr %out, ptr %a, ptr %b, i64 %amount) {{\nentry:\n" ++
                 " %x = load i{0d}, ptr %a, align 1\n %y = load i{0d}, ptr %b, align 1\n" ++
                 " %s = zext i64 %amount to i{0d}\n %r = {1s} i{0d} %x, %{2s}\n" ++
                 " store i{0d} %r, ptr %out, align 1\n" ++
-                " %live = xor i64 %amount, 23\n ret i64 %live\n}}\n", .{ bits, op, if (oi >= 5) "s" else "y" });
+                " %live = xor i64 %amount, 23\n ret i64 %live\n}}\n", .{ bits, op, if (oi >= 5 and oi < 8) "s" else "y" });
             defer std.testing.allocator.free(text);
             var module = try ir.Module.parse(std.testing.allocator, text);
             defer module.deinit();
@@ -130,6 +144,7 @@ test "bounded limb integers execute exact tails carry borrow and cross word shif
                         5 => x << @intCast(amount),
                         6 => x >> @intCast(amount),
                         7 => @bitCast(@as(S, @bitCast(x)) >> @intCast(amount)),
+                        8 => x *% y,
                         else => unreachable,
                     };
                     var out: [80]u8 = @splat(0xa5);
@@ -156,7 +171,7 @@ test "bounded limb integer intrinsics execute counts permutations saturation and
     inline for ([_]u16{ 129, 140, 144, 200, 256, 495, 512 }) |bits| {
         const U = @Int(.unsigned, bits);
         const S = @Int(.signed, bits);
-        const names = [_][]const u8{ "abs", "ctpop", "ctlz", "cttz", "bitreverse", "bswap", "uadd.sat", "usub.sat", "sadd.sat", "ssub.sat", "fshl", "fshr" };
+        const names = [_][]const u8{ "abs", "ctpop", "ctlz", "cttz", "bitreverse", "bswap", "uadd.sat", "usub.sat", "sadd.sat", "ssub.sat", "fshl", "fshr", "umin", "umax", "smin", "smax", "umul.fix.sat", "smul.fix.sat", "ushl.sat", "sshl.sat" };
         for (names, 0..) |name, op| {
             if (op == 5 and bits % 16 != 0) continue;
             var strings = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -164,11 +179,12 @@ test "bounded limb integer intrinsics execute counts permutations saturation and
             const ta = strings.allocator();
             const unary = op <= 5;
             const flag = op == 0 or op == 2 or op == 3;
-            const funnel = op >= 10;
-            const args = try std.fmt.allocPrint(ta, "i{d} %x{s}{s}", .{ bits, if (flag) ", i1 0" else if (unary) "" else try std.fmt.allocPrint(ta, ", i{d} %y", .{bits}), if (funnel) try std.fmt.allocPrint(ta, ", i{d} %a", .{bits}) else "" });
+            const funnel = op == 10 or op == 11;
+            const scale = op == 16 or op == 17;
+            const args = try std.fmt.allocPrint(ta, "i{d} %x{s}{s}", .{ bits, if (flag) ", i1 0" else if (unary) "" else try std.fmt.allocPrint(ta, ", i{d} %{s}", .{ bits, if (op >= 18) "a" else "y" }), if (funnel) try std.fmt.allocPrint(ta, ", i{d} %a", .{bits}) else if (scale) ", i32 0" else "" });
             var text: std.ArrayList(u8) = .empty;
             defer text.deinit(std.testing.allocator);
-            const header = try std.fmt.allocPrint(ta, "declare i{0d} @llvm.{1s}.i{0d}({2s})\ndefine i64 @intrinsic(ptr %out, ptr %xp, ptr %yp, ptr %ap, i64 %salt) {{\nentry:\n %x = load i{0d}, ptr %xp, align 1\n %y = load i{0d}, ptr %yp, align 1\n %a = load i{0d}, ptr %ap, align 1\n %r = call i{0d} @llvm.{1s}.i{0d}({3s})\n store i{0d} %r, ptr %out, align 1\n %live = xor i64 %salt, 90\n ret i64 %live\n}}\n", .{ bits, name, if (flag) try std.fmt.allocPrint(ta, "i{0d}, i1", .{bits}) else if (funnel) try std.fmt.allocPrint(ta, "i{0d}, i{0d}, i{0d}", .{bits}) else if (unary) try std.fmt.allocPrint(ta, "i{d}", .{bits}) else try std.fmt.allocPrint(ta, "i{0d}, i{0d}", .{bits}), args });
+            const header = try std.fmt.allocPrint(ta, "declare i{0d} @llvm.{1s}.i{0d}({2s})\ndefine i64 @intrinsic(ptr %out, ptr %xp, ptr %yp, ptr %ap, i64 %salt) {{\nentry:\n %x = load i{0d}, ptr %xp, align 1\n %y = load i{0d}, ptr %yp, align 1\n %a = load i{0d}, ptr %ap, align 1\n %r = call i{0d} @llvm.{1s}.i{0d}({3s})\n store i{0d} %r, ptr %out, align 1\n %live = xor i64 %salt, 90\n ret i64 %live\n}}\n", .{ bits, name, if (flag) try std.fmt.allocPrint(ta, "i{0d}, i1", .{bits}) else if (funnel) try std.fmt.allocPrint(ta, "i{0d}, i{0d}, i{0d}", .{bits}) else if (scale) try std.fmt.allocPrint(ta, "i{0d}, i{0d}, i32", .{bits}) else if (unary) try std.fmt.allocPrint(ta, "i{d}", .{bits}) else try std.fmt.allocPrint(ta, "i{0d}, i{0d}", .{bits}), args });
             try text.appendSlice(std.testing.allocator, header);
             var module = try ir.Module.parse(std.testing.allocator, text.items);
             defer module.deinit();
@@ -192,7 +208,7 @@ test "bounded limb integer intrinsics execute counts permutations saturation and
             const inputs = [_]U{ 0, 1, std.math.maxInt(U), sign, sign - 1, sign + 1, ~@as(U, 1), (@as(U, 1) << 64) | 17 };
             for (inputs, 0..) |x, seed| {
                 const y = inputs[(seed + 3) % inputs.len];
-                const amount = (@as(U, seed) << 64) | @as(U, seed * 65);
+                const amount = if (op >= 18) @as(U, seed * 65 % bits) else (@as(U, seed) << 64) | @as(U, seed * 65);
                 const shift: std.math.Log2Int(U) = @intCast(amount % bits);
                 const sx: S = @bitCast(x);
                 const sy: S = @bitCast(y);
@@ -209,6 +225,14 @@ test "bounded limb integer intrinsics execute counts permutations saturation and
                     9 => @bitCast(sx -| sy),
                     10 => if (shift == 0) x else (x << shift) | (y >> @intCast(bits - shift)),
                     11 => if (shift == 0) y else (y >> shift) | (x << @intCast(bits - shift)),
+                    12 => @min(x, y),
+                    13 => @max(x, y),
+                    14 => @bitCast(@min(sx, sy)),
+                    15 => @bitCast(@max(sx, sy)),
+                    16 => x *| y,
+                    17 => @bitCast(sx *| sy),
+                    18 => x <<| shift,
+                    19 => @bitCast(sx <<| shift),
                     else => unreachable,
                 };
                 var a: [64]u8 = @splat(0);
@@ -242,7 +266,7 @@ test "bounded limb overflow tuples execute exact modular results and signed unsi
     inline for ([_]u16{ 129, 140, 200, 256, 495, 512 }) |bits| {
         const U = @Int(.unsigned, bits);
         const S = @Int(.signed, bits);
-        for ([_][]const u8{ "uadd", "usub", "sadd", "ssub" }, 0..) |name, op| {
+        for ([_][]const u8{ "uadd", "usub", "sadd", "ssub", "umul", "smul" }, 0..) |name, op| {
             const text = try std.fmt.allocPrint(std.testing.allocator, "declare {{i{0d},i1}} @llvm.{1s}.with.overflow.i{0d}(i{0d},i{0d})\n" ++
                 "define i64 @checked(ptr %out,ptr %flag,ptr %xp,ptr %yp,i64 %salt) {{\nentry:\n" ++
                 " %x = load i{0d},ptr %xp,align 1\n %y = load i{0d},ptr %yp,align 1\n" ++
@@ -263,7 +287,10 @@ test "bounded limb overflow tuples execute exact modular results and signed unsi
             const sign = @as(U, 1) << @intCast(bits - 1);
             const values = [_]U{ 0, 1, std.math.maxInt(U), sign, sign - 1, sign + 1 };
             for (values, 0..) |x, xi| for (values, 0..) |y, yi| {
-                const got = if (op < 2) (if (op == 0) @addWithOverflow(x, y) else @subWithOverflow(x, y)) else blk: {
+                const got = if (op == 4) @mulWithOverflow(x, y) else if (op == 5) blk: {
+                    const product = @mulWithOverflow(@as(S, @bitCast(x)), @as(S, @bitCast(y)));
+                    break :blk .{ @as(U, @bitCast(product[0])), product[1] };
+                } else if (op < 2) (if (op == 0) @addWithOverflow(x, y) else @subWithOverflow(x, y)) else blk: {
                     const pair = if (op == 2) @addWithOverflow(@as(S, @bitCast(x)), @as(S, @bitCast(y))) else @subWithOverflow(@as(S, @bitCast(x)), @as(S, @bitCast(y)));
                     break :blk .{ @as(U, @bitCast(pair[0])), pair[1] };
                 };
@@ -298,7 +325,7 @@ test "bounded limb overflow tuples reject aggregate escapes phis and unsupported
         "declare {i140,i1} @llvm.uadd.with.overflow.i140(i140,i140)\ndefine {i140,i1} @escape(i140 %a,i140 %b) {\nentry:\n %t = call {i140,i1} @llvm.uadd.with.overflow.i140(i140 %a,i140 %b)\n ret {i140,i1} %t\n}\n",
         "declare {i140,i1} @llvm.uadd.with.overflow.i140(i140,i140)\ndefine void @escape(ptr %out,i140 %a,i140 %b) {\nentry:\n %t = call {i140,i1} @llvm.uadd.with.overflow.i140(i140 %a,i140 %b)\n store {i140,i1} %t,ptr %out,align 1\n ret void\n}\n",
         "declare {i140,i1} @llvm.uadd.with.overflow.i140(i140,i140)\ndefine void @escape(ptr %out,i140 %a,i140 %b) {\nentry:\n %t = call {i140,i1} @llvm.uadd.with.overflow.i140(i140 %a,i140 %b)\n br label %merge\nmerge:\n %p = phi {i140,i1} [%t,%entry]\n %v = extractvalue {i140,i1} %p,0\n store i140 %v,ptr %out,align 1\n ret void\n}\n",
-        "declare {i140,i1} @llvm.umul.with.overflow.i140(i140,i140)\ndefine void @escape(ptr %out,i140 %a,i140 %b) {\nentry:\n %t = call {i140,i1} @llvm.umul.with.overflow.i140(i140 %a,i140 %b)\n %v = extractvalue {i140,i1} %t,0\n store i140 %v,ptr %out,align 1\n ret void\n}\n",
+        "declare {i513,i1} @llvm.umul.with.overflow.i513(i513,i513)\ndefine void @escape(ptr %out,i513 %a,i513 %b) {\nentry:\n %t = call {i513,i1} @llvm.umul.with.overflow.i513(i513 %a,i513 %b)\n %v = extractvalue {i513,i1} %t,0\n store i513 %v,ptr %out,align 1\n ret void\n}\n",
     };
     for (snippets) |text| {
         var module = try ir.Module.parse(std.testing.allocator, text);

@@ -7,6 +7,42 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "integer forms zero extend odd width literals by their source bit pattern" {
+    for ([_]u16{ 2, 3, 6, 31, 33, 47, 52, 62, 63 }) |bits| {
+        const sign = @as(i128, 1) << @as(u7, @intCast(bits - 1));
+        const limit = @as(i128, 1) << @as(u7, @intCast(bits));
+        for ([_]i128{ 0, 1, -1, -sign, sign - 1, limit - 1 }) |literal| {
+            const source = try std.fmt.allocPrint(std.testing.allocator,
+                "define i64 @literal(i64 %input,i64 %seed) {{\nentry:\n %wide = zext i{d} {d} to i64\n %mixed = xor i64 %wide,%seed\n %answer = add i64 %mixed,%input\n ret i64 %answer\n}}\n", .{ bits, literal });
+            defer std.testing.allocator.free(source);
+            var module = try ir.Module.parse(std.testing.allocator, source);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const original = module.functions.items[0];
+            const view = (try forms.legalize(arena.allocator(), original)).?;
+            try std.testing.expect(original.blocks.items[0].instructions.items[0].kind == .cast);
+            try std.testing.expectEqualStrings("wide", view.blocks.items[0].instructions.items[0].result.?);
+            try std.testing.expect(try forms.legalize(arena.allocator(), view) == null);
+            var lowered = machine.MachineFunction.init("literal", .{ .int = 64 });
+            defer lowered.deinit(std.testing.allocator);
+            try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &lowered, original));
+            try verify.verifyFunction(lowered);
+            const bytes = try encoding.encodeFunction(std.testing.allocator, lowered);
+            defer std.testing.allocator.free(bytes);
+            const executable = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+            defer std.posix.munmap(executable);
+            @memcpy(executable[0..bytes.len], bytes);
+            const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(executable.ptr);
+            const expected: u64 = @intCast(@mod(literal, limit));
+            const values = [_]u64{ 0, 1, 0x123456789abcdef0, 1 << 63, std.math.maxInt(u64) };
+            for (values) |input| for (values) |seed| try std.testing.expectEqual((expected ^ seed) +% input, run(input, seed));
+            try module.verify();
+        }
+    }
+}
+
 test "integer forms bridge pair truncation to i52 with clean word bits" {
     for ([_]bool{ false, true }) |literal| {
         const fixed: u128 = 0xfedcba98765432100123456789abcdef;

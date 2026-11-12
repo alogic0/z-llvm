@@ -150,7 +150,7 @@ fn parseTypedLane(raw: []const u8, elem_ty: core.VectorElementType) ?Lane {
     if (std.mem.eql(u8, value, "zeroinitializer")) return .zero_initializer;
     if (std.mem.eql(u8, value, "null")) return if (elem_ty == .ptr) .null_value else null;
     return switch (elem_ty) {
-        .int => .{ .int = std.fmt.parseInt(i128, value, 10) catch return null },
+        .int => |bits| .{ .int = if (bits == 1 and std.mem.eql(u8, value, "true")) 1 else if (bits == 1 and std.mem.eql(u8, value, "false")) 0 else std.fmt.parseInt(i128, value, 10) catch return null },
         .half, .float, .double, .x86_fp80, .fp128 => .{ .fp = value },
         .ptr => null,
     };
@@ -192,6 +192,23 @@ fn findTopLevelComma(text: []const u8) ?usize {
         else => {},
     };
     return null;
+}
+
+test "typed i1 vector constants retain boolean spellings and reject other integer widths" {
+    const ty: core.VectorType = .{ .len = 3, .elem_ty = .{ .int = 1 } };
+    const mixed = parseFixed(3, .{ .vector = "<i1 true, i1 false, i1 poison>" }, ty).?;
+    try std.testing.expectEqual(@as(i128, 1), mixed.lanes[0].int);
+    try std.testing.expectEqual(@as(i128, 0), mixed.lanes[1].int);
+    try std.testing.expect(mixed.lanes[2] == .poison);
+    for ([_][]const u8{ "true", "false" }, [_]i128{ 1, 0 }) |word, expected| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "splat (i1 {s})", .{word});
+        defer std.testing.allocator.free(text);
+        const splat = parseFixed(3, .{ .vector = text }, ty).?;
+        for (splat.lanes) |lane| try std.testing.expectEqual(expected, lane.int);
+    }
+    for ([_][]const u8{ "<i1 true, i1 false>", "<i1 true, i2 false, i1 0>", "splat (i1 TRUE)", "splat (i1 false trailing)" }) |text|
+        try std.testing.expect(parseFixed(3, .{ .vector = text }, ty) == null);
+    try std.testing.expect(parseFixed(3, .{ .vector = "splat (i2 true)" }, .{ .len = 3, .elem_ty = .{ .int = 2 } }) == null);
 }
 
 test "fixed vector constants and typed splat masks are structured once" {

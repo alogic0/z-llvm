@@ -378,6 +378,41 @@ the ReleaseSmall runtime's ABI/instruction forms. Retain exact failing inputs
 and extend shared parser/lowering/object contracts with independent execution
 and rejection controls. Do not normalize the accepted suite or filter cases.
 
+### Current implementation sequence (2026-11-12)
+
+1. Integrate the independently exercised eight-family batch: boolean vector
+   constants; ordinary and checked limb multiplication; limb saturation and
+   min/max; native volatile accesses; bounded direct-call argument capacity;
+   typed vector storage and array strides; odd-width integer literal casts;
+   and ordered floating reductions, including min/max signed-zero ties.
+   Preserve the cumulative lifetime, frame, machine-memory and typed incoming
+   transfer repairs. The isolated combination passes 2,251 units in both
+   Debug and ReleaseSafe and selects 7,638/7,874 unchanged Debug definitions,
+   gaining 99 and losing none. These are provisional results, not full-suite
+   acceptance; 236 definitions still reject.
+2. Maintain the ten corresponding native populations and the deterministic
+   [Zig generator](../../tools/generate_behavior_boundary_canaries.zig),
+   retaining byte-identical research inputs and
+   independent C/LLVM execution oracles. Include the separate mixed signed-zero
+   reference fixture: the installed LLVM reduction's zero choice differs from
+   the required explicit zero-tie oracle. Preserve that original failed
+   comparison and do not claim identical mixed-zero intrinsic semantics.
+3. Freeze the integrated source, build both backend modes and run the required
+   immediate Tier 3, both complete native suites, all added fault controls and
+   strict preservation comparisons against the accepted 142 populations.
+   Replay the original 8,928-definition compiler and 455-definition runtime;
+   audit complete objects, unchanged owners, ELF and balanced events. Review
+   every changed function body before accepting the capability checkpoint.
+4. Diagnose and repair the remaining unchanged Debug and ReleaseSmall runtime
+   rejections using their full original context. Retain each failed invocation,
+   add independent executable regressions and repeat the applicable cumulative
+   checks. Selection gains alone cannot close the behavior milestone.
+5. Build the final two compiler generations from the accepted source under
+   normal stack limits and CPU scheduling. Run both complete four-mode normal
+   LLVM and explicit local-hook matrices, compare every named outcome with the
+   pinned reference, and audit every delivered hook object before publishing
+   follow-up acceptance and its successor evidence seal.
+
 The [vector checkpoint](../evidence/compiler_behavior_vector_checkpoint_20261111.json)
 accepts code `a328d225` for quoted global references, floating vector data and
 packed x87 lanes. Both 117-population native suites, all 17 integration gates,

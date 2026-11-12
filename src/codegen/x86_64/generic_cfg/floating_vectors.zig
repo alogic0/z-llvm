@@ -24,6 +24,23 @@ fn abiType(ty: ir.Type) !ir.Type {
     if (sysv.isVector128AbiType(ty)) return ty;
     return error.UnsupportedFloatingVectorAbi;
 }
+const Reduction = enum { add, mul, min, max };
+fn reduction(call: ir.CallInst) ?Reduction {
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or call.raw_args != null or
+        call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return null;
+    for ([_][]const u8{ "fadd", "fmul", "fmin", "fmax" }, std.enums.values(Reduction)) |name, op| {
+        const seeded = op == .add or op == .mul;
+        if (call.args.items.len != @as(usize, if (seeded) 2 else 1)) continue;
+        const vector = call.args.items[if (seeded) 1 else 0];
+        if (!fp(vector.ty) or vector.attrs != null or !vector.ty.vector.elem_ty.toType().eql(call.ret_ty)) continue;
+        if (seeded and (!call.args.items[0].ty.eql(call.ret_ty) or call.args.items[0].attrs != null)) continue;
+        var buffer: [96]u8 = undefined;
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.vector.reduce.{s}.v{d}f{d}", .{ name, vector.ty.vector.len, width(call.ret_ty) }) catch return null;
+        if (std.mem.eql(u8, call.callee, spelling)) return op;
+    }
+    return null;
+}
 fn needed(function: ir.Function) bool {
     if (packedPair(function.ret_ty)) return true;
     for (function.params.items) |p| if (packedPair(p.ty)) return true;
@@ -64,6 +81,7 @@ fn needed(function: ir.Function) bool {
                         ir.vector_constant.classifyPacked2ShuffleMask(s) == null);
             },
             .call => |c| {
+                if (reduction(c) != null) return true;
                 if (packedPair(c.ret_ty)) return true;
                 for (c.args.items) |arg| if (packedPair(arg.ty)) return true;
             },
@@ -113,6 +131,42 @@ const Builder = struct {
     }
     fn cast(b: Builder, op: ir.CastOp, from: ir.Type, value: ir.Value, to: ir.Type) !ir.Value {
         return b.emit(.{ .cast = .{ .op = op, .from_ty = from, .value = value, .to_ty = to } });
+    }
+    fn negateBits(b: Builder, ty: ir.Type, value: ir.Value) !ir.Value {
+        const bits = width(ty);
+        const raw: ir.Type = .{ .int = bits };
+        const carrier: ir.Type = .{ .int = if (bits == 80) 128 else bits };
+        var payload = try b.cast(.bitcast, ty, try stable(value, ty), raw);
+        if (!raw.eql(carrier)) payload = try b.cast(.zext, raw, payload, carrier);
+        const sign: i128 = @bitCast(@as(u128, 1) << @as(u7, @intCast(bits - 1)));
+        payload = try b.emit(.{ .binary = .{ .op = .xor, .ty = carrier, .lhs = payload, .rhs = .{ .int = sign } } });
+        if (!raw.eql(carrier)) payload = try b.cast(.trunc, carrier, payload, raw);
+        return b.cast(.bitcast, raw, payload, ty);
+    }
+    const ZeroTie = struct { condition: ir.Value, payload: ir.Value };
+    fn zeroTie(b: Builder, ty: ir.Type, x: ir.Value, y: ir.Value, minimum: bool) !ZeroTie {
+        const zero: ir.Value = .{ .fp = if (ty == .half) "0xH0000" else if (ty == .x86_fp80) "0xK00000000000000000000" else "0.000000e+00" };
+        const zx = try b.emit(.{ .fcmp = .{ .predicate = .oeq, .operand_ty = ty, .lhs = x, .rhs = zero } });
+        const zy = try b.emit(.{ .fcmp = .{ .predicate = .oeq, .operand_ty = ty, .lhs = y, .rhs = zero } });
+        const condition = try b.emit(.{ .binary = .{ .op = .@"and", .ty = .{ .int = 1 }, .lhs = zx, .rhs = zy } });
+        const raw: ir.Type = .{ .int = width(ty) };
+        const carrier: ir.Type = .{ .int = if (width(ty) == 80) 128 else width(ty) };
+        var left = try b.cast(.bitcast, ty, x, raw);
+        var right = try b.cast(.bitcast, ty, y, raw);
+        if (!raw.eql(carrier)) {
+            left = try b.cast(.zext, raw, left, carrier);
+            right = try b.cast(.zext, raw, right, carrier);
+        }
+        const joined = try b.emit(.{ .binary = .{ .op = if (minimum) .@"or" else .@"and", .ty = carrier, .lhs = left, .rhs = right } });
+        // Only a signed zero reaches the FP bitcast. Unselected arithmetic on
+        // arbitrary payloads must not create an invalid x87 encoding.
+        const safe = try b.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = condition, .ty = carrier, .true_value = joined, .false_value = .{ .int = 0 } } });
+        return .{ .condition = condition, .payload = safe };
+    }
+    fn zeroFromPayload(b: Builder, ty: ir.Type, payload: ir.Value) !ir.Value {
+        const raw: ir.Type = .{ .int = width(ty) };
+        const bits = if (width(ty) == 80) try b.cast(.trunc, .{ .int = 128 }, payload, raw) else payload;
+        return b.cast(.bitcast, raw, bits, ty);
     }
     fn copy(b: Builder, name: []const u8, ty: ir.Type, value: ir.Value) !void {
         const raw: ir.Type = .{ .int = width(ty) };
@@ -354,6 +408,37 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                     continue;
                 },
                 .call => |x| {
+                    if (reduction(x)) |op| {
+                        const seeded = op == .add or op == .mul;
+                        const argument = x.args.items[if (seeded) 1 else 0];
+                        const lanes = try b.lanes(argument.value, argument.ty);
+                        var accumulator = try stable(if (seeded) x.args.items[0].value else lanes.values[0], x.ret_ty);
+                        const begin: usize = if (seeded) 0 else 1;
+                        for (lanes.values[begin..argument.ty.vector.len]) |lane| {
+                            const input = try stable(lane, x.ret_ty);
+                            if (seeded) {
+                                // Unflagged reductions retain the LLVM source
+                                // order and round after every scalar operation.
+                                accumulator = try b.emit(.{ .binary = .{ .op = if (op == .add) .fadd else .fmul, .ty = x.ret_ty, .lhs = accumulator, .rhs = input } });
+                            } else {
+                                // Bitwise negation is exact for every payload.
+                                // min(a,b)=-max(-a,-b) retains the pinned scalar
+                                // maxnum owner, including its GNU provider ABI.
+                                const tie = try b.zeroTie(x.ret_ty, accumulator, input, op == .min);
+                                const left = if (op == .min) try b.negateBits(x.ret_ty, accumulator) else accumulator;
+                                const right = if (op == .min) try b.negateBits(x.ret_ty, input) else input;
+                                var call: ir.CallInst = .{ .callee = try std.fmt.allocPrint(a, "llvm.maxnum.f{d}", .{width(x.ret_ty)}), .ret_ty = x.ret_ty, .args = .empty };
+                                try call.args.append(a, .{ .ty = x.ret_ty, .value = left });
+                                try call.args.append(a, .{ .ty = x.ret_ty, .value = right });
+                                const maximum = try b.emit(.{ .call = call });
+                                const ordinary = if (op == .min) try b.negateBits(x.ret_ty, maximum) else maximum;
+                                const signed_zero = try b.zeroFromPayload(x.ret_ty, tie.payload);
+                                accumulator = try b.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = tie.condition, .ty = x.ret_ty, .true_value = signed_zero, .false_value = ordinary } });
+                            }
+                        }
+                        try b.copy(inst.result.?, x.ret_ty, accumulator);
+                        continue;
+                    }
                     if (fp(x.ret_ty) and std.mem.startsWith(u8, x.callee, "llvm.")) {
                         const scalar = x.ret_ty.vector.elem_ty.toType();
                         var operation: ?[]const u8 = null;

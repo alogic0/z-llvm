@@ -60,6 +60,43 @@ test "integer stack ABI executes eighteen and thirty-two scalar parameters" {
     }
 }
 
+test "integer stack ABI executes forty and sixty-four scalar parameters" {
+    inline for (.{ 40, 64 }) |count| {
+        const Signature = if (count == 40)
+            fn (
+                u64, u64, u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64, u64, u64,
+            ) callconv(.c) u64
+        else
+            fn (
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+                u64, u64, u64, u64, u64, u64, u64, u64,
+            ) callconv(.c) u64;
+        const source = try scalarSource(count);
+        defer std.testing.allocator.free(source);
+        const code = try executable(source);
+        defer std.posix.munmap(code);
+        const run: *const Signature = @ptrCast(code.ptr);
+        for ([_]u64{ 0, 1, 0x8000000000000000, std.math.maxInt(u64) }) |seed| {
+            var args: std.meta.ArgsTuple(Signature) = undefined;
+            var expected: u64 = 0;
+            inline for (0..count) |i| {
+                args[i] = seed +% (@as(u64, i) *% 0x9e3779b97f4a7c15);
+                expected ^= args[i];
+            }
+            try std.testing.expectEqual(expected, @call(.auto, run, args));
+        }
+    }
+}
+
 test "integer stack ABI captures a stacked pair before first-use register parameters" {
     const code = try executable(
         \\define i64 @pair(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i128 %wide, i64 %tail) {
@@ -115,21 +152,32 @@ test "integer stack ABI preserves scalar padding before an incoming pair" {
 }
 
 test "integer stack ABI reserves all incoming words even for unused wide parameters" {
+    inline for (.{ 32, 64 }) |count| {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
     var pieces: std.ArrayList([]const u8) = .empty;
     try pieces.append(a, "define i128 @last(");
-    for (0..32) |i| try pieces.append(a, try std.fmt.allocPrint(a, "{s}i128 %a{d}", .{ if (i == 0) "" else ", ", i }));
-    try pieces.append(a, ") {\nentry:\n  ret i128 %a31\n}\n");
+    for (0..count) |i| try pieces.append(a, try std.fmt.allocPrint(a, "{s}i128 %a{d}", .{ if (i == 0) "" else ", ", i }));
+    try pieces.append(a, try std.fmt.allocPrint(a, ") {{\nentry:\n  ret i128 %a{d}\n}}\n", .{count - 1}));
     const source = try std.mem.concat(a, u8, pieces.items);
     const code = try executable(source);
     defer std.posix.munmap(code);
-    const Signature = fn (u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128) callconv(.c) u128;
+    const Signature = if (count == 32) fn (u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128, u128) callconv(.c) u128 else fn (
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+        u128, u128, u128, u128, u128, u128, u128, u128,
+    ) callconv(.c) u128;
     const run: *const Signature = @ptrCast(code.ptr);
     var args: std.meta.ArgsTuple(Signature) = undefined;
-    inline for (0..32) |i| args[i] = @as(u128, 0xfedcba9876543210 + i) << 64 | (0x8123456789abcdef - i);
-    try std.testing.expectEqual(args[31], @call(.auto, run, args));
+    inline for (0..count) |i| args[i] = @as(u128, 0xfedcba9876543210 + i) << 64 | (0x8123456789abcdef - i);
+    try std.testing.expectEqual(args[count - 1], @call(.auto, run, args));
+    }
 }
 
 test "integer stack ABI masks every wide integer carrier and preserves signed shifts" {
