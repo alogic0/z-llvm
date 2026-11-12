@@ -300,7 +300,7 @@ fn bindStackParams(selector: *ComposedBlockSelector, function: ir.Function) !?Di
             try selector_state.clobberArgReg(selector, .rdi);
             try selector.machine.instructions.append(selector.allocator, .{ .mov_rsp_arg64 = .rdi });
             try selector_state.emitEflagsInstruction(selector, .{ .add_arg64_imm32 = .{ .reg = .rdi, .imm = std.math.cast(i32, after_return) orelse return .{ .no_spill_envelope = "incoming-address-overflow" } } }, .write);
-            try selector_state.bindValueLoc(selector, param.name, .{ .arg64 = .rdi });
+            if (try captureIncomingWord(selector, param.name, 64, .{ .register = .rdi })) |diagnostic| return diagnostic;
             if (try selector_state.spillValue(selector, param.name)) |diagnostic| return diagnostic;
             try selector.abi_pointer_params.put(param.name, {});
             continue;
