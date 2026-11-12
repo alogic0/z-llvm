@@ -552,14 +552,14 @@ fn runtimeObjectChecks(c: *u.Context, output: []const u8, invocation: u.Value, e
     const driver = try c.join(&.{"test/whole_compiler/runtime_completion_driver.c"});
     const reference = try c.join(&.{ directory, "reference.o" });
     try runner.require(&.{ "clang-22", "-O2", "-c", try u.str(input, "path"), "-o", reference }, try c.join(&.{ directory, "reference-object" }), env);
-    const expected = "runtime-completion observations=1280 complex=conversion=sqrt=integer=preserved\n";
+    const expected = "runtime-completion observations=21792 complex=conversion=sqrt=integer=unsigned-division=preserved\n";
     var result = u.object(c.a);
     for ([_][]const u8{ "local", "reference" }) |route| {
         const object = if (std.mem.eql(u8, route, "local")) try u.str(try u.get(invocation, "object"), "path") else reference;
         const exe = try c.join(&.{ directory, route });
         try runner.require(&.{ "cc", "-O2", "-fno-builtin", "-no-pie", "-Wl,-z,noexecstack", driver, object, "-lm", "-o", exe }, try c.fmt("{s}-link", .{exe}), env);
         try runner.observe(exe, &.{}, 0, expected, try c.fmt("{s}-run", .{exe}), env);
-        for (1..4) |fault| {
+        for (1..8) |fault| {
             const stem = try c.fmt("{s}-fault-{d}", .{ exe, fault });
             const observed = try runner.run(&.{ exe, try c.fmt("{d}", .{fault}) }, stem, env, .{ .timeout_ms = 5000 });
             const diagnostic = try c.read(try c.fmt("{s}.stderr", .{stem}));
@@ -572,9 +572,11 @@ fn runtimeObjectChecks(c: *u.Context, output: []const u8, invocation: u.Value, e
     try u.put(c.a, &result, "status", u.s("passed"));
     try u.put(c.a, &result, "driver", try fileIdentity(c, driver));
     try u.put(c.a, &result, "reference_object", try fileIdentity(c, reference));
-    try u.put(c.a, &result, "local_observations", u.n(1280));
-    try u.put(c.a, &result, "reference_observations", u.n(1280));
-    try u.put(c.a, &result, "fault_controls", u.n(6));
+    try u.put(c.a, &result, "local_observations", u.n(21792));
+    try u.put(c.a, &result, "reference_observations", u.n(21792));
+    try u.put(c.a, &result, "unsigned_division_cases", u.n(641));
+    try u.put(c.a, &result, "unsigned_division_helpers", u.n(4));
+    try u.put(c.a, &result, "fault_controls", u.n(14));
     return result;
 }
 

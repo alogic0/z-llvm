@@ -1297,35 +1297,43 @@ test "generic cfg selector lowers named i32 unsigned division and remainder" {
     }, remainder_machine.instructions.items);
 }
 
-test "accumulator-resident named i32 shift keeps accepted direct materialization stream" {
-    var machine = MachineFunction.init("shift-i32-accumulator-lhs", .{ .int = 32 });
-    defer machine.deinit(std.testing.allocator);
-    var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
-        .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = 9 },
-        .{ .name = "amount", .class = .gpr32, .bits = 32, .start = 1, .end = 4 },
-    });
-    defer plan.deinit();
+test "accumulator-resident named i32 shifts preserve live sources and reuse final uses" {
+    for ([_]bool{ false, true }) |live| {
+        var machine = MachineFunction.init("shift-i32-accumulator-lhs", .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+            .{ .name = "lhs", .class = .gpr32, .bits = 32, .start = 0, .end = if (live) 9 else 4 },
+            .{ .name = "amount", .class = .gpr32, .bits = 32, .start = 1, .end = 4 },
+        });
+        defer plan.deinit();
 
-    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
-    defer selector.deinit();
-    selector.allocation_plan = &plan;
-    selector.current_position = 4;
-    selector.stack_frame_bytes = stage2SpillReservedBytes();
-    try selector_state.bindValueLoc(&selector, "lhs", .eax);
-    try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 4;
+        selector.stack_frame_bytes = stage2SpillReservedBytes();
+        try selector_state.bindValueLoc(&selector, "lhs", .eax);
+        try selector_state.bindValueLoc(&selector, "amount", .{ .arg32 = .rsi });
 
-    try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
-        .op = .shl,
-        .ty = .{ .int = 32 },
-        .lhs = .{ .named = "lhs" },
-        .rhs = .{ .named = "amount" },
-    })) == null);
-    try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
-        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
-        .shl_eax_cl,
-    }, machine.instructions.items);
-    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "lhs").?);
-    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+        try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = .shl,
+            .ty = .{ .int = 32 },
+            .lhs = .{ .named = "lhs" },
+            .rhs = .{ .named = "amount" },
+        })) == null);
+        const expected: []const x86_64_machine.Instruction = if (live) &.{
+            .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+            .{ .spill_eax_rsp = .slot0 },
+            .{ .reload_rsp_eax = .slot0 },
+            .shl_eax_cl,
+        } else &.{
+            .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rsi } },
+            .shl_eax_cl,
+        };
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, expected, machine.instructions.items);
+        try std.testing.expectEqual(if (live) ValueLoc{ .spill64 = .slot0 } else ValueLoc.eax, selector_state.valueLoc(&selector, "lhs").?);
+        try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+    }
 }
 
 test "accumulator-resident udiv lhs keeps accepted fixed-register stream" {

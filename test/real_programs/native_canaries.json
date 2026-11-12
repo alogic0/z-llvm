@@ -3259,6 +3259,14 @@
       "libraries": ["pthread"],
       "observations": 64,
       "stdout": "medium-stack-frames observations=64 recursion=3 stack=131072 wave-live=16 guards=preserved\n"
+    },
+    {
+      "population": "scalar_destructive_live",
+      "prefix": "scalar-destructive-live",
+      "fixture": "scalar_destructive_live",
+      "functions": ["destructive_shift16", "destructive_loop16", "destructive_shift32", "destructive_loop32", "destructive_shift64", "destructive_loop64", "destructive_bool_and", "destructive_bool_or"],
+      "observations": 5856,
+      "stdout": "scalar-destructive-live observations=5856 shifts=booleans=loop-phis=guards=preserved\n"
     }
   ]
 }

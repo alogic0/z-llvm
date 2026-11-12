@@ -149,6 +149,72 @@ fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     return memory;
 }
 
+test "named shifts preserve accumulator inputs used after the destructive operation" {
+    const a = std.testing.allocator;
+    inline for (.{ 16, 32, 64 }) |bits| {
+        inline for (.{ "shl", "lshr", "ashr" }) |op| {
+            const text = try std.fmt.allocPrint(
+                a,
+                "define i{0d} @shift_live(ptr %input, i{0d} %amount, ptr %out) {{\n" ++
+                    "entry:\n %value = load i{0d}, ptr %input, align 1\n" ++
+                    " %shifted = {1s} i{0d} %value, %amount\n" ++
+                    " store i{0d} %shifted, ptr %out, align 1\n" ++
+                    " ret i{0d} %value\n}}\n",
+                .{ bits, op },
+            );
+            defer a.free(text);
+            var module = try ir.Module.parse(a, text);
+            defer module.deinit();
+            try module.verify();
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            const Word = @Int(.unsigned, bits);
+            const Signed = @Int(.signed, bits);
+            const Shift = std.math.Log2Int(Word);
+            const run: *const fn (*const Word, Word, *Word) callconv(.c) Word = @ptrCast(code.ptr);
+            for ([_]Word{ 0, 1, std.math.maxInt(Word), @as(Word, 1) << (bits - 1), @truncate(0xf06dea67e461de5b) }) |value| {
+                for ([_]Shift{ 0, 1, bits / 2, bits - 1 }) |amount| {
+                    var out: Word = 0;
+                    const expected: Word = if (comptime std.mem.eql(u8, op, "shl"))
+                        value << amount
+                    else if (comptime std.mem.eql(u8, op, "lshr"))
+                        value >> amount
+                    else
+                        @bitCast(@as(Signed, @bitCast(value)) >> amount);
+                    try std.testing.expectEqual(value, run(&value, amount, &out));
+                    try std.testing.expectEqual(expected, out);
+                }
+            }
+        }
+    }
+}
+
+test "named boolean operations preserve a loaded live accumulator source" {
+    const a = std.testing.allocator;
+    inline for (.{ "and", "or" }) |op| {
+        const text = try std.fmt.allocPrint(
+            a,
+            "define i32 @boolean_live(ptr %input, i32 %rhs, ptr %out) {{\nentry:\n" ++
+                " %value = load i1, ptr %input, align 1\n %other = trunc i32 %rhs to i1\n" ++
+                " %changed = {s} i1 %value, %other\n %wide = zext i1 %changed to i32\n" ++
+                " store i32 %wide, ptr %out, align 1\n %original = zext i1 %value to i32\n ret i32 %original\n}}\n",
+            .{op},
+        );
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (*const u8, u32, *u32) callconv(.c) u32 = @ptrCast(code.ptr);
+        for ([_]u8{ 0, 1 }) |value| for ([_]u32{ 0, 1, 0xfffffffe, 0xffffffff }) |other| {
+            var out: u32 = 0xa5a5a5a5;
+            try std.testing.expectEqual(@as(u32, value), run(&value, other, &out));
+            try std.testing.expectEqual(if (comptime std.mem.eql(u8, op, "and")) @as(u32, value) & (other & 1) else @as(u32, value) | (other & 1), out);
+        };
+    }
+}
+
 test "scalar forms unsigned minimum preserves full width and live operands" {
     const text =
         \\declare i64 @llvm.umin.i64(i64, i64)

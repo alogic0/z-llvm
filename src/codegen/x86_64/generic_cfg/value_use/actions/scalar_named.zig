@@ -390,7 +390,10 @@ fn displacementForPlan(
     plan: NamedScalarPlan,
 ) !selector_state.AccumulatorDisplacementPolicy {
     return switch (plan) {
-        .b01_boolean, .b04_narrow_shift => directDisplacement(transaction, lhs_index, .spill_live),
+        // These instructions overwrite EAX too. Reuse is valid only when the
+        // original source dies here; a later use (including a PHI edge) needs
+        // the same preservation as other destructive scalar operations.
+        .b01_boolean, .b04_narrow_shift => livenessDisplacement(Authority, transaction, lhs_index, .spill_live),
         .b03_narrow_multiply => livenessDisplacement(
             Authority,
             transaction,
