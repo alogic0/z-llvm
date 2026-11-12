@@ -3224,6 +3224,14 @@
       "functions": ["behavior_vector_nan", "behavior_vector_extended", "behavior_vector_nested", "behavior_vector_pointer", "behavior_vector_abs3", "behavior_vector_abs64", "behavior_vector_phi3", "behavior_vector_compare3", "behavior_vector_stack3"],
       "observations": 6250,
       "stdout": "behavior-vectors observations=6250 globals=payloads=packed-x87=phis=masks=guards=preserved\n"
+    },
+    {
+      "population": "frame_compaction",
+      "prefix": "frame-compaction",
+      "fixture": "frame_compaction",
+      "functions": ["frame_compact_abs64"],
+      "observations": 646,
+      "stdout": "frame-compaction observations=646 frame-budget=65536 payloads=guards=preserved\n"
     }
   ]
 }

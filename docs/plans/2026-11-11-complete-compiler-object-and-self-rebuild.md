@@ -414,7 +414,7 @@ spill home and interval, removes only an unreferenced gap, rebases owned-object
 and incoming-stack offsets, preserves temporary stack bias, alignment and page
 touching, and retains opaque cases unchanged. Its isolated proof passes all
 2,188 units, executable/negative stack controls, all 117 native populations and
-432 fault controls. Adopt the reviewed code, complete immediate Tier 3 and fresh
+432 fault controls. The reviewed code is adopted for immediate Tier 3 and fresh
 source-bound compiler/runtime replays, then require the actual normal-resource
 build and self-rebuild before closing this milestone.
 
@@ -434,6 +434,12 @@ new evidence seal. Reuse unchanged gates only under the existing reuse policy.
 - [ ] Diagnose and remove special CPU-affinity and main-stack requirements.
 - [ ] Prove fresh normal-resource self-rebuild and the rebuilt compiler's full behavior matrix.
 - [ ] Publish follow-up acceptance and seal successor evidence.
+
+The completed PHI and vector checkpoints remain accepted independently. The
+active compaction slice adds a 64 KiB worker-stack native regression whose old
+backend fails with SIGSEGV and whose LLVM/prototype executions pass. Complete
+the adopted slice's frozen validation before the fresh unchanged compiler build
+and normal-resource self-rebuild; retain all remaining behavior-suite failures.
 
 ## Delivery checklist
 

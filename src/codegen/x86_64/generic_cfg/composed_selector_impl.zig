@@ -191,6 +191,7 @@ pub fn tryLowerComposedCfgObserved(
         try machine.instructions.append(allocator, .ret);
     }
     try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
+    try @import("frame_compaction.zig").compact(&composed, function);
     return .selected;
 }
 
@@ -682,6 +683,7 @@ pub fn tryLowerComposedBlockObserved(
         .br, .condbr, .@"switch", .indirectbr => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
     }
     try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
+    try @import("frame_compaction.zig").compact(&composed, function);
     return .selected;
 }
 
@@ -690,7 +692,11 @@ fn unsupported(diagnostic: Diagnostic) SelectionResult {
 }
 
 fn prepareObservedStackFrame(composed: *ComposedBlockSelector, function: ir.Function) !?Diagnostic {
-    const diagnostic = (try selector_frame.prepareStackFrame(composed, function)) orelse return null;
+    composed.frame_setup_begin = composed.machine.instructions.items.len;
+    const diagnostic = (try selector_frame.prepareStackFrame(composed, function)) orelse {
+        composed.frame_setup_end = composed.machine.instructions.items.len;
+        return null;
+    };
     if (composed.rejection_observer) |observer| try observer.reject(.{
         .function = function,
         .position = 0,

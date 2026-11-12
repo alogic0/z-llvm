@@ -74,3 +74,10 @@ spill homes and lifetimes. Nine cross-build literal-encoding differences match
 the maintained ReleaseFast backend exactly; six vector objects contain the
 reviewed frame reduction. Adoption and cumulative validation remain separate
 from this diagnostic result. A fresh normal-resource rebuild is still required.
+
+The reviewed compaction code is now adopted for cumulative validation. A new
+native regression runs the 64-lane operation on a fixed 64 KiB pthread stack:
+the preceding backend terminates with SIGSEGV, while the prototype and LLVM
+reference pass. Its three numbered faults cover the result and both surrounding
+guards. This resource regression supplements the stack-argument/rebasing unit
+controls; it does not establish the compiler's normal-resource rebuild.

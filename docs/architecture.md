@@ -111,9 +111,16 @@ An aggregate `generic_codegen` counter is not a substitute for that assertion.
 Register pressure is admitted through the shared allocation plan and concrete
 frame layout. The six-register/32-spill summary describes the minimum reservation;
 it is not a 38-value selection limit. Planned and emergency homes are sized
-dynamically, with checked frame indices, page probing and a one-MiB frame ceiling.
-The independent 1,024-block boundary remains. Rejected frame construction rolls
+dynamically, with checked frame indices, page probing and the existing 8 MiB frame
+ceiling. The independent 65,536-block boundary remains. Rejected frame construction rolls
 back machine state and can report its pressure context through the observer.
+
+After lowering, [frame compaction](../src/codegen/x86_64/generic_cfg/frame_compaction.zig)
+can remove an unused trailing spill-reserve gap. Spill homes and lifetimes stay
+unchanged. The pass rebases object and incoming-stack offsets, accounts for
+temporary pushes, retains 16-byte alignment and page touching, and verifies a
+private candidate before publication. Opaque stack uses keep their original
+machine function. The 64 KiB stack-object limit is unchanged.
 
 Scalar bit intrinsics use the existing integer legalizer and shared native-width
 operations. Logical widths, funnel counts and advisory facts are validated before
