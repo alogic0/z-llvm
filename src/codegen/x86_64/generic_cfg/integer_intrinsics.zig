@@ -7,6 +7,62 @@ const forms = @import("scalar_forms.zig");
 const intrinsic_attrs = @import("intrinsic_attrs.zig");
 const bit_intrinsics = @import("integer_bit_intrinsics.zig");
 
+const PairOperation = enum { uadd, usub, sadd, ssub, smin, smax };
+fn pairOperation(call: ir.CallInst) ?PairOperation {
+    if (!call.ret_ty.eql(.{ .int = 128 }) or call.args.items.len != 2 or !intrinsic_attrs.scalarIntegerCallSupported(call)) return null;
+    for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or (arg.value != .named and arg.value != .int) or (arg.value == .named and std.mem.startsWith(u8, arg.value.named, "@"))) return null;
+    var buffer: [64]u8 = undefined;
+    for (std.enums.values(PairOperation)) |op| {
+        const name = @tagName(op);
+        const sat = op == .uadd or op == .usub or op == .sadd or op == .ssub;
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}{s}.i128", .{ name, if (sat) ".sat" else "" }) catch return null;
+        if (std.mem.eql(u8, spelling, call.callee)) return op;
+    }
+    return null;
+}
+
+fn expandPair(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, inst: ir.Instruction, op: PairOperation) !void {
+    const pair: ir.Type = .{ .int = 128 };
+    const word: ir.Type = .{ .int = 64 };
+    const boolean: ir.Type = .{ .int = 1 };
+    var values: [2]ir.Value = undefined;
+    for (&values, inst.kind.call.args.items) |*value, arg| value.* = if (arg.value == .int)
+        try @import("binary128_arithmetic.zig").materializeIntegerArgument(allocator, function, block, serial, .{ .op = .uitofp, .from_ty = pair, .value = arg.value, .to_ty = .fp128 })
+    else
+        arg.value;
+    const x = values[0];
+    const y = values[1];
+    var answer: ir.Value = undefined;
+    if (op == .smin or op == .smax) {
+        const minimum = op == .smin;
+        const less = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = .slt, .operand_ty = pair, .lhs = if (minimum) x else y, .rhs = if (minimum) y else x } });
+        answer = try emit(allocator, function, block, serial, .{ .select = .{ .cond_ty = boolean, .cond = less, .ty = pair, .true_value = x, .false_value = y } });
+    } else {
+        const subtract = op == .usub or op == .ssub;
+        const signed = op == .sadd or op == .ssub;
+        const wrapped = try emit(allocator, function, block, serial, .{ .binary = .{ .op = if (subtract) .sub else .add, .ty = pair, .lhs = x, .rhs = y } });
+        var overflow: ir.Value = undefined;
+        var limit: ir.Value = undefined;
+        if (!signed) {
+            overflow = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = .ult, .operand_ty = pair, .lhs = if (subtract) x else wrapped, .rhs = if (subtract) y else x } });
+            limit = .{ .int = if (subtract) 0 else -1 };
+        } else {
+            const first = try emit(allocator, function, block, serial, .{ .binary = .{ .op = .xor, .ty = pair, .lhs = x, .rhs = if (subtract) y else wrapped } });
+            const second = try emit(allocator, function, block, serial, .{ .binary = .{ .op = .xor, .ty = pair, .lhs = if (subtract) x else y, .rhs = wrapped } });
+            const both = try emit(allocator, function, block, serial, .{ .binary = .{ .op = .@"and", .ty = pair, .lhs = first, .rhs = second } });
+            const high = try emit(allocator, function, block, serial, .{ .binary = .{ .op = .lshr, .ty = pair, .lhs = both, .rhs = .{ .int = 64 } } });
+            const sign = try emit(allocator, function, block, serial, .{ .cast = .{ .op = .trunc, .from_ty = pair, .value = high, .to_ty = word } });
+            overflow = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = .slt, .operand_ty = word, .lhs = sign, .rhs = .{ .int = 0 } } });
+            const xhigh = try emit(allocator, function, block, serial, .{ .binary = .{ .op = .lshr, .ty = pair, .lhs = x, .rhs = .{ .int = 64 } } });
+            const xsign = try emit(allocator, function, block, serial, .{ .cast = .{ .op = .trunc, .from_ty = pair, .value = xhigh, .to_ty = word } });
+            const negative = try emit(allocator, function, block, serial, .{ .icmp = .{ .predicate = .slt, .operand_ty = word, .lhs = xsign, .rhs = .{ .int = 0 } } });
+            limit = try emit(allocator, function, block, serial, .{ .select = .{ .cond_ty = boolean, .cond = negative, .ty = pair, .true_value = .{ .int = std.math.minInt(i128) }, .false_value = .{ .int = std.math.maxInt(i128) } } });
+        }
+        answer = try emit(allocator, function, block, serial, .{ .select = .{ .cond_ty = boolean, .cond = overflow, .ty = pair, .true_value = limit, .false_value = wrapped } });
+    }
+    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .binary = .{ .op = .@"or", .ty = pair, .lhs = answer, .rhs = .{ .int = 0 } } } });
+}
+
 const Operation = enum { uadd_sat, usub_sat, ushl_one, sadd_sat, ssub_sat, scmp, ucmp, reverse, umin, umax, smin, smax };
 
 fn minimumMaximum(op: Operation) bool {
@@ -20,6 +76,7 @@ fn emit(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlo
 }
 
 fn extend(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *forms.TemporaryNames, ty: ir.Type, wide: ir.Type, value: ir.Value) !ir.Value {
+    if (value == .int and ty.eql(.{ .int = 128 })) return @import("binary128_arithmetic.zig").materializeIntegerArgument(allocator, function, block, serial, .{ .op = .uitofp, .from_ty = ty, .value = value, .to_ty = .fp128 });
     if (value == .int) return emit(allocator, function, block, serial, .{ .binary = .{
         .op = .add,
         .ty = wide,
@@ -170,6 +227,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result != null and inst.kind == .call) if (pairOperation(inst.kind.call)) |op| {
+                try candidate.begin(&block, block_index, instruction_index);
+                try expandPair(allocator, function, &block, &serial, inst, op);
+                continue;
+            };
             if (!inst.removed and inst.result != null and inst.kind == .call) if (saturatingShift(inst.kind.call)) |signed| {
                 try candidate.begin(&block, block_index, instruction_index);
                 try expandSaturatingShift(allocator, function, &block, &serial, inst, signed);

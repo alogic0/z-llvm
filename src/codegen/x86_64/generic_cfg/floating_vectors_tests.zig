@@ -5,11 +5,183 @@ const encoding = @import("../../../mc/encoding.zig");
 const verify = @import("../verify.zig");
 const vectors = @import("floating_vectors.zig");
 
+test "scalar floating minimum uses typed maximum ownership without mutating source" {
+    for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare {0s} @llvm.minnum.f{1d}({0s},{0s})\ndeclare {0s} @llvm.maxnum.f{1d}({0s},{0s})\ndefine {0s} @minimum({0s} %a,{0s} %b) {{\nentry:\n %r = call {0s} @llvm.minnum.f{1d}({0s} %a,{0s} %b)\n ret {0s} %r\n}}\n", .{ ty, bits });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const source = module.functions.items[0];
+        const view = (try vectors.legalize(arena.allocator(), source, null)).?;
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        try std.testing.expect((try vectors.legalize(arena.allocator(), view, null)) == null);
+        try std.testing.expectEqualStrings(try std.fmt.allocPrint(arena.allocator(), "llvm.minnum.f{d}", .{bits}), source.blocks.items[0].instructions.items[0].kind.call.callee);
+        var calls: usize = 0;
+        for (view.blocks.items) |block| for (block.instructions.items) |inst| if (inst.kind == .call) {
+            try std.testing.expectEqualStrings(try std.fmt.allocPrint(arena.allocator(), "llvm.maxnum.f{d}", .{bits}), inst.kind.call.callee);
+            calls += 1;
+        };
+        try std.testing.expectEqual(@as(usize, 1), calls);
+        try module.verify();
+    }
+}
+
+test "scalar floating minimum keeps mismatched call envelopes closed" {
+    for (0..6) |variant| {
+        var module = try ir.Module.parse(std.testing.allocator, "declare float @llvm.minnum.f32(float,float)\ndefine float @bad(float %a,float %b) {\nentry:\n %r = call float @llvm.minnum.f32(float %a,float %b)\n ret float %r\n}\n");
+        defer module.deinit();
+        const call = &module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+        switch (variant) {
+            0 => call.ret_attrs = "nnan",
+            1 => call.calling_conv = "fastcc",
+            2 => call.tail_kind = "musttail",
+            3 => call.args.items[0].attrs = "noundef",
+            4 => call.args.items[1].ty = .double,
+            5 => call.callee = "llvm.minimum.f32",
+            else => unreachable,
+        }
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try vectors.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+}
+
+test "small floating vector ABI preserves raw scalar packed and padded payloads" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "half", "half", "half", "half", "float", "float", "double", "float" }, [_]u16{ 16, 16, 16, 16, 32, 32, 64, 32 }, [_]u16{ 1, 2, 4, 8, 1, 3, 1, 2 }) |ty, bits, n| for ([_]bool{ false, true }) |fast| {
+        var text: std.Io.Writer.Allocating = .init(a);
+        defer text.deinit();
+        try text.writer.print("define {0s}<{1d} x {2s}> @permutation(<{1d} x {2s}> %a,<{1d} x {2s}> %b) {{\nentry:\n %r = shufflevector <{1d} x {2s}> %a,<{1d} x {2s}> %b,<{1d} x i32> <", .{ if (fast) "fastcc " else "", n, ty });
+        for (0..n) |i| {
+            if (i != 0) try text.writer.writeAll(",");
+            try text.writer.print("i32 {d}", .{(if (i % 2 == 0) @as(usize, n) else 0) + n - 1 - i});
+        }
+        try text.writer.print(">\n ret <{d} x {s}> %r\n}}\n", .{ n, ty });
+        var module = try ir.Module.parse(a, text.written());
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const source = module.functions.items[0];
+        const view = (try vectors.legalize(arena.allocator(), source, null)).?;
+        try std.testing.expect(try vectors.legalize(arena.allocator(), view, null) == null);
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        try module.verify();
+        const machine = @import("../machine.zig");
+        var output = machine.MachineFunction.init(source.name, source.ret_ty);
+        defer output.deinit(a);
+        const selection = try @import("../generic_cfg_selector.zig").tryLower(a, &output, source);
+        if (selection == .unsupported) std.debug.print("small FP ABI {s} n={d} fast={}: {s}\n", .{ ty, n, fast, selection.unsupported.detail() });
+        try std.testing.expect(selection == .selected);
+        try verify.verifyFunction(output);
+        const code = try encoding.encodeFunction(a, output);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (@Vector(2, u64), @Vector(2, u64)) callconv(.c) @Vector(2, u64) = @ptrCast(memory.ptr);
+        const mask = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+        for (0..64) |seed| {
+            const x: [2]u64 = .{ @as(u64, seed) *% 0x9e3779b97f4a7c15, ~(@as(u64, seed) *% 0x8123456789abcdef) };
+            const y: [2]u64 = .{ ~(@as(u64, seed) *% 0xf06dea67e461de5b), @as(u64, seed) *% 0x361962e2b9c8b6a5 };
+            const actual: [2]u64 = @bitCast(run(@bitCast(x), @bitCast(y)));
+            for (0..n) |i| {
+                const source_lane = n - 1 - i;
+                const input = if (i % 2 == 0) y else x;
+                const expected = (input[source_lane * bits / 64] >> @as(u6, @intCast(source_lane * bits % 64))) & mask;
+                try std.testing.expectEqual(expected, (actual[i * bits / 64] >> @as(u6, @intCast(i * bits % 64))) & mask);
+            }
+        }
+    };
+}
+
+test "small floating vector ABI keeps unproved wider and scalarized shapes closed" {
+    for ([_][]const u8{ "<3 x half>", "<4 x double>", "<4 x x86_fp80>", "<4 x fp128>" }) |ty| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define {0s} @closed({0s} %v) {{\nentry:\n ret {0s} %v\n}}\n", .{ty});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try vectors.legalize(arena.allocator(), module.functions.items[0], null) == null);
+    }
+}
+
+test "floating lane math preserves scalar intrinsic types arities and source IR" {
+    for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
+        for ([_]usize{ 1, 2, 3, 4 }) |count| for (@import("extended_math_intrinsics.zig").operations) |op| {
+            const fma = std.mem.eql(u8, op, "fma");
+            var formatting = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer formatting.deinit();
+            const text = try std.fmt.allocPrint(std.testing.allocator, "declare {0s} @llvm.{1s}.f{3d}({0s}{4s})\ndeclare <{2d} x {0s}> @llvm.{1s}.v{2d}f{3d}(<{2d} x {0s}>{5s})\ndefine void @lanes(ptr %out,ptr %ap,ptr %bp,ptr %cp) {{\nentry:\n %a = load <{2d} x {0s}>,ptr %ap,align 1\n %b = load <{2d} x {0s}>,ptr %bp,align 1\n %c = load <{2d} x {0s}>,ptr %cp,align 1\n %r = call <{2d} x {0s}> @llvm.{1s}.v{2d}f{3d}(<{2d} x {0s}> %a{6s})\n store <{2d} x {0s}> %r,ptr %out,align 1\n ret void\n}}\n", .{
+                ty,                                                                                   op,                                                                                                              count,                                                                                                                 bits,
+                if (fma) try std.fmt.allocPrint(formatting.allocator(), ",{0s},{0s}", .{ty}) else "", if (fma) try std.fmt.allocPrint(formatting.allocator(), ",<{0d} x {1s}>,<{0d} x {1s}>", .{ count, ty }) else "", if (fma) try std.fmt.allocPrint(formatting.allocator(), ",<{0d} x {1s}> %b,<{0d} x {1s}> %c", .{ count, ty }) else "",
+            });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const source = module.functions.items[0];
+            const view = (try vectors.legalize(arena.allocator(), source, null)).?;
+            try std.testing.expect(try vectors.legalize(arena.allocator(), view, null) == null);
+            var private = module;
+            private.functions = try module.functions.clone(arena.allocator());
+            private.functions.items[0] = view;
+            try private.verify();
+            var calls: usize = 0;
+            for (view.blocks.items) |block| for (block.instructions.items) |inst| if (inst.kind == .call) {
+                const call = inst.kind.call;
+                try std.testing.expectEqualStrings(try std.fmt.allocPrint(arena.allocator(), "llvm.{s}.f{d}", .{ op, bits }), call.callee);
+                try std.testing.expectEqual(if (fma) @as(usize, 3) else 1, call.args.items.len);
+                try std.testing.expect(call.ret_ty.eql(source.blocks.items[0].instructions.items[3].kind.call.ret_ty.vector.elem_ty.toType()));
+                for (call.args.items) |arg| try std.testing.expect(arg.ty.eql(call.ret_ty));
+                calls += 1;
+            };
+            try std.testing.expectEqual(count, calls);
+            try std.testing.expect(source.blocks.items[0].instructions.items[3].kind.call.ret_ty == .vector);
+            try std.testing.expectEqualStrings("r", source.blocks.items[0].instructions.items[3].result.?);
+            try module.verify();
+        };
+    }
+}
+
+test "floating lane math rejects unproved call envelopes and mismatched lane types" {
+    for (0..7) |variant| {
+        var module = try ir.Module.parse(std.testing.allocator, "declare <4 x float> @llvm.trunc.v4f32(<4 x float>)\ndefine void @bad(ptr %out,ptr %in) {\nentry:\n %v = load <4 x float>,ptr %in,align 1\n %r = call <4 x float> @llvm.trunc.v4f32(<4 x float> %v)\n store <4 x float> %r,ptr %out,align 1\n ret void\n}\n");
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const call = &module.functions.items[0].blocks.items[0].instructions.items[1].kind.call;
+        switch (variant) {
+            0 => call.tail_kind = "musttail",
+            1 => call.ret_attrs = "noundef",
+            2 => call.args.items[0].attrs = "noundef",
+            3 => call.args.items[0].ty.vector.len = 3,
+            4 => call.callee = "llvm.trunc.v4f64",
+            5 => call.calling_conv = "fastcc",
+            6 => call.operand_bundle = "[ \"cold\"() ]",
+            else => unreachable,
+        }
+        try std.testing.expect(try vectors.legalize(arena.allocator(), module.functions.items[0], null) == null);
+    }
+}
+
 test "floating minmax reductions retain scalar maxnum owners and exact sign bit views" {
     for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
         for ([_]usize{ 2, 3, 4 }) |count| for ([_][]const u8{ "fmin", "fmax" }) |op| {
-            const text = try std.fmt.allocPrint(std.testing.allocator,
-                "declare {0s} @llvm.maxnum.f{3d}({0s},{0s})\ndeclare {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}(<{2d} x {0s}>)\ndefine void @reduce(ptr %out,ptr %in) {{\nentry:\n %v = load <{2d} x {0s}>,ptr %in,align 1\n %r = call {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}(<{2d} x {0s}> %v)\n store {0s} %r,ptr %out,align 1\n ret void\n}}\n", .{ ty, op, count, bits });
+            const text = try std.fmt.allocPrint(std.testing.allocator, "declare {0s} @llvm.maxnum.f{3d}({0s},{0s})\ndeclare {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}(<{2d} x {0s}>)\ndefine void @reduce(ptr %out,ptr %in) {{\nentry:\n %v = load <{2d} x {0s}>,ptr %in,align 1\n %r = call {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}(<{2d} x {0s}> %v)\n store {0s} %r,ptr %out,align 1\n ret void\n}}\n", .{ ty, op, count, bits });
             defer std.testing.allocator.free(text);
             var module = try ir.Module.parse(std.testing.allocator, text);
             defer module.deinit();
@@ -54,8 +226,7 @@ test "floating minmax reductions retain scalar maxnum owners and exact sign bit 
 test "floating reductions preserve ordered scalar steps seed and source identities" {
     for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
         for ([_]usize{ 2, 3, 4 }) |count| for ([_][]const u8{ "fadd", "fmul" }) |op| {
-            const text = try std.fmt.allocPrint(std.testing.allocator,
-                "declare {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}({0s},<{2d} x {0s}>)\ndefine void @reduce(ptr %out,ptr %in,ptr %seed) {{\nentry:\n %v = load <{2d} x {0s}>,ptr %in,align 1\n %s = load {0s},ptr %seed,align 1\n %r = call {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}({0s} %s,<{2d} x {0s}> %v)\n store {0s} %r,ptr %out,align 1\n ret void\n}}\n", .{ ty, op, count, bits });
+            const text = try std.fmt.allocPrint(std.testing.allocator, "declare {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}({0s},<{2d} x {0s}>)\ndefine void @reduce(ptr %out,ptr %in,ptr %seed) {{\nentry:\n %v = load <{2d} x {0s}>,ptr %in,align 1\n %s = load {0s},ptr %seed,align 1\n %r = call {0s} @llvm.vector.reduce.{1s}.v{2d}f{3d}({0s} %s,<{2d} x {0s}> %v)\n store {0s} %r,ptr %out,align 1\n ret void\n}}\n", .{ ty, op, count, bits });
             defer std.testing.allocator.free(text);
             var module = try ir.Module.parse(std.testing.allocator, text);
             defer module.deinit();
@@ -78,8 +249,7 @@ test "floating reductions preserve ordered scalar steps seed and source identiti
                 try std.testing.expectEqual(if (std.mem.eql(u8, op, "fadd")) ir.BinaryOp.fadd else .fmul, binary.op);
                 try std.testing.expect(binary.ty.eql(source.blocks.items[0].instructions.items[1].kind.load.ty));
                 try std.testing.expect(!binary.fp_flags.any());
-                if (previous) |name| try std.testing.expectEqualStrings(name, binary.lhs.named)
-                else try std.testing.expectEqualStrings("s", binary.lhs.named);
+                if (previous) |name| try std.testing.expectEqualStrings(name, binary.lhs.named) else try std.testing.expectEqualStrings("s", binary.lhs.named);
                 previous = inst.result;
                 steps += 1;
             };

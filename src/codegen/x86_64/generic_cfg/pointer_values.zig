@@ -13,6 +13,11 @@ fn constant(value: ir.Value) bool {
     return addresses.fromValue(value) != null or addresses.pointerBits(value) != null;
 }
 
+fn absoluteVolatile(ty: ir.Type, ty_addrspace: ?[]const u8, ptr: ir.Value, attrs: ir.MemoryAttrs) bool {
+    if (!attrs.is_volatile or attrs.isAtomic() or attrs.syncscope != null or ty_addrspace != null or addresses.pointerBits(ptr) == null) return false;
+    return ty == .ptr or (ty == .int and (ty.int == 8 or ty.int == 16 or ty.int == 32 or ty.int == 64));
+}
+
 fn appendSymbolAddress(allocator: std.mem.Allocator, block: *ir.BasicBlock, name: []const u8, address: addresses.Address) !void {
     var indices: std.ArrayList(ir.GepIndex) = .empty;
     try indices.append(allocator, .{ .ty = word, .value = .{ .int = address.addend } });
@@ -112,10 +117,10 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, context, gep)) {
                     copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);
                 },
-                .load => |load| if (load.ptr_addrspace == null and !load.attrs.isBarrier()) {
+                .load => |load| if (load.ptr_addrspace == null and (!load.attrs.isBarrier() or absoluteVolatile(load.ty, load.ty_addrspace, load.ptr, load.attrs))) {
                     copy.kind.load.ptr = try materialize(allocator, function, &block, &serial, load.ptr);
                 },
-                .store => |store| if (store.ptr_addrspace == null and !store.attrs.isBarrier()) {
+                .store => |store| if (store.ptr_addrspace == null and (!store.attrs.isBarrier() or absoluteVolatile(store.ty, store.ty_addrspace, store.ptr, store.attrs))) {
                     copy.kind.store.ptr = try materialize(allocator, function, &block, &serial, store.ptr);
                     if (store.ty == .ptr and store.ty_addrspace == null)
                         copy.kind.store.value = try materialize(allocator, function, &block, &serial, store.value);

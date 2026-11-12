@@ -7,13 +7,76 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "integer constant pairs preserve modular results flags and source definitions" {
+    inline for (.{ 1, 3, 8, 17, 32, 64 }) |bits| {
+        const U = @Int(.unsigned, bits);
+        const S = @Int(.signed, bits);
+        const mask: u64 = std.math.maxInt(U);
+        for ([_][]const u8{ "add", "sub", "mul", "and", "or", "xor", "shl", "lshr", "ashr", "udiv", "urem" }, 0..) |op, kind| for (0..4) |sample| {
+            const x: U = @truncate(([_]u64{ 0, 1, mask, @as(u64, 1) << (bits - 1) })[sample]);
+            const rhs: u64 = if (kind >= 6 and kind <= 8) ([_]u64{ 0, if (bits > 1) 1 else 0, bits - 1, bits / 2 })[sample] else if (kind >= 9) ([_]u64{ 1, 1, mask, 1 })[sample] else ([_]u64{ mask, mask, 1, 1 })[sample];
+            const y: U = @truncate(rhs);
+            const expected: U = switch (kind) {
+                0 => x +% y,
+                1 => x -% y,
+                2 => x *% y,
+                3 => x & y,
+                4 => x | y,
+                5 => x ^ y,
+                6 => x << @intCast(y),
+                7 => x >> @intCast(y),
+                8 => @bitCast(@as(S, @bitCast(x)) >> @intCast(y)),
+                9 => x / y,
+                10 => x % y,
+                else => unreachable,
+            };
+            var formatting = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer formatting.deinit();
+            const a = formatting.allocator();
+            const source = try std.fmt.allocPrint(a, "define i64 @constant_pair(i64 %salt) {{\nentry:\n %value = {s} i{d} {d},{d}\n %wide = {s}\n %r = xor i64 %wide,%salt\n ret i64 %r\n}}\n", .{ op, bits, x, y, if (bits == 64) "add i64 %value,0" else try std.fmt.allocPrint(a, "zext i{d} %value to i64", .{bits}) });
+            var module = try ir.Module.parse(std.testing.allocator, source);
+            defer module.deinit();
+            try module.verify();
+            var output = machine.MachineFunction.init("constant_pair", .{ .int = 64 });
+            defer output.deinit(std.testing.allocator);
+            const selection = try selector.tryLower(std.testing.allocator, &output, module.functions.items[0]);
+            if (selection == .unsupported) std.debug.print("constant pair {s} {d} {d} {d}: {s}\n", .{ op, bits, x, y, selection.unsupported.detail() });
+            try std.testing.expectEqual(selector.SelectionResult.selected, selection);
+            try verify.verifyFunction(output);
+            const bytes = try encoding.encodeFunction(std.testing.allocator, output);
+            defer std.testing.allocator.free(bytes);
+            const code = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+            defer std.posix.munmap(code);
+            @memcpy(code[0..bytes.len], bytes);
+            const run: *const fn (u64) callconv(.c) u64 = @ptrCast(code.ptr);
+            for ([_]u64{ 0, 1, 0xf06dea67e461de5b, std.math.maxInt(u64) }) |salt| try std.testing.expectEqual(@as(u64, expected) ^ salt, run(salt));
+            try module.verify();
+        };
+    }
+}
+
+test "integer constant folding leaves flagged division and shift poison cases closed" {
+    for ([_][]const u8{ "add nuw i64 18446744073709551615,1", "shl i64 7,64", "udiv i64 7,0", "urem i64 7,0", "sdiv i64 -9223372036854775808,-1" }) |expression| {
+        const source = try std.fmt.allocPrint(std.testing.allocator, "define i64 @closed() {{\nentry:\n %r = {s}\n ret i64 %r\n}}\n", .{expression});
+        defer std.testing.allocator.free(source);
+        var module = try ir.Module.parse(std.testing.allocator, source);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = try forms.legalize(arena.allocator(), module.functions.items[0]);
+        if (std.mem.startsWith(u8, expression, "sdiv")) {
+            // Existing signed-division normalization remains unchanged.
+            try std.testing.expect(view != null);
+        } else try std.testing.expect(view == null);
+    }
+}
+
 test "integer forms zero extend odd width literals by their source bit pattern" {
     for ([_]u16{ 2, 3, 6, 31, 33, 47, 52, 62, 63 }) |bits| {
         const sign = @as(i128, 1) << @as(u7, @intCast(bits - 1));
         const limit = @as(i128, 1) << @as(u7, @intCast(bits));
         for ([_]i128{ 0, 1, -1, -sign, sign - 1, limit - 1 }) |literal| {
-            const source = try std.fmt.allocPrint(std.testing.allocator,
-                "define i64 @literal(i64 %input,i64 %seed) {{\nentry:\n %wide = zext i{d} {d} to i64\n %mixed = xor i64 %wide,%seed\n %answer = add i64 %mixed,%input\n ret i64 %answer\n}}\n", .{ bits, literal });
+            const source = try std.fmt.allocPrint(std.testing.allocator, "define i64 @literal(i64 %input,i64 %seed) {{\nentry:\n %wide = zext i{d} {d} to i64\n %mixed = xor i64 %wide,%seed\n %answer = add i64 %mixed,%input\n ret i64 %answer\n}}\n", .{ bits, literal });
             defer std.testing.allocator.free(source);
             var module = try ir.Module.parse(std.testing.allocator, source);
             defer module.deinit();

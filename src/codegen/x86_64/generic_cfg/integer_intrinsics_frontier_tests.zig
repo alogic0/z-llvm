@@ -6,6 +6,73 @@ const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const intrinsics = @import("integer_intrinsics.zig");
 
+test "native pair saturation and signed extrema preserve full values and live carriers" {
+    const samples = [_]u128{ 0, 1, 0xffffffffffffffff, 0x10000000000000000, 0x7fffffffffffffffffffffffffffffff, 0x80000000000000000000000000000000, 0xfffffffffffffffffffffffffffffffe, std.math.maxInt(u128), 0x123456789abcdef0fedcba9876543210 };
+    for ([_][]const u8{ "uadd.sat", "usub.sat", "sadd.sat", "ssub.sat", "umin", "umax", "smin", "smax" }, 0..) |op, kind| for (0..4) |literal_mode| {
+        var formatting = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer formatting.deinit();
+        const a = formatting.allocator();
+        const fixed = samples[6];
+        const constant = try std.fmt.allocPrint(a, "{d}", .{@as(i128, @bitCast(fixed))});
+        const lhs = if (literal_mode == 1) constant else if (literal_mode == 2) "1" else "%a";
+        const rhs = if (literal_mode == 3) constant else if (literal_mode == 2) "2" else "%b";
+        const text = try std.fmt.allocPrint(a, "declare i128 @llvm.{0s}.i128(i128,i128)\ndefine i128 @pair_probe(i128 %a,i128 %b,i64 %salt) {{\nentry:\n %v = call i128 @llvm.{0s}.i128(i128 {1s},i128 {2s})\n %wide = zext i64 %salt to i128\n %r = xor i128 %v,%wide\n ret i128 %r\n}}\n", .{ op, lhs, rhs });
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        const view = (try intrinsics.legalize(a, original)).?;
+        var private = module;
+        private.functions = try module.functions.clone(a);
+        private.functions.items[0] = view;
+        try private.verify();
+        try std.testing.expect((try intrinsics.legalize(a, view)) == null);
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128, u128, u64) callconv(.c) u128 = @ptrCast(code.ptr);
+        for (samples) |x| for (samples) |y| {
+            const input = if (literal_mode == 1) fixed else if (literal_mode == 2) 1 else x;
+            const right = if (literal_mode == 3) fixed else if (literal_mode == 2) 2 else y;
+            const sx: i128 = @bitCast(input);
+            const sy: i128 = @bitCast(right);
+            const expected: u128 = switch (kind) {
+                0 => input +| right,
+                1 => input -| right,
+                2 => @bitCast(sx +| sy),
+                3 => @bitCast(sx -| sy),
+                4 => @min(input, right),
+                5 => @max(input, right),
+                6 => @bitCast(@min(sx, sy)),
+                7 => @bitCast(@max(sx, sy)),
+                else => unreachable,
+            };
+            const salt: u64 = @truncate(x ^ y);
+            try std.testing.expectEqual(expected ^ salt, run(x, y, salt));
+        };
+        try std.testing.expectEqual(@as(usize, 3), original.blocks.items[0].instructions.items.len);
+        try module.verify();
+    };
+}
+
+test "native pair saturation retains closed call promises and operand types" {
+    for (0..5) |variant| {
+        var module = try ir.Module.parse(std.testing.allocator, "declare i128 @llvm.sadd.sat.i128(i128,i128)\ndefine i128 @closed(i128 %a,i128 %b) {\nentry:\n %r = call i128 @llvm.sadd.sat.i128(i128 %a,i128 %b)\n ret i128 %r\n}\n");
+        defer module.deinit();
+        const call = &module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+        switch (variant) {
+            0 => call.calling_conv = "fastcc",
+            1 => call.tail_kind = "musttail",
+            2 => call.ret_attrs = "zeroext",
+            3 => call.args.items[0].attrs = "inreg",
+            4 => call.args.items[1].ty = .{ .int = 64 },
+            else => unreachable,
+        }
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try intrinsics.legalize(arena.allocator(), module.functions.items[0])) == null);
+    }
+}
+
 test "right funnels execute scalar widths with full counts zero and live sources" {
     for ([_]u16{ 1, 6, 8, 16, 23, 32, 33, 63, 64 }) |bits| for ([_]bool{ false, true }) |literal| {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -267,7 +334,7 @@ test "integer frontier rewrites preserve source ownership idempotence and alloca
 test "integer frontier rejects unimplemented widths flags and semantic envelopes" {
     for ([_][]const u8{
         "call i48 @llvm.ssub.sat.i48(i48 1, i48 2)",
-        "call i128 @llvm.ssub.sat.i128(i128 1, i128 2)",
+        "call i128 @llvm.ssub.sat.i128(i128 poison, i128 2)",
         "call fastcc i8 @llvm.ssub.sat.i8(i8 1, i8 2)",
         "musttail call i32 @llvm.scmp.i32.i32(i32 1, i32 2)",
         "call i16 @llvm.scmp.i16.i32(i32 1, i32 2)",

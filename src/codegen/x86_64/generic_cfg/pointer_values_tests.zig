@@ -24,6 +24,76 @@ const pointer_values = @import("pointer_values.zig");
 const pair_values = @import("word_pair_values.zig");
 const Pair = extern struct { first: u64, second: u64 };
 
+test "absolute volatile native pointers retain event types and exact memory extents" {
+    for ([_][]const u8{ "i8", "i16", "i32", "i64", "ptr" }, [_]usize{ 1, 2, 4, 8, 8 }) |ty, bytes| {
+        var storage: [32]u8 = @splat(165);
+        const address = @intFromPtr(&storage[9]);
+        const load_cast = if (bytes == 8 and std.mem.eql(u8, ty, "ptr")) "ptrtoint ptr" else if (bytes < 8) try std.fmt.allocPrint(std.testing.allocator, "zext {s}", .{ty}) else "add i64";
+        defer if (bytes < 8) std.testing.allocator.free(load_cast);
+        const input = if (std.mem.eql(u8, ty, "ptr")) " %small = inttoptr i64 %value to ptr\n" else if (bytes < 8) try std.fmt.allocPrint(std.testing.allocator, " %small = trunc i64 %value to {s}\n", .{ty}) else " %small = add i64 %value,0\n";
+        defer if (bytes < 8 and !std.mem.eql(u8, ty, "ptr")) std.testing.allocator.free(input);
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @absolute(i64 %value,i64 %salt) {{\nentry:\n{s} %before = load volatile {s},ptr inttoptr (i64 {d} to ptr),align 1\n store volatile {s} %small,ptr inttoptr (i64 {d} to ptr),align 1\n %after = load volatile {s},ptr inttoptr (i64 {d} to ptr),align 1\n %a = {s} %before{s}\n %b = {s} %after{s}\n %pair = xor i64 %a,%b\n %r = xor i64 %pair,%salt\n ret i64 %r\n}}\n", .{ input, ty, address, ty, address, ty, address, load_cast, if (std.mem.eql(u8, ty, "ptr") or bytes < 8) " to i64" else ",0", load_cast, if (std.mem.eql(u8, ty, "ptr") or bytes < 8) " to i64" else ",0" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const view = (try pointer_values.legalize(arena.allocator(), original, null)).?;
+        try std.testing.expect((try pointer_values.legalize(arena.allocator(), view, null)) == null);
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        var loads: usize = 0;
+        var stores: usize = 0;
+        for (view.blocks.items[0].instructions.items) |inst| switch (inst.kind) {
+            .load => |x| {
+                try std.testing.expect(x.attrs.is_volatile and x.ptr == .named);
+                loads += 1;
+            },
+            .store => |x| {
+                try std.testing.expect(x.attrs.is_volatile and x.ptr == .named);
+                stores += 1;
+            },
+            else => {},
+        };
+        try std.testing.expectEqual(@as(usize, 2), loads);
+        try std.testing.expectEqual(@as(usize, 1), stores);
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for (0..64) |seed| {
+            @memset(&storage, 165);
+            const before: u64 = 0x1928374655aa80ff;
+            const after = @as(u64, seed) *% 0x8123456789abcdef;
+            @memcpy(storage[9..][0..bytes], std.mem.asBytes(&before)[0..bytes]);
+            const salt: u64 = 0xf06dea67e461de5b;
+            const mask: u64 = if (bytes == 8) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bytes * 8))) - 1;
+            try std.testing.expectEqual(((before ^ after) & mask) ^ salt, run(after, salt));
+            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&after)[0..bytes], storage[9..][0..bytes]);
+            for (storage[0..9]) |byte| try std.testing.expectEqual(@as(u8, 165), byte);
+            for (storage[9 + bytes ..]) |byte| try std.testing.expectEqual(@as(u8, 165), byte);
+        }
+        try module.verify();
+    }
+}
+
+test "absolute volatile address normalization keeps atomics address spaces and vector widths closed" {
+    for ([_][]const u8{
+        "define i32 @closed() {\nentry:\n %r = load atomic volatile i32,ptr inttoptr (i64 4096 to ptr) monotonic,align 4\n ret i32 %r\n}\n",
+        "define i8 @closed() {\nentry:\n %r = load volatile i8,ptr addrspace(1) inttoptr (i64 4096 to ptr addrspace(1)),align 1\n ret i8 %r\n}\n",
+        "define <2 x i64> @closed() {\nentry:\n %r = load volatile <2 x i64>,ptr inttoptr (i64 4096 to ptr),align 1\n ret <2 x i64> %r\n}\n",
+    }) |text| {
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try pointer_values.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+}
+
 test "integer symbolic operands retain source identities and closed layout boundaries" {
     const text =
         \\@table = internal global [64 x i8] zeroinitializer, align 16

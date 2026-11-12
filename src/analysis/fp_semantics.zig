@@ -89,6 +89,45 @@ pub fn halfLiteralBits(spelling: []const u8) !u16 {
     return std.fmt.parseInt(u16, text[3..], 16) catch error.InvalidFloatingPointLiteral;
 }
 
+/// Exact scalar LLVM literal representation, shared by data and code lowering.
+pub fn scalarLiteralBits(ty: ir.Type, text: []const u8) !u128 {
+    if (ty == .half) return try halfLiteralBits(text);
+    if (ty == .x86_fp80) {
+        if (text.len != 23 or !std.mem.startsWith(u8, text, "0xK")) return error.InvalidFloatingPointLiteral;
+        return std.fmt.parseUnsigned(u80, text[3..], 16) catch error.InvalidFloatingPointLiteral;
+    }
+    if (ty == .fp128) {
+        if (std.mem.startsWith(u8, text, "0xL")) {
+            if (text.len != 35) return error.InvalidFloatingPointLiteral;
+            const lo = std.fmt.parseUnsigned(u64, text[3..19], 16) catch return error.InvalidFloatingPointLiteral;
+            const hi = std.fmt.parseUnsigned(u64, text[19..35], 16) catch return error.InvalidFloatingPointLiteral;
+            return (@as(u128, hi) << 64) | lo;
+        }
+        return @bitCast(std.fmt.parseFloat(f128, text) catch return error.InvalidFloatingPointLiteral);
+    }
+    if (std.mem.startsWith(u8, text, "0x")) {
+        if (text.len < 3 or text.len > 18) return error.InvalidFloatingPointLiteral;
+        const raw = std.fmt.parseUnsigned(u64, text[2..], 16) catch return error.InvalidFloatingPointLiteral;
+        if (ty == .double) return raw;
+        if (ty != .float) return error.InvalidFloatingPointLiteral;
+        const fraction = raw & 0x000fffffffffffff;
+        if (raw & 0x7ff0000000000000 == 0x7ff0000000000000 and fraction != 0) {
+            // Copy a representable NaN payload without a floating conversion.
+            if (fraction & 0x1fffffff != 0 or fraction >> 29 == 0) return error.InvalidFloatingPointLiteral;
+            return ((raw >> 32) & 0x80000000) | 0x7f800000 | (fraction >> 29);
+        }
+        const wide: f64 = @bitCast(raw);
+        const narrow: f32 = @floatCast(wide);
+        if (@as(f64, @floatCast(narrow)) != wide) return error.InvalidFloatingPointLiteral;
+        return @as(u32, @bitCast(narrow));
+    }
+    return switch (ty) {
+        .float => @as(u32, @bitCast(std.fmt.parseFloat(f32, text) catch return error.InvalidFloatingPointLiteral)),
+        .double => @as(u64, @bitCast(std.fmt.parseFloat(f64, text) catch return error.InvalidFloatingPointLiteral)),
+        else => error.InvalidFloatingPointLiteral,
+    };
+}
+
 pub fn isHalfZeroLiteral(spelling: []const u8) bool {
     const bits = halfLiteralBits(spelling) catch return false;
     return bits & 0x7fff == 0;

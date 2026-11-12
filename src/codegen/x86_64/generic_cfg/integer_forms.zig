@@ -60,6 +60,32 @@ fn supported(op: ir.BinaryOp) bool {
     };
 }
 
+fn constantPair(value: ir.BinaryInst) ?u64 {
+    if (!integer(value.ty) or value.lhs != .int or value.rhs != .int or value.flags.any() or
+        !operand(value.lhs, value.ty.int) or !operand(value.rhs, value.ty.int)) return null;
+    // Keep the established full-word materialization as the terminal form.
+    if (value.op == .add and value.rhs.int == 0 and (value.ty.int == 32 or value.ty.int == 64)) return null;
+    const sem = @import("../../../analysis/integer_semantics.zig").Integer.init(value.ty).?;
+    const x = sem.unsigned(value.lhs.int);
+    const y = sem.unsigned(value.rhs.int);
+    const result = switch (value.op) {
+        .add => x +% y,
+        .sub => x -% y,
+        .mul => x *% y,
+        .@"and" => x & y,
+        .@"or" => x | y,
+        .xor => x ^ y,
+        .shl => if (y < value.ty.int) x << @as(u7, @intCast(y)) else return null,
+        .lshr => if (y < value.ty.int) x >> @as(u7, @intCast(y)) else return null,
+        .ashr => if (y < value.ty.int) @as(u128, @bitCast(sem.normalize(value.lhs.int) >> @as(u7, @intCast(y)))) else return null,
+        .udiv => if (y != 0) x / y else return null,
+        .urem => if (y != 0) x % y else return null,
+        // Signed division overflow and poison cases keep their existing paths.
+        else => return null,
+    };
+    return @intCast(result & sem.unsignedMax());
+}
+
 fn truncatedWord(function: ir.Function, cast: ir.CastInst) ?ir.Value {
     if (cast.op != .zext or !cast.to_ty.eql(.{ .int = 64 }) or !integer(cast.from_ty) or
         cast.from_ty.int == 64 or cast.value != .named) return null;
@@ -102,7 +128,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!inst.removed and inst.result != null) switch (inst.kind) {
-                .binary => |value| if ((value.ty.eql(.{ .int = 32 }) or value.ty.eql(.{ .int = 64 })) and
+                .binary => |value| if (constantPair(value)) |result| {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const wide: ir.Type = .{ .int = if (value.ty.int <= 32) 32 else 64 };
+                    const answer = try binary(allocator, function, &block, &serial, wide, .add, .{ .int = result }, .{ .int = 0 });
+                    try finish(allocator, &block, inst, wide, value.ty, answer);
+                    continue;
+                } else if ((value.ty.eql(.{ .int = 32 }) or value.ty.eql(.{ .int = 64 })) and
                     (value.op == .shl or value.op == .lshr or value.op == .ashr) and
                     value.lhs == .int and value.rhs == .named and
                     operand(value.lhs, value.ty.int) and operand(value.rhs, value.ty.int))

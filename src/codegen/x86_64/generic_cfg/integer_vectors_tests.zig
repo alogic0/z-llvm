@@ -2,6 +2,177 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const forms = @import("integer_vectors.zig");
 
+test "pair vector saturation preserves aligned owned storage and exact lane results" {
+    const a = std.testing.allocator;
+    const samples = [_]u128{ 0, 1, 0xffffffffffffffff, 0x10000000000000000, 0x7fffffffffffffffffffffffffffffff, 0x80000000000000000000000000000000, std.math.maxInt(u128), 0x123456789abcdef0fedcba9876543210 };
+    for ([_]u32{ 2, 3, 4, 8, 16, 32 }) |n| for ([_][]const u8{ "uadd.sat", "usub.sat", "sadd.sat", "ssub.sat", "umin", "umax", "smin", "smax" }, 0..) |op, kind| {
+        const alignment = try std.math.ceilPowerOfTwo(u32, n * 16);
+        const text = try std.fmt.allocPrint(a, "declare i128 @llvm.{0s}.i128(i128,i128)\ndeclare <{1d} x i128> @llvm.{0s}.v{1d}i128(<{1d} x i128>,<{1d} x i128>)\ndefine i64 @pair_vectors(ptr %out,ptr %ap,ptr %bp,i64 %salt) {{\nentry:\n %slot = alloca <{1d} x i128>,align {2d}\n %a = load <{1d} x i128>,ptr %ap,align 1\n %b = load <{1d} x i128>,ptr %bp,align 1\n store <{1d} x i128> %a,ptr %slot,align 1\n %again = load <{1d} x i128>,ptr %slot,align 1\n %r = call <{1d} x i128> @llvm.{0s}.v{1d}i128(<{1d} x i128> %again,<{1d} x i128> %b)\n store <{1d} x i128> %r,ptr %out,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ op, n, alignment });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const view = (try forms.legalize(arena.allocator(), original, null)).?;
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        try std.testing.expect((try forms.legalize(arena.allocator(), view, null)) == null);
+        const machine = @import("../machine.zig");
+        const selector = @import("../generic_cfg_selector.zig");
+        var output = machine.MachineFunction.init("pair_vectors", .{ .int = 64 });
+        defer output.deinit(a);
+        const selected = try selector.tryLower(a, &output, original);
+        if (selected == .unsupported) std.debug.print("pair vectors {d} {s}: {s}\n", .{ n, op, selected.unsupported.detail() });
+        try std.testing.expectEqual(selector.SelectionResult.selected, selected);
+        try @import("../verify.zig").verifyFunction(output);
+        const bytes = try @import("../../../mc/encoding.zig").encodeFunction(a, output);
+        defer a.free(bytes);
+        const code = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(code);
+        @memcpy(code[0..bytes.len], bytes);
+        const run: *const fn (*u8, *const u128, *const u128, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for (0..samples.len) |seed| {
+            var x: [32]u128 = undefined;
+            var y: [32]u128 = undefined;
+            for (0..n) |i| {
+                x[i] = samples[(i + seed) % samples.len];
+                y[i] = samples[(i * 3 + seed) % samples.len];
+            }
+            const before_x = x;
+            const before_y = y;
+            var guarded: [528]u8 = @splat(165);
+            const salt: u64 = seed *% 0xf06dea67e461de5b;
+            try std.testing.expectEqual(salt ^ 90, run(&guarded[8], &x[0], &y[0], salt));
+            for (0..n) |i| {
+                const sx: i128 = @bitCast(x[i]);
+                const sy: i128 = @bitCast(y[i]);
+                const expected: u128 = switch (kind) {
+                    0 => x[i] +| y[i],
+                    1 => x[i] -| y[i],
+                    2 => @bitCast(sx +| sy),
+                    3 => @bitCast(sx -| sy),
+                    4 => @min(x[i], y[i]),
+                    5 => @max(x[i], y[i]),
+                    6 => @bitCast(@min(sx, sy)),
+                    7 => @bitCast(@max(sx, sy)),
+                    else => unreachable,
+                };
+                try std.testing.expectEqual(expected, std.mem.readInt(u128, guarded[8 + i * 16 ..][0..16], .little));
+            }
+            for (guarded[0..8]) |byte| try std.testing.expectEqual(@as(u8, 165), byte);
+            for (guarded[8 + n * 16 ..]) |byte| try std.testing.expectEqual(@as(u8, 165), byte);
+            try std.testing.expectEqualSlices(u128, before_x[0..n], x[0..n]);
+            try std.testing.expectEqualSlices(u128, before_y[0..n], y[0..n]);
+        }
+        try module.verify();
+    };
+}
+
+test "pair vector owned storage keeps larger dynamic and excessive alignment closed" {
+    for ([_][]const u8{ "alloca <64 x i128>,align 1024", "alloca <4 x i128>,i64 %n,align 64", "alloca <4 x i128>,align 8192" }) |expression| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define void @closed(i64 %n) {{\nentry:\n %slot = {s}\n ret void\n}}\n", .{expression});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+}
+
+test "promoted vector ABI executes expanded XMM cells and ignores non-payload bits" {
+    const a = std.testing.allocator;
+    const machine = @import("../machine.zig");
+    const selector = @import("../generic_cfg_selector.zig");
+    var shapes: std.ArrayList([2]u16) = .empty;
+    defer shapes.deinit(a);
+    for ([_]u16{ 2, 4, 8, 16 }) |n| for (1..128 / n) |bits| {
+        if (bits == 8 or bits == 16 or bits == 32 or bits == 51 or bits == 52 or bits == 64) continue;
+        try shapes.append(a, .{ n, @intCast(bits) });
+    };
+    try shapes.append(a, .{ 3, 32 });
+    try std.testing.expectEqual(@as(usize, 109), shapes.items.len);
+    for ([_]u16{ 51, 52 }) |bits| try std.testing.expect(forms.privateAbiType(.{ .vector = .{ .len = 2, .elem_ty = .{ .int = bits } } }) == null);
+    for (shapes.items) |shape| for ([_]bool{ false, true }) |fast| {
+        const n = shape[0];
+        const bits = shape[1];
+        const text = try std.fmt.allocPrint(a, "define {0s}<{1d} x i{2d}> @promoted(<{1d} x i{2d}> %a,<{1d} x i{2d}> %b) {{\nentry:\n %r = add <{1d} x i{2d}> %a,%b\n ret <{1d} x i{2d}> %r\n}}\n", .{ if (fast) "fastcc " else "", n, bits });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const source = module.functions.items[0];
+        const view = (try forms.legalize(arena.allocator(), source, null)).?;
+        try std.testing.expect(source.params.items.ptr != view.params.items.ptr);
+        try std.testing.expectEqual(@as(u32, n), source.ret_ty.vector.len);
+        try std.testing.expectEqual(@as(u16, bits), source.ret_ty.vector.elem_ty.int);
+        try std.testing.expect(view.ret_ty.eql(.{ .vector = .{ .len = 2, .elem_ty = .double } }));
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        try module.verify();
+        var selected = machine.MachineFunction.init(source.name, source.ret_ty);
+        defer selected.deinit(a);
+        const selection = try selector.tryLower(a, &selected, source);
+        if (selection == .unsupported) std.debug.print("promoted <{d}xi{d}>: {s}\n", .{ n, bits, selection.unsupported.detail() });
+        try std.testing.expect(selection == .selected);
+        try @import("../verify.zig").verifyFunction(selected);
+        const code = try @import("../../../mc/encoding.zig").encodeFunction(a, selected);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (@Vector(2, u64), @Vector(2, u64)) callconv(.c) @Vector(2, u64) = @ptrCast(memory.ptr);
+        const stride: u16 = if (n == 3) 32 else @intCast(128 / n);
+        const mask = (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+        for (0..64) |seed| {
+            const x: @Vector(2, u64) = .{ @as(u64, seed) *% 0x9e3779b97f4a7c15, ~(@as(u64, seed) *% 0x8123456789abcdef) };
+            const y: @Vector(2, u64) = .{ ~(@as(u64, seed) *% 0xf06dea67e461de5b), @as(u64, seed) *% 0x361962e2b9c8b6a5 };
+            const actual = run(x, y);
+            const x_words: [2]u64 = @bitCast(x);
+            const y_words: [2]u64 = @bitCast(y);
+            const actual_words: [2]u64 = @bitCast(actual);
+            for (0..n) |i| {
+                const word = i * stride / 64;
+                const offset: u6 = @intCast(i * stride % 64);
+                const expected = (((x_words[word] >> offset) & mask) + ((y_words[word] >> offset) & mask)) & mask;
+                try std.testing.expectEqual(expected, (actual_words[word] >> offset) & mask);
+            }
+        }
+    };
+}
+
+test "promoted vector ABI retains scalarized layouts and ninth XMM arguments closed" {
+    for ([_][2]u16{ .{ 3, 1 }, .{ 3, 8 }, .{ 3, 16 }, .{ 4, 48 }, .{ 64, 4 }, .{ 2, 51 }, .{ 2, 52 } }) |shape| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define <{0d} x i{1d}> @closed(<{0d} x i{1d}> %v) {{\nentry:\n ret <{0d} x i{1d}> %v\n}}\n", .{ shape[0], shape[1] });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try forms.legalize(arena.allocator(), module.functions.items[0], null) == null);
+    }
+    var module = try ir.Module.parse(std.testing.allocator, "define <2 x i1> @ninth(<2 x i1> %a,<2 x i1> %b,<2 x i1> %c,<2 x i1> %d,<2 x i1> %e,<2 x i1> %f,<2 x i1> %g,<2 x i1> %h,<2 x i1> %i) {\nentry:\n %sum = add <2 x i1> %a,%i\n ret <2 x i1> %sum\n}\n");
+    defer module.deinit();
+    try module.verify();
+    const machine = @import("../machine.zig");
+    var selected = machine.MachineFunction.init("ninth", module.functions.items[0].ret_ty);
+    defer selected.deinit(std.testing.allocator);
+    const selection = @import("../generic_cfg_selector.zig").tryLower(std.testing.allocator, &selected, module.functions.items[0]) catch |err| {
+        try std.testing.expectEqual(error.UnsupportedVectorAbi, err);
+        return;
+    };
+    try std.testing.expect(selection == .unsupported);
+}
+
 test "vector intrinsic lanes preserve source facts exact scalar signatures and immediate flags" {
     const names = [_][]const u8{ "abs", "ctpop", "ctlz", "cttz", "bitreverse", "bswap", "uadd.sat", "usub.sat", "sadd.sat", "ssub.sat", "fshl", "fshr", "umin", "umax", "smin", "smax", "ushl.sat", "sshl.sat", "umul.fix.sat", "smul.fix.sat" };
     for ([_]u16{ 8, 16, 32, 64 }) |bits| for (names, 0..) |name, index| {

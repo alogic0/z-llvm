@@ -12,13 +12,14 @@ const xmm_carrier: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
 
 // Exact LLVM integer vector shapes use packed low XMM bits. Up to64-bit
 // shapes occupy an8-byte overflow slot; a private double preserves that ABI.
-// 128-bit shapes keep their existing two-double raw boundary. Sub-byte and
-// non-power-of-two lane counts remain separate, closed contracts.
+// 128-bit shapes keep their existing two-double raw boundary. Non-native
+// integer widths use promoted cells; three i32 lanes retain XMM tail padding.
 fn abiType(ty: ir.Type) ?ir.Type {
     if (abi.isVector128AbiType(ty)) return ty;
     return privateAbiType(ty);
 }
 pub fn privateAbiType(ty: ir.Type) ?ir.Type {
+    if (promotedLaneBits(ty) != null or (ty == .vector and ty.vector.len == 3 and ty.vector.elem_ty == .int and ty.vector.elem_ty.int == 32)) return xmm_carrier;
     if (ty == .vector and ty.vector.elem_ty == .int) {
         const n = ty.vector.len;
         const bits = ty.vector.elem_ty.int;
@@ -28,6 +29,19 @@ pub fn privateAbiType(ty: ir.Type) ?ir.Type {
     if (ty == .vector and ty.vector.elem_ty == .int and
         ((ty.vector.len == 16 and ty.vector.elem_ty.int == 8) or
             (ty.vector.len == 8 and ty.vector.elem_ty.int == 16))) return xmm_carrier;
+    return null;
+}
+
+fn promotedLaneBits(ty: ir.Type) ?u16 {
+    if (ty != .vector or ty.vector.elem_ty != .int) return null;
+    const n = ty.vector.len;
+    const bits = ty.vector.elem_ty.int;
+    // These non-native element widths use LLVM's full-width promoted XMM
+    // cells, unlike their densely packed memory representation.
+    // The established scalar cast actions keep general i51/i52 carriers
+    // closed. Promoted ABI admission does not widen that frozen authority.
+    if (bits == 0 or bits == 8 or bits == 16 or bits == 32 or bits == 51 or bits == 52 or bits == 64) return null;
+    if ((n == 2 or n == 4 or n == 8 or n == 16) and bits < 128 / n) return @intCast(128 / n);
     return null;
 }
 
@@ -93,7 +107,10 @@ fn laneIntrinsic(allocator: std.mem.Allocator, call: ir.CallInst) !?[]const u8 {
         if (!std.mem.eql(u8, call.callee, vector_name)) continue;
         // Existing byte swap/count/funnel paths keep their original width
         // envelope. New lane operations use the proved scalar<=64 contracts.
-        if (s.bits > 64 and !std.mem.eql(u8, name, "fshl") and !std.mem.eql(u8, name, "bswap") and !std.mem.eql(u8, name, "ctpop") and !std.mem.eql(u8, name, "usub.sat")) return error.UnsupportedIntegerVector;
+        const pair_scalar = s.bits == 128 and (std.mem.eql(u8, name, "uadd.sat") or std.mem.eql(u8, name, "usub.sat") or
+            std.mem.eql(u8, name, "sadd.sat") or std.mem.eql(u8, name, "ssub.sat") or std.mem.eql(u8, name, "umin") or
+            std.mem.eql(u8, name, "umax") or std.mem.eql(u8, name, "smin") or std.mem.eql(u8, name, "smax"));
+        if (s.bits > 64 and !pair_scalar and !std.mem.eql(u8, name, "fshl") and !std.mem.eql(u8, name, "bswap") and !std.mem.eql(u8, name, "ctpop") and !std.mem.eql(u8, name, "usub.sat")) return error.UnsupportedIntegerVector;
         if (std.mem.eql(u8, name, "bswap") and s.bits % 16 != 0) return error.UnsupportedIntegerVector;
         if (call.args.items.len != arity or call.callee_value != null or call.callee_function_ty != null or
             call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null)
@@ -274,7 +291,7 @@ const Builder = struct {
         }
         var result: Lanes = .{ .ty = ty, .values = @splat(.poison) };
         for (result.values[0..s.len], 0..) |*lane, i| {
-            const offset = i * s.bits;
+            const offset = i * (promotedLaneBits(ty) orelse s.bits);
             const word = words[offset / 64];
             const part = if (offset % 64 == 0) word else try b.binary(.lshr, .{ .int = 64 }, word, .{ .int = @intCast(offset % 64) });
             lane.* = try b.cast(.trunc, .{ .int = 64 }, part, s.scalar());
@@ -286,11 +303,14 @@ const Builder = struct {
         const outgoing = abiType(lanes_value.ty) orelse return error.UnsupportedIntegerVector;
         if (outgoing == .double) return b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = .{ .int = 64 }, .value = try b.pack(lanes_value), .to_ty = .double } });
         var vector: ir.Value = .poison;
+        const stride = promotedLaneBits(lanes_value.ty) orelse s.bits;
         for (0..2) |word_index| {
             var word: ir.Value = .{ .int = 0 };
-            for (0..64 / s.bits) |lane_index| {
-                var lane = try b.cast(.zext, s.scalar(), lanes_value.values[word_index * (64 / s.bits) + lane_index], .{ .int = 64 });
-                if (lane_index != 0) lane = try b.binary(.shl, .{ .int = 64 }, lane, .{ .int = @intCast(lane_index * s.bits) });
+            for (0..64 / stride) |lane_index| {
+                const source_index = word_index * (64 / stride) + lane_index;
+                if (source_index >= s.len) continue;
+                var lane = try b.cast(.zext, s.scalar(), lanes_value.values[source_index], .{ .int = 64 });
+                if (lane_index != 0) lane = try b.binary(.shl, .{ .int = 64 }, lane, .{ .int = @intCast(lane_index * stride) });
                 word = if (lane_index == 0) lane else try b.binary(.@"or", .{ .int = 64 }, word, lane);
             }
             const fp = try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = .{ .int = 64 }, .value = word, .to_ty = .double } });
@@ -421,7 +441,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                         if (!std.mem.startsWith(u8, text, "align ")) return error.UnsupportedIntegerVector;
                         alignment = @max(alignment, std.fmt.parseUnsigned(u32, text[6..], 10) catch return error.UnsupportedIntegerVector);
                     }
-                    if (alignment > 16 or alignment == 0 or !std.math.isPowerOfTwo(alignment)) return error.UnsupportedIntegerVector;
+                    if (alignment > 4096 or alignment == 0 or !std.math.isPowerOfTwo(alignment) or (alignment > 16 and natural > 512)) return error.UnsupportedIntegerVector;
                     var copy = inst;
                     copy.kind.alloca.allocated_ty = .{ .aggregate = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{@max(natural, 4) / 4}) };
                     copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{@max(alignment, 4)});

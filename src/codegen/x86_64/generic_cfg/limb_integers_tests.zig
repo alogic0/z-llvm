@@ -4,10 +4,50 @@ const limb = @import("limb_integers.zig");
 const machine = @import("../machine.zig");
 const layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
 
+test "bounded limb switches keep source cases and CFG edges while executing exact wide equality" {
+    const minimum = "115792089237316195423570985008687907853269984665640564039457584007913129639936";
+    const text = "define i64 @wide_switch(ptr %input,i64 %salt) {\nentry:\n %x = load i257,ptr %input,align 1\n switch i257 %x,label %other [ i257 -125,label %negative\n i257 125,label %positive\n i257 0,label %zero\n i257 " ++ minimum ++ ",label %minimum ]\nnegative:\n br label %join\npositive:\n br label %join\nzero:\n br label %join\nminimum:\n br label %join\nother:\n br label %join\njoin:\n %tag = phi i64 [101,%negative],[202,%positive],[303,%zero],[404,%minimum],[505,%other]\n %result = xor i64 %tag,%salt\n ret i64 %result\n}\n";
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout };
+    const source = module.functions.items[0];
+    const view = (try limb.legalize(arena.allocator(), source, &context)).?;
+    try std.testing.expectEqual(source.blocks.items.len, view.blocks.items.len);
+    const before = source.blocks.items[0].terminator.?.@"switch";
+    const after = view.blocks.items[0].terminator.?.@"switch";
+    try std.testing.expectEqual(@as(u16, 257), before.cond_ty.int);
+    try std.testing.expectEqual(@as(u16, 64), after.cond_ty.int);
+    try std.testing.expect(before.cases.items.ptr != after.cases.items.ptr);
+    try std.testing.expectEqualStrings(before.default_target, after.default_target);
+    for (before.cases.items, after.cases.items, 0..) |old, new, i| {
+        try std.testing.expectEqual(@as(u16, 257), old.value_ty.int);
+        try std.testing.expectEqual(@as(u16, 64), new.value_ty.int);
+        try std.testing.expectEqual(@as(i128, @intCast(i + 1)), new.value.int);
+        try std.testing.expectEqualStrings(old.target, new.target);
+    }
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    private.functions.items[0] = view;
+    try private.verify();
+    try module.verify();
+    const memory = try executable(module);
+    defer std.posix.munmap(memory);
+    const function: *const fn ([*]const u8, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+    const modulus: u320 = @as(u320, 1) << 257;
+    for ([_]u320{ modulus - 125, 125, 0, @as(u320, 1) << 256, 1, (@as(u320, 1) << 192) + 125, modulus - 1 }, [_]u64{ 101, 202, 303, 404, 505, 505, 505 }) |value, expected| {
+        var bytes: [40]u8 = undefined;
+        std.mem.writeInt(u320, &bytes, value, .little);
+        bytes[32] |= 0xfe; // Bits outside i257 cannot participate in equality.
+        for ([_]u64{ 0, 1, 0x8123456789abcdef, std.math.maxInt(u64) }) |salt| try std.testing.expectEqual(expected ^ salt, function(&bytes, salt));
+    }
+}
+
 test "bounded limb fixed point saturation keeps fractional and dynamic scales closed" {
     for ([_][]const u8{ "umul", "smul" }) |op| for ([_][]const u8{ "1", "%scale" }) |scale| {
-        const text = try std.fmt.allocPrint(std.testing.allocator,
-            "declare i140 @llvm.{0s}.fix.sat.i140(i140,i140,i32)\ndefine i64 @f(ptr %xp,i32 %scale) {{\nentry:\n %x = load i140,ptr %xp,align 1\n %r = call i140 @llvm.{0s}.fix.sat.i140(i140 %x,i140 %x,i32 {1s})\n %low = trunc i140 %r to i64\n ret i64 %low\n}}\n", .{ op, scale });
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i140 @llvm.{0s}.fix.sat.i140(i140,i140,i32)\ndefine i64 @f(ptr %xp,i32 %scale) {{\nentry:\n %x = load i140,ptr %xp,align 1\n %r = call i140 @llvm.{0s}.fix.sat.i140(i140 %x,i140 %x,i32 {1s})\n %low = trunc i140 %r to i64\n ret i64 %low\n}}\n", .{ op, scale });
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);
         defer module.deinit();
@@ -16,6 +56,38 @@ test "bounded limb fixed point saturation keeps fractional and dynamic scales cl
         const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout };
         try std.testing.expect(try limb.legalize(arena.allocator(), module.functions.items[0], &context) == null);
     };
+}
+
+test "bounded limb switches enforce the private case budget and retain incoming limbs" {
+    for ([_]usize{ 0, 1, 256, 257 }) |count| {
+        var text: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        defer text.deinit();
+        try text.writer.writeAll("define i64 @boundary(i257 %value) {\nentry:\n switch i257 %value,label %done [\n");
+        for (0..count) |i| try text.writer.print("i257 {d},label %done\n", .{i});
+        try text.writer.writeAll("]\ndone:\n ret i64 0\n}\n");
+        var module = try ir.Module.parse(std.testing.allocator, text.written());
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout };
+        const source = module.functions.items[0];
+        const view = try limb.legalize(arena.allocator(), source, &context);
+        if (count == 257) {
+            try std.testing.expect(view == null);
+        } else {
+            try std.testing.expectEqual(@as(usize, 5), view.?.params.items.len);
+            const replacement = view.?.blocks.items[0].terminator.?.@"switch";
+            try std.testing.expectEqual(count, replacement.cases.items.len);
+            var private = module;
+            private.functions = try module.functions.clone(arena.allocator());
+            private.functions.items[0] = view.?;
+            try private.verify();
+        }
+        try std.testing.expectEqual(@as(u16, 257), source.params.items[0].ty.int);
+        try std.testing.expectEqual(count, source.blocks.items[0].terminator.?.@"switch".cases.items.len);
+        try module.verify();
+    }
 }
 
 test "bounded limb division keeps source immutable and verifies its runtime call ABI" {

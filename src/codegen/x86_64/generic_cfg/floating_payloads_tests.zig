@@ -6,6 +6,56 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "native floating literal returns preserve payloads branch effects and source IR" {
+    inline for (.{ .{ "half", 16 }, .{ "float", 32 }, .{ "double", 64 } }) |shape| {
+        const ty = shape[0];
+        const bits = shape[1];
+        const F = if (bits == 16) f16 else if (bits == 32) f32 else f64;
+        const U = @Int(.unsigned, bits);
+        const literals = if (bits == 16) [_][]const u8{ "0xH0000", "0xH8000", "0xH0001", "0xH7C00", "0xH7C01", "0xH7E23", "0xH3555" } else if (bits == 32) [_][]const u8{ "0.000000e+00", "-0.000000e+00", "0x36A0000000000000", "0x7FF0000000000000", "0x7FF0000020000000", "0x7FF8002460000000", "0x3FD5555560000000" } else [_][]const u8{ "0x0000000000000000", "0x8000000000000000", "0x0000000000000001", "0x7FF0000000000000", "0x7FF0000000000001", "0x7FF8000000000123", "0x3FD5555555555555" };
+        const expected = if (bits == 16) [_]u64{ 0, 0x8000, 1, 0x7c00, 0x7c01, 0x7e23, 0x3555 } else if (bits == 32) [_]u64{ 0, 0x80000000, 1, 0x7f800000, 0x7f800001, 0x7fc00123, 0x3eaaaaab } else [_]u64{ 0, 0x8000000000000000, 1, 0x7ff0000000000000, 0x7ff0000000000001, 0x7ff8000000000123, 0x3fd5555555555555 };
+        for (literals, expected) |literal, raw| for ([_]bool{ false, true }) |fast| {
+            const text = try std.fmt.allocPrint(std.testing.allocator, "define {s}{s} @literal(i1 %choice,i64 %salt,ptr %out) {{\nentry:\n store volatile i64 %salt,ptr %out,align 1\n br i1 %choice,label %yes,label %no\nyes:\n ret {s} {s}\nno:\n ret {s} {s}\n}}\n", .{ if (fast) "fastcc " else "", ty, ty, literal, ty, literals[1] });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const original = module.functions.items[0];
+            const view = (try payloads.legalize(arena.allocator(), original, null)).?;
+            var private = module;
+            private.functions = try module.functions.clone(arena.allocator());
+            private.functions.items[0] = view;
+            try private.verify();
+            try std.testing.expect((try payloads.legalize(arena.allocator(), view, null)) == null);
+            try std.testing.expect(original.blocks.items[1].terminator.?.ret.value.? == .fp);
+            const code = try executable(text);
+            defer std.posix.munmap(code);
+            const run: *const fn (bool, u64, *u64) callconv(.c) F = @ptrCast(code.ptr);
+            for ([_]bool{ false, true }) |choice| for ([_]u64{ 0, 1, 0xf06dea67e461de5b, std.math.maxInt(u64) }) |salt| {
+                var out: u64 = 0xa5a5a5a5a5a5a5a5;
+                try std.testing.expectEqual(@as(U, @intCast(if (choice) raw else expected[1])), @as(U, @bitCast(run(choice, salt, &out))));
+                try std.testing.expectEqual(salt, out);
+            };
+            try module.verify();
+        };
+    }
+}
+
+test "native floating literal returns reject malformed or nonrepresentable spellings" {
+    for ([_][]const u8{ "half 0xH123", "float 0x3FF0000000000001", "float 0x7FF0000000000001", "double 0xFFFFFFFFFFFFFFFFF" }) |typed| {
+        const space = std.mem.indexOfScalar(u8, typed, ' ').?;
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define {s} @closed(ptr %unused) {{\nentry:\n ret {s}\n}}\n", .{ typed[0..space], typed });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try payloads.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+}
+
 fn executable(source: []const u8) ![]align(std.heap.page_size_min) u8 {
     var module = try ir.Module.parse(std.testing.allocator, source);
     defer module.deinit();

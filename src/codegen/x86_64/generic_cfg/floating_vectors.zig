@@ -18,13 +18,51 @@ fn width(ty: ir.Type) u16 {
 fn packedPair(ty: ir.Type) bool {
     return fp(ty) and ty.vector.len == 2 and ty.vector.elem_ty == .float;
 }
+fn smallAbi(ty: ir.Type) ?ir.Type {
+    if (!fp(ty)) return null;
+    const n = ty.vector.len;
+    const elem = ty.vector.elem_ty;
+    if (n == 1 and (elem == .half or elem == .float or elem == .double)) return elem.toType();
+    if (packedPair(ty) or (elem == .half and (n == 2 or n == 4))) return .double;
+    if (elem == .half and n == 8) return .{ .vector = .{ .len = 2, .elem_ty = .double } };
+    if (elem == .float and n == 3) return .{ .vector = .{ .len = 4, .elem_ty = .float } };
+    return null;
+}
 fn abiType(ty: ir.Type) !ir.Type {
     if (!fp(ty)) return ty;
-    if (packedPair(ty)) return .double;
+    if (smallAbi(ty)) |physical| return physical;
     if (sysv.isVector128AbiType(ty)) return ty;
     return error.UnsupportedFloatingVectorAbi;
 }
 const Reduction = enum { add, mul, min, max };
+fn scalarMinimum(call: ir.CallInst) bool {
+    if (call.ret_ty != .half and call.ret_ty != .float and call.ret_ty != .double and call.ret_ty != .x86_fp80 and call.ret_ty != .fp128) return false;
+    if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or call.raw_args != null or
+        call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or call.args.items.len != 2) return false;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return false;
+    for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null) return false;
+    var buffer: [48]u8 = undefined;
+    const spelling = std.fmt.bufPrint(&buffer, "llvm.minnum.f{d}", .{width(call.ret_ty)}) catch return false;
+    return std.mem.eql(u8, call.callee, spelling);
+}
+const LaneOperation = struct { name: []const u8, arity: usize };
+fn laneOperation(call: ir.CallInst) ?LaneOperation {
+    if (!fp(call.ret_ty) or call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or
+        call.raw_args != null or call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
+    sysv.rejectUnsupportedCallEnvelope(call) catch return null;
+    const scalar = call.ret_ty.vector.elem_ty.toType();
+    const operations = [_][]const u8{ "fabs", "copysign" } ++ @import("extended_math_intrinsics.zig").operations;
+    for (operations) |op| {
+        var buffer: [96]u8 = undefined;
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.v{d}f{d}", .{ op, call.ret_ty.vector.len, width(scalar) }) catch return null;
+        if (!std.mem.eql(u8, call.callee, spelling)) continue;
+        const arity: usize = if (std.mem.eql(u8, op, "fma")) 3 else if (std.mem.eql(u8, op, "copysign")) 2 else 1;
+        if (call.args.items.len != arity) return null;
+        for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null) return null;
+        return .{ .name = op, .arity = arity };
+    }
+    return null;
+}
 fn reduction(call: ir.CallInst) ?Reduction {
     if (call.inline_asm != null or call.callee_value != null or call.callee_function_ty != null or call.raw_args != null or
         call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
@@ -42,8 +80,8 @@ fn reduction(call: ir.CallInst) ?Reduction {
     return null;
 }
 fn needed(function: ir.Function) bool {
-    if (packedPair(function.ret_ty)) return true;
-    for (function.params.items) |p| if (packedPair(p.ty)) return true;
+    if (smallAbi(function.ret_ty) != null) return true;
+    for (function.params.items) |p| if (smallAbi(p.ty) != null) return true;
     var crossing = false;
     var integer_binary = false;
     var shuffle = false;
@@ -81,9 +119,11 @@ fn needed(function: ir.Function) bool {
                         ir.vector_constant.classifyPacked2ShuffleMask(s) == null);
             },
             .call => |c| {
+                if (scalarMinimum(c)) return true;
                 if (reduction(c) != null) return true;
-                if (packedPair(c.ret_ty)) return true;
-                for (c.args.items) |arg| if (packedPair(arg.ty)) return true;
+                if (laneOperation(c)) |op| if (!std.mem.eql(u8, op.name, "fabs") and !std.mem.eql(u8, op.name, "copysign")) return true;
+                if (smallAbi(c.ret_ty) != null) return true;
+                for (c.args.items) |arg| if (smallAbi(arg.ty) != null) return true;
             },
             .binary => |b| if (b.ty == .vector and b.ty.vector.elem_ty == .int) {
                 integer_binary = true;
@@ -168,6 +208,18 @@ const Builder = struct {
         const bits = if (width(ty) == 80) try b.cast(.trunc, .{ .int = 128 }, payload, raw) else payload;
         return b.cast(.bitcast, raw, bits, ty);
     }
+    fn minimumValue(b: Builder, ty: ir.Type, x: ir.Value, y: ir.Value) !ir.Value {
+        const left = try stable(x, ty);
+        const right = try stable(y, ty);
+        const tie = try b.zeroTie(ty, left, right, true);
+        var call: ir.CallInst = .{ .callee = try std.fmt.allocPrint(b.a, "llvm.maxnum.f{d}", .{width(ty)}), .ret_ty = ty, .args = .empty };
+        try call.args.append(b.a, .{ .ty = ty, .value = try b.negateBits(ty, left) });
+        try call.args.append(b.a, .{ .ty = ty, .value = try b.negateBits(ty, right) });
+        const maximum = try b.emit(.{ .call = call });
+        const ordinary = try b.negateBits(ty, maximum);
+        const signed_zero = try b.zeroFromPayload(ty, tie.payload);
+        return b.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = tie.condition, .ty = ty, .true_value = signed_zero, .false_value = ordinary } });
+    }
     fn copy(b: Builder, name: []const u8, ty: ir.Type, value: ir.Value) !void {
         const raw: ir.Type = .{ .int = width(ty) };
         const bits = try b.cast(.bitcast, ty, try stable(value, ty), raw);
@@ -187,32 +239,71 @@ const Builder = struct {
     }
     fn fromAbi(b: Builder, value: ir.Value, ty: ir.Type) !Lanes {
         var result: Lanes = .{ .ty = ty };
-        if (packedPair(ty)) {
+        const physical = try abiType(ty);
+        if (ty.vector.len == 1 and physical != .vector) {
+            result.values[0] = value;
+        } else if (physical == .double) {
             const word: ir.Type = .{ .int = 64 };
             const bits = try b.cast(.bitcast, .double, value, word);
-            for (0..2) |i| {
-                const shifted = if (i == 0) bits else try b.emit(.{ .binary = .{ .op = .lshr, .ty = word, .lhs = bits, .rhs = .{ .int = 32 } } });
-                result.values[i] = try b.cast(.bitcast, .{ .int = 32 }, try b.cast(.trunc, word, shifted, .{ .int = 32 }), .float);
+            const scalar = ty.vector.elem_ty.toType();
+            const raw: ir.Type = .{ .int = width(scalar) };
+            for (0..ty.vector.len) |i| {
+                const shifted = if (i == 0) bits else try b.emit(.{ .binary = .{ .op = .lshr, .ty = word, .lhs = bits, .rhs = .{ .int = @intCast(i * width(scalar)) } } });
+                result.values[i] = try b.cast(.bitcast, raw, try b.cast(.trunc, word, shifted, raw), scalar);
+            }
+        } else if ((ty.vector.elem_ty == .half and ty.vector.len == 8) or (ty.vector.elem_ty == .float and ty.vector.len == 3)) {
+            const carrier: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+            const source = if (physical.eql(carrier)) value else try b.cast(.bitcast, physical, value, carrier);
+            const scalar = ty.vector.elem_ty.toType();
+            const raw: ir.Type = .{ .int = width(scalar) };
+            const per_word = 64 / width(scalar);
+            for (0..2) |word| {
+                const lane = try b.emit(.{ .extractelement = .{ .vector_ty = carrier, .vector = source, .index_ty = .{ .int = 64 }, .index = .{ .int = @intCast(word) } } });
+                const bits = try b.cast(.bitcast, .double, lane, .{ .int = 64 });
+                for (0..per_word) |i| {
+                    if (word * per_word + i >= ty.vector.len) break;
+                    const shifted = if (i == 0) bits else try b.emit(.{ .binary = .{ .op = .lshr, .ty = .{ .int = 64 }, .lhs = bits, .rhs = .{ .int = @intCast(i * width(scalar)) } } });
+                    result.values[word * per_word + i] = try b.cast(.bitcast, raw, try b.cast(.trunc, .{ .int = 64 }, shifted, raw), scalar);
+                }
             }
         } else {
-            _ = try abiType(ty);
-            for (0..ty.vector.len) |i| result.values[i] = try b.emit(.{ .extractelement = .{ .vector_ty = ty, .vector = value, .index_ty = .{ .int = 64 }, .index = .{ .int = @intCast(i) } } });
+            for (0..ty.vector.len) |i| result.values[i] = try b.emit(.{ .extractelement = .{ .vector_ty = physical, .vector = value, .index_ty = .{ .int = 64 }, .index = .{ .int = @intCast(i) } } });
         }
         return result;
     }
     fn toAbi(b: Builder, value: ir.Value, ty: ir.Type) !ir.Value {
         const lanes_value = try b.lanes(value, ty);
-        if (packedPair(ty)) {
+        const physical = try abiType(ty);
+        const scalar = ty.vector.elem_ty.toType();
+        if (ty.vector.len == 1 and physical != .vector) return stable(lanes_value.values[0], scalar);
+        if (physical == .double or (ty.vector.elem_ty == .half and ty.vector.len == 8) or (ty.vector.elem_ty == .float and ty.vector.len == 3)) {
             const word: ir.Type = .{ .int = 64 };
-            var bits: [2]ir.Value = undefined;
-            for (&bits, 0..) |*part, i| part.* = try b.cast(.zext, .{ .int = 32 }, try b.cast(.bitcast, .float, try stable(lanes_value.values[i], .float), .{ .int = 32 }), word);
-            const high = try b.emit(.{ .binary = .{ .op = .shl, .ty = word, .lhs = bits[1], .rhs = .{ .int = 32 } } });
-            const joined = try b.emit(.{ .binary = .{ .op = .@"or", .ty = word, .lhs = bits[0], .rhs = high } });
-            return b.cast(.bitcast, word, joined, .double);
+            const raw: ir.Type = .{ .int = width(scalar) };
+            const words: usize = if (physical == .double) 1 else 2;
+            const per_word: usize = if (words == 1) ty.vector.len else 64 / width(scalar);
+            var carriers: [2]ir.Value = undefined;
+            for (0..words) |wi| {
+                var payload: ir.Value = .{ .int = 0 };
+                for (0..per_word) |i| {
+                    if (wi * per_word + i >= ty.vector.len) break;
+                    const part = try b.cast(.zext, raw, try b.cast(.bitcast, scalar, try stable(lanes_value.values[wi * per_word + i], scalar), raw), word);
+                    const shifted = if (i == 0) part else try b.emit(.{ .binary = .{ .op = .shl, .ty = word, .lhs = part, .rhs = .{ .int = @intCast(i * width(scalar)) } } });
+                    payload = if (i == 0) shifted else try b.emit(.{ .binary = .{ .op = .@"or", .ty = word, .lhs = payload, .rhs = shifted } });
+                }
+                carriers[wi] = try b.cast(.bitcast, word, payload, .double);
+            }
+            if (words == 1) return carriers[0];
+            const carrier: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
+            const name = try forms.temporary(b.a, b.f, b.names);
+            try b.vector(name, carrier, carriers[0..2]);
+            return if (physical.eql(carrier)) .{ .named = name } else try b.cast(.bitcast, carrier, .{ .named = name }, physical);
         }
-        _ = try abiType(ty);
         const name = try forms.temporary(b.a, b.f, b.names);
-        try b.vector(name, ty, lanes_value.values[0..ty.vector.len]);
+        if (physical.vector.len != ty.vector.len) {
+            var padded: [max_lanes]ir.Value = @splat(.{ .fp = "0.000000e+00" });
+            @memcpy(padded[0..ty.vector.len], lanes_value.values[0..ty.vector.len]);
+            try b.vector(name, physical, padded[0..physical.vector.len]);
+        } else try b.vector(name, physical, lanes_value.values[0..ty.vector.len]);
         return .{ .named = name };
     }
     fn pointer(b: Builder, base: ir.Value, offset: usize) !ir.Value {
@@ -408,6 +499,10 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                     continue;
                 },
                 .call => |x| {
+                    if (scalarMinimum(x)) {
+                        try b.copy(inst.result.?, x.ret_ty, try b.minimumValue(x.ret_ty, x.args.items[0].value, x.args.items[1].value));
+                        continue;
+                    }
                     if (reduction(x)) |op| {
                         const seeded = op == .add or op == .mul;
                         const argument = x.args.items[if (seeded) 1 else 0];
@@ -441,24 +536,15 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                     }
                     if (fp(x.ret_ty) and std.mem.startsWith(u8, x.callee, "llvm.")) {
                         const scalar = x.ret_ty.vector.elem_ty.toType();
-                        var operation: ?[]const u8 = null;
-                        var buffer: [64]u8 = undefined;
-                        for ([_][]const u8{ "fabs", "copysign" }) |op| {
-                            const spelling = try std.fmt.bufPrint(&buffer, "llvm.{s}.v{d}f{d}", .{ op, x.ret_ty.vector.len, width(scalar) });
-                            if (std.mem.eql(u8, x.callee, spelling)) operation = op;
-                        }
-                        const op = operation orelse return error.UnsupportedFloatingVector;
-                        if (x.args.items.len != (if (std.mem.eql(u8, op, "fabs")) @as(usize, 1) else 2) or x.inline_asm != null or x.callee_value != null or x.callee_function_ty != null or x.raw_args != null or x.operand_bundle != null or x.calling_conv != null or x.ret_attrs != null) return error.UnsupportedFloatingVector;
-                        if (x.tail_kind) |tail| if (std.mem.eql(u8, tail, "musttail")) return error.UnsupportedFloatingVector;
-                        var inputs: [2]Lanes = undefined;
+                        const operation = laneOperation(x) orelse return error.UnsupportedFloatingVector;
+                        var inputs: [3]Lanes = undefined;
                         for (x.args.items, 0..) |arg, i| {
-                            if (!arg.ty.eql(x.ret_ty) or arg.attrs != null) return error.UnsupportedFloatingVector;
                             inputs[i] = try b.lanes(arg.value, arg.ty);
                         }
                         var lanes: Lanes = .{ .ty = x.ret_ty };
                         for (0..x.ret_ty.vector.len) |i| {
-                            var call: ir.CallInst = .{ .callee = try std.fmt.allocPrint(a, "llvm.{s}.f{d}", .{ op, width(scalar) }), .ret_ty = scalar, .args = .empty };
-                            for (0..x.args.items.len) |j| try call.args.append(a, .{ .ty = scalar, .value = inputs[j].values[i] });
+                            var call: ir.CallInst = .{ .callee = try std.fmt.allocPrint(a, "llvm.{s}.f{d}", .{ operation.name, width(scalar) }), .ret_ty = scalar, .args = .empty };
+                            for (0..operation.arity) |j| try call.args.append(a, .{ .ty = scalar, .value = inputs[j].values[i] });
                             lanes.values[i] = try b.emit(.{ .call = call });
                         }
                         try b.define(inst.result.?, lanes);

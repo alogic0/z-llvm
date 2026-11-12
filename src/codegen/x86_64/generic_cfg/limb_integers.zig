@@ -441,15 +441,15 @@ const Builder = struct {
         if (call.tail_kind) |kind| if (std.mem.eql(u8, kind, "musttail")) return null;
         const bits = try width(call.ret_ty);
         const kinds = [_]struct { name: []const u8, arity: usize, flag: bool }{
-            .{ .name = "abs", .arity = 2, .flag = true },         .{ .name = "ctpop", .arity = 1, .flag = false },
-            .{ .name = "ctlz", .arity = 2, .flag = true },        .{ .name = "cttz", .arity = 2, .flag = true },
-            .{ .name = "bitreverse", .arity = 1, .flag = false }, .{ .name = "bswap", .arity = 1, .flag = false },
-            .{ .name = "uadd.sat", .arity = 2, .flag = false },   .{ .name = "usub.sat", .arity = 2, .flag = false },
-            .{ .name = "sadd.sat", .arity = 2, .flag = false },   .{ .name = "ssub.sat", .arity = 2, .flag = false },
-            .{ .name = "fshl", .arity = 3, .flag = false },       .{ .name = "fshr", .arity = 3, .flag = false },
-            .{ .name = "umin", .arity = 2, .flag = false }, .{ .name = "umax", .arity = 2, .flag = false },
-            .{ .name = "smin", .arity = 2, .flag = false }, .{ .name = "smax", .arity = 2, .flag = false },
-            .{ .name = "ushl.sat", .arity = 2, .flag = false }, .{ .name = "sshl.sat", .arity = 2, .flag = false },
+            .{ .name = "abs", .arity = 2, .flag = true },           .{ .name = "ctpop", .arity = 1, .flag = false },
+            .{ .name = "ctlz", .arity = 2, .flag = true },          .{ .name = "cttz", .arity = 2, .flag = true },
+            .{ .name = "bitreverse", .arity = 1, .flag = false },   .{ .name = "bswap", .arity = 1, .flag = false },
+            .{ .name = "uadd.sat", .arity = 2, .flag = false },     .{ .name = "usub.sat", .arity = 2, .flag = false },
+            .{ .name = "sadd.sat", .arity = 2, .flag = false },     .{ .name = "ssub.sat", .arity = 2, .flag = false },
+            .{ .name = "fshl", .arity = 3, .flag = false },         .{ .name = "fshr", .arity = 3, .flag = false },
+            .{ .name = "umin", .arity = 2, .flag = false },         .{ .name = "umax", .arity = 2, .flag = false },
+            .{ .name = "smin", .arity = 2, .flag = false },         .{ .name = "smax", .arity = 2, .flag = false },
+            .{ .name = "ushl.sat", .arity = 2, .flag = false },     .{ .name = "sshl.sat", .arity = 2, .flag = false },
             .{ .name = "umul.fix.sat", .arity = 3, .flag = false }, .{ .name = "smul.fix.sat", .arity = 3, .flag = false },
         };
         const kind = for (kinds) |k| {
@@ -879,7 +879,24 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                 block.terminator = .{ .ret = .{ .ty = .ptr, .value = return_ptr.? } };
             },
             .@"switch" => |x| if (wide(x.cond_ty)) {
-                return error.UnsupportedLimbInteger;
+                // Keep every source successor and predecessor identity. A
+                // bounded private tag maps exact limb equality to each case;
+                // zero retains the original default edge.
+                if (x.cases.items.len > 256) return error.UnsupportedLimbInteger;
+                const condition = try b.get(x.cond, x.cond_ty);
+                var tag: ir.Value = .{ .int = 0 };
+                var replacement = x;
+                replacement.cond_ty = word;
+                replacement.cases = try x.cases.clone(a);
+                for (replacement.cases.items, 0..) |*case, i| {
+                    if (!case.value_ty.eql(x.cond_ty)) return error.UnsupportedLimbInteger;
+                    const matches = try b.comparison(.eq, condition, try b.get(case.value, case.value_ty));
+                    tag = try b.choose(matches, .{ .int = @intCast(i + 1) }, tag);
+                    case.value_ty = word;
+                    case.value = .{ .int = @intCast(i + 1) };
+                }
+                replacement.cond = tag;
+                block.terminator = .{ .@"switch" = replacement };
             },
             else => {},
         };

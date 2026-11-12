@@ -6,7 +6,9 @@ follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-
 self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
 remainder error is repaired at `9cb21139`. Twenty behavior-family populations
 pass cumulative validation at `d9148ebc`; eight additional families pass at
-`ca38e3ee`. The complete local-hook matrices and
+`ca38e3ee`. A further fifteen native populations are adopted for immediate
+cumulative validation, with 141 unchanged Debug rejections still open.
+The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
@@ -409,18 +411,39 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    comparisons and all 2,782 required faults pass. The complete original
    compiler and both fixed runtime objects are byte-identical to the preceding
    checkpoint. See the [eight-family record](../evidence/compiler_behavior_eight_families_checkpoint_20261112.json).
-4. Diagnose and repair the remaining unchanged Debug and ReleaseSmall runtime
-   rejections using their full original context. Retain each failed invocation,
-   add independent executable regressions and repeat the applicable cumulative
-   checks. Next combine the independently exercised wide-switch, floating
-   lane-math and promoted integer-vector ABI repairs. Finish independent LLVM/C
-   raw-payload checks for the small floating-vector ABI extension before adding
-   it. Preserve all original definitions, prove no lost selections, and repeat
-   cumulative validation after adoption. The separate unchanged ReleaseSmall
-   runtime input now emits all 503 definitions; its provenance remains distinct
-   from the fixed 455-definition input. Selection gains alone cannot close the
-   behavior milestone.
-5. Build the final two compiler generations from the accepted source under
+4. **Adopted for immediate cumulative validation.** Combine the independently
+   exercised wide-switch, floating lane-math, promoted integer-vector ABI,
+   small floating-vector ABI, scalar floating minimum, absolute volatile
+   pointer, constant integer-pair, 128-bit saturation and floating literal
+   return repairs. Include aligned integer-vector saturation and the confirmed
+   full-width literal min/max repair. Keep the existing unsigned min/max owner;
+   materialize its literal operands through the shared typed two-word contract.
+   Both isolated unit builds pass 2,271 tests. Independent LLVM/C execution and
+   fault controls pass for all fifteen added native populations in both builds.
+   The maintained [Zig generator](../../tools/generate_behavior_expansion_canaries.zig)
+   reproduces all 31 fixture files and population metadata exactly. Replace the
+   old newly supported constant signed-saturation rejection with a poison
+   operand, retaining positive coverage for both literal operands. Keep failed
+   prototype, reference-setup and old wrong-code receipts unchanged.
+5. Freeze the adopted canonical source, build both backend modes and run
+   immediate Tier 3, both complete 167-population native suites, all 3,592
+   required fault controls and strict preservation against the accepted
+   152-population checkpoint. Repeat both official unit builds, all eight
+   readiness procedures and complete original compiler/runtime production.
+   Audit every owner, event stream, ELF and changed function encoding before
+   accepting this batch. Formatting and test-only source bridges authorize no
+   automatic object reuse. These cumulative checks remain open.
+6. Diagnose the remaining unchanged Debug rejections using their full original
+   context. The combined isolated replay selects 7,733/7,874 definitions, gaining
+   95 and losing none against the eight-family checkpoint; it returns nonzero,
+   retains 141 rejections and emits no complete behavior object. Classify odd
+   scalar saturation widths, vector argument/return fragments and remaining
+   instruction forms before choosing each next bounded repair. Preserve the
+   frozen Source/value-use contracts, call/stack guards and independent
+   execution proofs. The separate unchanged ReleaseSmall runtime input emits
+   all 503 definitions; retain its distinct provenance alongside the fixed
+   455-definition input. Selection gains cannot close the behavior milestone.
+7. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
    pinned reference, and audit every delivered hook object before publishing
@@ -701,20 +724,18 @@ module reproduce all thirty before/after function encodings exactly. The frozen
 3,505-file source is retained. This checkpoint does not establish final rebuilt
 compiler behavior or close either complete local-hook matrix.
 
-Continue step 3 with the isolated six-family combination: boolean vector
-constants, wide multiplication and saturation, native-width volatile access,
-bounded direct-call capacity, larger vector storage/array strides and odd-width
-literal extensions. Both 2,249-unit builds and all seven new native populations
-pass, including 189 faults per backend build. Its unchanged 7,874-definition
-Debug input gains 78 selections without losing any prior identity, reaching
-7,617 selections with **257 rejections still open**. Its replay returns actual
-one and emits no complete object. Preserve that failure and close the remaining
-families before claiming the complete suite. A separate ordered floating
-add/multiply reduction slice gains ten selections with independent five-format
-native proofs; it remains separate until a combined replay passes. Review and
-adopt proven deltas through the same source, guard and cumulative-validation
-requirements, then return to steps 4–5 for final generations, both complete
-four-mode local-hook matrices and the normal-resource rebuild.
+The eight-family checkpoint completes the next part of step 3 at `ca38e3ee`:
+both 2,251-unit builds, all eight readiness procedures, all 17 integration
+gates, both 152-population native suites and all 2,782 required faults pass.
+Strict preservation and original compiler/runtime audits pass, with byte-identical
+complete objects. The next adopted batch adds fifteen populations and raises
+the isolated original Debug selection to 7,733/7,874, with **141 rejections still
+open**. Follow the current implementation sequence in milestone 7: finish its
+fresh cumulative validation, close remaining bounded families, then return to
+steps 4–5 above for final generations, both complete four-mode local-hook
+matrices and the normal-resource rebuild. All partial behavior replays remain
+failed evidence until the complete unchanged suite and both final generations
+pass.
 
 - [x] Identify the exact first global rejection and retain a focused reproducer.
 - [x] Implement the required shared global/ELF forms with LLVM/native and negative proofs.

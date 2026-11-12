@@ -113,6 +113,7 @@ const Builder = struct {
 };
 
 pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    if (try nativeConstantReturns(allocator, function, context)) |candidate| return candidate;
     const quad = expand(allocator, function, context) catch |err| switch (err) {
         error.UnsupportedFloatingPayload => null,
         else => return err,
@@ -120,6 +121,36 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
     if (quad) |candidate| return candidate;
     if (try @import("half_memory.zig").legalize(allocator, function, context)) |candidate| return candidate;
     return @import("extended80_payloads.zig").legalize(allocator, function, context);
+}
+
+fn nativeConstantReturns(a: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    if ((function.ret_ty != .half and function.ret_ty != .float and function.ret_ty != .double) or !advisory(function.ret_attrs) or
+        !helpers.isDefaultOrFastcc(function.calling_conv) or !addresses.supportsLayout(if (context) |ctx| ctx.target_datalayout else null)) return null;
+    var needed_return = false;
+    for (function.blocks.items) |block| if (block.terminator) |term| if (term == .ret and term.ret.value != null and term.ret.value.? == .fp) {
+        _ = @import("../../../analysis/fp_semantics.zig").scalarLiteralBits(term.ret.ty, term.ret.value.?.fp) catch return null;
+        needed_return = true;
+    };
+    if (!needed_return) return null;
+    var result = function;
+    result.blocks = .empty;
+    var names: forms.TemporaryNames = .{};
+    defer names.deinit(a);
+    for (function.blocks.items) |original| {
+        var block = original;
+        block.instructions = try original.instructions.clone(a);
+        if (block.terminator) |*term| if (term.* == .ret and term.ret.value != null and term.ret.value.? == .fp) {
+            const raw = try @import("../../../analysis/fp_semantics.zig").scalarLiteralBits(term.ret.ty, term.ret.value.?.fp);
+            const wide: ir.Type = .{ .int = if (term.ret.ty == .double) 64 else 32 };
+            const logical: ir.Type = .{ .int = if (term.ret.ty == .half) 16 else wide.int };
+            const b: Builder = .{ .allocator = a, .function = function, .block = &block, .serial = &names };
+            var bits = try b.emit(.{ .binary = .{ .op = .add, .ty = wide, .lhs = .{ .int = @intCast(raw) }, .rhs = .{ .int = 0 } } });
+            if (!logical.eql(wide)) bits = try b.emit(.{ .cast = .{ .op = .trunc, .from_ty = wide, .value = bits, .to_ty = logical } });
+            term.ret.value = try b.emit(.{ .cast = .{ .op = .bitcast, .from_ty = logical, .value = bits, .to_ty = term.ret.ty } });
+        };
+        try result.blocks.append(a, block);
+    }
+    return result;
 }
 
 fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
