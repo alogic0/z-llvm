@@ -8,6 +8,14 @@ repair observed failures; and prove self-rebuild under normal stack and CPU
 settings. These follow-ups are active. Preserve the accepted five-milestone
 baseline below while collecting separate successor evidence.
 
+The [floating PHI checkpoint](evidence/compiler_behavior_progress.md) accepts
+`84f1ad7c`: all 17 integration gates, both 116-population native suites and all
+822 fault controls pass. The full reference behavior matrix passes; both old
+compiler generations expose the repaired exp failure. Fresh compiler rebuilds,
+the remaining local-hook behavior boundaries and normal-resource self-rebuild
+are still open. Frame-allocation research remains isolated until existing tests
+and independent execution proofs pass.
+
 The [compiler object, runtime and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
 is complete at accepted code `b738377e`, with backend implementation `e398030f`.
 Complete census, independent production and balanced event audits establish

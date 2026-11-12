@@ -359,6 +359,21 @@ Rerun affected cases before repeating the complete matrix. Acceptance requires
 both generations to match the reference's complete named outcomes in all four
 modes through the local hook, with no unaccounted failures or missing captures.
 
+The first accepted repair is the [floating PHI checkpoint](../evidence/compiler_behavior_progress.md)
+at `84f1ad7c`. All four reference modes pass. Both retained generations fail
+`@exp with vectors` in all four normal-LLVM modes; the reduced runtime case
+exposes a literal overwriting a named floating PHI snapshot. The shared planning
+repair passes all 17 integration gates, both 116-population native suites,
+2,183 units plus 63 structural/two profile checks per unit build and all 822
+fault controls. This accepts the repair, not rebuilt compiler generations or
+the complete follow-up matrix.
+
+Continue with the observed local-hook boundaries: quoted global names and
+vector splats, wide integer forms, x87 vectors, floating atomics, varargs and
+the ReleaseSmall runtime's ABI/instruction forms. Retain exact failing inputs
+and extend shared parser/lowering/object contracts with independent execution
+and rejection controls. Do not normalize the accepted suite or filter cases.
+
 ## Follow-up milestone 8: normal-resource self-rebuild
 
 Measure the final accepted compiler under inherited normal stack limits and
@@ -376,6 +391,12 @@ controls, the f80 regression and the full four-mode upstream behavior suite with
 that executable. Keep the CPU-0 / 1 GiB result as the historical accepted baseline
 until this stronger result passes. LLVM optimization and declared providers
 remain in scope; performance tuning and further LLVM removal are later work.
+
+The retained normal-resource frontend probe fails with SIGSEGV under the
+inherited 46 MiB main-stack limit and CPU affinity 0–15. Diagnose that failure
+with a stack trace before assigning its precise cause. Isolated spill-home
+coloring research reduces the large Sema frame but fails existing tests; it
+must not be adopted on selection or frame-size measurements alone.
 
 Write successor evidence under
 `local-state/validations/compiler-behavior-completion-20261111/`, preserving the

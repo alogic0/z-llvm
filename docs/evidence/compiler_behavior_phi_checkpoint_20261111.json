@@ -1,0 +1,58 @@
+{
+  "schema": "upstream-behavior-phi-checkpoint-v1",
+  "status": "passed",
+  "scope": "Floating PHI repair and behavior-runner checkpoint; follow-up milestones 6–8 remain open",
+  "accepted_revision": "84f1ad7c587a8c553371191ed3c23912740dbee5",
+  "accepted_tree": "e13f926e7b444f9bcd251022ee3473b341faacc3",
+  "frozen_files": 3416,
+  "units_per_build": 2183,
+  "structural_per_build": 63,
+  "profiling_per_build": 2,
+  "unit_builds": [
+    "Debug",
+    "ReleaseSafe"
+  ],
+  "integration_gates": 17,
+  "native_populations_per_build": 116,
+  "native_builds": [
+    "Debug",
+    "ReleaseFast"
+  ],
+  "native_local_observations_per_build": 94661646,
+  "native_reference_observations_per_build": 47330823,
+  "preservation": {
+    "prior_populations": 115,
+    "prior_command_outcomes_per_build": 4241,
+    "unchanged_optimizer_outputs": 354,
+    "unchanged_owners": 693,
+    "unchanged_objects": 699
+  },
+  "fault_controls": 822,
+  "native_fault_controls_per_build": 405,
+  "fixed_runtime_fault_controls_per_build": 6,
+  "fixed_runtime_definitions": 455,
+  "fixed_runtime_object": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-phi-final-v6/backend/local.o",
+    "bytes": 3089792,
+    "sha256": "dfd3a7e294b4571d87425880c8c16fbd1ad171707f4d664f775c1bfa06cc1843"
+  },
+  "fixed_runtime_owners_unchanged": true,
+  "compiler_rebuild_after_repair": false,
+  "normal_resource_self_rebuild": false,
+  "reference_behavior_modes_passed": [
+    "Debug",
+    "ReleaseSafe",
+    "ReleaseFast",
+    "ReleaseSmall"
+  ],
+  "old_generations_behavior_failure": "@exp with vectors in both generations/all modes; old binaries remain retained",
+  "remaining_local_behavior_boundaries": [
+    "global syntax",
+    "wide integers",
+    "x87 vectors",
+    "atomic float",
+    "varargs",
+    "ReleaseSmall runtime ABI/instructions"
+  ],
+  "new_stack_prototype_adopted": false
+}
