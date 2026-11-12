@@ -5,7 +5,8 @@ Status: milestones 1–5 complete at `b738377e`, backend implementation `e398030
 follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-resource
 self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
 remainder error is repaired at `9cb21139`. Twenty behavior-family populations
-pass cumulative validation at `d9148ebc`. The complete local-hook matrices and
+pass cumulative validation at `d9148ebc`; eight additional families pass at
+`ca38e3ee`. The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
@@ -385,11 +386,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    min/max; native volatile accesses; bounded direct-call argument capacity;
    typed vector storage and array strides; odd-width integer literal casts;
    and ordered floating reductions, including min/max signed-zero ties.
-   Preserve the cumulative lifetime, frame, machine-memory and typed incoming
-   transfer repairs. The isolated combination passes 2,251 units in both
-   Debug and ReleaseSafe and selects 7,638/7,874 unchanged Debug definitions,
-   gaining 99 and losing none. These are provisional results, not full-suite
-   acceptance; 236 definitions still reject.
+   **Complete at `ca38e3ee`.** Preserve the cumulative lifetime, frame,
+   machine-memory and typed incoming transfer repairs. Both unit builds pass
+   2,251 tests. Selection of the unchanged Debug input reaches 7,638/7,874,
+   gaining 99 and losing none; the nonzero replay remains failed, with 236
+   rejected definitions and no complete behavior object.
 2. Maintain the ten corresponding native populations and the deterministic
    [Zig generator](../../tools/generate_behavior_boundary_canaries.zig),
    retaining byte-identical research inputs and
@@ -397,16 +398,28 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    reference fixture: the installed LLVM reduction's zero choice differs from
    the required explicit zero-tie oracle. Preserve that original failed
    comparison and do not claim identical mixed-zero intrinsic semantics.
-3. Freeze the integrated source, build both backend modes and run the required
+3. **Complete for the eight-family checkpoint.** Freeze the integrated source,
+   build both backend modes and run the required
    immediate Tier 3, both complete native suites, all added fault controls and
    strict preservation comparisons against the accepted 142 populations.
    Replay the original 8,928-definition compiler and 455-definition runtime;
    audit complete objects, unchanged owners, ELF and balanced events. Review
    every changed function body before accepting the capability checkpoint.
+   All 17 gates, both 152-population native suites, strict prior-artifact
+   comparisons and all 2,782 required faults pass. The complete original
+   compiler and both fixed runtime objects are byte-identical to the preceding
+   checkpoint. See the [eight-family record](../evidence/compiler_behavior_eight_families_checkpoint_20261112.json).
 4. Diagnose and repair the remaining unchanged Debug and ReleaseSmall runtime
    rejections using their full original context. Retain each failed invocation,
    add independent executable regressions and repeat the applicable cumulative
-   checks. Selection gains alone cannot close the behavior milestone.
+   checks. Next combine the independently exercised wide-switch, floating
+   lane-math and promoted integer-vector ABI repairs. Finish independent LLVM/C
+   raw-payload checks for the small floating-vector ABI extension before adding
+   it. Preserve all original definitions, prove no lost selections, and repeat
+   cumulative validation after adoption. The separate unchanged ReleaseSmall
+   runtime input now emits all 503 definitions; its provenance remains distinct
+   from the fixed 455-definition input. Selection gains alone cannot close the
+   behavior milestone.
 5. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the

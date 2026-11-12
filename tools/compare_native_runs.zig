@@ -6,6 +6,10 @@ const u = @import("validation/common.zig");
 const canaries = @import("validation/native_canaries.zig");
 const comparison = @import("validation/native_comparison.zig");
 
+test {
+    _ = @import("validation/native_comparison.zig");
+}
+
 fn execute(c: *u.Context, args: u.Args, report: *u.Value) !void {
     var additions = u.array(c.a);
     var requested = std.mem.splitScalar(u8, args.get("added-populations") orelse "", ',');

@@ -48,6 +48,10 @@ fn expectedFixtures(c: *u.Context, additions: []const u.Value) !std.StringHashMa
         const entry = try result.getOrPut(try c.fmt("{s}.ll", .{try u.json.text(reference)}));
         if (entry.found_existing) return error.DuplicateNativeAddition;
         if (addition.object.get("reference_source")) |source| {
+            // The reference may intentionally link the same C oracle as its
+            // candidate. That one physical driver is already required above.
+            const own_driver = try c.fmt("{s}_driver.c", .{try u.str(addition, "fixture")});
+            if (std.mem.eql(u8, try u.json.text(source), own_driver)) continue;
             const origin = try result.getOrPut(try u.json.text(source));
             if (origin.found_existing) return error.DuplicateNativeAddition;
         }
@@ -57,6 +61,28 @@ fn expectedFixtures(c: *u.Context, additions: []const u.Value) !std.StringHashMa
         if (entry.found_existing) return error.DuplicateNativeAddition;
     };
     return result;
+}
+
+test "native fixture comparison counts a shared candidate-reference driver once" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var c: u.Context = .{ .a = arena.allocator(), .gpa = std.testing.allocator, .io = std.testing.io, .root = ".", .env = undefined };
+    const addition = (try u.json.parse(c.a, "{\"fixture\":\"mixed\",\"reference_fixture\":\"zero_oracle\",\"reference_source\":\"mixed_driver.c\"}")).value;
+    var actual = try expectedFixtures(&c, &.{addition});
+    defer actual.deinit();
+    try std.testing.expectEqual(@as(usize, 3), actual.count());
+    for ([_][]const u8{ "mixed.ll", "mixed_driver.c", "zero_oracle.ll" }) |name| try std.testing.expect(actual.contains(name));
+}
+
+test "native fixture comparison keeps ambiguous reference and fixture duplicates closed" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var c: u.Context = .{ .a = arena.allocator(), .gpa = std.testing.allocator, .io = std.testing.io, .root = ".", .env = undefined };
+    const same_ir = (try u.json.parse(c.a, "{\"fixture\":\"same\",\"reference_fixture\":\"same\"}")).value;
+    try std.testing.expectError(error.DuplicateNativeAddition, expectedFixtures(&c, &.{same_ir}));
+    const first = (try u.json.parse(c.a, "{\"fixture\":\"first\"}")).value;
+    const second = (try u.json.parse(c.a, "{\"fixture\":\"second\",\"reference_fixture\":\"oracle\",\"reference_source\":\"first_driver.c\"}")).value;
+    try std.testing.expectError(error.DuplicateNativeAddition, expectedFixtures(&c, &.{ first, second }));
 }
 pub fn compare(c: *u.Context, before_root: []const u8, after_root: []const u8, additions: []const u.Value, report: *u.Value) !void {
     const before = try c.load(try c.join(&.{ before_root, "report.json" }));

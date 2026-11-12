@@ -1,5 +1,22 @@
 # Upstream behavior and resource follow-up
 
+The [eight-family checkpoint](compiler_behavior_eight_families_checkpoint_20261112.json)
+accepts `ca38e3ee`: both 2,251-unit builds, eight readiness procedures, all 17
+integration gates and both 152-population native suites pass. All 2,782 required
+faults are detected. Each strict comparison preserves all 5,216 prior command
+outcomes and all 864 objects, 855 owner artifacts and 435 optimizer artifacts
+byte for byte. The original compiler and fixed runtime objects are complete,
+have unchanged owners, pass ELF and balanced-event audits, and match the
+preceding checkpoint's complete objects exactly. The separately retained
+ReleaseSmall runtime now emits all 503 of its original definitions.
+
+The unchanged Debug behavior input still rejects 236 of 7,874 definitions;
+its nonzero replay receives no complete-object or behavior acceptance. The next
+repairs cover wide switches, floating lane math and vector ABI layouts. Their
+isolated checks remain provisional until adoption and cumulative validation.
+Both final source-bound generations and the complete four-mode local-hook
+matrices remain open. Earlier entries below retain their original scopes.
+
 The current [scalar-liveness checkpoint](compiler_behavior_scalar_liveness_checkpoint_20261112.json)
 repairs the unsigned remainder error at `9cb21139`. Both 2,204-unit builds,
 all 17 integration gates, both 122-population native suites, strict preservation

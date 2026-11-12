@@ -23,10 +23,20 @@ required faults and fresh complete original compiler/runtime objects pass.
 Both corrected unit builds pass 2,204 tests; the test-only source bridge is
 explicit and does not authorize automatic object reuse.
 
-Next, adopt the proven behavior families while preserving the cumulative stack
-and machine-memory repairs. Run immediate cumulative validation, finish the
-remaining original behavior rejections, then build the final generations and
-complete both four-mode local-hook matrices and the normal-resource rebuild.
+The [eight-family checkpoint](evidence/compiler_behavior_eight_families_checkpoint_20261112.json)
+accepts `ca38e3ee`: all 17 gates, both 152-population native suites, strict
+preservation and all 2,782 required faults pass. Fresh original compiler and
+fixed runtime objects match the preceding checkpoint byte for byte. Debug
+behavior selection gains 99 definitions without loss but still rejects 236;
+that replay remains failed. The separate Small-runtime input emits all 503
+definitions and does not replace the fixed 455-definition corpus.
+
+Next, combine the independently exercised wide-switch, floating lane-math and
+promoted integer-vector ABI repairs. Complete independent small floating-vector
+ABI checks before adoption. Preserve the cumulative stack and machine-memory
+repairs, finish the remaining original behavior rejections, then build the final
+generations and complete both four-mode local-hook matrices and the
+normal-resource rebuild.
 The existing resource and scalar checkpoints retain their separate scopes.
 The entries below retain the preceding checkpoint history.
 
