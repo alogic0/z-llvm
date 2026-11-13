@@ -87,6 +87,7 @@ jqz '.actions | each | where(.status == "skipped") | {path,reason}' REPORT.json
 | Category | Required evidence |
 | --- | --- |
 | Completed private compiler caches | A passed isolated compiler `report.json` and completed commands whose cache arguments name direct children of that run. The default project policy does not require source/configuration reconstruction; `cache_evidence:"replay"` optionally adds it. |
+| Released private test caches | An explicit disposable release bound to a terminal `run_checked` receipt, its working directory and exact cache arguments. The producer log remains hash-bound outside the cache, including for failed/canceled tests. |
 | Released raw event streams | An explicit owner release, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler and complete build/source evidence, and the auditor sources. An audited failure retains its original outcome and diagnostics; it does not require a passed successor. |
 | Superseded executable/object files | An explicit release record, accepted successor, complete source/build/input/result evidence and matching bytes. Only the supported output names and ELF/archive formats qualify. |
 | Disposable executable/object files | An explicit `disposable` release, a closed producer in the owning run, and exact output hashes. No source/configuration reconstruction or accepted successor is required. Only compiled ELF/archive output can qualify. |
@@ -164,6 +165,48 @@ Other files in the manifest and references from other manifests remain protected
 Original manifests stay unchanged. Current manifests are pins regardless of
 their filename or location. Current holds and retained dependencies always win,
 including dependencies declared by a release that cannot itself qualify.
+
+### Private native-test caches
+
+`prepare-caches --caches PLAN.json --reason TEXT` prepares hash-bound requests
+for explicitly reviewed completed jobs. Review and apply the resulting
+`requests.json` as above. Preparation also writes `cache-plan-review.json` with
+the reason for each rejected entry; it never removes payloads. For example:
+
+```json
+{
+  "schema": "zllvm-private-cache-plan-v1",
+  "runs": [{
+    "producer": "local-state/validations/example/unit/evidence/test.json",
+    "run_root": "local-state/validations/example/unit",
+    "working_directory": "local-state/validations/example/unit"
+  }]
+}
+```
+
+The receipt must record `status:"finished"`, a completed or canceled outcome,
+an actual return code and ordered start/finish timestamps. Its `cwd` must match
+the declared directory. New `run_checked` receipts record the actual child cwd.
+Old receipts lacking that field require a nonempty
+`legacy_working_directory_review` in the plan, documenting the operator's review
+of the copied project, launch evidence and cache layout. This is an explicit
+ownership declaration, not inferred historical cwd evidence. The copied project
+must also contain owned regular `.zigversion` and `src/main.zig` markers.
+
+Supported commands directly invoke Zig `test`, `build`, `build-exe`, `build-lib`
+or `build-obj`, optionally through `env`. Cache paths must appear in
+`--cache-dir`, `--global-cache-dir`, `ZIG_LOCAL_CACHE_DIR` or
+`ZIG_GLOBAL_CACHE_DIR`. Only recognized private cache names directly under the
+working directory, its `evidence/`, or its `local-state/` qualify. Shared caches,
+default paths absent from argv, shell-wrapped commands and arbitrary source
+subdirectories remain unsupported. A failed test does not become a successful
+result when its disposable cache is removed.
+
+Private-cache artifacts use `kind:"private_cache"` and omit the single-file
+`sha256`. Review snapshots every member's metadata and SHA-256; the same guarded
+whole-cache removal checks used for compiler caches apply. Source/configuration
+reconstruction is not required. Logs, receipts, current pins, queued holds,
+active consumers and retained dependencies remain protected.
 
 ## Accounting for the remaining tree
 

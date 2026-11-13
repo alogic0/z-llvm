@@ -2,8 +2,39 @@
 const std = @import("std");
 const core = @import("engine.zig");
 const release = @import("release.zig");
+const private_cache = @import("private_cache.zig");
 const p = core.p;
 const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests: []const p.Evidence };
+
+pub fn caches(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void {
+    if (!p.relative(plan_path) or reason.len == 0) return error.InvalidEvidencePath;
+    try e.addControl(plan_path);
+    var parsed = try e.load(e.c.gpa, plan_path);
+    defer parsed.deinit();
+    const Plan = struct { schema: []const u8, runs: []const private_cache.PlanEntry };
+    var plan = try std.json.parseFromValue(Plan, e.c.gpa, parsed.value, .{});
+    defer plan.deinit();
+    if (!std.mem.eql(u8, plan.value.schema, "zllvm-private-cache-plan-v1") or plan.value.runs.len > 1024) return error.InvalidCachePlan;
+    var requests: std.ArrayList(p.Evidence) = .empty;
+    const Rejected = struct { producer: []const u8, reason: []const u8 };
+    var rejected: std.ArrayList(Rejected) = .empty;
+    for (plan.value.runs) |entry| {
+        const candidate = private_cache.request(e, entry, reason) catch |err| {
+            try rejected.append(e.c.a, .{ .producer = try e.c.a.dupe(u8, entry.producer), .reason = @errorName(err) });
+            continue;
+        };
+        const record = candidate orelse {
+            try rejected.append(e.c.a, .{ .producer = try e.c.a.dupe(u8, entry.producer), .reason = "No present owned cache roots" });
+            continue;
+        };
+        const destination = try e.c.fmt("{s}/request-{d}.json", .{ e.output, requests.items.len });
+        try e.write(destination, record);
+        try requests.append(e.c.a, .{ .path = destination, .sha256 = try e.digest(destination) });
+    }
+    try e.write(try e.c.fmt("{s}/cache-plan-review.json", .{e.output}), .{ .prepared = requests.items.len, .rejected = rejected.items });
+    if (requests.items.len != 0) try e.write(try e.c.fmt("{s}/requests.json", .{e.output}), List{ .requests = requests.items });
+    try e.c.print("Prepared {d} private-cache requests; {d} entries need review. No payloads changed.\n{s}/cache-plan-review.json\n", .{ requests.items.len, rejected.items.len, e.output });
+}
 
 pub fn load(e: *core.Engine, path: []const u8) ![]const p.Evidence {
     if (!p.relative(path)) return error.InvalidEvidencePath;

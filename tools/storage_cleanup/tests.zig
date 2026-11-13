@@ -5,6 +5,7 @@ const core = @import("engine.zig");
 const mutation = @import("mutation.zig");
 const releases = @import("release.zig");
 const batches = @import("batch.zig");
+const private_cache = @import("private_cache.zig");
 const p = core.p;
 const run = "local-state/validations/test/batch/build";
 const cache = run ++ "/zig-local-cache";
@@ -73,6 +74,17 @@ const Fixture = struct {
             .zig = .{ .path = argv[0], .sha256 = try e.digest("toolchain/zig"), .library = try @import("../validation/toolchain.zig").libraryIdentity(&f.c, try e.absolute("toolchain/lib")) },
         });
     }
+    fn privateCache(f: *Fixture, e: *core.Engine, legacy: bool, code: i64, env_args: bool) !p.Release {
+        try f.tmp.dir.createDirPath(t.io, run ++ "/evidence/zig-local-Debug-v1/o");
+        try f.tmp.dir.createDirPath(t.io, run ++ "/src");
+        try f.write(run ++ "/.zigversion", "0.17.0\n");
+        try f.write(run ++ "/src/main.zig", "unique original source remains");
+        try f.write(run ++ "/evidence/zig-local-Debug-v1/o/test", "temporary test binary");
+        try f.write(run ++ "/evidence/unit.log", "complete diagnostics remain");
+        const args: []const []const u8 = if (env_args) &.{ "env", "ZIG_LOCAL_CACHE_DIR=evidence/zig-local-Debug-v1", "zig", "build", "test" } else &.{ "zig", "test", "--cache-dir", "evidence/zig-local-Debug-v1", "src/tests.zig" };
+        try e.write(run ++ "/evidence/unit.json", .{ .argv = args, .cwd = if (legacy) null else try e.absolute(run), .status = "finished", .outcome = if (code < 0) "canceled" else "completed", .actual_returncode = code, .started_ns = 1, .finished_ns = 2, .log = try e.absolute(run ++ "/evidence/unit.log") });
+        return (try private_cache.request(e, .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run, .legacy_working_directory_review = if (legacy) "Reviewed copied project markers, run log and matching private cache arguments" else null }, "Closed temporary native-test cache")).?;
+    }
     fn release(f: *Fixture, e: *core.Engine, kind: @FieldType(p.Artifact, "kind"), complete: bool, successor_passed: bool, failed_without_diagnostic: bool) !usize {
         try f.build(e);
         try f.tmp.dir.createDirPath(t.io, released);
@@ -80,6 +92,7 @@ const Fixture = struct {
             .log => "old.log",
             .raw_trace => "profile.events.jsonl",
             .build_output => "result.o",
+            .private_cache => unreachable,
         } });
         try f.write(path, if (kind == .build_output and complete) "\x7fELFsynthetic-object" else "original payload");
         try f.write(released ++ "/input.ll", "original input");
@@ -451,6 +464,114 @@ test "storage cleanup: completed private caches may be disposable without old so
     try mutation.apply(&e, 0);
     try t.expectError(error.FileNotFound, e.metadata(cache));
     _ = try e.metadata(report);
+}
+
+test "storage cleanup: private test caches preserve diagnostics for passed failed and canceled commands" {
+    for ([_]i64{ 0, 1, -15 }) |code| for ([_]bool{ false, true }) |legacy| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var initial = f.engine();
+        const record = try f.privateCache(&initial, legacy, code, legacy);
+        try initial.write(run ++ "/storage-release.json", record);
+        var e = f.engine();
+        try e.discover();
+        try t.expectEqual(@as(usize, 1), e.actions.items.len);
+        try e.qualify(0);
+        try t.expect(e.actions.items[0].released_cache);
+        try t.expect(!e.actions.items[0].replay_required);
+        try mutation.apply(&e, 0);
+        try t.expectError(error.FileNotFound, e.metadata(run ++ "/evidence/zig-local-Debug-v1"));
+        _ = try e.metadata(run ++ "/evidence/unit.log");
+        _ = try e.metadata(run ++ "/evidence/unit.json");
+        _ = try e.metadata(run ++ "/src/main.zig");
+    };
+}
+
+test "storage cleanup: legacy cache cwd requires explicit review and modern cwd must match" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    _ = try f.privateCache(&initial, true, 1, false);
+    var legacy = f.engine();
+    try t.expectError(error.MissingCacheWorkingDirectory, private_cache.request(&legacy, .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run }, "Temporary cache"));
+    var modern_setup = f.engine();
+    _ = try f.privateCache(&modern_setup, false, 0, false);
+    var modern = f.engine();
+    try t.expectError(error.CacheWorkingDirectoryMismatch, private_cache.request(&modern, .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run ++ "/different", .legacy_working_directory_review = "Cannot override a recorded cwd" }, "Temporary cache"));
+}
+
+test "storage cleanup: private caches reject nonterminal producers missing logs and other release states" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var initial = f.engine();
+        var record = try f.privateCache(&initial, false, 1, false);
+        if (case == 0) {
+            var v = try initial.load(f.c.a, run ++ "/evidence/unit.json");
+            try u.put(f.c.a, &v.value, "status", u.s("running"));
+            try initial.write(run ++ "/evidence/unit.json", v.value);
+            var fresh = f.engine();
+            record.producer.sha256 = try fresh.digest(record.producer.path);
+        } else if (case == 1) record.retained = &.{} else record.state = .superseded;
+        try initial.write(run ++ "/storage-release.json", record);
+        var e = f.engine();
+        try e.discover();
+        try t.expectError(switch (case) {
+            0 => error.ProducerNotTerminal,
+            1 => error.MissingCacheDiagnostics,
+            else => error.PrivateCacheRequiresDisposable,
+        }, e.qualify(0));
+    }
+}
+
+test "storage cleanup: private cache release cannot claim shared source or arbitrary directories" {
+    try t.expect(!p.privateCacheOwned(run, run, "local-state/caches/zig-local-cache"));
+    try t.expect(!p.privateCacheOwned(run, run, run ++ "/src/zig-local-cache"));
+    try t.expect(!p.privateCacheOwned(run, run, run ++ "/evidence/diagnostics"));
+    try t.expect(p.privateCacheOwned(run, run, run ++ "/local-state/zig-global-Debug-v1"));
+    try t.expect(!p.artifactName(.{ .path = run ++ "/src", .kind = .private_cache }));
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const invalid = try u.toValue(f.c.a, .{ .argv = [_][]const u8{ "zig", "test", "--cache-dir", "../shared/zig-local-cache" } });
+    try t.expectError(error.InvalidPrivateCacheArgument, private_cache.paths(&e, run, run, invalid));
+}
+
+test "storage cleanup: current manifest protects a member of a released private cache" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    const record = try f.privateCache(&initial, false, 0, false);
+    try initial.write(run ++ "/storage-release.json", record);
+    const member = run ++ "/evidence/zig-local-Debug-v1/o/test";
+    try f.write("current-cache", try initial.c.fmt("{s}  {s}\n", .{ try initial.digest(member), member }));
+    var e = f.engine();
+    e.config.current_manifests = &.{"current-cache"};
+    try e.discover();
+    try e.qualify(0);
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: cache preparation reports rejected ownership and binds requests" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    _ = try f.privateCache(&initial, false, 0, false);
+    try initial.write("cache-plan.json", .{ .schema = "zllvm-private-cache-plan-v1", .runs = [_]private_cache.PlanEntry{
+        .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run },
+        .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run ++ "/wrong" },
+    } });
+    try batches.caches(&initial, "cache-plan.json", "Reviewed test cache");
+    var e = f.engine();
+    try batches.discover(&e, output ++ "/requests.json");
+    try t.expectEqual(@as(usize, 1), e.actions.items.len);
+    try e.qualify(0);
+    _ = try e.metadata(run ++ "/evidence/zig-local-Debug-v1/o/test");
+    var review = try e.load(f.c.a, output ++ "/cache-plan-review.json");
+    try t.expectEqual(@as(i64, 1), try core.integer(review.value, "prepared"));
+    try t.expectEqual(@as(usize, 1), (try core.get(review.value, "rejected")).array.items.len);
+    review.deinit();
 }
 
 test "storage cleanup: parsed control bytes cannot be rebound to changed or replaced files" {
@@ -914,6 +1035,22 @@ test "storage cleanup: missing pin parent is refreshed on every pass" {
     try e.pins();
     try t.expectEqual(.discovered, e.actions.items[0].status);
     try f.tmp.dir.createDir(t.io, "future", .default_dir);
+    try f.tmp.dir.symLink(t.io, "../" ++ cache ++ "/o/object", "future/pin-alias", .{});
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: repeated missing pin leaves in existing parents are refreshed" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try e.discover();
+    try f.tmp.dir.createDir(t.io, "future", .default_dir);
+    const line = try e.c.fmt("{s}  future/pin-alias\n", .{try e.digest(cache ++ "/o/object")});
+    try f.write(run ++ "/pins.sha256", try e.c.fmt("{s}{s}{s}", .{ line, line, line }));
+    try e.pins();
+    try t.expectEqual(.discovered, e.actions.items[0].status);
     try f.tmp.dir.symLink(t.io, "../" ++ cache ++ "/o/object", "future/pin-alias", .{});
     try e.pins();
     try t.expectEqual(.skipped, e.actions.items[0].status);

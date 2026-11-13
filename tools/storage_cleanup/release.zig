@@ -166,7 +166,8 @@ pub fn publish(e: *core.Engine, release: p.Release) ![]const u8 {
             .raw_trace => .raw_trace,
             .build_output => .build_output,
             .log => .log,
-        }, .sha256 = try e.c.a.dupe(u8, artifact.sha256) });
+            .private_cache => .cache,
+        }, .sha256 = if (artifact.kind == .private_cache) null else try e.c.a.dupe(u8, artifact.sha256), .released_cache = artifact.kind == .private_cache });
     }
     try e.loadHolds();
     try e.consumers();

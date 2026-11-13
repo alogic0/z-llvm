@@ -22,7 +22,11 @@ pub fn minimal(c: Config) Config {
 }
 pub const Holds = struct { schema: u32 = 1, paths: []const []const u8 = &.{} };
 pub const Retained = struct { path: []const u8, sha256: []const u8, role: enum { source, input, build, result, diagnostic, audit, compiler, other } };
-pub const Artifact = struct { path: []const u8, sha256: []const u8, kind: enum { raw_trace, build_output, log }, audit: ?[]const u8 = null };
+pub const Artifact = struct { path: []const u8, sha256: []const u8 = "", kind: enum { raw_trace, build_output, log, private_cache }, audit: ?[]const u8 = null };
+pub const CacheOwner = struct {
+    working_directory: []const u8,
+    legacy_working_directory_review: ?[]const u8 = null,
+};
 pub const PinTransition = struct {
     manifest: Evidence,
     reference: []const u8,
@@ -40,6 +44,7 @@ pub const Release = struct {
     artifacts: []const Artifact,
     source_reconstructions: []const Evidence = &.{},
     retired_pins: []const PinTransition = &.{},
+    cache_owner: ?CacheOwner = null,
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');
@@ -73,13 +78,27 @@ pub fn cacheName(s: []const u8) bool {
 pub fn cacheOwned(run: []const u8, path: []const u8) bool {
     return candidate(path) and std.mem.eql(u8, std.fs.path.dirname(path) orelse "", run) and cacheName(std.fs.path.basename(path));
 }
+pub fn privateCacheName(name: []const u8) bool {
+    return cacheName(name) or (std.mem.startsWith(u8, name, "zig-local-") and name.len > "zig-local-".len) or
+        (std.mem.startsWith(u8, name, "zig-global-") and name.len > "zig-global-".len);
+}
+pub fn privateCacheOwned(run: []const u8, cwd: []const u8, path: []const u8) bool {
+    if (!candidate(cwd) or !candidate(path) or !within(run, cwd) or !within(cwd, path) or !privateCacheName(std.fs.path.basename(path))) return false;
+    const parent = std.fs.path.dirname(path) orelse return false;
+    if (std.mem.eql(u8, parent, cwd)) return true;
+    return std.mem.eql(u8, std.fs.path.dirname(parent) orelse "", cwd) and
+        (std.mem.eql(u8, std.fs.path.basename(parent), "evidence") or std.mem.eql(u8, std.fs.path.basename(parent), "local-state"));
+}
 pub fn artifactName(a: Artifact) bool {
-    if (!candidate(a.path) or !hash(a.sha256)) return false;
+    if (!candidate(a.path)) return false;
+    if (a.kind == .private_cache) return a.sha256.len == 0 and privateCacheName(std.fs.path.basename(a.path));
+    if (!hash(a.sha256)) return false;
     const name = std.fs.path.basename(a.path);
     return switch (a.kind) {
         .raw_trace => std.mem.eql(u8, name, "profile.events.jsonl") and a.audit != null,
         .build_output => std.mem.eql(u8, name, "z_llvm") or std.mem.endsWith(u8, name, ".o") or std.mem.endsWith(u8, name, ".obj") or std.mem.endsWith(u8, name, ".exe") or std.mem.endsWith(u8, name, ".a"),
         .log => std.mem.endsWith(u8, name, ".log") or std.mem.endsWith(u8, name, ".stdout") or std.mem.endsWith(u8, name, ".stderr"),
+        .private_cache => unreachable,
     };
 }
 pub fn validate(c: Config) !void {

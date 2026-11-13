@@ -1,6 +1,7 @@
 const std = @import("std");
 const u = @import("../validation/common.zig");
 const historical = @import("historical.zig");
+const private_cache = @import("private_cache.zig");
 pub const fa = @import("../vendor/file_audit/src/root.zig");
 pub const p = @import("policy.zig");
 const D = std.Io.Dir;
@@ -48,6 +49,7 @@ pub const Action = struct {
     measured: bool = false,
     idle_seconds: ?i64 = null,
     replay_required: bool = true,
+    released_cache: bool = false,
     retired_pins: []const p.PinTransition = &.{},
 };
 pub const Engine = struct {
@@ -72,6 +74,7 @@ pub const Engine = struct {
     pin_paths: ?*std.StringHashMap(void) = null,
     pin_parents: ?*std.StringHashMap(?PinDirectory) = null,
     pin_target_capacity: usize = 0,
+    pin_missing_entries: usize = 0,
     pin_open_directories: usize = 0,
     pin_manifests: std.StringHashMap(PinManifest),
     collecting_pins: ?*std.ArrayList(Pin) = null,
@@ -250,11 +253,13 @@ pub const Engine = struct {
                 error.FileNotFound => continue,
                 else => return err,
             };
-            _ = try e.add(a.path, r.value.run_root, name, switch (a.kind) {
+            const index = try e.add(a.path, r.value.run_root, name, switch (a.kind) {
                 .raw_trace => .raw_trace,
                 .build_output => .build_output,
                 .log => .log,
-            }, a.sha256);
+                .private_cache => .cache,
+            }, if (a.kind == .private_cache) null else a.sha256);
+            e.actions.items[index].released_cache = a.kind == .private_cache;
             present = true;
         }
         if (present) for (r.value.retained) |row| {
@@ -408,7 +413,20 @@ pub const Engine = struct {
             if (seen.contains(absolute_path)) return;
         }
         const canonical = e.resolvePin(absolute_path) catch |err| switch (err) {
-            error.FileNotFound, error.NotDir => return,
+            error.FileNotFound, error.NotDir => {
+                // Historical ledgers repeatedly reference absent leaves in
+                // existing directories. Memoize a bounded number for this
+                // refresh only, just as missing parents are memoized below.
+                // Candidate-overlapping paths still need every pin reference.
+                const overlaps = p.within(e.c.root, absolute_path) and absolute_path.len > e.c.root.len and e.indexedOverlap(absolute_path[e.c.root.len + 1 ..]);
+                if (!overlaps and e.pin_missing_entries < 65_536) if (e.pin_paths) |seen| {
+                    const owned = try e.c.gpa.dupe(u8, absolute_path);
+                    errdefer e.c.gpa.free(owned);
+                    try seen.put(owned, {});
+                    e.pin_missing_entries += 1;
+                };
+                return;
+            },
             else => return err,
         };
         defer e.c.gpa.free(canonical);
@@ -421,8 +439,8 @@ pub const Engine = struct {
             reusable = !e.indexedOverlap(relative_target);
         }
         if (reusable) if (e.pin_paths) |seen| {
-            // Cache only existing targets. Speculative ancestor resolutions
-            // often do not exist and otherwise dominate memory on old ledgers.
+            // Existing targets are reusable; absent leaves use the separate
+            // bounded admission above to limit historical-ledger memory.
             const owned = try e.c.gpa.dupe(u8, absolute_path);
             errdefer e.c.gpa.free(owned);
             try seen.put(owned, {});
@@ -551,6 +569,7 @@ pub const Engine = struct {
         try seen.ensureTotalCapacity(@intCast(e.pin_target_capacity));
         var parents = std.StringHashMap(?PinDirectory).init(e.c.gpa);
         e.pin_open_directories = 0;
+        e.pin_missing_entries = 0;
         var arena = std.heap.ArenaAllocator.init(e.c.gpa);
         defer arena.deinit();
         var bases = std.StringHashMap([]const []const u8).init(arena.allocator());
@@ -780,6 +799,7 @@ pub const Engine = struct {
         defer rp.deinit();
         const r = rp.value;
         if (r.state == .held) return error.ReleaseHeld;
+        if (a.released_cache and r.state != .disposable) return error.PrivateCacheRequiresDisposable;
         for ([_]Evidence{r.producer}) |ev| {
             if (!p.relative(ev.path)) return error.InvalidEvidencePath;
             try e.keep(list, ev.path, ev.sha256);
@@ -790,8 +810,8 @@ pub const Engine = struct {
             // Closed ordinary binaries/objects are temporary outputs. Source
             // reconstruction is not a prerequisite for discarding them.
             // Active use, pins, ownership and exact artifact checks still apply.
-            if (a.kind != .build_output) return error.DisposableOnlyBuildOutputs;
-            for (r.artifacts) |artifact| if (artifact.kind != .build_output) return error.DisposableOnlyBuildOutputs;
+            if (a.kind != .build_output and !a.released_cache) return error.DisposableOnlyBuildOutputs;
+            for (r.artifacts) |artifact| if (artifact.kind != .build_output and artifact.kind != .private_cache) return error.DisposableOnlyBuildOutputs;
             if (!p.within(r.run_root, r.producer.path)) return error.UnboundDisposableProducer;
             if (eq(producer.value, "schema", "zllvm-compiler-build-v1")) {
                 const command = try get(producer.value, "command");
@@ -803,6 +823,7 @@ pub const Engine = struct {
                 for (r.artifacts) |artifact| if (p.overlaps(artifact.path, row.path)) return error.RetentionOverlap;
                 try e.keep(list, row.path, row.sha256);
             }
+            if (a.released_cache) try private_cache.verify(e, a.*, r, producer.value);
             try e.releaseTransitions(a, list, r);
             try e.keep(list, a.producer, null);
             a.replay_required = false;
@@ -916,8 +937,12 @@ pub const Engine = struct {
         if (!e.oldEnough(m) or !e.oldEnough(producer_metadata)) return error.TooRecent;
         var kept: std.ArrayList(Evidence) = .empty;
         if (a.kind == .cache) {
-            a.replay_required = e.config.cache_evidence == .replay;
-            if (e.config.cache_evidence == .closed_producer) try e.closedCache(a.*, &kept) else try e.buildEvidence(a.producer, &kept, null, &.{});
+            if (a.released_cache) {
+                try e.releaseEvidence(a, &kept);
+            } else {
+                a.replay_required = e.config.cache_evidence == .replay;
+                if (e.config.cache_evidence == .closed_producer) try e.closedCache(a.*, &kept) else try e.buildEvidence(a.producer, &kept, null, &.{});
+            }
         } else try e.releaseEvidence(a, &kept);
         const absolute_candidate = try e.absolute(a.path);
         for (kept.items) |ev| {
@@ -1103,7 +1128,7 @@ pub fn boolean(v: u.Value, key: []const u8) !bool {
     if (x != .bool) return error.ExpectedBoolean;
     return x.bool;
 }
-fn has(v: u.Value, key: []const u8, tag: std.meta.Tag(u.Value)) bool {
+pub fn has(v: u.Value, key: []const u8, tag: std.meta.Tag(u.Value)) bool {
     if (v != .object) return false;
     const x = v.object.get(key) orelse return false;
     return std.meta.activeTag(x) == tag;

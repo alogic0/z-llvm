@@ -33,6 +33,7 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     const start = std.Io.Clock.awake.now(c.io);
     var record = u.object(c.a);
     try u.put(c.a, &record, "argv", try u.strings(c.a, args[4..]));
+    try u.put(c.a, &record, "cwd", u.s(c.root));
     try u.put(c.a, &record, "status", u.s("running"));
     try u.put(c.a, &record, "started_ns", u.n(std.Io.Clock.real.now(c.io).nanoseconds));
     try u.put(c.a, &record, "samples", u.array(c.a));

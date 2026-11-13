@@ -115,4 +115,28 @@ ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" release-build --build lo
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --policy policy.json > "$cleanup_fixture/disposable-apply.log"
 test ! -e "$cleanup_disposable/z_llvm"
 test -f "$cleanup_disposable/report.json"
-printf 'Fourteen isolated CLI checks passed, including disposable binaries without source reconstruction, exact pin retirement, failed-job protection, inventory and publication failure.\n'
+cleanup_private="$cleanup_fixture/local-state/validations/cli/batch/private-units"
+mkdir -p "$cleanup_private/src" "$cleanup_private/evidence/zig-local-Debug-v1/o"
+printf 'copied project marker\n' > "$cleanup_private/.zigversion"
+printf 'retained test source\n' > "$cleanup_private/src/main.zig"
+printf 'temporary test executable\n' > "$cleanup_private/evidence/zig-local-Debug-v1/o/test"
+printf 'one failed test; retain this diagnostic\n' > "$cleanup_private/evidence/unit.log"
+cat > "$cleanup_private/evidence/unit.json" <<EOF
+{"status":"finished","outcome":"completed","actual_returncode":1,"started_ns":1,"finished_ns":2,"cwd":"$cleanup_private","log":"$cleanup_private/evidence/unit.log","argv":["zig","test","--cache-dir","evidence/zig-local-Debug-v1","-Mroot=src/tests.zig"]}
+EOF
+cat > "$cleanup_fixture/caches.json" <<EOF
+{"schema":"zllvm-private-cache-plan-v1","runs":[{"producer":"local-state/validations/cli/batch/private-units/evidence/unit.json","run_root":"local-state/validations/cli/batch/private-units","working_directory":"local-state/validations/cli/batch/private-units"}]}
+EOF
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" prepare-caches --caches caches.json --reason 'Closed private test cache; diagnostics remain' --policy policy.json > "$cleanup_fixture/cache-plan.log"
+cleanup_cache_review=$(tail -n 1 "$cleanup_fixture/cache-plan.log")
+cleanup_cache_requests="${cleanup_cache_review%/cache-plan-review.json}/requests.json"
+test -f "$cleanup_private/evidence/zig-local-Debug-v1/o/test"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_cache_requests" --policy policy.json > "$cleanup_fixture/cache-apply.log"
+test ! -e "$cleanup_private/evidence/zig-local-Debug-v1"
+test -f "$cleanup_private/src/main.zig"
+test -f "$cleanup_private/evidence/unit.json"
+test -f "$cleanup_private/evidence/unit.log"
+"${ZIGREP:-zigrep}" --no-config -q -F 'removed: 1;' "$cleanup_fixture/cache-apply.log"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_cache_requests" --policy policy.json > "$cleanup_fixture/cache-repeat.log"
+"${ZIGREP:-zigrep}" --no-config -q -F 'removed: 0;' "$cleanup_fixture/cache-repeat.log"
+printf 'Sixteen isolated CLI checks passed, including closed private test caches, retained failure diagnostics, disposable binaries, exact pin retirement, maintenance leases and repeated collection.\n'
