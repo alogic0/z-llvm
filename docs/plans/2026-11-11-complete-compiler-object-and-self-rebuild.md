@@ -28,6 +28,14 @@ explicit; all eight distinct before/after pairs pass full-module encoding and
 ELF reviews. A new 58,431-file seal retains the evidence. The unchanged Debug
 input selects 7,846/7,874 definitions, gaining 23 without loss; 28 failures remain
 open. See the [ten-family checkpoint](../evidence/compiler_behavior_remaining_checkpoint_20261113.json).
+The three-family tail checkpoint passes at `57eca23b`: both 2,314-unit builds,
+eight readiness procedures, all 17 gates, both complete 196-population native
+suites and all 5,158 required faults pass. Strict comparisons preserve all
+7,052 preceding outcomes per build and every preceding object, owner and
+optimizer artifact byte-for-byte. Original compiler/runtime objects remain
+identical. A verified 62,216-file seal retains the evidence. The unchanged Debug
+input selects 7,860/7,874 definitions, gaining 14 without loss; 14 failures remain.
+See the [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -614,12 +622,19 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    builds and all six native runs pass, including 162 faults. Both fresh
    503-definition Small-runtime objects match the accepted bytes exactly; the
    original Debug selection and its fourteen failures remain unchanged.
-   **Adopted for fresh cumulative validation.** Freeze the committed source,
-   repeat both official 2,314-unit builds, all eight readiness procedures,
-   all 17 gates, both complete 196-population native suites and all 5,158
-   required fault controls. Compare against every accepted 193-population
-   outcome and artifact; repeat original compiler/runtime production and all
-   affected audits. Then close the fourteen remaining original Debug failures
+   **Accepted at `57eca23b`.** Both official 2,314-unit builds, all eight readiness
+   procedures, all 17 gates, both complete 196-population native suites and all
+   5,158 required fault controls pass. Both strict comparisons preserve all 7,052
+   preceding outcomes, 1,170 objects, 1,161 owner manifests and 588 optimizer
+   artifacts per build exactly. The original 8,928-definition compiler object,
+   all 8,929 function encodings, both 455-definition runtime objects and the
+   503-definition Small runtime remain byte-identical to the preceding checkpoint;
+   ELF, ordered-event and owner audits pass. The verified 62,216-file seal retains
+   the evidence and superseded failed/canceled jobs remain explicit. The serial
+   runner removes its temporary bundle after completion; the full receipt/log
+   and retained integrated outputs preserve its validation evidence. See the
+   [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
+   Close the fourteen remaining original Debug failures and complete its object
    before the final generations and full behavior matrices in step 12.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal

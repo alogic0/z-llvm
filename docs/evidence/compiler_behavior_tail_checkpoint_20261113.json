@@ -1,0 +1,215 @@
+{
+  "schema": "upstream-behavior-tail-checkpoint-v1",
+  "status": "repair-checkpoint-passed-follow-up-open",
+  "scope": "Bounded self-tail recursion, signed narrow ABI, direct/indirect tail transfer and exact legacy frame-owner repair. Original Debug behavior has 14 remaining failures; final-source generations and complete local-hook matrices remain open.",
+  "code_revision": "57eca23b61a3a652260ba56f207b4e00be9e6fb4",
+  "preceding_code_revision": "e4e330b61f7a2f4dbf440a61a0cffc3b91444d3c",
+  "source_snapshot": "local-state/isolated-validations-tail-fixed-v1132/source-frozen-tail-fixed-v1132.json",
+  "source_tree": "8d89ff72d522c0aa4ca82eb06cd053027f3f749c",
+  "source_files": 3687,
+  "retained_source": "local-state/isolated-validations-tail-fixed-v1132/retained-source-v1133",
+  "official_unit_tests_per_mode": 2314,
+  "structural_checks_per_mode": 64,
+  "profile_event_tests_per_mode": 2,
+  "unit_modes": [
+    "Debug",
+    "ReleaseSafe"
+  ],
+  "readiness_procedures": 8,
+  "integration_gates": 17,
+  "native_populations_per_build": 196,
+  "native_builds": [
+    "Debug",
+    "ReleaseFast"
+  ],
+  "native_release_modes": 3,
+  "preserved_prior_outcomes_per_build": 7052,
+  "byte_identical_prior_objects_per_build": 1170,
+  "byte_identical_prior_owners_per_build": 1161,
+  "byte_identical_prior_optimizer_artifacts_per_build": 588,
+  "changed_prior_artifacts": 0,
+  "native_fault_controls_per_build": 2565,
+  "runtime_fault_controls_per_build": 14,
+  "required_fault_controls": 5158,
+  "fixed_compiler_definitions": 8928,
+  "compiler_object_sha256": "2955471809d24338864675a51c29e1a50568f5147d2dd19790ceab1a84e8c5d9",
+  "compiler_unchanged_function_encodings": 8929,
+  "original_runtime_definitions": 455,
+  "small_runtime_definitions": 503,
+  "compiler_and_runtime_objects_identical_to_previous_checkpoint": true,
+  "original_debug_behavior_definitions": 7874,
+  "original_debug_behavior_selected": 7860,
+  "original_debug_behavior_remaining": 14,
+  "original_debug_gained": [
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(i8).callee\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(u8).callee\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(i16).callee\"",
+    "\"behavior.call.test.arguments pointed to on stack into tailcall.S.insertionSort\"",
+    "\"behavior.call.test.inline call preserves tail call.S.foo\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(i8).caller\"",
+    "\"behavior.call.test.tail call with potentially extended types\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(u16).callee\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(u8).caller\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(u16).caller\"",
+    "\"behavior.call.test.tail call with potentially extended types.S.Test(i16).caller\"",
+    "\"behavior.call.test.tail call function pointer.S.bar\"",
+    "\"behavior.call.test.forced tail call.S.fibonacciTailInternal\"",
+    "\"behavior.call.test.tail call function pointer.S.foo\""
+  ],
+  "original_debug_lost": 0,
+  "original_debug_actual_returncode": 1,
+  "original_debug_object_complete": false,
+  "final_follow_up_complete": false,
+  "source_and_value_use_interfaces_unchanged": true,
+  "stack_object_bytes": 65536,
+  "stack_frame_bytes": 8388608,
+  "ordinary_direct_arguments": 64,
+  "ordinary_indirect_arguments": 16,
+  "stack_argument_words": 128,
+  "ordinary_ninth_sse_argument_closed": true,
+  "ordinary_sixty_fifth_direct_argument_closed": true,
+  "receipts": {
+    "local-state/isolated-validations-tail-fixed-v1132/freeze-tail-fixed-source-v1132-run.json": {
+      "sha256": "eea4774cfa498a1aa67c5c0683d03e5d630c0a73c90a3076c931d5630ffea6ee",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/preserve-tail-fixed-source-v1133-run.json": {
+      "sha256": "59a791d4801728e6259bb7713365b006ad6fa6011df4a48e82e69ce8fb0393a7",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/build-tail-fixed-Debug-v1133-run.json": {
+      "sha256": "b8351b73e5f0d86363e6b6cb3ddfc8907d0edf987d67f7212cb62f106c6b48ba",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/build-tail-fixed-ReleaseFast-v1133-run.json": {
+      "sha256": "53090b50c8e2617f71cb7bf066601d5cbe43addf5f82586ed1c0a85cc25bde91",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/units-tail-fixed-Debug-v1133-run.json": {
+      "sha256": "97e9c4bf5630746c66b34933674f4fe9d6ef3841242c447906f73f10934f934c",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/units-tail-fixed-ReleaseSafe-v1133-run.json": {
+      "sha256": "4ebd8671f98193b3170a5d1ce0950a2da6944106cc1f45943c64acf53c51c590",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/readiness-tail-fixed-v1134-run.json": {
+      "sha256": "53381fcc784999301f4d9dcdc0cb276eaede668d190acf1d9369970156dd1a97",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/full-tail-fixed-v1134-run.json": {
+      "sha256": "22ced957009c7a66cbcced2f17adf159a5093e8a4c3efe8cc49e75d9ca01e19d",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/native-Debug-tail-fixed-v1134-run.json": {
+      "sha256": "035aec9aca2c8ea8ecb21f96e5e5e9cc79fbab323f2e845fd08dec607a4f1f47",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/compiler-original-tail-fixed-v1134-run.json": {
+      "sha256": "4d9ea34579865c51ea7598b5467c56d8e3dc735508699ad6b3dc54e5a9c24bc2",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/runtime-Debug-tail-fixed-v1135-run.json": {
+      "sha256": "2dab46c0cc59dd046bb9616bf5ab461228355eef51ccaa21b1b826a73b93fca0",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/runtime-ReleaseFast-tail-fixed-v1135-run.json": {
+      "sha256": "0e5cb3316397516fb22d7ca1fd21c0297f6a436f08de36a2b6ed148d693f2041",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/runtime-small-tail-fixed-v1135-run.json": {
+      "sha256": "ea882b9b2d8b9ec7ce44eab2e57135fde94a7394723903ef6abd5a3aee7e8ad1",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-elf-runtime-Debug-tail-fixed-v1141-run.json": {
+      "sha256": "143812fca795801eee1aaf4a960cc4bcf81a5b4f59f70cd5f9fa140098ba0d9f",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-elf-runtime-ReleaseFast-tail-fixed-v1141-run.json": {
+      "sha256": "d1e724b20140c55dfcc5a614a337296b551fe2ce12c1682d51aaad1705118331",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-elf-runtime-Small-tail-fixed-v1141-run.json": {
+      "sha256": "0fa8c50ec56e30f91c8f456fa16f9531d739b38c303edb38e0ba4f231111b595",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-events-runtime-Debug-tail-fixed-v1141-run.json": {
+      "sha256": "56f9e5ef5fc6045f16422738e0d65711ca500e11b84fd83294491037ae8d6de6",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-events-runtime-ReleaseFast-tail-fixed-v1141-run.json": {
+      "sha256": "e6a170661df6724cea80dfdd5c0c4f4038e2de340e945f76c08d94511b2daada",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-events-runtime-Small-tail-fixed-v1141-run.json": {
+      "sha256": "c3f27ac1edf8b3bf71831951794219ac95898f027614eb4f73f3376aec6f52c6",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/owners-runtime-Debug-tail-fixed-v1141-run.json": {
+      "sha256": "599764ffac8c670cba0ff60f086d0559c8e437a782c7709abf92843f7db27dcf",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/owners-runtime-ReleaseFast-tail-fixed-v1141-run.json": {
+      "sha256": "0812ea8ec3a3fab27d1df2d2bd902d961c641326d608c80ef051b0995cf366c9",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/owners-runtime-Small-tail-fixed-v1141-run.json": {
+      "sha256": "9547c0d5a66b07f4ac89983d638b6fdab5bd56a82d266fa0d3b9ba9b302434da",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-elf-compiler-tail-fixed-v1165-run.json": {
+      "sha256": "6831532bd97c4c15ea4ad37a3bbc23cc29b54e5e85aa3af6a59c6ac67dab726f",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/audit-events-compiler-tail-fixed-v1165-run.json": {
+      "sha256": "68b15e4001371c4201e0ee7dddc6ee2301daab818b8138d20afb1ad38bf20e18",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/owners-compiler-tail-fixed-v1165-run.json": {
+      "sha256": "c8290da298552cf9530eed0354ca60db9b86a48cb441a3ac2d16b27865f571c1",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/compare-compiler-functions-tail-fixed-v1166-run.json": {
+      "sha256": "1ee8a18f968376b6610bdb55f2738ed1664bbfcb4cfba08b7ede0bc240998222",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/verify-source-tail-fixed-v1166-run.json": {
+      "sha256": "413bbd80898fa58c9f2dc417a74927fe7de270b8f1772a5faf3a022cb08d8d35",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/compare-ReleaseFast-tail-fixed-v1164-run.json": {
+      "sha256": "316bdfcaae0217ec0e3a3530a10fa8b11d0f5b3e75cc76d71ad19e758dca098d",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/compare-Debug-tail-fixed-v1171-run.json": {
+      "sha256": "be04a01dde2e4ba7d5888ca4feb77fb353d17617be2853194c5f854b65003add",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/native-faults-ReleaseFast-tail-fixed-v1164-run.json": {
+      "sha256": "a2ba7026992093a679b90656361d217c069d9cf424aec7aae089136e406ee694",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/native-faults-Debug-tail-fixed-v1171-run.json": {
+      "sha256": "e1fe100861fe16094103b4d5941e2ec3998a12030df17319fcef87ddb4e8fad4",
+      "actual_returncode": 0
+    },
+    "local-state/validations/compiler-behavior-completion-20261111/batch-01/retained-pins-tail-fixed-v1173-run.json": {
+      "sha256": "b0000469250922ae72a3e0e22eba14bdca9e92e53bc6682f67102818a608c6b0",
+      "actual_returncode": 0
+    },
+    "local-state/isolated-validations-tail-fixed-v1132/behavior-canonical-tail-fixed-v1135-run.json": {
+      "sha256": "593b931608b15cdeb9985dab8ec86e136453fe1473b41a9798157e93d3f933d7",
+      "actual_returncode": 1
+    }
+  },
+  "retained_nonacceptance_attempts": [
+    "local-state/isolated-validations-tail-v1106/native-Debug-tail-v1108-run.json",
+    "local-state/isolated-validations-tail-v1106/full-tail-v1109-run.json",
+    "local-state/isolated-validations-tail-v1106/compiler-original-tail-v1109-run.json"
+  ],
+  "checkpoint_artifact_manifest": "/home/oleg/prog/z_llvm/local-state/validations/compiler-behavior-completion-20261111/batch-01/tail-checkpoint-v1174/accepted-artifacts.sha256",
+  "checkpoint_artifact_manifest_sha256": "1798135c82effefb067e710d8dc2e5d81df92ec95282ba19f1367e8252c61c32",
+  "checkpoint_files": 62216,
+  "serial_bundle_artifacts_retained": false,
+  "serial_bundle_evidence": "The successful full-gate receipt and complete log retain bundle identity, production/consumption and validation results. The runner removed its temporary serial bundle after completion. Retained integrated outputs are sealed separately."
+}
