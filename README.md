@@ -153,6 +153,9 @@ Artifacts use a local content-addressed store with per-run JSON manifests;
 there is no separate control Git repository or fixed workstation topology.
 See [storage](docs/zllvm_artifact_retention_contract.md) and
 [retention](docs/retention_headroom_policy.md) for publication and cleanup.
+The [automatic storage collector](docs/storage_cleanup.md) reviews completed
+private caches and explicitly released artifacts, then removes verified
+candidates with `tools/clean-storage --apply`.
 
 The Git repository contains source, fixtures, and acceptance summaries.
 Large raw validation runs, build caches, installed binaries, and scratch

@@ -342,6 +342,32 @@ pub fn build(b: *std.Build) void {
     );
     artifact_store_test_step.dependOn(&b.addRunArtifact(artifact_store_tests).step);
     addToolStepWithArgs(b, "artifact-store", "Publish, verify, retrieve, or collect artifacts", "tools/zllvm_artifact_store.zig");
+    const verify_file_audit = b.addSystemCommand(&.{ "sha256sum", "--check", "--quiet", "tools/vendor/file_audit.SHA256SUMS", "tools/vendor/process.SHA256SUMS", "tools/vendor/test_support.SHA256SUMS" });
+    verify_file_audit.setCwd(b.path("."));
+    b.step("verify-file-audit-source", "Verify the unchanged filesystem audit provider").dependOn(&verify_file_audit.step);
+    const storage_cleanup = b.addExecutable(.{ .name = "clean-storage", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/clean_storage.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    storage_cleanup.step.dependOn(&verify_file_audit.step);
+    const storage_cleanup_run = b.addRunArtifact(storage_cleanup);
+    storage_cleanup_run.addPassthruArgs();
+    storage_cleanup_run.has_side_effects = true;
+    b.step("storage-cleanup", "Review storage; pass -- --apply for guarded collection").dependOn(&storage_cleanup_run.step);
+    const storage_cleanup_tests = b.addTest(.{ .filters = &.{"storage cleanup:"}, .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/clean_storage.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    storage_cleanup_tests.step.dependOn(&verify_file_audit.step);
+    const storage_cleanup_test_run = b.addRunArtifact(storage_cleanup_tests);
+    storage_cleanup_test_run.has_side_effects = true;
+    const storage_cleanup_cli_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/cli_tests.sh" });
+    storage_cleanup_cli_tests.addArtifactArg(storage_cleanup);
+    const storage_cleanup_test_step = b.step("test-storage-cleanup", "Run isolated storage retention, mutation and CLI checks");
+    storage_cleanup_test_step.dependOn(&storage_cleanup_test_run.step);
+    storage_cleanup_test_step.dependOn(&storage_cleanup_cli_tests.step);
     const inbox206_descriptor_identity_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/zllvm_inbox206_materialize.zig"),

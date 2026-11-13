@@ -1,5 +1,16 @@
 # Shared tool dependencies
 
+## Filesystem audit
+
+`file_audit/` contains the verbatim public `src/` tree, compiler pin and MIT
+license from `zig-file-audit` 0.1.2 at
+`640f1eed78731816b9afc0b3492d70338d41f835`, copied from the independent provider.
+`file_audit.SHA256SUMS` seals every copied file. There are no local modifications.
+The provider inventories, hashes and reads observed files; project cleanup decisions and
+mutations live in `tools/storage_cleanup/`. Run
+`zig build verify-file-audit-source test-storage-cleanup` after an update.
+Shared filesystem fixes belong in the provider before adopting a new snapshot.
+
 `regex/` is a read-only subset of the independent `zig-regex` 0.1.0 source
 distribution at tag `v0.1.0`, commit
 `b9cff7ce90e17449ce388dca67dfaf177a88e23f`. It contains the exact public `src/`

@@ -5,6 +5,14 @@ Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 
 ## Retained state
 
+The [automatic collector](storage_cleanup.md) implements the reviewed rules for
+completed private build caches and explicitly superseded generated outputs.
+Run `tools/clean-storage` for a review or `tools/clean-storage --apply` for
+verified collection. Its [policy](storage_cleanup_policy.json), current pins,
+queued-work holds and shared reader lease govern each invocation. Source/input
+reconstruction, trace audits and accepted replacement evidence remain required;
+unknown diagnostics are kept for review.
+
 - `local-state/artifacts`: verified immutable objects and retained run manifests.
   All local manifests are pins; accepted copies are tracked under
   `docs/evidence/artifacts/`. Use the artifact-store dry-run/apply collector.

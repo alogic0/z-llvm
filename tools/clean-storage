@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+project_root=$(cd -- "${ZLLVM_PROJECT_ROOT:-$source_root}" && pwd -P)
+storage_state="$project_root/local-state/storage-cleanup"
+if [[ -L "$project_root/local-state" || -L "$storage_state" ]]; then
+    printf 'Storage cleanup state must be inside the project, without symlinks.\n' >&2
+    exit 2
+fi
+mkdir -p -- "$storage_state"
+if [[ ${1:-} == exec ]]; then
+    shift
+    if [[ ${1:-} == -- ]]; then shift; fi
+    if [[ $# == 0 ]]; then printf 'usage: tools/clean-storage exec -- COMMAND [ARG...]\n' >&2; exit 2; fi
+    # The collector takes an exclusive flock on this same file.
+    cd -- "$project_root"
+    exec flock --shared "$storage_state/cleanup.lock" "$@"
+fi
+cd -- "$source_root"
+cleanup_zig=${ZIG:-zig}
+if [[ $("$cleanup_zig" version) != $(cat .zigversion) ]]; then
+    printf 'Select the compiler pinned in .zigversion with ZIG=/path/to/zig.\n' >&2
+    exit 2
+fi
+sha256sum --check --quiet --strict tools/vendor/file_audit.SHA256SUMS tools/vendor/process.SHA256SUMS tools/vendor/test_support.SHA256SUMS
+# Serialize building the reusable helper, including two simultaneous invocations.
+exec 9> "$storage_state/build.lock"
+flock --exclusive 9
+"$cleanup_zig" build-exe -O ReleaseFast tools/clean_storage.zig \
+    --cache-dir "$storage_state/tool-cache" \
+    --global-cache-dir "$storage_state/tool-global-cache" \
+    -femit-bin="$storage_state/clean-storage.new"
+mv -- "$storage_state/clean-storage.new" "$storage_state/clean-storage"
+flock --unlock 9
+exec 9>&-
+cd -- "$project_root"
+exec "$storage_state/clean-storage" "$@"
