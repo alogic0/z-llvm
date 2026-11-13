@@ -5,6 +5,51 @@ const encoding = @import("../../../mc/encoding.zig");
 const verify = @import("../verify.zig");
 const vectors = @import("floating_vectors.zig");
 
+test "half literal preparation preserves live integer accumulator aliases before conversion calls" {
+    const a = std.testing.allocator;
+    const machine = @import("../machine.zig");
+    const state = @import("composed_selector_state.zig");
+    for ([_]u16{ 32, 64 }) |bits| for ([_]bool{ false, true }) |alias| {
+        var output = machine.MachineFunction.init("half_prefix", .{ .int = 64 });
+        defer output.deinit(a);
+        var plan = @import("stage2_planning.zig").SelectorAllocationPlan.init(a);
+        defer plan.deinit();
+        var selector = state.ComposedBlockSelector.init(a, &output);
+        defer selector.deinit();
+        selector.stack_frame_bytes = 72;
+        selector.allocation_plan = &plan;
+        try output.instructions.appendSlice(a, &.{ .{ .sub_rsp_imm32 = 72 }, if (bits == 32) .{ .mov_arg_eax = .rdi } else .{ .mov_arg_rax = .rdi } });
+        try state.bindValueLoc(&selector, "keep", if (bits == 32) .eax else .rax);
+        if (alias) try state.bindValueLoc(&selector, "alias", if (bits == 32) .eax else .rax);
+        const diagnostic = try @import("composed_selector_fp.zig").lowerFpBinary(&selector, "sum", .{
+            .op = .fadd,
+            .ty = .half,
+            .lhs = .{ .fp = "0xH8000" },
+            .rhs = .{ .fp = "0xHBF9A" },
+        });
+        try std.testing.expect(diagnostic == null);
+        const first_call = for (output.instructions.items, 0..) |inst, i| {
+            if (inst == .direct_call) break i;
+        } else return error.ExpectedHalfConversionCall;
+        // Execute the complete preparation prefix before the external conversion
+        // call. Native canaries separately execute the entire half operation.
+        output.instructions.shrinkRetainingCapacity(first_call);
+        try state.emitValueIntoAccumulator(&selector, .{ .named = if (alias) "alias" else "keep" }, bits);
+        try output.instructions.appendSlice(a, &.{ .{ .add_rsp_imm32 = 72 }, .ret });
+        try verify.verifyFunction(output);
+        const code = try encoding.encodeFunction(a, output);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        for ([_]u64{ 0, 1, 0x9182736455aaccdd, std.math.maxInt(u64) }) |input| {
+            const expected = if (bits == 32) input & std.math.maxInt(u32) else input;
+            try std.testing.expectEqual(expected, run(input));
+        }
+    };
+}
+
 test "scalar floating minimum uses typed maximum ownership without mutating source" {
     for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]u16{ 16, 32, 64, 80, 128 }) |ty, bits| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "declare {0s} @llvm.minnum.f{1d}({0s},{0s})\ndeclare {0s} @llvm.maxnum.f{1d}({0s},{0s})\ndefine {0s} @minimum({0s} %a,{0s} %b) {{\nentry:\n %r = call {0s} @llvm.minnum.f{1d}({0s} %a,{0s} %b)\n ret {0s} %r\n}}\n", .{ ty, bits });
