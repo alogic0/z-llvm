@@ -158,4 +158,7 @@ comptime {
     _ = @import("codegen/x86_64/generic_cfg/intrinsic_attrs.zig");
     _ = @import("codegen/x86_64/generic_cfg/vector_tail_calls_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/optional_assembly_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/symbolic_roundtrip_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/floating_boolean_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/padded_floating_memory_tests.zig");
 }

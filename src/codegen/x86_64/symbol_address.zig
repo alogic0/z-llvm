@@ -106,6 +106,30 @@ pub fn fromGep(gep: ir.GepInst) ?Address {
 }
 
 pub fn fromValue(value: ir.Value) ?Address {
+    if (fromDirectValue(value)) |address| return address;
+    if (value != .constant_expr) return null;
+    const text = trim(value.constant_expr);
+    const prefix = "inttoptr (i64 ";
+    const suffix = " to ptr)";
+    if (!std.mem.startsWith(u8, text, prefix) or !std.mem.endsWith(u8, text, suffix)) return null;
+    const arithmetic = trim(text[prefix.len .. text.len - suffix.len]);
+    const subtract = std.mem.startsWith(u8, arithmetic, "sub (");
+    if (!subtract and !std.mem.startsWith(u8, arithmetic, "add (")) return null;
+    if (arithmetic.len < 6 or arithmetic[arithmetic.len - 1] != ')') return null;
+    var fields: @import("../../ir/structure.zig").Fields = .{ .rest = arithmetic[5 .. arithmetic.len - 1], .packed_type = false };
+    const base_text = trim(fields.next() orelse return null);
+    const offset_text = trim(fields.next() orelse return null);
+    if (fields.next() != null or !std.mem.startsWith(u8, base_text, "i64 ") or !std.mem.startsWith(u8, offset_text, "i64 ")) return null;
+    // A single same-width round trip over the existing symbol/GEP grammar.
+    // The base decoder excludes nested arithmetic and other address spaces.
+    const base = fromIntegerValue(.{ .int = 64 }, .{ .constant_expr = trim(base_text[4..]) }) orelse return null;
+    const offset = i64Bits(std.fmt.parseInt(i128, trim(offset_text[4..]), 10) catch return null) orelse return null;
+    const original: u64 = @bitCast(@as(i64, base.addend));
+    const result: i64 = @bitCast(if (subtract) original -% offset else original +% offset);
+    return .{ .symbol = base.symbol, .addend = std.math.cast(i32, result) orelse return null };
+}
+
+fn fromDirectValue(value: ir.Value) ?Address {
     if (value == .named) return .{ .symbol = symbolName(value.named) orelse return null };
     if (value != .constant_expr) return null;
     const text = trim(value.constant_expr);
@@ -153,7 +177,7 @@ pub fn fromIntegerValue(ty: ir.Type, value: ir.Value) ?Address {
     const suffix = " to i64)";
     if (text.len <= prefix.len + suffix.len or !std.mem.startsWith(u8, text, prefix) or !std.mem.endsWith(u8, text, suffix)) return null;
     const pointer = trim(text[prefix.len .. text.len - suffix.len]);
-    return fromValue(if (std.mem.startsWith(u8, pointer, "@")) .{ .named = pointer } else .{ .constant_expr = pointer });
+    return fromDirectValue(if (std.mem.startsWith(u8, pointer, "@")) .{ .named = pointer } else .{ .constant_expr = pointer });
 }
 
 pub fn supportsLayout(text: ?[]const u8) bool {

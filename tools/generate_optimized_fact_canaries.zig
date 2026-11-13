@@ -3,13 +3,13 @@
 const std = @import("std");
 const u = @import("validation/common.zig");
 const header = "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\ndeclare i64 @complete_clobber(i64,i64,i64,i64,i64,i64,i64,i64)\n";
-const Output = struct {
+pub const Output = struct {
     ir: std.Io.Writer.Allocating,
     driver: std.Io.Writer.Allocating,
     table: std.Io.Writer.Allocating,
     functions: u.Value,
     count: usize = 0,
-    fn init(c: *u.Context, prefix: []const u8, model: []const u8, contract: []const u8) !Output {
+    pub fn init(c: *u.Context, prefix: []const u8, model: []const u8, contract: []const u8) !Output {
         var out: Output = .{ .ir = .init(c.a), .driver = .init(c.a), .table = .init(c.a), .functions = u.array(c.a) };
         try out.ir.writer.writeAll(header);
         try out.driver.writer.print("#define DRIVER_NAME \"{s}\"\n#define DRIVER_SEEDS 64\n#define DRIVER_CONTRACT \"{s}\"\n", .{ prefix, contract });
@@ -18,14 +18,14 @@ const Output = struct {
         try out.table.writer.writeAll("static const struct test_case cases[]={\n");
         return out;
     }
-    fn probe(out: *Output, c: *u.Context, name: []const u8, bits: usize, kind: usize) !void {
+    pub fn probe(out: *Output, c: *u.Context, name: []const u8, bits: usize, kind: usize) !void {
         try u.add(&out.functions, u.s(name));
         try out.driver.writer.print("extern uint64_t {s}(void *,void *,const void *,uint64_t);\n", .{name});
         try out.table.writer.print("{{{s},{d},{d},0}},\n", .{ name, bits, kind });
         out.count += 1;
         _ = c;
     }
-    fn finish(out: *Output, c: *u.Context, root: []const u8, population: []const u8, prefix: []const u8, contract: []const u8) !u.Value {
+    pub fn finish(out: *Output, c: *u.Context, root: []const u8, population: []const u8, prefix: []const u8, contract: []const u8) !u.Value {
         try out.table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
         try out.driver.writer.writeAll(out.table.written());
         try c.write(try c.join(&.{ root, try c.fmt("{s}.ll", .{population}) }), out.ir.written());

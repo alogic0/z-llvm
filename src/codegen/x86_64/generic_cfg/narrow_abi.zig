@@ -81,8 +81,9 @@ fn callReturn(function: ir.Function, call: ir.CallInst) bool {
     for (call.args.items) |arg| {
         if (arg.value != .named or std.mem.startsWith(u8, arg.value.named, "@")) return true;
         if (arg.ty == .ptr and !stackObject(function, arg.value)) return true;
-        // Wide integer arguments need the existing multiword ABI dispatcher.
-        if (arg.ty == .int and arg.ty.int > 64) return true;
+        // SSE, extended floating and wide arguments use the ordinary ABI
+        // dispatcher; the typed boolean action owns native GPR operands.
+        if (arg.ty != .ptr and (arg.ty != .int or arg.ty.int > 64)) return true;
     }
     return false;
 }

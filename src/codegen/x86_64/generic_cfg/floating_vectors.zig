@@ -88,6 +88,8 @@ fn needed(function: ir.Function) bool {
     var native_fp_cast = false;
     var unsupported_shuffle = false;
     var owned_storage = false;
+    var byte_storage = false;
+    var native_memory_store = false;
     // A native vector may also be the physical carrier of a scalar quad
     // parameter. Restrict this additional storage trigger to scalar boundaries;
     // existing vector ABI rewrites retain their original activation rules.
@@ -106,6 +108,14 @@ fn needed(function: ir.Function) bool {
         switch (inst.kind) {
             .alloca => |x| {
                 owned_storage = owned_storage or fp(x.allocated_ty);
+                if (x.allocated_ty == .aggregate) {
+                    const text = std.mem.trim(u8, x.allocated_ty.aggregate, " \t");
+                    byte_storage = byte_storage or (std.mem.startsWith(u8, text, "[") and std.mem.endsWith(u8, text, " x i8]"));
+                }
+            },
+            .store => |x| {
+                const native_half: ir.Type = .{ .vector = .{ .len = 8, .elem_ty = .half } };
+                native_memory_store = native_memory_store or ((!x.attrs.isBarrier() and x.ty_addrspace == null and x.ptr_addrspace == null) and (x.ty.eql(native_float) or x.ty.eql(native_half)));
             },
             .fcmp => |x| {
                 if (fp(x.operand_ty)) return true;
@@ -149,7 +159,8 @@ fn needed(function: ir.Function) bool {
             else => {},
         }
     };
-    return (crossing and integer_binary) or unsupported_shuffle or (shuffle and !native_fp_cast) or (owned_storage and (scalar_boundary or native_float_boundary));
+    return (crossing and integer_binary) or unsupported_shuffle or (shuffle and !native_fp_cast) or
+        ((owned_storage or (byte_storage and native_memory_store)) and (scalar_boundary or native_float_boundary));
 }
 fn stable(value: ir.Value, ty: ir.Type) !ir.Value {
     if (value == .undef or value == .poison or value == .zero_initializer)
