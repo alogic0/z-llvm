@@ -51,6 +51,7 @@ pub const Action = struct {
     idle_seconds: ?i64 = null,
     replay_required: bool = true,
     released_cache: bool = false,
+    workspace_release: ?[]const u8 = null,
     retired_compiler: ?Evidence = null,
     retired_pins: []const p.PinTransition = &.{},
 };

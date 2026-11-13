@@ -75,4 +75,16 @@ ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply > "$cl
 test ! -e "$cleanup_fixture/local-state/storage-cleanup/pending.json"
 test -f "$cleanup_fixture/local-state/tmp/validations/test/batch/failure/.workspaces/check/test-exe"
 test -f "$cleanup_fixture/local-state/tmp/validations/test/batch/raw/.workspaces/check/profile.events.jsonl"
-printf 'Six workspace CLI checks passed: successful collection, failed retention, evidence hold, raw-trace guard, explicit cache override and repeat.\n'
+# The release command preserves the failed producer's result and refuses holds.
+printf '{"schema":1,"paths":["local-state/validations/test/batch/failure"]}\n' > "$cleanup_fixture/local-state/storage-cleanup/holds.json"
+if ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" release-workspace --layout local-state/validations/test/batch/failure/check.storage-layout.json --reason 'Resolved fixture failure' > "$cleanup_fixture/release-held.log" 2>&1; then exit 1; fi
+test ! -e "$cleanup_fixture/local-state/validations/test/batch/failure/check.workspace-release.json"
+printf '{"schema":1,"paths":[]}\n' > "$cleanup_fixture/local-state/storage-cleanup/holds.json"
+sha256sum "$cleanup_fixture/local-state/validations/test/batch/failure/check.json" "$cleanup_fixture/local-state/validations/test/batch/failure/check.log" > "$cleanup_fixture/failure.sha256"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" release-workspace --layout local-state/validations/test/batch/failure/check.storage-layout.json --reason 'Resolved fixture failure' > "$cleanup_fixture/release.log" 2>&1
+test -f "$cleanup_fixture/local-state/tmp/validations/test/batch/failure/.workspaces/check/test-exe"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply > "$cleanup_fixture/release-apply.log" 2>&1
+test ! -e "$cleanup_fixture/local-state/tmp/validations/test/batch/failure/.workspaces/check"
+sha256sum --check --status "$cleanup_fixture/failure.sha256"
+test -f "$cleanup_fixture/local-state/tmp/validations/test/batch/raw/.workspaces/check/profile.events.jsonl"
+printf 'Eight workspace CLI checks passed: successful collection, failed retention, evidence hold, raw-trace guard, explicit cache override, repeat, held release refusal and reviewed failure release.\n'

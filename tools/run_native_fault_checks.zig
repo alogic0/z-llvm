@@ -52,6 +52,11 @@ fn execute(c: *u.Context, args: u.Args, runner: *Runner, report: *u.Value) !void
 }
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
+    const lease = try @import("validation/storage_workspace.zig").reader(&c);
+    defer if (lease) |file| {
+        file.unlock(c.io);
+        file.close(c.io);
+    };
     u.installSignals();
     const argv = try init.minimal.args.toSlice(c.a);
     const args = try u.Args.parse(c.a, argv[1..], &.{ "input-manifest", "output-root", "compare-with", "legacy-population" }, &.{});

@@ -628,3 +628,40 @@ job runner after completed builds, with producers using the lease and holds
 above. A missing dependency, invalid policy, changed evidence or interrupted
 operation produces a nonzero exit and a report. This change installs no timer
 or background process.
+
+## Reviewed workspace release
+
+Fresh C/native, input-program and retained integrated runs use the same layout
+as real-program and whole-compiler validation. Generated objects, executable
+files, shared libraries and binary stdout go into the temporary tree. Reports,
+commands, textual logs, generated inputs and profiles stay in the evidence tree.
+Native fault checks and comparisons resolve old mixed runs and new mapped
+products. Run faults in the native command with `--fault-count`. For a later
+comparison or fault check, use `--retain-products` on `run_native_canary` or
+`run_upstream_c_program`, then explicitly release that workspace afterward.
+Queued holds on the input run also protect its products.
+
+Fresh `build_validation_compiler` installations use a `pipeline` lifetime. Their
+stable `MODE/bin/z_llvm` alias points to the temporary executable; the adjacent
+build receipt and terminal report remain maintained. Successful builds do not
+release the compiler. Rebuilding a retained installation is supported under its
+build lock; a failed or released installation requires a fresh output root.
+Existing mixed installations are not moved.
+
+After reviewing a resolved failure or finishing all downstream compiler work:
+
+```sh
+tools/clean-storage release-workspace \
+  --layout local-state/validations/PROJECT/BATCH/RUN/validation.storage-layout.json \
+  --reason 'Failure resolved; retained diagnostics reviewed; no further consumers'
+tools/clean-storage --minimal
+tools/clean-storage --minimal --apply
+```
+
+For compiler installations, select `MODE/compiler.storage-layout.json` instead.
+Publication creates a separate `*.workspace-release.json` authorization; it
+does not change the original result or delete the products. The normal collector
+rechecks its layout/result hashes, diagnostics, holds, current pins and readers.
+An unfinished producer cannot be released this way. A raw trace accidentally
+written into scratch still blocks whole-workspace deletion. Existing explicit
+shared-cache overrides remain caller-owned and outside that workspace release.

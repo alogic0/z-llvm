@@ -36,11 +36,17 @@ pub const Session = struct {
 
 pub fn projectRoot(c: *u.Context) !?[]const u8 {
     var root: ?[]const u8 = c.root;
+    var found: ?[]const u8 = null;
     while (root) |path| : (root = std.fs.path.dirname(path)) {
         if (u.exists(c.io, try c.fmt("{s}/docs/storage_cleanup_policy.json", .{path})) and
-            u.exists(c.io, try c.fmt("{s}/tools/clean-storage", .{path}))) return path;
+            u.exists(c.io, try c.fmt("{s}/tools/clean-storage", .{path})))
+        {
+            // Copied validation roots can contain the same tools/policy. Their
+            // storage is owned by the enclosing project's validations tree.
+            if (found == null or p.candidate(found.?[path.len + 1 ..])) found = path;
+        }
     }
-    return null;
+    return found;
 }
 
 pub fn start(c: *u.Context, output: []const u8, producer: []const u8, started_ns: i128) !?Session {

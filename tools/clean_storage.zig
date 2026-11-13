@@ -20,6 +20,7 @@ const usage =
     \\           [--reconstruction FILE ...]
     \\           [--compiler-retirement RECORD.json]
     \\       tools/clean-storage release --request FILE
+    \\       tools/clean-storage release-workspace --layout FILE --reason TEXT
     \\       tools/clean-storage release-build --build FILE --reason TEXT [--successor FILE]
     \\           [--reconstruction FILE ...]
     \\       tools/clean-storage inventory [--policy FILE]
@@ -53,7 +54,9 @@ pub fn main(init: std.process.Init) !void {
     const release_trace = args.len > 1 and std.mem.eql(u8, args[1], "release-trace");
     const release_request = args.len > 1 and std.mem.eql(u8, args[1], "release");
     const release_build = args.len > 1 and std.mem.eql(u8, args[1], "release-build");
-    const publishing = release_trace or release_request or release_build;
+    const release_workspace = args.len > 1 and std.mem.eql(u8, args[1], "release-workspace");
+    const publishing = release_trace or release_request or release_build or release_workspace;
+    var workspace_layout: ?[]const u8 = null;
     const inventory_requested = args.len > 1 and std.mem.eql(u8, args[1], "inventory");
     const share_inputs = args.len > 1 and std.mem.eql(u8, args[1], "share-inputs");
     var inputs_plan: ?[]const u8 = null;
@@ -105,6 +108,18 @@ pub fn main(init: std.process.Init) !void {
             i += 1;
             requests_path = args[i];
             continue;
+        }
+        if (release_workspace and i + 1 < args.len) {
+            if (std.mem.eql(u8, args[i], "--layout")) {
+                i += 1;
+                workspace_layout = args[i];
+                continue;
+            }
+            if (std.mem.eql(u8, args[i], "--reason")) {
+                i += 1;
+                reason = args[i];
+                continue;
+            }
         }
         if (prepare_builds and std.mem.eql(u8, args[i], "--builds") and i + 1 < args.len) {
             i += 1;
@@ -183,6 +198,7 @@ pub fn main(init: std.process.Init) !void {
     if (release_trace and (apply or minimal or audit_path == null or build_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (release_request and (apply or minimal or request_path == null)) return error.InvalidReleaseArguments;
     if (release_build and (apply or minimal or build_path == null or reason == null or audit_path != null)) return error.InvalidReleaseArguments;
+    if (release_workspace and (apply or minimal or workspace_layout == null or reason == null)) return error.InvalidReleaseArguments;
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
     if (share_inputs and (inputs_plan == null or minimal or requests_path != null)) return error.InvalidSharedInputPlan;
     if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) and (apply or minimal)) return error.PreparationIsReadOnly;
@@ -237,6 +253,12 @@ pub fn main(init: std.process.Init) !void {
     }
     if (publishing) {
         try e.currentManifests(true);
+        if (release_workspace) {
+            const published = try @import("storage_cleanup/workspaces.zig").publish(&e, workspace_layout.?, reason.?);
+            status = "release-published";
+            try c.print("Workspace release: {s}; payload retained until --apply.\n", .{published});
+            return;
+        }
         var reconstructions: std.ArrayList(p.Evidence) = .empty;
         for (reconstruction_paths.items) |path| {
             if (!p.relative(path)) return error.InvalidEvidencePath;

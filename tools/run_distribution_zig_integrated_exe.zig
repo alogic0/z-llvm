@@ -112,9 +112,49 @@ comptime {
 }
 
 pub fn main(init: std.process.Init) !void {
+    const root = init.environ_map.get("ZLLVM_INTEGRATED_OUTPUT_ROOT") orelse return run(init);
+    if (init.environ_map.get("ZLLVM_INTEGRATED_WORKER") != null) return run(init);
+    var c = try u.Context.init(init);
+    u.installSignals();
+    const output = try c.newOutput(root);
+    const storage = @import("validation/storage_workspace.zig");
+    const workspace = try storage.start(&c, output, "validation");
+    defer if (workspace) |w| w.close(&c);
+    var env = try c.env.clone(c.a);
+    try env.put("ZLLVM_INTEGRATED_WORKER", "1");
+    try env.put("ZLLVM_INTEGRATED_OUTPUT_ROOT", output);
+    try storage.exportPaths(&c, &env);
+    if (workspace != null) {
+        for ([_][2][]const u8{ .{ "ZIG_LOCAL_CACHE_DIR", "local-cache" }, .{ "ZIG_GLOBAL_CACHE_DIR", "global-cache" }, .{ "TMPDIR", "tmp" } }) |setting| {
+            if (env.get(setting[0]) == null) {
+                const path = try c.temporaryPath(&.{ output, setting[1] });
+                try c.mkdir(path);
+                try env.put(setting[0], path);
+            }
+        }
+    }
+    const argv = try init.minimal.args.toSlice(c.a);
+    const command = try c.a.dupe([]const u8, argv);
+    command[0] = try std.Io.Dir.cwd().realPathFileAlloc(c.io, "/proc/self/exe", c.a);
+    var runner = @import("validation/runner.zig").Runner.init(&c, output);
+    const result = try runner.run(command, try c.join(&.{ output, "integrated" }), &env, .{ .timeout_ms = 3_600_000 });
+    const passed = result.completed and result.code == 0;
+    try c.writeJson(try c.join(&.{ output, "report.json" }), .{ .schema = "integrated-workspace-v1", .status = if (passed) "passed" else "failed", .returncode = result.code, .completed = result.completed });
+    if (workspace) |w| try w.finish(&c, try c.join(&.{ output, "report.json" }), &.{ try c.join(&.{ output, "commands.json" }), try c.join(&.{ output, "integrated.stdout" }), try c.join(&.{ output, "integrated.stderr" }) });
+    // Existing callers parse these summaries; keep the worker's streams intact
+    // while also retaining them as evidence for workspace collection.
+    try std.Io.File.stdout().writeStreamingAll(c.io, try c.read(try c.join(&.{ output, "integrated.stdout" })));
+    try std.Io.File.stderr().writeStreamingAll(c.io, try c.read(try c.join(&.{ output, "integrated.stderr" })));
+    if (!passed) std.process.exit(@intCast(if (result.code < 0) 128 - result.code else result.code));
+}
+
+fn run(init: std.process.Init) !void {
     const allocator = init.gpa;
     const io = init.io;
     var context = try u.Context.init(init);
+    try @import("validation/storage_workspace.zig").adopt(&context);
+    if (context.workspace_paths != null) common.workspace_context = &context;
+    defer common.workspace_context = null;
 
     var mode_filter: ?[]const u8 = null;
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
@@ -159,10 +199,11 @@ pub fn main(init: std.process.Init) !void {
 
     const retained_root = init.environ_map.get("ZLLVM_INTEGRATED_OUTPUT_ROOT");
     const temp: common.TempDir = if (retained_root) |path|
-        .{ .path = try allocator.dupe(u8, try context.newOutput(path)) }
+        .{ .path = try allocator.dupe(u8, try context.join(&.{path})) }
     else
         try common.TempDir.init(allocator, io, "zig_integrated_exe");
     defer if (retained_root != null) allocator.free(temp.path) else temp.deinit(allocator, io);
+    const work: common.TempDir = .{ .path = if (context.workspace_paths) |mapping| mapping.temporary else temp.path };
     const selected_toolchain = try toolchain.record(&context, zllvm_exe, zig_emitter, zig_source_dir);
     const identity_path = try temp.join(allocator, "toolchain.json");
     defer allocator.free(identity_path);
@@ -191,7 +232,7 @@ pub fn main(init: std.process.Init) !void {
             if (!std.mem.eql(u8, filter, case.mode)) continue;
         }
         total += 1;
-        const exe = try common.allocTempFile(allocator, temp, case.mode, case.proof.outputStem());
+        const exe = try common.allocTempFile(allocator, work, case.mode, case.proof.outputStem());
         defer allocator.free(exe);
         var case_env = std.process.Environ.Map.init(allocator);
         defer case_env.deinit();
@@ -202,7 +243,7 @@ pub fn main(init: std.process.Init) !void {
             extra_objects.deinit(allocator);
         }
         if (case.prebuild_start_object) {
-            const start_obj = try common.allocTempFile(allocator, temp, case.id, ".start.o");
+            const start_obj = try common.allocTempFile(allocator, work, case.id, ".start.o");
             errdefer allocator.free(start_obj);
             try buildCaseSourceObject(allocator, io, zig_emitter, target, start_obj, case);
             try extra_objects.append(allocator, start_obj);
@@ -214,16 +255,16 @@ pub fn main(init: std.process.Init) !void {
             if (case.generic_cfg_selector) {
                 try focused_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
             }
-            try canaries.runMulti3Canary(allocator, io, temp, zllvm_exe, zig_emitter, target, &focused_env);
-            const builtins_obj = try common.allocTempFile(allocator, temp, case.id, ".builtins.o");
+            try canaries.runMulti3Canary(allocator, io, work, zllvm_exe, zig_emitter, target, &focused_env);
+            const builtins_obj = try common.allocTempFile(allocator, work, case.id, ".builtins.o");
             errdefer allocator.free(builtins_obj);
-            const helper_obj = try common.allocTempFile(allocator, temp, case.id, ".helper.o");
+            const helper_obj = try common.allocTempFile(allocator, work, case.id, ".helper.o");
             errdefer allocator.free(helper_obj);
-            const wide_division_obj = try common.allocTempFile(allocator, temp, case.id, ".wide-division.o");
+            const wide_division_obj = try common.allocTempFile(allocator, work, case.id, ".wide-division.o");
             errdefer allocator.free(wide_division_obj);
-            const signed_division_obj = try common.allocTempFile(allocator, temp, case.id, ".signed-division.o");
+            const signed_division_obj = try common.allocTempFile(allocator, work, case.id, ".signed-division.o");
             errdefer allocator.free(signed_division_obj);
-            const signed_remainder_obj = try common.allocTempFile(allocator, temp, case.id, ".signed-remainder.o");
+            const signed_remainder_obj = try common.allocTempFile(allocator, work, case.id, ".signed-remainder.o");
             errdefer allocator.free(signed_remainder_obj);
             try emitFocusedCompilerRtI128Builtins(allocator, io, zllvm_exe, target, builtins_obj, &focused_env);
             try emitFocusedCompilerRtObject(allocator, io, zllvm_exe, target, wide_division_obj, "test/zig/integrated/compiler_rt_udivei5_umodei4.ll", "wide division", &focused_env);
@@ -238,19 +279,19 @@ pub fn main(init: std.process.Init) !void {
             if (case.generic_cfg_selector) {
                 try focused_env.put("ZLLVM_GENERIC_CFG_SELECTOR", "1");
             }
-            const fma_obj = try common.allocTempFile(allocator, temp, case.id, ".fma.o");
+            const fma_obj = try common.allocTempFile(allocator, work, case.id, ".fma.o");
             errdefer allocator.free(fma_obj);
-            const fma_helpers_obj = try common.allocTempFile(allocator, temp, case.id, ".fma-helpers.o");
+            const fma_helpers_obj = try common.allocTempFile(allocator, work, case.id, ".fma-helpers.o");
             errdefer allocator.free(fma_helpers_obj);
             try canaries.buildAndValidateFmaObjects(allocator, io, zllvm_exe, zig_emitter, target, fma_obj, fma_helpers_obj, &focused_env);
             try extra_objects.appendSlice(allocator, &.{ fma_obj, fma_helpers_obj });
         } else if (case.setcc_semantic_object) {
-            const predicate_obj = try common.allocTempFile(allocator, temp, case.id, ".predicates.o");
+            const predicate_obj = try common.allocTempFile(allocator, work, case.id, ".predicates.o");
             errdefer allocator.free(predicate_obj);
             try emitSetccSemanticObject(allocator, io, predicate_obj);
             try extra_objects.append(allocator, predicate_obj);
         } else if (case.aggregate_sse_semantic_object) {
-            const aggregate_obj = try common.allocTempFile(allocator, temp, case.id, ".aggregates.o");
+            const aggregate_obj = try common.allocTempFile(allocator, work, case.id, ".aggregates.o");
             errdefer allocator.free(aggregate_obj);
             try emitAggregateSseSemanticObject(allocator, io, aggregate_obj);
             try extra_objects.append(allocator, aggregate_obj);

@@ -464,3 +464,23 @@ procedure; cross-engine differences do not establish a compiler speedup. Compile
 build time, links and verification remain outside the measured IR-to-object
 interval. The adoption checks exercise timeout handling but do not rerun the
 performance matrix or claim a speedup.
+## Launch current tools with copied test inputs
+
+Use the tracked launcher when a validation project contains copied fixtures:
+
+```sh
+ZIG=/home/oleg/.zig/0.17.0/files/zig tools/run-validation \
+  --project-root /absolute/copied/project \
+  --output-root /absolute/copied/project/evidence native-check run_native_canary \
+  --output-root /absolute/copied/project/evidence/native \
+  --population module_dependencies --mode ReleaseFast --zllvm /absolute/compiler
+```
+
+The launcher compiles the current checkout's checked runner and selected tool in
+ReleaseFast mode.
+`ZLLVM_PROJECT_ROOT` selects the inputs; it does not select frozen tool sources.
+The checked child uses its workspace for default caches and temporary files.
+The launcher's reusable bootstrap cache lives in `local-state/tmp/validation-tools`.
+Explicit cache environment overrides still take precedence. Running a previously
+cached executable or `zig run` against a frozen checkout keeps that old tool's
+behavior; updating the main checkout alone cannot migrate such jobs.

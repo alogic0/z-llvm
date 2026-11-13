@@ -19,7 +19,7 @@ pub fn run(runner: *Runner, input: []const u8, modes: []const []const u8, canary
     for (modes) |mode| {
         if (!u.contains(&u.modes, mode)) return error.InvalidMode;
         for (routes) |route| {
-            const exe = try c.join(&.{ input, mode, try c.fmt("{s}-{s}", .{ try u.str(canary, "prefix"), route }) });
+            const exe = try @import("storage_workspace.zig").artifact(c, input, &.{ input, mode, try c.fmt("{s}-{s}", .{ try u.str(canary, "prefix"), route }) });
             const digest = try c.digest(exe);
             const stem = try c.join(&.{ runner.output, try c.fmt("{s}-{s}-{s}-{s}", .{ build, population, mode, route }) });
             // A pre-existing success report alone cannot rule out an always-failing oracle.

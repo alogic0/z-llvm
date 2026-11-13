@@ -4,18 +4,22 @@ const u = @import("common.zig");
 const Entry = struct { command: u.Value, matched: bool = false };
 const Index = std.StringHashMap(Entry);
 
-fn canonical(c: *u.Context, command: u.Value, root: []const u8) !u.Value {
+fn canonical(c: *u.Context, command: u.Value, root: []const u8, mapping: ?@import("storage_paths.zig").Paths) !u.Value {
     const argv = try u.stringSlice(c.a, try u.get(command, "argv"));
     if (argv.len == 0) return error.EmptyCommand;
     var result = u.array(c.a);
-    for (argv, 0..) |arg, i| try u.add(&result, u.s(if (i == 0 and std.mem.endsWith(u8, arg, "/z_llvm")) "COMPILER" else try std.mem.replaceOwned(u8, c.a, arg, root, "OUTPUT")));
+    for (argv, 0..) |arg, i| {
+        const logical = if (mapping) |m| try std.mem.replaceOwned(u8, c.a, arg, m.temporary, root) else arg;
+        try u.add(&result, u.s(if (i == 0 and std.mem.endsWith(u8, arg, "/z_llvm")) "COMPILER" else try std.mem.replaceOwned(u8, c.a, logical, root, "OUTPUT")));
+    }
     return result;
 }
 fn index(c: *u.Context, commands: []u.Value, root: []const u8) !Index {
     var seen = std.StringHashMap(usize).init(c.a);
     var result = Index.init(c.a);
+    const mapping = try @import("storage_workspace.zig").inspect(c, root, "validation");
     for (commands) |command| {
-        const argv = try u.canonical(c.a, try canonical(c, command, root));
+        const argv = try u.canonical(c.a, try canonical(c, command, root, mapping));
         const occurrence = try seen.getOrPut(argv);
         if (!occurrence.found_existing) occurrence.value_ptr.* = 0;
         const key = try c.fmt("{s}#{d}", .{ argv, occurrence.value_ptr.* });
@@ -175,4 +179,16 @@ pub fn registry(c: *u.Context, before: u.Value, after: u.Value, additions: []con
         if (!u.json.eql(wanted.value, addition)) return error.RegistryAdditionChanged;
     }
     return u.toValue(c.a, .{ .prior_populations = old.len, .current_populations = new.len, .prior_entries_unchanged = true });
+}
+
+test "native comparison normalizes maintained and temporary artifact paths without hiding arguments" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var c: u.Context = .{ .a = arena.allocator(), .gpa = std.testing.allocator, .io = std.testing.io, .root = ".", .env = undefined };
+    const before = try u.toValue(c.a, .{ .argv = [_][]const u8{ "cc", "/before/ReleaseFast/reference.o", "-o", "/before/ReleaseFast/reference" } });
+    const after = try u.toValue(c.a, .{ .argv = [_][]const u8{ "cc", "/scratch/ReleaseFast/reference.o", "-o", "/scratch/ReleaseFast/reference" } });
+    const mapping: @import("storage_paths.zig").Paths = .{ .evidence = "/after", .temporary = "/scratch" };
+    try std.testing.expect(u.json.eql(try canonical(&c, before, "/before", null), try canonical(&c, after, "/after", mapping)));
+    const changed = try u.toValue(c.a, .{ .argv = [_][]const u8{ "cc", "/scratch/ReleaseFast/reference.o", "-shared", "-o", "/scratch/ReleaseFast/reference" } });
+    try std.testing.expect(!u.json.eql(try canonical(&c, before, "/before", null), try canonical(&c, changed, "/after", mapping)));
 }

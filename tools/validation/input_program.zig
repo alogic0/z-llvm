@@ -18,6 +18,8 @@ pub fn main(init: std.process.Init) !void {
     const argv = try init.minimal.args.toSlice(c.a);
     const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-emitter", "mode" }, &.{});
     const output = try c.newOutput(try args.require("output-root"));
+    const workspace = try @import("storage_workspace.zig").start(&c, output, "validation");
+    defer if (workspace) |w| w.close(&c);
     var runner = Runner.init(&c, output);
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("input-program-v1"));
@@ -30,6 +32,7 @@ pub fn main(init: std.process.Init) !void {
         try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("input-program: {s}\n", .{c.diagnostic orelse @errorName(err)}));
     };
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(&c);
     const passed = u.json.is(try u.get(report, "status"), "passed");
     try c.print("summary input-program schema=input-program-v1 program=jsmn-jsondump program_modes={d} matched_inputs={d} reference_executions={d} local_executions={d} negative_controls={d} local_fail={d}\n", .{
         (try u.get(report, "matched_program_modes")).integer, (try u.get(report, "matched_inputs")).integer,
@@ -72,8 +75,8 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, r: *Runner, report: 
     try u.put(c.a, report, "frontend", u.s(zig));
     try u.put(c.a, report, "source_head", u.s(u.trim(try c.capture(&.{ "git", "rev-parse", "HEAD" }))));
     var env = try c.cleanEnvironment();
-    try env.put("ZIG_LOCAL_CACHE_DIR", try c.join(&.{ output, "frontend-cache" }));
-    try env.put("ZIG_GLOBAL_CACHE_DIR", try c.join(&.{ output, "global-cache" }));
+    try env.put("ZIG_LOCAL_CACHE_DIR", try c.temporaryPath(&.{ output, "frontend-cache" }));
+    try env.put("ZIG_GLOBAL_CACHE_DIR", try c.temporaryPath(&.{ output, "global-cache" }));
     try r.require(&.{ "clang-22", "--version" }, try c.join(&.{ output, "reference-version" }), &env);
     if (std.mem.indexOf(u8, try c.read(try c.join(&.{ output, "reference-version.stdout" })), "clang version 22.") == null) return error.WrongReferenceVersion;
     const source = try c.join(&.{try u.str(manifest, "source")});
@@ -111,15 +114,15 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, r: *Runner, report: 
 }
 
 fn modeRun(c: *u.Context, r: *Runner, report: *u.Value, row: *u.Value, manifest: u.Value, output: []const u8, directory: []const u8, mode: []const u8, raw: []const u8, compiler: []const u8, env: *const std.process.Environ.Map) !void {
-    const reference = try c.join(&.{ directory, "reference.o" });
-    const reference_exe = try c.join(&.{ directory, "reference" });
+    const reference = try c.temporaryPath(&.{ directory, "reference.o" });
+    const reference_exe = try c.temporaryPath(&.{ directory, "reference" });
     try r.require(&.{ "clang-22", "-x", "ir", try canaries.llvmOpt(mode), "-c", raw, "-o", reference }, try c.join(&.{ directory, "reference-compile" }), env);
     try r.require(&.{ "cc", "-no-pie", reference, "-o", reference_exe }, try c.join(&.{ directory, "reference-link" }), env);
     const profile = try c.join(&.{ directory, "profile.json" });
     const owners = try c.join(&.{ directory, "owners.tsv" });
-    const local_object = try c.join(&.{ directory, "local-object.stdout" });
+    const local_object = try c.temporaryPath(&.{ directory, "local-object.stdout" });
     const passes = try c.fmt("--passes=memory-foundation,{s}", .{try u.pipeline(mode)});
-    try r.require(&.{ compiler, "--emit=obj", "--generic-cfg-selector", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", passes, try c.fmt("--profile={s}", .{profile}), try c.fmt("--selection-owner-output={s}", .{owners}), raw }, try c.join(&.{ directory, "local-object" }), env);
+    try r.requireOutput(&.{ compiler, "--emit=obj", "--generic-cfg-selector", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", "--input-limit=67108864", passes, try c.fmt("--profile={s}", .{profile}), try c.fmt("--selection-owner-output={s}", .{owners}), raw }, try c.join(&.{ directory, "local-object" }), env, local_object);
     try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), try elf.parse(c.a, try c.read(local_object)));
     try canaries.owners(c, try c.read(owners), try u.stringSlice(c.a, try u.get(manifest, "expected_functions")));
     try u.put(c.a, row, "compilation_profile", try c.load(profile));
@@ -128,7 +131,7 @@ fn modeRun(c: *u.Context, r: *Runner, report: *u.Value, row: *u.Value, manifest:
     // An independent selection replay remains a permanent regression check.
     try r.require(&.{ compiler, "--emit=selection-owner-manifest", "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", passes, raw }, try c.join(&.{ directory, "owners-replay" }), env);
     if (!std.mem.eql(u8, try c.read(owners), try c.read(try c.join(&.{ directory, "owners-replay.stdout" })))) return error.OwnershipReplayMismatch;
-    const executable = try c.join(&.{ directory, "local" });
+    const executable = try c.temporaryPath(&.{ directory, "local" });
     try r.require(&.{ "cc", "-no-pie", "-x", "none", local_object, "-o", executable }, try c.join(&.{ directory, "local-link" }), env);
     for ((try u.get(manifest, "cases")).array.items) |case| {
         const name = try u.str(case, "id");

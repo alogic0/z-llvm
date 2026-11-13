@@ -9,9 +9,19 @@ pub const Record = struct {
     temporary_root: []const u8,
     key: []const u8,
     state: enum { active, retained, disposable } = .active,
+    lifetime: enum { validation, pipeline } = .validation,
     result: ?p.Evidence = null,
     diagnostics: []const p.Evidence = &.{},
 };
+pub const Release = struct {
+    schema: []const u8 = "zllvm-workspace-release-v1",
+    layout: p.Evidence,
+    result: p.Evidence,
+    reason: []const u8,
+};
+pub fn releasePath(a: std.mem.Allocator, r: Record) ![]const u8 {
+    return std.fmt.allocPrint(a, "{s}/{s}.workspace-release.json", .{ r.evidence_root, r.key });
+}
 pub fn validKey(key: []const u8) bool {
     if (key.len == 0) return false;
     for (key) |ch| if (!std.ascii.isAlphanumeric(ch) and ch != '-' and ch != '_') return false;

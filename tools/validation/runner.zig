@@ -112,6 +112,12 @@ pub const Runner = struct {
         if (result.code != 0) return r.context.fail("command failed ({d}): {s}; see {s}.stderr", .{ result.code, argv[0], stem });
     }
 
+    /// Binary stdout is a product, while stderr and the command remain evidence.
+    pub fn requireOutput(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, output: []const u8) !void {
+        const result = try r.run(argv, stem, env, .{ .stdout_file = output });
+        if (!result.completed or result.code != 0) return r.context.fail("command failed ({d}): {s}; see {s}.stderr", .{ result.code, argv[0], stem });
+    }
+
     pub fn observe(r: *Runner, exe: []const u8, args: []const []const u8, expected_status: i64, expected_stdout: []const u8, stem: []const u8, env: *const std.process.Environ.Map) !void {
         const c = r.context;
         const argv = try c.a.alloc([]const u8, args.len + 1);

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Always compile current validation tools; keep copied test inputs independent.
+set -euo pipefail
+validation_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+validation_project=$validation_source
+if [[ ${1:-} == --project-root ]]; then
+    if [[ $# -lt 2 ]]; then printf '%s\n' '--project-root requires a directory' >&2; exit 2; fi
+    validation_project=$(realpath -- "$2")
+    shift 2
+fi
+if [[ $# -lt 4 || $1 != --output-root ]]; then
+    printf 'usage: tools/run-validation [--project-root DIR] --output-root DIR LABEL TOOL [ARG...]\n' >&2
+    exit 2
+fi
+validation_output=$2
+validation_label=$3
+validation_tool=$4
+shift 4
+if [[ ! $validation_tool =~ ^[a-zA-Z0-9_]+$ || ! -f $validation_source/tools/$validation_tool.zig ]]; then
+    printf 'unknown validation tool: %s\n' "$validation_tool" >&2
+    exit 2
+fi
+validation_zig=${ZIG:-zig}
+validation_bootstrap=$validation_source/local-state/tmp/validation-tools
+for validation_dir in "$validation_source/local-state" "$validation_source/local-state/tmp" "$validation_bootstrap" "$validation_bootstrap/local-cache" "$validation_bootstrap/global-cache"; do
+    if [[ -L $validation_dir ]]; then printf 'refusing symlink: %s\n' "$validation_dir" >&2; exit 2; fi
+    mkdir -p -- "$validation_dir"
+done
+export ZLLVM_PROJECT_ROOT=$validation_project
+exec "$validation_zig" run -O ReleaseFast --cache-dir "$validation_bootstrap/local-cache" --global-cache-dir "$validation_bootstrap/global-cache" \
+    "$validation_source/tools/run_checked.zig" -- --output-root "$validation_output" "$validation_label" -- \
+    "$validation_zig" run -O ReleaseFast "$validation_source/tools/$validation_tool.zig" -- "$@"

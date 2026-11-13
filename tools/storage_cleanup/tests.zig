@@ -2030,3 +2030,153 @@ test "storage cleanup: input sharing recognizes parent jobs without a batch dire
     try t.expectEqualStrings(current, shared.consumerRoot(current ++ "/backend/input.ll"));
     try t.expect(!core.commandUsesRun("123 runner --output-root local-state/validations/compiler-behavior-completion-20261111/batch-01/new-run", shared.consumerRoot(current ++ "/backend/input.ll"), 456));
 }
+
+test "storage cleanup: reviewed failed workspace release preserves the failed result" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, false);
+    w.close(&f.c);
+    const result_hash = try f.c.digest(try f.c.join(&.{report}));
+    var publishing = f.engine();
+    const name = try publishing.relative(w.record_path);
+    _ = try workspaces.publish(&publishing, name, "Reviewed resolved failure; diagnostics remain maintained");
+    var e = f.engine();
+    try workspaces.discover(&e);
+    try e.qualify(0);
+    try mutation.apply(&e, 0);
+    try t.expectEqualStrings(result_hash, try f.c.digest(try f.c.join(&.{report})));
+    try t.expect(!workspace.successful(try f.c.load(try f.c.join(&.{report}))));
+    try t.expect(!u.exists(f.c.io, try e.absolute(w.record.temporary_root)));
+    try t.expect(u.exists(f.c.io, try e.absolute(run ++ "/diagnostic.log")));
+}
+
+test "storage cleanup: explicit workspace release refuses holds unfinished producers and raw traces" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, false);
+    w.close(&f.c);
+    const name = w.record_path[f.c.root.len + 1 ..];
+    const destination = try workspace.paths.releasePath(f.c.a, w.record);
+    var held = f.engine();
+    try held.write(held.config.holds_file, p.Holds{ .paths = &.{run} });
+    try t.expectError(error.ReleaseCandidateHeld, workspaces.publish(&held, name, "review"));
+    try t.expect(!u.exists(f.c.io, try held.absolute(destination)));
+    try held.write(held.config.holds_file, p.Holds{ .paths = &.{} });
+    const saved = try f.c.read(w.record_path);
+    try f.c.writeJson(w.record_path, w.record);
+    var active = f.engine();
+    try t.expectError(error.WorkspaceProducerNotClosed, workspaces.publish(&active, name, "review"));
+    try f.c.write(w.record_path, saved);
+    try f.c.write(try f.c.fmt("{s}/{s}/profile.events.jsonl", .{ f.c.root, w.record.temporary_root }), "unique trace");
+    var raw = f.engine();
+    try t.expectError(error.WorkspaceContainsRawTrace, workspaces.publish(&raw, name, "review"));
+    try t.expect(!u.exists(f.c.io, try raw.absolute(destination)));
+}
+
+test "storage cleanup: workspace release is bound to unchanged layout result and diagnostics" {
+    for ([_][]const u8{ "layout", "result", "diagnostic" }) |changed| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const w = try workspaceFixture(f, false);
+        w.close(&f.c);
+        var publishing = f.engine();
+        _ = try workspaces.publish(&publishing, try publishing.relative(w.record_path), "resolved");
+        if (std.mem.eql(u8, changed, "layout")) {
+            var value = try f.c.load(w.record_path);
+            try u.put(f.c.a, &value, "state", u.s("disposable"));
+            try f.c.writeJson(w.record_path, value);
+        } else if (std.mem.eql(u8, changed, "result")) try f.write(report, "{\"status\":\"passed\"}") else try f.write(run ++ "/diagnostic.log", "changed diagnostic");
+        var e = f.engine();
+        try workspaces.discover(&e);
+        if (e.qualify(0)) |_| return error.ChangedReleaseAccepted else |_| {}
+        try t.expect(u.exists(f.c.io, try e.absolute(w.record.temporary_root)));
+    }
+}
+
+test "storage cleanup: compiler workspace stays retained until explicit pipeline release" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const fixture = try workspaceFixture(f, true);
+    fixture.close(&f.c);
+    const compiler_root = try f.c.join(&.{ run, "compiler-install" });
+    try f.c.mkdir(compiler_root);
+    const w = (try workspace.compiler(&f.c, compiler_root)).?;
+    const binary = try f.c.temporaryPath(&.{ compiler_root, "bin/z_llvm" });
+    try f.c.write(binary, "\x7fELFtemporary compiler");
+    try f.c.writeJson(try f.c.join(&.{ compiler_root, "report.json" }), .{ .status = "passed" });
+    try w.finishReport(&f.c);
+    w.close(&f.c);
+    var before = f.engine();
+    try workspaces.discover(&before);
+    for (before.actions.items) |action| if (std.mem.eql(u8, action.path, w.record.temporary_root)) try t.expectEqual(.skipped, action.status);
+    const reopened = (try workspace.compiler(&f.c, compiler_root)).?;
+    try t.expectEqualStrings(binary, try f.c.temporaryPath(&.{ compiler_root, "bin/z_llvm" }));
+    try reopened.finishReport(&f.c);
+    reopened.close(&f.c);
+    var publishing = f.engine();
+    _ = try workspaces.publish(&publishing, try publishing.relative(w.record_path), "All downstream validation has completed");
+    try t.expectError(error.WorkspaceNotReusable, workspace.compiler(&f.c, compiler_root));
+    var e = f.engine();
+    try workspaces.discover(&e);
+    for (e.actions.items, 0..) |action, i| if (std.mem.eql(u8, action.path, w.record.temporary_root)) {
+        try e.qualify(i);
+        try mutation.apply(&e, i);
+    };
+    try t.expect(!u.exists(f.c.io, binary));
+}
+
+test "storage cleanup: copied roots use enclosing storage and native readers resolve split artifacts" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    const original = f.c.root;
+    for ([_][]const u8{ "docs", "tools" }) |dir| try f.c.mkdir(try f.c.join(&.{ run, dir }));
+    try f.write(run ++ "/docs/storage_cleanup_policy.json", "{\"schema\":1}");
+    try f.write(run ++ "/tools/clean-storage", "copied wrapper");
+    f.c.root = try f.c.join(&.{run});
+    try t.expectEqualStrings(original, (try @import("../validation/storage_lifecycle.zig").projectRoot(&f.c)).?);
+    const logical = try f.c.join(&.{"objects/subject.o"});
+    const physical = try workspace.artifact(&f.c, f.c.root, &.{logical});
+    try t.expect(std.mem.indexOf(u8, physical, "/local-state/tmp/") != null);
+    try t.expectEqualStrings("\x7fELFtemporary object", try f.c.read(physical));
+    f.c.workspace_paths = .{ .evidence = f.c.root, .temporary = try f.c.fmt("{s}/{s}", .{ original, w.record.temporary_root }) };
+    try t.expectEqualStrings(logical, try f.c.evidencePath(physical));
+    try std.Io.Dir.cwd().deleteFile(f.c.io, physical);
+    try t.expectEqualStrings(physical, try workspace.artifact(&f.c, f.c.root, &.{logical}));
+    try t.expect(!u.exists(f.c.io, physical)); // no fallback or reconstruction
+}
+
+test "storage cleanup: a maintained compiler alias pin protects its temporary target" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    var e = f.engine();
+    const target = try f.c.fmt("{s}/objects/subject.o", .{w.record.temporary_root});
+    const alias = run ++ "/compiler-alias";
+    try std.Io.Dir.cwd().symLink(f.c.io, try e.absolute(target), try e.absolute(alias), .{});
+    try f.write("current.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(target), alias }));
+    e.config.current_manifests = &.{"current.sha256"};
+    try workspaces.discover(&e);
+    try e.qualify(0);
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+    try e.currentManifests(true);
+}
+
+test "storage cleanup: reopening a compiler cannot overwrite unresolved failure diagnostics" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const fixture = try workspaceFixture(f, true);
+    fixture.close(&f.c);
+    const root = try f.c.join(&.{ run, "failed-compiler" });
+    try f.c.mkdir(root);
+    const w = (try workspace.compiler(&f.c, root)).?;
+    try f.c.writeJson(try f.c.join(&.{ root, "report.json" }), .{ .status = "failed", .diagnostic = "unique failed compiler preparation" });
+    try w.finishReport(&f.c);
+    w.close(&f.c);
+    const hash = try f.c.digest(w.record_path);
+    try t.expectError(error.WorkspaceNotReusable, workspace.compiler(&f.c, root));
+    try t.expectEqualStrings(hash, try f.c.digest(w.record_path));
+}

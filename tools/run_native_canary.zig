@@ -8,9 +8,15 @@ const faults = @import("validation/native_faults.zig");
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
+    const storage = @import("validation/storage_workspace.zig");
+    const lease = try storage.reader(&c);
+    defer if (lease) |file| {
+        file.unlock(c.io);
+        file.close(c.io);
+    };
     u.installSignals();
     const argv = try init.minimal.args.toSlice(c.a);
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "population", "zllvm", "mode", "fault-count" }, &.{});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "population", "zllvm", "mode", "fault-count" }, &.{"retain-products"});
     const fault_count = if (args.get("fault-count")) |text| try std.fmt.parseInt(u16, text, 10) else 0;
     if (args.get("fault-count") != null and (fault_count == 0 or fault_count > 1000)) return error.InvalidFaultCount;
     const population = try args.require("population");
@@ -21,6 +27,8 @@ pub fn main(init: std.process.Init) !void {
     const modes: []const []const u8 = if (args.get("mode")) |mode| &.{mode} else &u.modes;
     for (modes) |mode| if (!u.contains(&u.modes, mode)) return error.InvalidMode;
     const output = try c.newOutput(try args.require("output-root"));
+    const workspace = if (args.flag("retain-products")) try storage.startPipeline(&c, output, "validation") else try storage.start(&c, output, "validation");
+    defer if (workspace) |w| w.close(&c);
     var runner = Runner.init(&c, output);
     const compiler = try c.join(&.{args.get("zllvm") orelse "zig-out/bin/z_llvm"});
     var report = u.object(c.a);
@@ -70,6 +78,7 @@ pub fn main(init: std.process.Init) !void {
     }
     try u.put(c.a, &report, "status", u.s(if (passed) "passed" else "failed"));
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(&c);
     try c.print("native-canary {s}: {s}; evidence: {s}/report.json\n", .{ population, if (passed) "passed" else "failed", output });
     if (!passed) std.process.exit(1);
 }

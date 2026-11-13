@@ -48,6 +48,13 @@ pub const Context = struct {
         return path;
     }
 
+    /// Diagnostics derived from an artifact name belong in the evidence tree.
+    pub fn evidencePath(c: *Context, path: []const u8) ![]const u8 {
+        const mapping = c.workspace_paths orelse return path;
+        if (!isWithin(mapping.temporary, path) or std.mem.eql(u8, mapping.temporary, path)) return path;
+        return c.fmt("{s}/{s}", .{ mapping.evidence, path[mapping.temporary.len + 1 ..] });
+    }
+
     pub fn init(start: std.process.Init) !Context {
         const a = start.arena.allocator();
         const env = try start.minimal.environ.createMap(a);

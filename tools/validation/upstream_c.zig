@@ -12,7 +12,7 @@ pub fn main(init: std.process.Init) !void {
     u.installSignals();
     const args = try init.minimal.args.toSlice(c.a);
     if (args.len == 2 and std.mem.eql(u8, args[1], "--help")) {
-        try c.print("usage: run_upstream_c_program --output-root DIR [--zig-source DIR] [--zig-emitter EXE] [--zllvm EXE] [--mode ReleaseFast|ReleaseSafe|ReleaseSmall]\n", .{});
+        try c.print("usage: run_upstream_c_program --output-root DIR [--zig-source DIR] [--zig-emitter EXE] [--zllvm EXE] [--mode ReleaseFast|ReleaseSafe|ReleaseSmall] [--retain-products]\n", .{});
         return;
     }
     const code = run(&c, args[1..]) catch |err| {
@@ -22,8 +22,11 @@ pub fn main(init: std.process.Init) !void {
     std.process.exit(code);
 }
 fn run(c: *u.Context, arguments: []const []const u8) !u8 {
-    const args = try u.Args.parse(c.a, arguments, &.{ "output-root", "zig-source", "zig-emitter", "zllvm", "mode" }, &.{});
+    const args = try u.Args.parse(c.a, arguments, &.{ "output-root", "zig-source", "zig-emitter", "zllvm", "mode" }, &.{"retain-products"});
     const output = try c.newOutput(try args.require("output-root"));
+    const storage = @import("storage_workspace.zig");
+    const workspace = if (args.flag("retain-products")) try storage.startPipeline(c, output, "validation") else try storage.start(c, output, "validation");
+    defer if (workspace) |w| w.close(c);
     const registry = try canaries.load(c);
     var runner = Runner.init(c, output);
     var report = u.object(c.a);
@@ -39,6 +42,7 @@ fn run(c: *u.Context, arguments: []const []const u8) !u8 {
         try u.put(c.a, &report, "error", u.s(c.diagnostic orelse @errorName(err)));
     };
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(c);
     try summary(c, report, registry);
     try c.print("evidence: {s}/report.json\n", .{output});
     if (report.object.get("error")) |err| try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("{s}\n", .{err.string}));
@@ -95,8 +99,8 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     };
     try u.put(c.a, report, "fixture_sha256", fixtures);
     var env = try c.cleanEnvironment();
-    try env.put("ZIG_LOCAL_CACHE_DIR", try c.join(&.{ output, "frontend-cache" }));
-    try env.put("ZIG_GLOBAL_CACHE_DIR", try c.join(&.{ output, "global-cache" }));
+    try env.put("ZIG_LOCAL_CACHE_DIR", try c.temporaryPath(&.{ output, "frontend-cache" }));
+    try env.put("ZIG_GLOBAL_CACHE_DIR", try c.temporaryPath(&.{ output, "global-cache" }));
     try runner.require(&.{ "clang-22", "--version" }, try c.join(&.{ output, "reference-identity" }), &env);
     if (std.mem.indexOf(u8, try c.read(try c.join(&.{ output, "reference-identity.stdout" })), "clang version 22.") == null) return c.fail("LLVM reference must be Clang 22", .{});
     const raw = try c.join(&.{ output, "preopt.ll" });
@@ -125,8 +129,8 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
 
 fn runMode(c: *u.Context, directory: []const u8, mode: []const u8, raw: []const u8, zllvm: []const u8, manifest: u.Value, env: *const std.process.Environ.Map, runner: *Runner, report: *u.Value, registry: []u.Value, row_index: usize) !void {
     const row = &report.object.getPtr("rows").?.array.items[row_index];
-    const reference = try c.join(&.{ directory, "reference.o" });
-    const reference_exe = try c.join(&.{ directory, "reference" });
+    const reference = try c.temporaryPath(&.{ directory, "reference.o" });
+    const reference_exe = try c.temporaryPath(&.{ directory, "reference" });
     try runner.require(&.{ "clang-22", "-x", "ir", try canaries.llvmOpt(mode), "-c", raw, "-o", reference }, try c.join(&.{ directory, "reference-compile" }), env);
     try runner.require(&.{ "cc", "-no-pie", reference, "-o", reference_exe }, try c.join(&.{ directory, "reference-link" }), env);
     for (try u.json.array(try u.get(manifest, "cases"))) |case| {
@@ -140,9 +144,8 @@ fn runMode(c: *u.Context, directory: []const u8, mode: []const u8, raw: []const 
     const optimized = try c.join(&.{ directory, "optimized.ll" });
     try runner.require(&.{ zllvm, try c.fmt("--pipeline={s}", .{try u.pipeline(mode)}), memory }, try c.join(&.{ directory, "release-optimize" }), env);
     try c.copy(try c.join(&.{ directory, "release-optimize.stdout" }), optimized);
-    const local = try c.join(&.{ directory, "local.o" });
-    try runner.require(&.{ zllvm, "--generic-cfg-selector", "--emit=obj", "--target=x86_64-unknown-linux-gnu", optimized }, try c.join(&.{ directory, "local-object" }), env);
-    try c.copy(try c.join(&.{ directory, "local-object.stdout" }), local);
+    const local = try c.temporaryPath(&.{ directory, "local.o" });
+    try runner.requireOutput(&.{ zllvm, "--generic-cfg-selector", "--emit=obj", "--target=x86_64-unknown-linux-gnu", optimized }, try c.join(&.{ directory, "local-object" }), env, local);
     try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), try elf.parse(c.a, try c.read(local)));
     try runner.require(&.{ zllvm, "--generic-cfg-selector", "--emit=selection-owner-manifest", "--target=x86_64-unknown-linux-gnu", optimized }, try c.join(&.{ directory, "owners" }), env);
     var owners = u.array(c.a);
@@ -152,7 +155,7 @@ fn runMode(c: *u.Context, directory: []const u8, mode: []const u8, raw: []const 
     try u.put(c.a, row, "owners", owners);
     const hash = try c.digest(local);
     try u.put(c.a, row, "local_object_sha256", u.s(hash));
-    const exe = try c.join(&.{ directory, "local" });
+    const exe = try c.temporaryPath(&.{ directory, "local" });
     try runner.require(&.{ "cc", "-no-pie", local, "-o", exe }, try c.join(&.{ directory, "local-link" }), env);
     for (try u.json.array(try u.get(manifest, "cases"))) |case| {
         try canaries.observation(runner, exe, case, try c.join(&.{ directory, try c.fmt("local-{s}", .{try u.str(case, "id")}) }), env);

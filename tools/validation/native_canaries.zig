@@ -67,10 +67,9 @@ pub fn variadic(runner: *Runner, directory: []const u8, zllvm: []const u8, env: 
     const optimized = try c.join(&.{ directory, "varargs-optimized.ll" });
     try runner.require(&.{ zllvm, "--passes=verify,instcombine,dce,verify", fixture }, try c.join(&.{ directory, "varargs-optimize" }), env);
     try c.copy(try c.join(&.{ directory, "varargs-optimize.stdout" }), optimized);
-    try runner.require(&.{ zllvm, "--generic-cfg-selector", "--emit=obj", "--target=x86_64-unknown-linux-gnu", optimized }, try c.join(&.{ directory, "varargs-object" }), env);
-    const obj = try c.join(&.{ directory, "varargs.o" });
-    try c.copy(try c.join(&.{ directory, "varargs-object.stdout" }), obj);
-    const exe = try c.join(&.{ directory, "varargs-canary" });
+    const obj = try c.temporaryPath(&.{ directory, "varargs.o" });
+    try runner.requireOutput(&.{ zllvm, "--generic-cfg-selector", "--emit=obj", "--target=x86_64-unknown-linux-gnu", optimized }, try c.join(&.{ directory, "varargs-object" }), env, obj);
+    const exe = try c.temporaryPath(&.{ directory, "varargs-canary" });
     try runner.require(&.{ "cc", "-O2", "-no-pie", try c.join(&.{"test/real_programs/variadic_integer_driver.c"}), try c.join(&.{"test/real_programs/variadic_integer_shim.S"}), obj, "-o", exe }, try c.join(&.{ directory, "varargs-link" }), env);
     try runner.observe(exe, &.{}, 0, "integer-call-canary varargs_cases=16 heap_cases=6 al=0 pointers=preserved live=preserved\n", try c.join(&.{ directory, "varargs-run" }), env);
 }
@@ -90,10 +89,10 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         if (canary.object.get("reference_source")) |source| try u.put(c.a, report, try c.fmt("{s}_reference_source_sha256", .{population}), u.s(try c.digest(try c.join(&.{ "test/real_programs", source.string }))));
     }
     const driver = try c.join(&.{ "test/real_programs", try c.fmt("{s}_driver.c", .{try u.str(canary, "fixture")}) });
-    const reference = try c.join(&.{ directory, try c.fmt("{s}-reference.o", .{prefix}) });
+    const reference = try c.temporaryPath(&.{ directory, try c.fmt("{s}-reference.o", .{prefix}) });
     const reference_args = &.{ "clang-22", "-x", "ir", try llvmOpt(mode), "-c", reference_fixture, "-o", reference };
     try runner.require(if (shared) try p.argv(c, reference_args, &.{"-fPIC"}) else reference_args, try c.join(&.{ directory, try c.fmt("{s}-reference-object", .{prefix}) }), env);
-    const reference_exe = try c.join(&.{ directory, try c.fmt("{s}-reference", .{prefix}) });
+    const reference_exe = try c.temporaryPath(&.{ directory, try c.fmt("{s}-reference", .{prefix}) });
     try link(runner, driver, reference, reference_exe, shared, dependencies, canary, env);
     try runner.observe(reference_exe, &.{}, 0, try u.str(canary, "stdout"), try c.join(&.{ directory, try c.fmt("{s}-reference-run", .{prefix}) }), env);
     const observations = try u.json.integer(try u.get(canary, "observations"));
@@ -109,9 +108,8 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         const codegen_args = if (canary.object.get("codegen_args")) |value| try u.stringSlice(c.a, value) else &.{};
         const arguments = try p.argv(c, codegen_args, &.{ "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", source });
         const object_stem = try c.join(&.{ directory, try c.fmt("{s}-{s}-object", .{ prefix, route }) });
-        try runner.require(try p.argv(c, &.{ zllvm, "--emit=obj" }, arguments), object_stem, env);
-        const obj = try c.join(&.{ directory, try c.fmt("{s}-{s}.o", .{ prefix, route }) });
-        try c.copy(try c.fmt("{s}.stdout", .{object_stem}), obj);
+        const obj = try c.temporaryPath(&.{ directory, try c.fmt("{s}-{s}.o", .{ prefix, route }) });
+        try runner.requireOutput(try p.argv(c, &.{ zllvm, "--emit=obj" }, arguments), object_stem, env, obj);
         if (std.mem.eql(u8, population, "module_dependencies")) {
             if (std.mem.indexOf(u8, try c.read(try c.fmt("{s}.stderr", .{object_stem})), "coverage=complete") == null) return error.IncompleteModuleDependencyCoverage;
             try moduleObject(c, obj);
@@ -122,22 +120,23 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
                 for (arguments) |arg| if (!std.mem.eql(u8, arg, "--codegen-reachable")) try env_args.append(arg);
                 var selected = try env.clone(c.a);
                 try selected.put("ZLLVM_CODEGEN_REACHABLE", "1");
-                try runner.require(env_args.items, env_stem, &selected);
-                if (!std.mem.eql(u8, try c.read(try c.fmt("{s}.stdout", .{env_stem})), try c.read(obj))) return error.ModuleSelectionEnvironmentDiffers;
+                const env_object = try c.temporaryPath(&.{try c.fmt("{s}.stdout", .{env_stem})});
+                try runner.requireOutput(env_args.items, env_stem, &selected, env_object);
+                if (!std.mem.eql(u8, try c.read(env_object), try c.read(obj))) return error.ModuleSelectionEnvironmentDiffers;
                 try u.increment(c.a, report, "module_dependencies_environment_checks", 1);
             }
         }
         const owner_stem = try c.join(&.{ directory, try c.fmt("{s}-{s}-owners", .{ prefix, route }) });
         try runner.require(try p.argv(c, &.{ zllvm, "--emit=selection-owner-manifest" }, arguments), owner_stem, env);
         try owners(c, try c.read(try c.fmt("{s}.stdout", .{owner_stem})), try u.stringSlice(c.a, try u.get(canary, "functions")));
-        const exe = try c.join(&.{ directory, try c.fmt("{s}-{s}", .{ prefix, route }) });
+        const exe = try c.temporaryPath(&.{ directory, try c.fmt("{s}-{s}", .{ prefix, route }) });
         try link(runner, driver, obj, exe, shared, dependencies, canary, env);
-        try runner.observe(exe, &.{}, 0, try u.str(canary, "stdout"), try c.fmt("{s}-run", .{exe}), env);
+        try runner.observe(exe, &.{}, 0, try u.str(canary, "stdout"), try c.fmt("{s}-run", .{try c.evidencePath(exe)}), env);
         try u.increment(c.a, report, try c.fmt("{s}_local_observations", .{population}), observations);
         if (canary.object.get("guard_probe")) |guard| {
             if (guard != .bool) return error.InvalidGuardProbe;
             if (guard.bool) {
-                try runner.observe(exe, &.{"--guard-probe"}, 0, "bounded-storage guard_checks=3 accessible=small-frame=guard-fault=verified\n", try c.fmt("{s}-guard-probe", .{exe}), env);
+                try runner.observe(exe, &.{"--guard-probe"}, 0, "bounded-storage guard_checks=3 accessible=small-frame=guard-fault=verified\n", try c.fmt("{s}-guard-probe", .{try c.evidencePath(exe)}), env);
                 try u.increment(c.a, report, try c.fmt("{s}_guard_checks", .{population}), 3);
             }
         }
@@ -165,10 +164,9 @@ fn resolveProvider(runner: *Runner, directory: []const u8, zllvm: []const u8, en
     const digest = try u.digestBytes(c.a, source);
     const stem = try c.join(&.{ directory, try c.fmt("{s}-provider-object", .{prefix}) });
     const owners_path = try c.join(&.{ directory, try c.fmt("{s}-provider-owners.tsv", .{prefix}) });
-    const emitted = try runner.run(&.{ zllvm, "--emit=obj", "--generic-cfg-selector", "--codegen-reachable", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{source.len + 1}), try c.fmt("--selection-owner-output={s}", .{owners_path}), fixture }, stem, env, .{ .timeout_ms = 900000 });
+    const object = try c.temporaryPath(&.{ directory, try c.fmt("{s}-provider.o", .{prefix}) });
+    const emitted = try runner.run(&.{ zllvm, "--emit=obj", "--generic-cfg-selector", "--codegen-reachable", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{source.len + 1}), try c.fmt("--selection-owner-output={s}", .{owners_path}), fixture }, stem, env, .{ .timeout_ms = 900000, .stdout_file = object });
     if (!emitted.completed or emitted.code != 0) return error.NativeProviderEmissionFailed;
-    const object = try c.join(&.{ directory, try c.fmt("{s}-provider.o", .{prefix}) });
-    try c.copy(try c.fmt("{s}.stdout", .{stem}), object);
     if (!std.mem.eql(u8, digest, try c.digest(fixture))) return error.NativeProviderSourceChanged;
     var resolved = registered;
     resolved.object = try registered.object.clone(c.a);
@@ -212,8 +210,8 @@ fn link(runner: *Runner, driver: []const u8, object: []const u8, exe: []const u8
     if (shared and providers.len != 0) return error.SharedNativeProvidersUnsupported;
     try flags.appendSlice(c.a, providers);
     for (dependencies) |dependency| try flags.append(c.a, try c.fmt("-l{s}", .{dependency}));
-    if (shared) try runner.require(try p.argv(c, try p.argv(c, &.{ "cc", "-shared", "-Wl,-z,noexecstack", object }, flags.items), &.{ "-o", library }), try c.fmt("{s}-shared-link", .{exe}), env);
-    try runner.require(try p.argv(c, try p.argv(c, &.{ "cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, library }, flags.items), &.{ "-o", exe }), try c.fmt("{s}-link", .{exe}), env);
+    if (shared) try runner.require(try p.argv(c, try p.argv(c, &.{ "cc", "-shared", "-Wl,-z,noexecstack", object }, flags.items), &.{ "-o", library }), try c.fmt("{s}-shared-link", .{try c.evidencePath(exe)}), env);
+    try runner.require(try p.argv(c, try p.argv(c, &.{ "cc", "-O2", "-no-pie", "-Wl,-z,noexecstack", driver, library }, flags.items), &.{ "-o", exe }), try c.fmt("{s}-link", .{try c.evidencePath(exe)}), env);
 }
 
 fn moduleObject(c: *u.Context, path: []const u8) !void {
@@ -241,7 +239,7 @@ fn moduleObject(c: *u.Context, path: []const u8) !void {
     }
     for ([_][]const u8{ "module_callback_alias", "module_get_slot" }) |name| if (symbols.get(name).?[2].integer != 2) return error.ModuleDependencyVisibilityDiffers;
     const stem = path[0 .. path.len - std.fs.path.extension(path).len];
-    try c.writeJson(try c.fmt("{s}.contract.json", .{stem}), contract);
+    try c.writeJson(try c.fmt("{s}.contract.json", .{try c.evidencePath(stem)}), contract);
 }
 
 fn moduleControls(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *const std.process.Environ.Map, report: *u.Value) !void {

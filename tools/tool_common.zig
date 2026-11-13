@@ -1,5 +1,7 @@
 const std = @import("std");
 const regex = @import("vendor/regex/src/root.zig");
+/// Set only by the integrated worker, after validating its parent's mapping.
+pub var workspace_context: ?*@import("validation/common.zig").Context = null;
 
 /// Explicit compiler selections must never be overwritten by a nested default
 /// installation. Standalone canaries retain their ordinary Debug build.
@@ -12,8 +14,13 @@ pub fn resolveZllvm(init: std.process.Init) ![]const u8 {
 
 pub const TempDir = struct {
     path: []const u8,
+    retained: bool = false,
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io, prefix: []const u8) !TempDir {
+        if (workspace_context) |c| if (c.workspace_paths) |mapping| {
+            const path = try c.newOutput(try c.fmt("{s}/{s}_{d}", .{ mapping.evidence, prefix, std.os.linux.getpid() }));
+            return .{ .path = try allocator.dupe(u8, path), .retained = true };
+        };
         var cwd = std.Io.Dir.cwd();
         try cwd.createDirPath(io, "tmp");
         const path = try std.fmt.allocPrint(allocator, "tmp/{s}_{}", .{ prefix, std.os.linux.getpid() });
@@ -24,7 +31,7 @@ pub const TempDir = struct {
     }
 
     pub fn deinit(temp: TempDir, allocator: std.mem.Allocator, io: std.Io) void {
-        std.Io.Dir.cwd().deleteTree(io, temp.path) catch {};
+        if (!temp.retained) std.Io.Dir.cwd().deleteTree(io, temp.path) catch {};
         allocator.free(temp.path);
     }
 
@@ -53,7 +60,18 @@ pub fn allocTempFile(
     defer allocator.free(stem);
     const name = try std.fmt.allocPrint(allocator, "{s}{s}", .{ stem, suffix });
     defer allocator.free(name);
-    return temp.join(allocator, name);
+    const path = try temp.join(allocator, name);
+    if (workspace_context) |c| if (c.workspace_paths) |mapping| {
+        // Explicit artifact suffixes only: generated inputs, owner manifests,
+        // command logs and observations stay in the maintained tree.
+        if (@import("validation/common.zig").isWithin(mapping.evidence, path) and
+            (std.mem.endsWith(u8, suffix, ".o") or std.mem.eql(u8, suffix, ".reference") or std.mem.eql(u8, suffix, ".linked")))
+        {
+            defer allocator.free(path);
+            return allocator.dupe(u8, try c.temporaryPath(&.{path}));
+        }
+    };
+    return path;
 }
 
 pub fn runCapture(

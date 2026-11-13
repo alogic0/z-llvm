@@ -24,7 +24,7 @@ pub const Workspace = struct {
         if (!p.within(try c.fmt("{s}/{s}", .{ w.project, w.record.evidence_root }), result_path)) return error.InvalidWorkspaceEvidence;
         const result = try c.load(result_path);
         var record = w.record;
-        record.state = if (successful(result)) .disposable else .retained;
+        record.state = if (record.lifetime == .validation and successful(result)) .disposable else .retained;
         record.result = .{ .path = result_path[w.project.len + 1 ..], .sha256 = try c.digest(result_path) };
         const kept = try c.a.alloc(p.Evidence, diagnostics.len);
         for (diagnostics, kept) |path, *ev| {
@@ -53,6 +53,19 @@ pub fn successful(value: u.Value) bool {
 }
 
 pub fn start(c: *u.Context, evidence: []const u8, key: []const u8) !?Workspace {
+    return startOwned(c, evidence, key, .validation, false);
+}
+pub fn startPipeline(c: *u.Context, evidence: []const u8, key: []const u8) !?Workspace {
+    return startOwned(c, evidence, key, .pipeline, false);
+}
+
+/// Compiler installations live until the pipeline owner explicitly releases
+/// them. The caller holds its own build lock when reopening an installation.
+pub fn compiler(c: *u.Context, evidence: []const u8) !?Workspace {
+    return startOwned(c, evidence, "compiler", .pipeline, true);
+}
+
+fn startOwned(c: *u.Context, evidence: []const u8, key: []const u8, lifetime: @FieldType(paths.Record, "lifetime"), reopen: bool) !?Workspace {
     const project = (try lifecycle.projectRoot(c)) orelse return null;
     if (evidence.len <= project.len or !p.within(project, evidence) or !p.candidate(evidence[project.len + 1 ..])) return null;
     const relative = evidence[project.len + 1 ..];
@@ -69,13 +82,57 @@ pub fn start(c: *u.Context, evidence: []const u8, key: []const u8) !?Workspace {
     var parent = try store.openDirectory(c.io, std.fs.path.dirname(absolute).?, true);
     defer parent.close(c.io);
     // Never adopt an old tree, follow a symlink, or re-bless an earlier result.
-    if (u.exists(c.io, record_path)) return error.WorkspaceAlreadyExists;
-    try parent.createDir(c.io, key, .fromMode(0o700));
-    const record: paths.Record = .{ .evidence_root = relative, .temporary_root = temporary, .key = key };
-    try u.json.writeAtomic(c.gpa, c.io, .{ .path = record_path, .replace = false }, record);
+    const exists = u.exists(c.io, record_path);
+    if (exists) {
+        if (!reopen) return error.WorkspaceAlreadyExists;
+        const old = try std.json.parseFromValue(paths.Record, c.a, try c.load(record_path), .{});
+        try paths.validate(c.a, record_path[project.len + 1 ..], old.value);
+        if (old.value.state == .active or old.value.lifetime != .pipeline or
+            u.exists(c.io, try c.fmt("{s}/{s}", .{ project, try paths.releasePath(c.a, old.value) }))) return error.WorkspaceNotReusable;
+        const result = old.value.result orelse return error.WorkspaceNotReusable;
+        const result_path = try c.fmt("{s}/{s}", .{ project, result.path });
+        if (!std.mem.eql(u8, result.sha256, try c.digest(result_path)) or !successful(try c.load(result_path))) return error.WorkspaceNotReusable;
+        for (old.value.diagnostics) |ev| {
+            if (!std.mem.eql(u8, ev.sha256, try c.digest(try c.fmt("{s}/{s}", .{ project, ev.path })))) return error.WorkspaceNotReusable;
+        }
+        var existing = try store.openDirectory(c.io, absolute, false);
+        existing.close(c.io);
+    } else try parent.createDir(c.io, key, .fromMode(0o700));
+    const record: paths.Record = .{ .evidence_root = relative, .temporary_root = temporary, .key = key, .lifetime = lifetime };
+    try u.json.writeAtomic(c.gpa, c.io, .{ .path = record_path, .replace = exists }, record);
     const previous = c.workspace_paths;
     c.workspace_paths = .{ .evidence = evidence, .temporary = absolute };
     return .{ .project = project, .record_path = record_path, .record = record, .lease = lease, .previous = previous };
+}
+
+/// A reader lease protects existing products while resolving their layout.
+pub fn reader(c: *u.Context) !?std.Io.File {
+    const project = (try lifecycle.projectRoot(c)) orelse return null;
+    var state = try store.openDirectory(c.io, try c.fmt("{s}/local-state/storage-cleanup", .{project}), true);
+    defer state.close(c.io);
+    const lease = try state.createFile(c.io, "cleanup.lock", .{ .truncate = false });
+    errdefer lease.close(c.io);
+    try lease.lock(c.io, .shared);
+    return lease;
+}
+
+/// Resolve another run's products without recreating an already collected tree.
+pub fn artifact(c: *u.Context, evidence: []const u8, parts: []const []const u8) ![]const u8 {
+    const logical = try c.join(parts);
+    const mapping = (try inspect(c, evidence, "validation")) orelse return logical;
+    if (logical.len <= evidence.len or !p.within(evidence, logical)) return error.TemporaryPathOutsideWorkspace;
+    return c.fmt("{s}/{s}", .{ mapping.temporary, logical[evidence.len + 1 ..] });
+}
+
+pub fn inspect(c: *u.Context, evidence: []const u8, key: []const u8) !?paths.Paths {
+    const project = (try lifecycle.projectRoot(c)) orelse return null;
+    if (evidence.len <= project.len or !p.within(project, evidence) or !p.candidate(evidence[project.len + 1 ..])) return null;
+    const name = try paths.recordPath(c.a, evidence[project.len + 1 ..], key);
+    const record_path = try c.fmt("{s}/{s}", .{ project, name });
+    if (!u.exists(c.io, record_path)) return null;
+    const record = try std.json.parseFromValue(paths.Record, c.a, try c.load(record_path), .{});
+    try paths.validate(c.a, name, record.value);
+    return .{ .evidence = evidence, .temporary = try c.fmt("{s}/{s}", .{ project, record.value.temporary_root }) };
 }
 
 /// Capture subprocesses inherit the exact checked mapping, never a free-form
