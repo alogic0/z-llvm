@@ -1,6 +1,6 @@
 # Retire completed validation runs
 
-Status: first execution complete; remaining-storage investigation in progress.
+Status: two reviewed cleanup executions complete; next unresolved groups recorded.
 Requested by the user on 2026-11-13.
 
 ## Objective and starting measurements
@@ -207,29 +207,34 @@ temporary outputs under the existing authorization.
 
 The [remaining-storage investigation](2026-11-13-remaining-storage-investigation.md)
 records the second execution's concrete purposes, completed removals and fresh
-verification. All 37 compiler outputs and four new private compiler caches are
-now removed (3.91 GiB). The private native-test cache adapter qualifies another
-70 roots (10.29 GiB) while preserving current held test projects and diagnostics.
+verification. It removed 56 compiler binaries, 74 complete private caches and
+18 freshly audited raw traces: **34,524,938,240 allocated file bytes
+(32.154 GiB)**, plus about 0.38 GiB of completed tool scratch space. A repeated
+apply removed nothing, all five current integrity manifests passed, and no
+pending mutation remained. The earlier 21.15-GiB trace catalog described files
+already retired by `strong-trace-cleanup-20261113`; that history is explicitly
+excluded from the new reclaim totals.
 
 The unclassified executable allocation includes private native-test caches such
 as `sign-extension-units-v1035/evidence/zig-local-Debug-v1039`. Its run receipt
 records relative cache arguments and a failed terminal test, without a working
-directory. The isolated-compiler adapter does not establish ownership for this
-format. Verify its producer working directory and lifecycle before adding a
-test-cache adapter; source reconstruction is not needed for temporary outputs.
-Remove whole owned caches, including manifests, rather than individual objects.
+directory. The new private-cache adapter binds an explicit review of the legacy
+working directory and exact private cache arguments, with current holds and
+diagnostics preserved. Whole owned caches were removed, including manifests;
+source reconstruction was not required. New receipts record actual cwd.
 
-Next review the selection suite's noncurrent accepted/expected-binary manifests,
-the one mismatched compiler identity, and raw traces whose original compilers
-have already been retired. Current manifests and explicit queued holds continue
-to protect their targets. Raw trace auditing has a separate evidence requirement
-from binary disposal.
+Next prioritize integrated/native comparison outputs, generated assembly and
+immutable input deduplication, then review noncurrent expected-binary manifests
+and remaining legacy trace bindings. Current manifests and explicit queued
+holds continue to protect their targets. The collector now authenticates a
+retired compiler through its completed guarded removal and unchanged original
+build receipt. Raw trace auditing retains its separate evidence requirement.
 
 A read-only follow-up also identified 37 present compiler outputs from passed
 behavior builds v800–v967. Their candidate list is
 `local-state/storage-cleanup/completed-run-qualification/later-present-builds.txt`.
-They still need explicit requests and fresh pin/consumer review; the list itself
-does not authorize removal and version order alone does not establish disuse.
+All 37 passed fresh release/pin/consumer review and were removed in the second
+execution. The original list remains historical evidence, not a live inventory.
 
 The first large batch exposes a latency limitation: refreshing the full
 historical pin graph and consumer checks before every artifact makes historical
@@ -237,9 +242,10 @@ collection slow. Profile that path before expanding large batches. Preserve
 fresh discovery, alias checks and newly introduced pins when optimizing it;
 small producer-completion batches remain the preferred steady-state workflow.
 
-Do not impose an arbitrary total-size cap while 124.1 GiB in the final full
-inventory remains unresolved. The measured 23.3 GiB under current contracts is
-a review starting point, not a proven minimum. The operating limits remain
+The latest full inventory reports **121.410 GiB**, comprising **28.423 GiB**
+under current contracts and **92.988 GiB unresolved**. Do not impose an arbitrary
+total-size cap while these purposes and contracts remain unresolved. Current
+protection is a review starting point, not a proven minimum. The operating limits remain
 20,000,000,000 bytes of free space for admitting serial validation, its existing
 8 GiB working allowance, and at most 32 GiB reclaimed per collector invocation.
 Refresh whole-tree accounting after each batch and retain explicit unresolved

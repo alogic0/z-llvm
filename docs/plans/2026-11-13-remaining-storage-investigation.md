@@ -1,6 +1,6 @@
 # Remaining local storage: purpose and retirement review
 
-Status: investigation and verified cleanup in progress. This continues
+Status: reviewed cleanup complete; remaining categories and next work recorded. This continues
 [completed-run retention](2026-11-13-completed-run-retention.md). Ordinary old
 build binaries and objects are disposable; reconstructing or archiving their
 source/build configuration is not a prerequisite for retirement. Current uses,
@@ -113,6 +113,28 @@ query in the test script; selecting the matching retirement file with
 This is usable for live newer traces after
 their full audits, rather than another retirement of the already absent group.
 
+The fresh live batch contains 18 single-link behavior traces, 17,056,370,688
+allocated bytes (15.885 GiB), from v733–v921. Seventeen original compilers have
+matching guarded retirement records; v853 ReleaseFast is still present.
+The tracked native auditor read **54,834,041 events** and verified all 18 full
+streams against input, producer, report, tail counter and failed-function
+bindings. All 18 remain recorded as failed compilations. Its results are under
+`local-state/retirements/native-event-audit/1794574631493448536-3818051/`.
+Build/source, pins, holds and consumers remain separate release requirements.
+
+The reusable auditor is committed as `45b69868`, with pinned-Zig build wiring
+corrected in the following commit. Fifteen native checks pass in Debug and
+ReleaseFast, including full fixture reads, truncation, changed hashes, unrelated
+producer commands, malformed events and exact failure bindings. Both actual
+`test-native-event-audit` build targets pass. A stale global Zig `maker` cache
+required task-private cache environment variables; no shared cache was deleted.
+
+All 18 live traces subsequently passed full release qualification and were
+removed in `1794575010186037946-3833279/report.json`, reclaiming
+**17,056,370,688 allocated file bytes (15.885 GiB)**. The completed pass rechecked
+all five current integrity manifests. No historical pin exception was needed.
+Original failed outcomes, source/input/build evidence and compact audits remain.
+
 ## Integrated comparison runs
 
 Twenty-nine unresolved integrated-run roots in the starting inventory total
@@ -147,6 +169,13 @@ outcomes, rather than requiring every command to return zero. Executables named
 `local`, `reference` and `capture-zllvm` also need explicit output ownership;
 the current filename allowlist does not treat arbitrary extensionless files as
 disposable binaries.
+
+A fresh filename/inode scan across the integrated roots found 38 distinct
+`capture-zllvm` executable inodes occupying 723,795,968 bytes (three have
+aliases), and 567 `linked-harness.s` files occupying 5,490,835,456 bytes. The
+scan includes current as well as unresolved integrated roots, so these are
+purpose-specific totals, not all immediately eligible bytes. These two known
+output families make the next command-ownership adapter concrete.
 
 ## Duplicate large IR inputs
 
@@ -222,7 +251,75 @@ payload archive. The pin optimization was measured on 100,000 repeated absent
 references: 0.59 s before and 0.50 s after in one isolated run. That narrow
 measurement is not a claim that historical full-project cleanup is fast.
 
-After the private-cache and compiler batches, prioritize fresh audits of live
-newer traces, terminal command/output ownership for integrated runs, and
-immutable input deduplication. Keep unresolved allocation
-visible; neither age nor a zero-candidate cleanup report proves necessity.
+## Verified result and remaining inventory
+
+Completed collector actions in this investigation reconcile to:
+
+| Removed family | Count | Allocated file bytes reclaimed |
+| --- | ---: | ---: |
+| Compiler binaries | 56 | 6,252,916,736 |
+| Complete private caches | 74 | 11,215,650,816 |
+| Freshly audited raw traces | 18 | 17,056,370,688 |
+| **Total** | **148** | **34,524,938,240 (32.154 GiB)** |
+
+Separately, completed tool qualification caches, a temporary cwd-check runner
+and the superseded collector occupied 408,023,040 allocated bytes (about
+0.38 GiB) and were removed. Cache measurements include directory blocks.
+Their receipts, qualification logs and current installed helpers remain.
+No source or configuration archive was created for these temporary outputs.
+The old 21.15-GiB trace retirement is excluded from all new reclaim totals.
+
+The repeat pass `1794575674718614739-3860888/report.json` removed zero files.
+All five current integrity manifests passed again, with no pending mutation.
+It retains 66 known candidate paths: 44 held caches and 22 pinned, aliased or
+discrepant compiler paths. Some aliases share allocation; do not sum their
+per-path sizes as exclusive disk usage.
+
+The final full inventory is
+`local-state/retirements/automatic-storage-cleanup/1794575797261399899-3863323/inventory.json`:
+
+| Disposition | Allocated bytes | GiB |
+| --- | ---: | ---: |
+| Required by current contracts | 30,518,611,968 | 28.423 |
+| Eligible under reviewed releases | 0 | 0 |
+| Unresolved | 99,844,767,744 | 92.988 |
+| **Total** | **130,363,379,712** | **121.410** |
+
+The walk observed 1,676,696 paths and 1,666,546 unique inodes, with no vanished
+or foreign-device entries. The folder fell from 147.34 to 121.41 GiB during
+concurrent development; new allocations mean that net change differs from
+the completed retirement ledger. These are filesystem observations, not an
+atomic snapshot or a claim that 121.41 GiB is necessary.
+
+The remaining executable family alone contains 32,486,006,784 unresolved bytes
+(about 30.26 GiB), plus 14,206,308,352 bytes under current contracts. Executable
+mode/name classification includes private build outputs; it is not proof of a
+live consumer. The integrated-run breakdown above is unchanged in the final
+inventory. A fresh raw-file scan finds 71 distinct remaining traces occupying
+13,606,133,760 bytes (12.672 GiB), including current baselines, aliases and
+older source/build cases.
+
+Next work, in order:
+
+1. Bind integrated/native comparison outputs to completed command and producer
+   records. Cover extensionless ELF programs, capture helpers, objects and
+   generated assembly, while keeping IR, compact results and failure diagnostics.
+   Account for expected nonzero test outcomes and complete alias groups. Many
+   small outputs need a guarded generation-level batch; a full pin-graph refresh
+   per object would be impractical.
+2. Establish an immutable input-store transition for duplicate IR. The verified
+   4.13-GiB redundancy in large inputs is potential reclaim, not permission to
+   couple independently writable files with hardlinks.
+3. Review the remaining original-compiler/self-rebuild traces and legacy source
+   bindings from the live inventory. Preserve current seals and queued holds;
+   whole-stream integrity alone is not a release decision.
+4. Review historical expected-binary contracts and the known repacked v4 Debug
+   executable separately from current acceptance. Keep unresolved allocation
+   visible until those contracts or producer roles are resolved.
+
+The utility work discovered during this investigation is also complete:
+`zigrep` 0.3.19 is installed in `~/bin`, with 454 tests passing in Debug and
+ReleaseFast and the original 41-pattern query reduced from 19.53 s to 0.02 s
+with identical results. Its own 1,804,275,712-byte cache retirement occurred
+outside this project's `local-state` and is excluded from the totals above.
+`jqz` 0.33.0 continues to handle exact structured accounting.

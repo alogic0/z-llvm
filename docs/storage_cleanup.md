@@ -463,6 +463,8 @@ zig build test-storage-cleanup -Doptimize=ReleaseFast
 Tests use isolated directories, including real file descriptors, aliases,
 symlinks, changed files, manifest/hold checks, source mismatches, accepted and
 failed release records, incomplete trace audits and directory permissions.
+CLI qualification requires `jqz` and `zigrep` on PATH; `JQZ` and `ZIGREP` can
+select explicit executable paths.
 Guarded reads bind parsed controls to their exact bytes and identity, including
 when a report is atomically replaced. Previous numbered retirement records pin
 their retained evidence in later runs. CLI
