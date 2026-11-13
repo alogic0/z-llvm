@@ -1,5 +1,53 @@
 # Automatic project storage cleanup
 
+New checked commands, real-program validations, execution-breadth controls and
+whole-compiler diagnostics separate their work files from maintained evidence:
+
+| Location | Contents and lifetime |
+| --- | --- |
+| `local-state/validations/SUITE/BATCH/RUN/` | Reports, command records, logs, generated test sources, captured inputs, profiles and raw traces. |
+| `local-state/tmp/validations/SUITE/BATCH/RUN/.workspaces/KEY/` | Private caches, generated assembly, objects, capture helpers and executables. A fresh directory owned by one producer. |
+| `RUN/KEY.storage-layout.json` | The exact mapping, producer state and hashes of the terminal result and diagnostic records. Retained after collection. |
+| `local-state/artifacts/` | Shared immutable inputs and explicitly maintained objects. |
+
+The collector's own build caches and staging executable also live under
+`local-state/tmp/storage-cleanup-build/`; its installed executable, locks and
+cleanup records remain under `local-state/storage-cleanup/`. Its build lock
+serializes access to that reusable cache.
+
+The converted tools select this layout automatically for output roots governed by
+the project policy under `local-state/validations/`. Existing mixed runs and
+standalone outputs keep their original paths and retention rules. There is no
+bulk move of historical files or rewrite of current manifests.
+
+`run_checked` gives commands `ZLLVM_TEMP_ROOT` and defaults `TMPDIR`,
+`ZIG_LOCAL_CACHE_DIR` and `ZIG_GLOBAL_CACHE_DIR` to that workspace. Explicit cache
+environment variables and command-line paths remain caller-owned overrides.
+Commands can put additional ordinary build products in `$ZLLVM_TEMP_ROOT`;
+reports, unique inputs and diagnostics belong in the supplied output root.
+For example:
+
+```sh
+zig run tools/run_checked.zig -- \
+  --output-root local-state/validations/example/batch-01/unit test -- \
+  zig build test-unit
+```
+
+A passed report or successful completed checked command releases its workspace
+for the normal collector. Failed or interrupted runs retain their scratch for
+investigation. Holds on either the maintained run or temporary tree protect it;
+checksum pins and active consumers still apply. The collector verifies the
+whole tree, refuses external hard links, symlinks and mounted trees, and uses its
+existing quarantine journal before removing exact inventoried entries. A raw
+`profile.events.jsonl` accidentally placed in scratch blocks collection. An
+unknown folder under `local-state/tmp` is never automatically disposable.
+
+The standalone producers publish their result for the next `clean-storage
+--minimal --apply`; `run_checked` also attempts that collection on exit. A parent
+job or shared lease can defer it. Compiler installations prepared for later
+validation remain live dependencies until the pipeline owner releases them;
+this layout does not infer that build completion closes downstream consumers.
+
 Run the collector to review completed private compiler caches and explicitly
 released artifacts. Ordinary old compiler/test binaries and objects are temporary;
 their deletion does not require reconstructing source or build configuration.

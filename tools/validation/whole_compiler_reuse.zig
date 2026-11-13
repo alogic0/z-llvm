@@ -82,7 +82,7 @@ pub fn tryReplay(c: *u.Context, prior_root: []const u8, compiler: []const u8, di
     const contract = try elf.parse(c.a, object_bytes);
     try reports.validateObject(c.a, contract, profile);
     var result = base;
-    try c.write(try c.join(&.{ directory, "local.o" }), object_bytes);
+    try c.write(try c.temporaryPath(&.{ directory, "local.o" }), object_bytes);
     try c.write(try c.join(&.{ directory, "profile.json" }), profile_bytes);
     try c.write(try c.join(&.{ directory, "owners.tsv" }), owners);
     try c.copy(try c.join(&.{ source_dir, "backend.stderr" }), try c.join(&.{ directory, "backend.stderr" }));
@@ -119,7 +119,7 @@ pub fn tryReplay(c: *u.Context, prior_root: []const u8, compiler: []const u8, di
     try u.put(c.a, &result, "profile", u.s(try c.join(&.{ directory, "profile.json" })));
     try u.put(c.a, &result, "selection", try u.get(source, "selection"));
     try u.put(c.a, &result, "diagnostic_tail", try u.get(source, "diagnostic_tail"));
-    try u.put(c.a, &result, "object", try identity(c, try c.join(&.{ directory, "local.o" })));
+    try u.put(c.a, &result, "object", try identity(c, try c.temporaryPath(&.{ directory, "local.o" })));
     try u.put(c.a, &result, "object_complete", u.b(true));
     try u.put(c.a, &result, "failure_stage", u.s("none"));
     try u.put(c.a, &result, "returncode", u.n(0));

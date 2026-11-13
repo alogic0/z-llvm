@@ -5,6 +5,7 @@ const elf = @import("object_contract.zig");
 const provenance = @import("provenance.zig");
 const toolchain = @import("toolchain.zig");
 const cases = @import("program_cases.zig");
+const storage = @import("storage_workspace.zig");
 
 pub fn identity(c: *u.Context) !std.StringHashMap([]const u8) {
     var fields = std.StringHashMap([]const u8).init(c.a);
@@ -94,13 +95,14 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn capture(c: *u.Context, args: []const []const u8) !i64 {
+    try storage.adopt(c);
     if (args.len == 0) return error.MissingCompilerArguments;
     const directory = c.env.get("ZLLVM_CAPTURE_DIR").?;
     const exe = c.env.get("ZLLVM_CAPTURE_EXE").?;
     const object = u.contains(args, "--emit=obj");
     const stem = if (object) "object" else "optimize";
     try c.copy(try c.join(&.{args[args.len - 1]}), try c.join(&.{ directory, if (object) "object-input.ll" else "preopt.ll" }));
-    const output = try c.join(&.{ directory, if (object) "local.o" else "optimized.ll" });
+    const output = if (object) try c.temporaryPath(&.{ directory, "local.o" }) else try c.join(&.{ directory, "optimized.ll" });
     var runner = Runner.init(c, directory);
     const extra: []const []const u8 = if (object) &.{
         try c.fmt("--selection-owner-output={s}/owners.tsv", .{directory}),
@@ -121,6 +123,8 @@ fn capture(c: *u.Context, args: []const []const u8) !i64 {
 fn run(c: *u.Context, arguments: []const []const u8) !u8 {
     const args = try u.Args.parse(c.a, arguments, &.{ "output-root", "zig-source", "zig-emitter", "zllvm", "linker", "manifest", "mode" }, &.{ "codegen-reachable", "replay-owners" });
     const output = try c.newOutput(try args.require("output-root"));
+    const workspace = try storage.start(c, output, "validation");
+    defer if (workspace) |w| w.close(c);
     const manifest_path = args.get("manifest") orelse try c.join(&.{"test/real_programs/hello_libc.json"});
     const program = std.fs.path.stem(manifest_path);
     var runner = Runner.init(c, output);
@@ -135,6 +139,7 @@ fn run(c: *u.Context, arguments: []const []const u8) !u8 {
         try u.put(c.a, &report, "error", u.s(c.diagnostic orelse @errorName(err)));
     };
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(c);
     for ((try u.get(report, "rows")).array.items) |row| {
         if (row.object.get("failed_command")) |command| {
             try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("real-program-failure program={s} mode={s} stage={s} outcome={s} returncode={d} timeout_ms={d}\n", .{
@@ -211,9 +216,10 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, manifest_path: []con
     try u.put(c.a, report, "program_modes", u.n(modes.len));
     try u.put(c.a, report, "manifest", u.s(manifest_path));
     try u.put(c.a, report, "program", u.s(std.fs.path.stem(manifest_path)));
-    const base_env = try c.cleanEnvironment();
-    const global_cache = try c.join(&.{ output, "global-cache" });
-    const proxy = try c.join(&.{ output, "capture-zllvm" });
+    var base_env = try c.cleanEnvironment();
+    try storage.exportPaths(c, &base_env);
+    const global_cache = try c.temporaryPath(&.{ output, "global-cache" });
+    const proxy = try c.temporaryPath(&.{ output, "capture-zllvm" });
     try c.copy("/proc/self/exe", proxy);
     const proxy_file = try std.Io.Dir.cwd().openFile(c.io, proxy, .{});
     defer proxy_file.close(c.io);
@@ -244,10 +250,10 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     var common = std.array_list.Managed([]const u8).init(c.a);
     try common.appendSlice(&.{ zig, "build-obj", source, "-lc", try c.fmt("-O{s}", .{mode}), "-target", try u.str(manifest, "target"), try c.fmt("-mcpu={s}", .{try u.str(manifest, "cpu")}), "-fllvm", "-flibllvm", "-fno-lto", "-fno-stack-protector", "-fno-unwind-tables", "--global-cache-dir", global_cache });
     if (manifest.object.get("extra_compile_args")) |extra| try common.appendSlice(try u.stringSlice(c.a, extra));
-    const reference = try c.join(&.{ directory, "reference.o" });
-    if (!try runStage(c, runner, row, "reference-compile", try argv(c, common.items, &.{ "--cache-dir", try c.join(&.{ directory, "reference-cache" }), try c.fmt("-femit-bin={s}", .{reference}) }), try c.join(&.{ directory, "reference-compile" }), base_env, compile_options)) return;
+    const reference = try c.temporaryPath(&.{ directory, "reference.o" });
+    if (!try runStage(c, runner, row, "reference-compile", try argv(c, common.items, &.{ "--cache-dir", try c.temporaryPath(&.{ directory, "reference-cache" }), try c.fmt("-femit-bin={s}", .{reference}) }), try c.join(&.{ directory, "reference-compile" }), base_env, compile_options)) return;
     const linker = args.get("linker") orelse "cc";
-    const reference_exe = try c.join(&.{ directory, "reference" });
+    const reference_exe = try c.temporaryPath(&.{ directory, "reference" });
     if (!try runStage(c, runner, row, "reference-link", try linkCommand(c, args, manifest, zig, linker, mode, reference, reference_exe, global_cache), try c.join(&.{ directory, "reference-link" }), base_env, .{})) return;
     try u.put(c.a, row, "failure_stage", u.s("reference-execution"));
     if (manifest.object.contains("cases")) {
@@ -259,7 +265,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
             return err;
         };
     }
-    const candidate = try c.join(&.{ directory, "candidate.o" });
+    const candidate = try c.temporaryPath(&.{ directory, "candidate.o" });
     const marker = try c.join(&.{ directory, "candidate.marker" });
     const capture_dir = try c.join(&.{ directory, "capture" });
     try c.mkdir(capture_dir);
@@ -270,7 +276,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     const selection: []const []const u8 = if (args.flag("codegen-reachable")) &.{"--codegen-reachable"} else &.{};
     if (args.flag("codegen-reachable")) try local_env.put("ZLLVM_CODEGEN_REACHABLE", "1");
     const local_compile = try c.join(&.{ directory, "local-compile" });
-    if (!try runStage(c, runner, row, "local-compile", try argv(c, common.items, &.{ "--cache-dir", try c.join(&.{ directory, "candidate-cache" }), try c.fmt("-femit-bin={s}", .{candidate}) }), local_compile, &local_env, compile_options)) {
+    if (!try runStage(c, runner, row, "local-compile", try argv(c, common.items, &.{ "--cache-dir", try c.temporaryPath(&.{ directory, "candidate-cache" }), try c.fmt("-femit-bin={s}", .{candidate}) }), local_compile, &local_env, compile_options)) {
         const diagnostic = try c.read(try c.fmt("{s}.stderr", .{local_compile}));
         const fields = try markerFields(c, diagnostic);
         const stage = fields.get("failure_category") orelse "local-compile";
@@ -287,9 +293,16 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     const fields = try markerFields(c, try c.read(marker));
     if (!std.mem.eql(u8, fields.get("pipeline") orelse "", "preopt") or !std.mem.eql(u8, fields.get("mode") orelse "", mode)) return c.fail("local hook marker does not prove the selected optimizer route", .{});
     const optimized = try c.join(&.{ capture_dir, "object-input.ll" });
-    for ([_][]const u8{ "ir", "object" }) |key| if (!u.isWithin(directory, try c.ownedPath(fields.get(key) orelse return error.MissingHookArtifact))) return c.fail("hook artifacts escaped the runner-owned directory", .{});
+    const work_directory = std.fs.path.dirname(candidate).?;
+    for ([_][]const u8{ "ir", "object" }) |key| {
+        const path = fields.get(key) orelse return error.MissingHookArtifact;
+        // Zig may already have retired the transient path named by its marker.
+        // Resolve the surviving parent, as in the original mixed-tree check.
+        const resolved = try c.resolveParent(path);
+        if (!u.isWithin(directory, resolved) and !u.isWithin(work_directory, resolved)) return c.fail("hook artifacts escaped the runner-owned directories", .{});
+    }
     if (!std.mem.eql(u8, fields.get("zllvm_passes") orelse "", try u.pipeline(mode))) return c.fail("local hook marker does not identify the accepted mode pipeline", .{});
-    const hook = try c.join(&.{ capture_dir, "local.o" });
+    const hook = try c.temporaryPath(&.{ capture_dir, "local.o" });
     const hook_contract = try elf.parse(c.a, try c.read(hook));
     if (!u.json.eql(hook_contract, try elf.parse(c.a, try c.read(candidate)))) return c.fail("linked candidate changed hook sections, symbols or relocations", .{});
     try c.writeJson(try c.join(&.{ directory, "object-contract.json" }), hook_contract);
@@ -313,7 +326,7 @@ fn runMode(c: *u.Context, args: u.Args, directory: []const u8, mode: []const u8,
     try u.put(c.a, row, "selector_owners", owners);
     try u.put(c.a, row, "object_bytes", u.n((try std.Io.Dir.cwd().statFile(c.io, candidate, .{})).size));
     try u.put(c.a, row, "object_sha256", u.s(try c.digest(candidate)));
-    const candidate_exe = try c.join(&.{ directory, "candidate" });
+    const candidate_exe = try c.temporaryPath(&.{ directory, "candidate" });
     if (!try runStage(c, runner, row, "local-link", try linkCommand(c, args, manifest, zig, linker, mode, candidate, candidate_exe, global_cache), try c.join(&.{ directory, "local-link" }), base_env, .{})) return;
     try u.put(c.a, row, "failure_stage", u.s("local-execution"));
     if (manifest.object.contains("cases")) {

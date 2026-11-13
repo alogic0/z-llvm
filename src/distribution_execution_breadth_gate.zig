@@ -7,6 +7,7 @@ const air = @import("zig_air_export.zig");
 const u = @import("validation").common;
 const Runner = @import("validation").Runner;
 const harnesses = @import("validation").linked_harness;
+const storage = @import("validation").storage_workspace;
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -14,6 +15,8 @@ pub fn main(init: std.process.Init) !void {
     const argv = try init.minimal.args.toSlice(c.a);
     const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zig-emitter", "mode" }, &.{"fresh-harness"});
     const output = try c.newOutput(try args.require("output-root"));
+    const workspace = try storage.start(&c, output, "validation");
+    defer if (workspace) |w| w.close(&c);
     const emitter = args.get("zig-emitter") orelse cohort.external_repository_root ++ "/build/stage4/bin/zig";
     const emitter_identity = try harnesses.emitterIdentity(&c, emitter);
     if (args.get("mode")) |mode| if (!u.contains(&u.modes, mode)) return error.InvalidMode;
@@ -21,8 +24,8 @@ pub fn main(init: std.process.Init) !void {
     try sources.validate();
     var runner = Runner.init(&c, output);
     var env = try c.env.clone(c.a);
-    try env.put("ZIG_LOCAL_CACHE_DIR", try c.join(&.{ output, "local-cache" }));
-    try env.put("ZIG_GLOBAL_CACHE_DIR", try c.join(&.{ output, "global-cache" }));
+    try env.put("ZIG_LOCAL_CACHE_DIR", try c.temporaryPath(&.{ output, "local-cache" }));
+    try env.put("ZIG_GLOBAL_CACHE_DIR", try c.temporaryPath(&.{ output, "global-cache" }));
     var rows = u.array(c.a);
     var negative_controls: i64 = 0;
     var observations: usize = 0;
@@ -40,15 +43,15 @@ pub fn main(init: std.process.Init) !void {
                     .success => |bytes| bytes,
                     .failure => |failure| return c.fail("{s}: {s}: {s}", .{ member.functionName(), failure.stage, failure.diagnostic }),
                 };
-                const object_path = try c.join(&.{ root, "subject.o" });
+                const object_path = try c.temporaryPath(&.{ root, "subject.o" });
                 try c.write(object_path, object);
                 const reference_source = try c.join(&.{ root, "reference.zig" });
                 const linked_source = try c.join(&.{ root, "linked.zig" });
                 try c.write(reference_source, member.referenceHarness());
                 try c.write(linked_source, member.linkedHarness());
                 const optimize = "-O" ++ mode;
-                const reference = try c.join(&.{ root, "reference" });
-                const linked = try c.join(&.{ root, "linked" });
+                const reference = try c.temporaryPath(&.{ root, "reference" });
+                const linked = try c.temporaryPath(&.{ root, "linked" });
                 try runner.require(&.{ emitter, "build-exe", reference_source, optimize, try c.fmt("-femit-bin={s}", .{reference}) }, try c.join(&.{ root, "reference-build" }), &env);
                 const harness: ?harnesses.Compiled = if (args.flag("fresh-harness")) null else try harnesses.compile(&runner, root, linked_source, mode, emitter_identity, &env);
                 const linked_command: []const []const u8 = if (harness) |h| try h.linkCommand(&c, object_path, linked) else &.{ emitter, "build-exe", "-fno-lld", linked_source, object_path, optimize, try c.fmt("-femit-bin={s}", .{linked}) };
@@ -59,21 +62,22 @@ pub fn main(init: std.process.Init) !void {
                     if (std.mem.eql(u8, control, "memory-clobber") and !member.hasMemoryGuard()) continue;
                     if (std.mem.eql(u8, control, "high-half-loss") and !member.isPacked()) continue;
                     const ir_path = try c.join(&.{ root, try c.fmt("{s}.ll", .{control}) });
-                    const bad_object = try c.join(&.{ root, try c.fmt("{s}.o", .{control}) });
-                    const bad_exe = try c.join(&.{ root, control });
+                    const bad_object = try c.temporaryPath(&.{ root, try c.fmt("{s}.o", .{control}) });
+                    const bad_exe = try c.temporaryPath(&.{ root, control });
+                    const log_stem = try c.join(&.{ root, control });
                     try c.write(ir_path, try negativeIR(&c, member, control));
-                    try runner.require(&.{ "clang-22", "-x", "ir", "-c", ir_path, "-o", bad_object }, try c.fmt("{s}-object", .{bad_exe}), &env);
+                    try runner.require(&.{ "clang-22", "-x", "ir", "-c", ir_path, "-o", bad_object }, try c.fmt("{s}-object", .{log_stem}), &env);
                     const negative_command: []const []const u8 = if (harness) |h| try h.linkCommand(&c, bad_object, bad_exe) else &.{ emitter, "build-exe", "-fno-lld", linked_source, bad_object, optimize, try c.fmt("-femit-bin={s}", .{bad_exe}) };
-                    const build = try runner.run(negative_command, try c.fmt("{s}-build", .{bad_exe}), &env, .{});
+                    const build = try runner.run(negative_command, try c.fmt("{s}-build", .{log_stem}), &env, .{});
                     if (std.mem.eql(u8, control, "wrong-symbol")) {
-                        const diagnostic = try c.read(try c.fmt("{s}-build.stderr", .{bad_exe}));
+                        const diagnostic = try c.read(try c.fmt("{s}-build.stderr", .{log_stem}));
                         if (!build.completed or build.code == 0 or std.mem.indexOf(u8, diagnostic, "undefined symbol") == null or std.mem.indexOf(u8, diagnostic, member.functionName()) == null) return error.WrongSymbolControlFailed;
                     } else {
                         if (build.code != 0) return error.NegativeHarnessBuildFailed;
-                        const run = try runner.run(&.{bad_exe}, try c.fmt("{s}-run", .{bad_exe}), &env, .{ .timeout_ms = 5000 });
+                        const run = try runner.run(&.{bad_exe}, try c.fmt("{s}-run", .{log_stem}), &env, .{ .timeout_ms = 5000 });
                         // An explicit oracle error is required; a crash/timeout is
                         // not evidence that the semantic check rejected the bug.
-                        if (!run.completed or run.code != 1 or std.mem.indexOf(u8, try c.read(try c.fmt("{s}-run.stderr", .{bad_exe})), "OracleMismatch") == null) return error.NegativeOracleControlFailed;
+                        if (!run.completed or run.code != 1 or std.mem.indexOf(u8, try c.read(try c.fmt("{s}-run.stderr", .{log_stem})), "OracleMismatch") == null) return error.NegativeOracleControlFailed;
                     }
                     negative_controls += 1;
                 }
@@ -104,6 +108,7 @@ pub fn main(init: std.process.Init) !void {
     try u.put(c.a, &report, "observations", u.n(observations));
     try u.put(c.a, &report, "status", u.s("passed"));
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(&c);
     try c.print("execution-breadth-controls function_modes={d} observations={d} negative_controls={d} local_fail=0\n", .{ function_modes, observations, negative_controls });
 }
 

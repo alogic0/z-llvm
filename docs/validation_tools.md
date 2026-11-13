@@ -16,6 +16,14 @@ Failed jobs keep their exit code and diagnostics. Manual investigation holds
 remain independent. Whole-compiler `backend/input.ll` captures use verified
 read-only artifact-store aliases, preserving their content hashes and paths.
 
+Checked commands, real-program validation, execution-breadth controls and the
+whole-compiler diagnostic now allocate caches and executable products under
+`local-state/tmp/validations/.../.workspaces/`. Their original output root keeps
+reports, logs, sources, captured inputs and traces. Each run writes a
+`*.storage-layout.json` mapping. Successful workspaces are collected by the
+storage tool; failed or interrupted workspaces remain available for review.
+See [storage cleanup](storage_cleanup.md) for the layout and lifetime contract.
+
 The [migration acceptance](evidence/python_tools_migration_20261105.json) and
 [gate summary](evidence/python_tools_migration_20261105.summary) bind the source,
 provider digests, output comparisons and cleanup. At `978ffaf9`, all 22 tests

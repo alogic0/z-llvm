@@ -377,6 +377,10 @@ pub fn build(b: *std.Build) void {
     storage_lifecycle_tests.addArtifactArg(storage_cleanup);
     storage_lifecycle_tests.addArtifactArg(storage_checked_runner);
     storage_cleanup_test_step.dependOn(&storage_lifecycle_tests.step);
+    const storage_workspace_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/workspace_cli_tests.sh" });
+    storage_workspace_tests.addArtifactArg(storage_cleanup);
+    storage_workspace_tests.addArtifactArg(storage_checked_runner);
+    storage_cleanup_test_step.dependOn(&storage_workspace_tests.step);
     const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
         .target = b.graph.host,

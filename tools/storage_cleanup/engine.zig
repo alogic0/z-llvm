@@ -36,7 +36,7 @@ pub const Action = struct {
     path: []const u8,
     run_root: []const u8,
     producer: []const u8,
-    kind: enum { cache, raw_trace, build_output, generated_assembly, log },
+    kind: enum { cache, temporary_workspace, raw_trace, build_output, generated_assembly, log },
     status: enum { discovered, ready, skipped, removed, absent } = .discovered,
     reason: ?[]const u8 = null,
     metadata: ?fa.Metadata = null,
@@ -184,8 +184,10 @@ pub const Engine = struct {
         const latest = @max(m.mtime_ns, m.ctime_ns);
         return e.now_ns >= latest and e.now_ns - latest >= @as(i128, e.config.minimum_idle_hours) * 3600 * std.time.ns_per_s;
     }
-    fn add(e: *Engine, path: []const u8, run: []const u8, producer: []const u8, kind: @FieldType(Action, "kind"), sha: ?[]const u8) !usize {
-        if (!p.candidate(path)) return error.InvalidCandidateScope;
+    pub fn add(e: *Engine, path: []const u8, run: []const u8, producer: []const u8, kind: @FieldType(Action, "kind"), sha: ?[]const u8) !usize {
+        if (kind == .temporary_workspace) {
+            if (!@import("../validation/storage_paths.zig").validTemporary(path) or !p.candidate(run)) return error.InvalidCandidateScope;
+        } else if (!p.candidate(path)) return error.InvalidCandidateScope;
         for (e.actions.items, 0..) |*old, index| if (p.overlaps(path, old.path)) {
             if (std.mem.eql(u8, path, old.path) and std.mem.eql(u8, producer, old.producer) and kind == old.kind) return index;
             old.status = .skipped;
@@ -210,6 +212,7 @@ pub const Engine = struct {
             _ = before;
         }
         try @import("jobs.zig").scan(e, true);
+        try @import("workspaces.zig").discover(e);
     }
     fn discoverBuild(e: *Engine, name: []const u8) !void {
         // Only this report family binds all source files to a preserved compiler.
@@ -321,7 +324,7 @@ pub const Engine = struct {
                 if (p.relative(path)) try e.held.append(e.c.a, try e.c.a.dupe(u8, path));
             }
         } else |err| if (err != error.FileNotFound) return err;
-        for (e.actions.items) |*a| for (e.held.items) |held| if (a.status != .removed and p.overlaps(held, a.path)) {
+        for (e.actions.items) |*a| for (e.held.items) |held| if (a.status != .removed and (p.overlaps(held, a.path) or (a.kind == .temporary_workspace and p.overlaps(held, a.run_root)))) {
             a.status = .skipped;
             a.reason = try e.c.fmt("protected by hold: {s}", .{held});
             break;
@@ -719,11 +722,13 @@ pub const Engine = struct {
         const processes = try e.c.capture(&.{ "ps", "-eo", "pid,args" });
         for (e.actions.items) |*a| {
             if (a.status == .removed or a.status == .absent or a.status == .skipped) continue;
-            const consumer_root = if (a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm")) @import("generated.zig").consumerRoot(a.run_root) else a.run_root;
+            const consumer_root = if (a.kind == .temporary_workspace or a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm")) @import("generated.zig").consumerRoot(a.run_root) else a.run_root;
             const absolute_run = try e.absolute(consumer_root);
             var busy = commandUsesRun(processes, consumer_root, std.os.linux.getpid());
+            const temporary = if (a.kind == .temporary_workspace) try e.absolute(a.path) else absolute_run;
+            if (a.kind == .temporary_workspace and commandUsesRun(processes, a.path, std.os.linux.getpid())) busy = true;
             var lines = std.mem.tokenizeScalar(u8, listing, '\n');
-            while (lines.next()) |line| if (line.len > 1 and line[0] == 'n' and p.within(absolute_run, line[1..])) {
+            while (lines.next()) |line| if (line.len > 1 and line[0] == 'n' and (p.within(absolute_run, line[1..]) or p.within(temporary, line[1..]))) {
                 busy = true;
                 break;
             };
@@ -959,7 +964,10 @@ pub const Engine = struct {
         a.idle_seconds = @intCast(@divFloor(e.now_ns - @max(@max(m.mtime_ns, m.ctime_ns), @max(producer_metadata.mtime_ns, producer_metadata.ctime_ns)), std.time.ns_per_s));
         if (!e.oldEnough(m) or !e.oldEnough(producer_metadata)) return error.TooRecent;
         var kept: std.ArrayList(Evidence) = .empty;
-        if (a.kind == .cache) {
+        if (a.kind == .temporary_workspace) {
+            try @import("workspaces.zig").verify(e, a.*, &kept);
+            a.replay_required = false;
+        } else if (a.kind == .cache) {
             if (a.released_cache) {
                 try e.releaseEvidence(a, &kept);
             } else {
@@ -974,10 +982,14 @@ pub const Engine = struct {
         }
         a.retained = try kept.toOwnedSlice(e.c.a);
         a.metadata = m;
-        if (a.kind == .cache) {
+        if (a.kind == .cache or a.kind == .temporary_workspace) {
             var snap = try fa.scan(e.c.gpa, e.c.io, try e.absolute(a.path), .{ .hash_files = true, .max_entries = e.config.max_candidate_entries });
             defer snap.deinit();
             try e.checkCache(snap.value);
+            if (a.kind == .temporary_workspace) for (snap.value.entries) |entry| {
+                // Misfiled raw evidence never inherits a blanket scratch release.
+                if (std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.WorkspaceContainsRawTrace;
+            };
             a.file_count = snap.value.totals.files;
             for (snap.value.entries) |entry| if (entry.metadata.kind == .file) {
                 a.allocated_bytes += entry.metadata.allocated_bytes;

@@ -175,7 +175,7 @@ pub fn apply(e: *core.Engine, index: usize) !void {
     const quarantine = try e.c.fmt("{s}/{s}", .{ std.fs.path.dirname(a.path).?, qname });
     const mode = (try parent.stat(e.c.io)).permissions;
     const readonly = mode.toMode() & 0o200 == 0;
-    if (a.kind == .cache and readonly) return error.FrozenCacheParent;
+    if ((a.kind == .cache or a.kind == .temporary_workspace) and readonly) return error.FrozenCacheParent;
     var snapshot: ?std.json.Parsed(fa.Snapshot) = null;
     defer if (snapshot) |*s| s.deinit();
     if (a.snapshot) |s| {
@@ -213,6 +213,15 @@ pub fn apply(e: *core.Engine, index: usize) !void {
         defer after.deinit();
         try compareMoved(s.value, after.value);
         try e.checkMounts(after.value);
+        if (a.kind == .temporary_workspace) {
+            // A large scratch tree can take time to rehash. Refresh its owner
+            // decision and pins after quarantine, while rollback is still possible.
+            try e.loadHolds();
+            try e.pins();
+            try e.consumers();
+            if (a.status != .ready) return error.WorkspaceBecameHeld;
+            try e.verifyEvidence(a.*);
+        }
         // Delete exact inventoried entries. Never use a recursive wildcard;
         // unexpected membership makes final directory removal fail closed.
         for (after.value.entries) |entry| {

@@ -3,6 +3,7 @@ const std = @import("std");
 const u = @import("validation/common.zig");
 const telemetry = @import("validation/telemetry.zig");
 const storage = @import("validation/storage_lifecycle.zig");
+const workspaces = @import("validation/storage_workspace.zig");
 var storage_project: ?[]const u8 = null;
 
 pub fn main(init: std.process.Init) !void {
@@ -53,6 +54,22 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     }
     const session = try storage.start(c, output, record_path, (try u.get(record, "started_ns")).integer);
     defer if (session) |s| s.close(c);
+    const workspace = try workspaces.start(c, output, label);
+    defer if (workspace) |w| w.close(c);
+    if (c.workspace_paths) |mapping| {
+        try c.env.put("ZLLVM_TEMP_ROOT", mapping.temporary);
+        for ([_][2][]const u8{ .{ "TMPDIR", "temp" }, .{ "ZIG_LOCAL_CACHE_DIR", "local-cache" }, .{ "ZIG_GLOBAL_CACHE_DIR", "global-cache" } }) |pair| {
+            if (c.env.get(pair[0]) == null) {
+                const path = try c.temporaryPath(&.{ output, pair[1] });
+                try c.mkdir(path);
+                try c.env.put(pair[0], path);
+            }
+        }
+        var environment = u.object(c.a);
+        for ([_][]const u8{ "TMPDIR", "ZIG_LOCAL_CACHE_DIR", "ZIG_GLOBAL_CACHE_DIR", "ZLLVM_TEMP_ROOT" }) |key|
+            try u.put(c.a, &environment, key, u.s(c.env.get(key).?));
+        try u.put(c.a, &record, "workspace_environment", environment);
+    }
     // Storage admission can wait for a collector; exclude that wait from the
     // supervised command's wall time.
     const start = std.Io.Clock.awake.now(c.io);
@@ -65,6 +82,10 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
         u.put(c.a, &record, "finished_ns", u.n(std.Io.Clock.real.now(c.io).nanoseconds)) catch {};
         c.writeJson(record_path, record) catch {};
         return err;
+    };
+    if (workspace) |w| w.finish(c, record_path, &.{log_path}) catch |err| {
+        try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("temporary workspace completion deferred: {s}\n", .{@errorName(err)}));
+        return code;
     };
     if (session) |s| {
         s.finish(c) catch |err| {

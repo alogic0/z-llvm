@@ -59,8 +59,8 @@ pub const Compiled = struct {
 pub fn compile(r: *Runner, directory: []const u8, source: []const u8, mode: []const u8, emitter: u.Value, env: *const std.process.Environ.Map) !Compiled {
     const c = r.context;
     if (!u.contains(&u.modes, mode)) return error.InvalidHarnessMode;
-    const assembly = try c.join(&.{ directory, "linked-harness.s" });
-    const object = try c.join(&.{ directory, "linked-harness.o" });
+    const assembly = try c.temporaryPath(&.{ directory, "linked-harness.s" });
+    const object = try c.temporaryPath(&.{ directory, "linked-harness.o" });
     const first = r.commands.array.items.len;
     const source_hash = try c.digest(source);
     try r.require(&.{ try u.str(emitter, "path"), "build-exe", "-fno-lld", "-fno-lto", "-target", try u.str(emitter, "target"), "-mcpu=native", source, try c.fmt("-O{s}", .{mode}), "-fno-emit-bin", try c.fmt("-femit-asm={s}", .{assembly}) }, try c.join(&.{ directory, "harness-compile" }), env);

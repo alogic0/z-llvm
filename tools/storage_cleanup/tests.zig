@@ -9,6 +9,8 @@ const private_cache = @import("private_cache.zig");
 const retired_compiler = @import("retired_compiler.zig");
 const generated = @import("generated.zig");
 const p = core.p;
+const workspaces = @import("workspaces.zig");
+const workspace = @import("../validation/storage_workspace.zig");
 const run = "local-state/validations/test/batch/build";
 const cache = run ++ "/zig-local-cache";
 const report = run ++ "/report.json";
@@ -17,6 +19,179 @@ const released = "local-state/validations/test/batch/released";
 const assembly_owner = run ++ "/execution-breadth-controls";
 const assembly_dir = assembly_owner ++ "/ReleaseFast/example";
 const assembly_path = assembly_dir ++ "/linked-harness.s";
+fn workspaceFixture(f: *Fixture, passed: bool) !workspace.Workspace {
+    try f.c.mkdir(try f.c.join(&.{"docs"}));
+    try f.c.mkdir(try f.c.join(&.{"tools"}));
+    try f.write("docs/storage_cleanup_policy.json", "{\"schema\":1}");
+    try f.write("tools/clean-storage", "fixture wrapper");
+    const w = (try workspace.start(&f.c, try f.c.join(&.{run}), "validation")).?;
+    const object = try f.c.temporaryPath(&.{ run, "objects/subject.o" });
+    try f.c.write(object, "\x7fELFtemporary object");
+    try f.write(run ++ "/input.ll", "retained input");
+    try f.write(run ++ "/profile.events.jsonl", "unique raw trace stays maintained");
+    try f.write(run ++ "/diagnostic.log", "retained diagnostic");
+    try f.c.writeJson(try f.c.join(&.{report}), .{ .status = if (passed) "passed" else "failed" });
+    try w.finish(&f.c, try f.c.join(&.{report}), &.{try f.c.join(&.{ run, "diagnostic.log" })});
+    return w;
+}
+
+test "storage cleanup: a completed separate workspace retires only temporary data and repeats safely" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    var e = f.engine();
+    try workspaces.discover(&e);
+    try t.expectEqual(@as(usize, 1), e.actions.items.len);
+    try e.qualify(0);
+    try t.expectEqual(.temporary_workspace, e.actions.items[0].kind);
+    try mutation.apply(&e, 0);
+    try t.expect(!u.exists(f.c.io, try e.absolute(w.record.temporary_root)));
+    for ([_][]const u8{ report, run ++ "/input.ll", run ++ "/profile.events.jsonl", run ++ "/diagnostic.log" }) |path| try t.expect(u.exists(f.c.io, try e.absolute(path)));
+    var again = f.engine();
+    try workspaces.discover(&again);
+    try t.expectEqual(@as(usize, 0), again.actions.items.len);
+}
+
+test "storage cleanup: unfinished and failed workspaces retain their objects" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, false);
+    w.close(&f.c);
+    var failed = f.engine();
+    try workspaces.discover(&failed);
+    try t.expectEqual(.skipped, failed.actions.items[0].status);
+    try f.c.writeJson(w.record_path, w.record); // original active record; no guessed expiry
+    var active = f.engine();
+    try workspaces.discover(&active);
+    try t.expectEqual(.skipped, active.actions.items[0].status);
+    try t.expect(u.exists(f.c.io, try active.absolute(w.record.temporary_root)));
+}
+
+test "storage cleanup: holds on either workspace tree protect all temporary products" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    for ([_][]const u8{ run, run ++ "/input.ll", w.record.temporary_root }) |held| {
+        var e = f.engine();
+        try e.write(e.config.holds_file, p.Holds{ .paths = &.{held} });
+        try workspaces.discover(&e);
+        try e.loadHolds();
+        try t.expectEqual(.skipped, e.actions.items[0].status);
+    }
+}
+
+test "storage cleanup: workspace scope cannot promote maintained or unrelated paths to scratch" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    for ([_][]const u8{ run, "local-state/tmp", "local-state/tmp/validations/other/.workspaces/validation", "local-state/tmp/validations/../artifacts" }) |path| {
+        var record = w.record;
+        record.temporary_root = path;
+        try f.c.writeJson(w.record_path, record);
+        var e = f.engine();
+        try t.expectError(error.InvalidWorkspaceScope, workspaces.discover(&e));
+    }
+}
+
+test "storage cleanup: changed workspace evidence prevents mutation" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    var e = f.engine();
+    try workspaces.discover(&e);
+    try e.qualify(0);
+    try f.write(run ++ "/diagnostic.log", "changed diagnostic");
+    if (mutation.apply(&e, 0)) |_| return error.ChangedEvidenceAccepted else |_| {}
+    try t.expect(u.exists(f.c.io, try e.absolute(w.record.temporary_root)));
+    try t.expect(!u.exists(f.c.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: a new workspace hold rolls back quarantine before unlink" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    var e = f.engine();
+    try workspaces.discover(&e);
+    try e.qualify(0);
+    try e.write(e.config.holds_file, p.Holds{ .paths = &.{run} });
+    try t.expectError(error.WorkspaceBecameHeld, mutation.apply(&e, 0));
+    try t.expect(u.exists(f.c.io, try e.absolute(try f.c.fmt("{s}/objects/subject.o", .{w.record.temporary_root}))));
+    try t.expect(!u.exists(f.c.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: workspace cannot collect external aliases or misfiled raw traces" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    const object = try f.c.fmt("{s}/{s}/objects/subject.o", .{ f.c.root, w.record.temporary_root });
+    const alias = try f.c.join(&.{ run, "adopted.o" });
+    _ = try f.c.capture(&.{ "ln", "--", object, alias });
+    var e = f.engine();
+    try workspaces.discover(&e);
+    try t.expectError(error.AliasedCacheFile, e.qualify(0));
+    try std.Io.Dir.cwd().deleteFile(f.c.io, alias);
+    const trace = try f.c.fmt("{s}/{s}/profile.events.jsonl", .{ f.c.root, w.record.temporary_root });
+    try f.c.write(trace, "must be audited independently");
+    var raw = f.engine();
+    try workspaces.discover(&raw);
+    try t.expectError(error.WorkspaceContainsRawTrace, raw.qualify(0));
+}
+
+test "storage cleanup: current checksum pins still protect temporary workspace files" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    var e = f.engine();
+    const object = try f.c.fmt("{s}/objects/subject.o", .{w.record.temporary_root});
+    try f.write("current.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(object), object }));
+    e.config.current_manifests = &.{"current.sha256"};
+    try workspaces.discover(&e);
+    try e.qualify(0);
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+    try e.currentManifests(true);
+}
+
+test "storage cleanup: consumer descriptors in either workspace tree defer collection" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    w.close(&f.c);
+    for ([_][]const u8{ run ++ "/input.ll", try f.c.fmt("{s}/objects/subject.o", .{w.record.temporary_root}) }) |path| {
+        const file = try std.Io.Dir.cwd().openFile(f.c.io, try f.c.join(&.{path}), .{});
+        defer file.close(f.c.io);
+        var e = f.engine();
+        try workspaces.discover(&e);
+        try e.consumers();
+        try t.expectEqual(.skipped, e.actions.items[0].status);
+    }
+}
+
+test "storage cleanup: workspace allocation refuses reuse and maps capture children exactly" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const w = try workspaceFixture(f, true);
+    defer w.close(&f.c);
+    try t.expectError(error.WorkspaceAlreadyExists, workspace.start(&f.c, try f.c.join(&.{run}), "validation"));
+    try t.expectError(error.TemporaryPathOutsideWorkspace, f.c.temporaryPath(&.{"src/main.zig"}));
+    try workspace.exportPaths(&f.c, &f.c.env);
+    f.c.workspace_paths = null;
+    try t.expectError(error.InvalidWorkspaceScope, workspace.adopt(&f.c)); // already finished
+    try f.c.writeJson(w.record_path, w.record);
+    try workspace.adopt(&f.c);
+    try t.expectEqualStrings(try f.c.fmt("{s}/{s}/nested/probe.o", .{ f.c.root, w.record.temporary_root }), try f.c.temporaryPath(&.{ run, "nested/probe.o" }));
+    const transient = try f.c.fmt("{s}/{s}/already-retired/marker.o", .{ f.c.root, w.record.temporary_root });
+    try t.expectEqualStrings(transient, try f.c.resolveParent(transient));
+    try f.c.env.put("ZLLVM_TEMPORARY_ROOT", try f.c.join(&.{"local-state/artifacts"}));
+    if (workspace.adopt(&f.c)) |_| return error.InvalidMappingAccepted else |_| {}
+}
 const Fixture = struct {
     tmp: t.TmpDir,
     arena: std.heap.ArenaAllocator,

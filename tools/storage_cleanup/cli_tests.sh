@@ -76,6 +76,11 @@ test "$cleanup_job_status" -eq 7
 "${ZIGREP:-zigrep}" --no-config -q -F 'Cleanup complete:' "$cleanup_fixture/maintain-failure.log"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain -- true > "$cleanup_fixture/maintain-success.log" 2>&1
 "${ZIGREP:-zigrep}" --no-config -q -F 'Cleanup complete:' "$cleanup_fixture/maintain-success.log"
+test -d "$cleanup_fixture/local-state/tmp/storage-cleanup-build/local-cache"
+test -d "$cleanup_fixture/local-state/tmp/storage-cleanup-build/global-cache"
+test ! -e "$cleanup_fixture/local-state/storage-cleanup/tool-cache"
+test ! -e "$cleanup_fixture/local-state/storage-cleanup/tool-global-cache"
+test -x "$cleanup_fixture/local-state/storage-cleanup/clean-storage"
 cleanup_released="$cleanup_fixture/local-state/validations/cli/batch/released"
 mkdir -p "$cleanup_released"
 printf 'obsolete diagnostic detail from a passed experiment\n' > "$cleanup_released/old.log"

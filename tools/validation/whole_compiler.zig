@@ -9,6 +9,7 @@ const elf = @import("object_contract.zig");
 const policy = @import("../distribution_headroom_policy.zig");
 const retained = @import("whole_compiler_reuse.zig");
 const resources = @import("whole_compiler_resources.zig");
+const storage = @import("storage_workspace.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
 const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--self-cpu N] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
 
@@ -31,6 +32,8 @@ pub fn main(init: std.process.Init) !void {
         if (args.get("input-ir") != null) return error.SelfCpuRequiresWholeBuild;
     }
     const output = try c.newOutput(try args.require("output-root"));
+    const workspace = try storage.start(&c, output, "validation");
+    defer if (workspace) |w| w.close(&c);
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("whole-compiler-diagnostic-v1"));
     try u.put(c.a, &report, "population", u.s(if (args.get("input-ir") != null) "captured-ir-diagnostic" else "whole-zig-compiler"));
@@ -44,6 +47,7 @@ pub fn main(init: std.process.Init) !void {
     };
     try u.put(c.a, &report, "commands", runner.commands);
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(&c);
     try c.print("whole-compiler status={s} stage={s} report={s}/report.json\n", .{ try u.str(report, "status"), try u.str(report, "failure_stage"), output });
     if (report.object.get("runner_error")) |err| try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("{s}\n", .{err.string}));
     std.process.exit(if (report.object.contains("runner_error")) 2 else if (u.json.is(try u.get(report, "status"), "passed")) 0 else 1);
@@ -70,9 +74,9 @@ fn environment(c: *u.Context, output: []const u8) !std.process.Environ.Map {
         .{ "LC_ALL", "C" },
         .{ "LANG", "C" },
         .{ "TZ", "UTC0" },
-        .{ "HOME", try c.join(&.{ output, "home" }) },
-        .{ "TMPDIR", try c.join(&.{ output, "temp" }) },
-        .{ "ZIG_GLOBAL_CACHE_DIR", try c.join(&.{ output, "global-cache" }) },
+        .{ "HOME", try c.temporaryPath(&.{ output, "home" }) },
+        .{ "TMPDIR", try c.temporaryPath(&.{ output, "temp" }) },
+        .{ "ZIG_GLOBAL_CACHE_DIR", try c.temporaryPath(&.{ output, "global-cache" }) },
         .{ "GIT_OPTIONAL_LOCKS", "0" },
         .{ "GIT_CONFIG_NOSYSTEM", "1" },
         .{ "GIT_CONFIG_SYSTEM", "/dev/null" },
@@ -80,6 +84,7 @@ fn environment(c: *u.Context, output: []const u8) !std.process.Environ.Map {
         .{ "GIT_TERMINAL_PROMPT", "0" },
         .{ "ZLLVM_PROJECT_ROOT", c.root },
     }) |pair| try env.put(pair[0], pair[1]);
+    try storage.exportPaths(c, &env);
     for ([_][]const u8{ "HOME", "TMPDIR", "ZIG_GLOBAL_CACHE_DIR" }) |key| try c.mkdir(env.get(key).?);
     return env;
 }
@@ -184,7 +189,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
 fn buildArgs(c: *u.Context, zig: []const u8, source: []const u8, config: []const u8, output: []const u8) ![]const []const u8 {
     // This pinned build runner accepts ZIG_GLOBAL_CACHE_DIR through its
     // environment; --global-cache-dir is a compiler-command option only.
-    return c.a.dupe([]const u8, &.{ zig, "build", "--build-file", try c.join(&.{ source, "build.zig" }), "--cache-dir", try c.join(&.{ output, "local-cache" }), "--prefix", try c.join(&.{ output, "install" }), "-j1", "--verbose", "--summary", "all", "-Dtarget=x86_64-linux-gnu", "-Dcpu=baseline", "-Doptimize=ReleaseFast", "-Dstrip=true", "-Ddev=full", "-Denable-llvm=true", "-Duse-llvm=true", "-Ddebug-extensions=true", "-Dno-lib=true", "-Dno-langref=true", try c.fmt("-Dconfig_h={s}", .{config}) });
+    return c.a.dupe([]const u8, &.{ zig, "build", "--build-file", try c.join(&.{ source, "build.zig" }), "--cache-dir", try c.temporaryPath(&.{ output, "local-cache" }), "--prefix", try c.temporaryPath(&.{ output, "install" }), "-j1", "--verbose", "--summary", "all", "-Dtarget=x86_64-linux-gnu", "-Dcpu=baseline", "-Doptimize=ReleaseFast", "-Dstrip=true", "-Ddev=full", "-Denable-llvm=true", "-Duse-llvm=true", "-Ddebug-extensions=true", "-Dno-lib=true", "-Dno-langref=true", try c.fmt("-Dconfig_h={s}", .{config}) });
 }
 
 fn timed(c: *u.Context, runner: *Runner, command: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Runner.Options) !Runner.Result {
@@ -326,7 +331,7 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     if (!compiler_seen) return error.MissingCompilerObjectCapture;
     const marker = try c.read(try c.join(&.{ output, "hook.marker" }));
     if (std.mem.indexOf(u8, marker, "pipeline=postopt") == null) return error.MissingPostoptHookMarker;
-    const candidate = try c.join(&.{ output, "install/bin/zig" });
+    const candidate = try c.temporaryPath(&.{ output, "install/bin/zig" });
     try u.put(c.a, report, "candidate", try fileIdentity(c, candidate));
     try u.put(c.a, report, "failure_stage", u.s("startup"));
     const version = try runner.run(&.{ candidate, "version" }, try c.join(&.{ output, "version" }), env, .{});
@@ -339,7 +344,7 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     const rebuild = try c.join(&.{ output, "self-rebuild" });
     try c.mkdir(rebuild);
     var rebuild_env = try env.clone(c.a);
-    const rebuild_global_cache = try c.join(&.{ rebuild, "global-cache" });
+    const rebuild_global_cache = try c.temporaryPath(&.{ rebuild, "global-cache" });
     try c.mkdir(rebuild_global_cache);
     try rebuild_env.put("ZIG_GLOBAL_CACHE_DIR", rebuild_global_cache);
     _ = rebuild_env.swapRemove("ZLLVM_WHOLE_REUSE_ROOT");
@@ -374,7 +379,7 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     // Runtime-only captures cannot prove that the new compiler rebuilt itself.
     if (!rebuilt_compiler_seen) return error.MissingCompilerObjectCapture;
     if (std.mem.indexOf(u8, try c.read(try c.join(&.{ rebuild, "hook.marker" })), "pipeline=postopt") == null) return error.MissingPostoptHookMarker;
-    const rebuilt_exe = try c.join(&.{ rebuild, "install/bin/zig" });
+    const rebuilt_exe = try c.temporaryPath(&.{ rebuild, "install/bin/zig" });
     try u.put(c.a, report, "rebuilt_candidate", try fileIdentity(c, rebuilt_exe));
     try runner.observe(rebuilt_exe, &.{"version"}, 0, try c.fmt("{s}\n", .{try u.str(report.*, "zig_version")}), try c.join(&.{ output, "self-version" }), env);
     try behaviors(c, rebuild, source, rebuilt_exe, env, runner);
@@ -433,26 +438,27 @@ fn behaviors(c: *u.Context, output: []const u8, source: []const u8, candidate: [
         const manifest = try c.load(try c.fmt("{s}/test/real_programs/{s}.json", .{ c.root, name }));
         const input = try c.join(&.{ source, try u.str(manifest, "source") });
         if (!std.mem.eql(u8, try c.digest(input), try u.str(manifest, "source_sha256"))) return error.BehaviorSourceChanged;
-        const exe = try c.join(&.{ output, name });
-        const command = [_][]const u8{ candidate, "build-exe", input, "-OReleaseFast", "-target", "x86_64-linux-gnu", "-mcpu=baseline", "-lc", "-fllvm", "-fsingle-threaded", "--cache-dir", try c.join(&.{ output, "behavior-cache" }), try c.fmt("-femit-bin={s}", .{exe}) };
+        const exe = try c.temporaryPath(&.{ output, name });
+        const command = [_][]const u8{ candidate, "build-exe", input, "-OReleaseFast", "-target", "x86_64-linux-gnu", "-mcpu=baseline", "-lc", "-fllvm", "-fsingle-threaded", "--cache-dir", try c.temporaryPath(&.{ output, "behavior-cache" }), try c.fmt("-femit-bin={s}", .{exe}) };
         const result = try timed(c, runner, &command, try c.fmt("{s}/compile-{s}", .{ output, name }), env, .{ .timeout_ms = 900_000 });
         if (result.code != 0) return error.BehaviorCompilationFailed;
         try runner.observe(exe, &.{}, try u.json.integer(try u.get(manifest, "exit_status")), try u.str(manifest, "stdout"), try c.fmt("{s}/run-{s}", .{ output, name }), env);
     }
     const invalid = try c.join(&.{ output, "invalid.zig" });
     try c.write(invalid, "pub fn main() void { @compileError(\"whole-compiler-negative-control\"); }\n");
-    const result = try runner.run(&.{ candidate, "build-exe", invalid, "-fno-emit-bin", "--cache-dir", try c.join(&.{ output, "behavior-cache" }) }, try c.join(&.{ output, "invalid" }), env, .{});
+    const result = try runner.run(&.{ candidate, "build-exe", invalid, "-fno-emit-bin", "--cache-dir", try c.temporaryPath(&.{ output, "behavior-cache" }) }, try c.join(&.{ output, "invalid" }), env, .{});
     if (!result.completed or result.code != 1 or std.mem.indexOf(u8, try c.read(try c.join(&.{ output, "invalid.stderr" })), "whole-compiler-negative-control") == null) return error.MissingExpectedCompileError;
 }
 
 fn capture(c: *u.Context, root: []const u8, argv: []const []const u8) !u8 {
+    try storage.adopt(c);
     if (argv.len == 0 or !u.contains(argv, "--emit=obj")) return error.UnexpectedHookInvocation;
     const directory = try c.newOutput(try c.fmt("{s}/{d}", .{ root, std.os.linux.getpid() }));
     const result = try backend(c, directory, c.env.get("ZLLVM_WHOLE_BACKEND") orelse return error.MissingBackend, argv[argv.len - 1], argv, &c.env, try std.fmt.parseInt(u32, c.env.get("ZLLVM_WHOLE_TIMEOUT_MS") orelse "3600000", 10), .child_only);
     // Only verified successful objects are delivered to Zig. Failed/partial
-    // output remains in the evidence directory and never reaches the linker.
+    // output remains in the retained failed workspace and never reaches the linker.
     if ((try u.get(result, "object_complete")).bool) {
-        const file = try std.Io.Dir.cwd().openFile(c.io, try c.join(&.{ directory, "local.o" }), .{});
+        const file = try std.Io.Dir.cwd().openFile(c.io, try c.temporaryPath(&.{ directory, "local.o" }), .{});
         defer file.close(c.io);
         var buffer: [65536]u8 = undefined;
         var input = file.readerStreaming(c.io, &buffer);
@@ -501,7 +507,7 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     }
     try u.put(c.a, &report, "backend_executed", u.b(true));
     var runner = Runner.init(c, directory);
-    const result = try timed(c, &runner, command.items, try c.join(&.{ directory, "backend" }), env, .{ .timeout_ms = deadline, .stdout_file = try c.join(&.{ directory, "local.o" }), .group = group });
+    const result = try timed(c, &runner, command.items, try c.join(&.{ directory, "backend" }), env, .{ .timeout_ms = deadline, .stdout_file = try c.temporaryPath(&.{ directory, "local.o" }), .group = group });
     try u.put(c.a, &report, "returncode", u.n(result.code));
     const time_path = try c.join(&.{ directory, "backend.time" });
     const time_text = if (u.exists(c.io, time_path)) try c.read(time_path) else "";
@@ -528,7 +534,7 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     }
     if (result.code == 0 and completed) {
         try reports.validateSuccess(c.a, analysis, profile orelse return error.MissingProfile, try c.read(owners_path));
-        const object_path = try c.join(&.{ directory, "local.o" });
+        const object_path = try c.temporaryPath(&.{ directory, "local.o" });
         const contract = try elf.parse(c.a, try c.read(object_path));
         reports.validateObject(c.a, contract, profile.?) catch |err| {
             try u.put(c.a, &report, "failure_stage", u.s("object-contract"));
@@ -550,17 +556,18 @@ fn runtimeObjectChecks(c: *u.Context, output: []const u8, invocation: u.Value, e
     if (!std.mem.eql(u8, try u.str(input, "sha256"), "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af")) return error.RuntimeChecksRequireOriginalRuntime;
     const directory = try c.newOutput(try c.join(&.{ output, "runtime-execution" }));
     const driver = try c.join(&.{"test/whole_compiler/runtime_completion_driver.c"});
-    const reference = try c.join(&.{ directory, "reference.o" });
+    const reference = try c.temporaryPath(&.{ directory, "reference.o" });
     try runner.require(&.{ "clang-22", "-O2", "-c", try u.str(input, "path"), "-o", reference }, try c.join(&.{ directory, "reference-object" }), env);
     const expected = "runtime-completion observations=21792 complex=conversion=sqrt=integer=unsigned-division=preserved\n";
     var result = u.object(c.a);
     for ([_][]const u8{ "local", "reference" }) |route| {
         const object = if (std.mem.eql(u8, route, "local")) try u.str(try u.get(invocation, "object"), "path") else reference;
-        const exe = try c.join(&.{ directory, route });
-        try runner.require(&.{ "cc", "-O2", "-fno-builtin", "-no-pie", "-Wl,-z,noexecstack", driver, object, "-lm", "-o", exe }, try c.fmt("{s}-link", .{exe}), env);
-        try runner.observe(exe, &.{}, 0, expected, try c.fmt("{s}-run", .{exe}), env);
+        const exe = try c.temporaryPath(&.{ directory, route });
+        const log_stem = try c.join(&.{ directory, route });
+        try runner.require(&.{ "cc", "-O2", "-fno-builtin", "-no-pie", "-Wl,-z,noexecstack", driver, object, "-lm", "-o", exe }, try c.fmt("{s}-link", .{log_stem}), env);
+        try runner.observe(exe, &.{}, 0, expected, try c.fmt("{s}-run", .{log_stem}), env);
         for (1..8) |fault| {
-            const stem = try c.fmt("{s}-fault-{d}", .{ exe, fault });
+            const stem = try c.fmt("{s}-fault-{d}", .{ log_stem, fault });
             const observed = try runner.run(&.{ exe, try c.fmt("{d}", .{fault}) }, stem, env, .{ .timeout_ms = 5000 });
             const diagnostic = try c.read(try c.fmt("{s}.stderr", .{stem}));
             if (!observed.completed or observed.code != 1 or (try c.read(try c.fmt("{s}.stdout", .{stem}))).len != 0 or

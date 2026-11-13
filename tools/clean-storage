@@ -59,11 +59,17 @@ sha256sum --check --quiet --strict tools/vendor/file_audit.SHA256SUMS tools/vend
 # Serialize building the reusable helper, including two simultaneous invocations.
 exec 9> "$storage_state/build.lock"
 flock --exclusive 9
+cleanup_build="$project_root/local-state/tmp/storage-cleanup-build"
+if [[ -L "$project_root/local-state/tmp" || -L "$cleanup_build" || -L "$cleanup_build/local-cache" || -L "$cleanup_build/global-cache" || -L "$cleanup_build/clean-storage.new" ]]; then
+    printf 'Storage cleanup build scratch must stay inside the project, without symlinks.\n' >&2
+    exit 2
+fi
+mkdir -p -- "$cleanup_build"
 "$cleanup_zig" build-exe -O ReleaseFast tools/clean_storage.zig \
-    --cache-dir "$storage_state/tool-cache" \
-    --global-cache-dir "$storage_state/tool-global-cache" \
-    -femit-bin="$storage_state/clean-storage.new"
-mv -- "$storage_state/clean-storage.new" "$storage_state/clean-storage"
+    --cache-dir "$cleanup_build/local-cache" \
+    --global-cache-dir "$cleanup_build/global-cache" \
+    -femit-bin="$cleanup_build/clean-storage.new"
+mv -- "$cleanup_build/clean-storage.new" "$storage_state/clean-storage"
 flock --unlock 9
 exec 9>&-
 cd -- "$project_root"

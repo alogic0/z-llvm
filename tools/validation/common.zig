@@ -34,6 +34,19 @@ pub const Context = struct {
     env: std.process.Environ.Map,
     diagnostic: ?[]const u8 = null,
     quiet: bool = false,
+    workspace_paths: ?@import("storage_paths.zig").Paths = null,
+
+    /// Explicitly classify a generated product as temporary. Logs, inputs and
+    /// reports continue to use join(). Legacy/standalone callers retain paths.
+    pub fn temporaryPath(c: *Context, parts: []const []const u8) ![]const u8 {
+        const original = try c.join(parts);
+        const mapping = c.workspace_paths orelse return original;
+        if (!isWithin(mapping.evidence, original) or std.mem.eql(u8, mapping.evidence, original)) return error.TemporaryPathOutsideWorkspace;
+        const path = try c.fmt("{s}/{s}", .{ mapping.temporary, original[mapping.evidence.len + 1 ..] });
+        var parent = try @import("../zllvm_artifact_store/store.zig").openDirectory(c.io, std.fs.path.dirname(path).?, true);
+        parent.close(c.io);
+        return path;
+    }
 
     pub fn init(start: std.process.Init) !Context {
         const a = start.arena.allocator();
@@ -131,7 +144,7 @@ pub const Context = struct {
     }
 
     /// Resolve the existing parent before creating anything, rejecting symlink escapes.
-    pub fn ownedPath(c: *Context, name: []const u8) ![]const u8 {
+    pub fn resolveParent(c: *Context, name: []const u8) ![]const u8 {
         const absolute = try c.join(&.{name});
         var parent = absolute;
         var suffix: []const u8 = "";
@@ -140,7 +153,11 @@ pub const Context = struct {
             parent = std.fs.path.dirname(parent) orelse return error.InvalidOutputPath;
         }
         const resolved_parent = try std.Io.Dir.cwd().realPathFileAlloc(c.io, parent, c.a);
-        const resolved = try std.fs.path.resolve(c.a, &.{ resolved_parent, suffix });
+        return std.fs.path.resolve(c.a, &.{ resolved_parent, suffix });
+    }
+
+    pub fn ownedPath(c: *Context, name: []const u8) ![]const u8 {
+        const resolved = try c.resolveParent(name);
         if (!isWithin(c.root, resolved) or std.mem.eql(u8, c.root, resolved)) return c.fail("evidence must stay in a new path inside the project", .{});
         return resolved;
     }
