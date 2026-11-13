@@ -24,6 +24,70 @@ const pointer_values = @import("pointer_values.zig");
 const pair_values = @import("word_pair_values.zig");
 const Pair = extern struct { first: u64, second: u64 };
 
+test "symbolic volatile scalar loads keep one exact memory event after pointer normalization" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "i8", "i16", "i32", "i64", "ptr" }, [_]usize{ 8, 16, 32, 64, 64 }) |ty, bits| {
+        const pointer = if (std.mem.eql(u8, ty, "ptr")) "getelementptr (i8,ptr @\"volatile cell\",i64 8)" else "@\"volatile cell\"";
+        const conversion = if (std.mem.eql(u8, ty, "ptr")) " %wide = ptrtoint ptr %value to i64\n" else if (bits < 64) try std.fmt.allocPrint(a, " %wide = zext {s} %value to i64\n", .{ty}) else " %wide = add i64 %value,0\n";
+        defer if (bits < 64) a.free(conversion);
+        const text = try std.fmt.allocPrint(a, "@\"volatile cell\" = global [16 x i8] zeroinitializer,align 16\ndefine i64 @read() {{\nentry:\n %value = load volatile {s},ptr {s},align 1\n{s} ret i64 %wide\n}}\n", .{ ty, pointer, conversion });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const source = module.functions.items[0];
+        const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items };
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const view = (try pointer_values.legalize(arena.allocator(), source, &context)).?;
+        var loads: usize = 0;
+        for (view.blocks.items) |block| for (block.instructions.items) |inst| {
+            if (inst.kind != .load) continue;
+            loads += 1;
+            try std.testing.expect(inst.kind.load.ptr == .named);
+            try std.testing.expect(inst.kind.load.attrs.is_volatile);
+            try std.testing.expect(!inst.kind.load.attrs.isAtomic());
+            try std.testing.expectEqual(@as(?u64, 1), inst.kind.load.attrs.@"align");
+        };
+        try std.testing.expectEqual(@as(usize, 1), loads);
+        var selected = try @import("../../../compilation.zig").select(a, "x86_64-unknown-linux-gnu", source, .{ .generic_cfg_selector = true, .module_context = &context });
+        defer selected.deinit(a);
+        try verify.verifyFunction(selected);
+        try std.testing.expect(source.blocks.items[0].instructions.items[0].kind.load.attrs.is_volatile);
+        try module.verify();
+    }
+}
+
+test "symbolic volatile pointer views keep atomic scoped wide and nonnative layouts closed" {
+    const a = std.testing.allocator;
+    for (0..6) |variant| {
+        var module = try ir.Module.parse(a,
+            \\@cell = global [32 x i8] zeroinitializer,align 16
+            \\define void @closed() {
+            \\entry:
+            \\ %value = load volatile i32,ptr @cell,align 4
+            \\ ret void
+            \\}
+        );
+        defer module.deinit();
+        try module.verify();
+        const load = &module.functions.items[0].blocks.items[0].instructions.items[0].kind.load;
+        var context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+        switch (variant) {
+            0 => load.attrs.atomic_ordering = "acquire",
+            1 => load.attrs.syncscope = "syncscope(\"singlethread\")",
+            2 => load.ty = .{ .int = 128 },
+            3 => load.ty = .{ .vector = .{ .len = 4, .elem_ty = .{ .int = 32 } } },
+            4 => load.ptr_addrspace = "addrspace(1)",
+            5 => context.target_datalayout = "e-p:32:32",
+            else => unreachable,
+        }
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        try std.testing.expect((try pointer_values.legalize(arena.allocator(), module.functions.items[0], &context)) == null);
+    }
+}
+
 test "absolute volatile native pointers retain event types and exact memory extents" {
     for ([_][]const u8{ "i8", "i16", "i32", "i64", "ptr" }, [_]usize{ 1, 2, 4, 8, 8 }) |ty, bytes| {
         var storage: [32]u8 = @splat(165);
