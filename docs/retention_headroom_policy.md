@@ -8,10 +8,14 @@ Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 The [automatic collector](storage_cleanup.md) implements the reviewed rules for
 completed private build caches and explicitly superseded generated outputs.
 Run `tools/clean-storage` for a review or `tools/clean-storage --apply` for
-verified collection. Its [policy](storage_cleanup_policy.json), current pins,
+verified collection. Use `tools/clean-storage --minimal --apply` to remove the
+optional idle delay for verified candidates. Use
+`tools/clean-storage maintain -- COMMAND` to collect after a leased job.
+Its [policy](storage_cleanup_policy.json), current pins,
 queued-work holds and shared reader lease govern each invocation. Source/input
 reconstruction, trace audits and accepted replacement evidence remain required;
-unknown diagnostics are kept for review.
+unknown diagnostics are kept for review. Complete audited trace releases retain
+failed outcomes and replay evidence without requiring a passed successor.
 
 - `local-state/artifacts`: verified immutable objects and retained run manifests.
   All local manifests are pins; accepted copies are tracked under

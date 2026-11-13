@@ -1,6 +1,7 @@
 # Complete the storage cleanup workflow
 
-Status: findings recorded; the policy and integration changes below are pending.
+Status: minimal mode and the audited-trace release workflow implemented;
+additional historical evidence adapters remain pending.
 
 The initial collector has guarded removal, pin checks and provenance validation,
 but its first real apply run reclaimed zero bytes. Its source and tests belong
@@ -39,24 +40,49 @@ replay sources, inputs, commands and diagnostics.
 
 ## Required changes
 
-1. Define an appropriate cache-specific lifecycle rule for completed private
-   builds. Keep evidence, current pins, active/queued consumers and fresh
-   mutation checks; do not let a blanket day-long delay substitute for them.
-2. Integrate the existing audit and reconstruction formats with release records,
-   and wire production lifecycle decisions to their creation. A record must
-   state exactly which outputs are obsolete and which evidence remains.
-3. Represent reviewed historical failures without inventing passed successors.
-   Full trace audits, replay bindings, retained diagnostics and valid ownership
-   release remain necessary; age or missing pins alone are insufficient.
-4. Report held bytes and ages separately from unassessed storage. The current
-   early `TooRecent` return leaves metadata unset and byte counts at zero, hiding
-   the size of the held pool and any subsequent provenance failures.
+Implemented in the minimal-retention follow-up:
+
+- `--minimal` removes the optional cache delay and reviews up to 1,024 candidates,
+  without relaxing source hashes, current pins, holds, consumers or mutation
+  checks. The effective policy and remaining byte cap are recorded.
+  The project policy adopts these settings as its default as well.
+- `maintain -- COMMAND` holds the shared lease during a producer job, then runs
+  a fresh minimal apply. Failed producer exit codes are preserved.
+- `release-trace --audit FILE --build FILE --reason TEXT` consumes the existing
+  complete native event audits, preserves all other run files and declared
+  external producer logs, and verifies complete isolated build/source evidence
+  before publishing an owner release. An audited failure needs no invented
+  passed successor. The audited state authorizes only raw trace retirement.
+- Held candidates are measured. Whole-storage before/after footprints explicitly
+  show protected and unassessed storage instead of calling all remaining bytes
+  useful. Candidate limits or unsupported formats remain visible.
+- Cross-candidate retention checks normalize unique paths once. Pin refreshes
+  reuse parsed, metadata-bound manifests, discover new files and re-resolve
+  aliases each time; missing-parent caches and the bounded directory descriptor
+  cache last only one refresh. A path index avoids comparing each reference
+  against every candidate. Empty passes explicitly skip deletion-only target
+  checks. Limits count eligible paths after pin checks, avoiding starvation.
+
+Still needed for broader historical coverage:
+
+1. Qualify historical source-reconstruction ledgers and standalone canonical
+   build receipts as additional adapters. Missing original source files must be
+   reconstructable and verified, never excused by age.
+2. Integrate explicit per-file historical pin transitions. Only two entire
+   historical seals currently have exact-hash exemptions; other references
+   remain blocking until their retention contract is reconciled.
+3. Wire producers that create test objects, binaries and logs to explicit
+   accepted-successor releases. The maintenance wrapper cannot infer that an
+   unresolved failure's unique diagnostic is redundant.
+4. Add finer file-purpose coverage for storage outside the supported candidates.
+   Top-level footprints expose the gap but do not classify every historical file.
 
 ## Acceptance checks
 
-Keep the existing 37 isolated tests and three CLI checks passing in Debug and
-ReleaseFast. Add regressions for the lifecycle policy and each adopted evidence
-format. A completed private cache should qualify when its approved lifecycle
+Keep the expanded native and CLI suites passing in Debug and ReleaseFast.
+Regressions cover minimal lifecycle, changed/missing pin aliases, cross-candidate
+retention, failed trace releases, real collection, idempotence and the maintenance
+wrapper. A completed private cache should qualify when its approved lifecycle
 permits removal; busy, queued, pinned or changed candidates must remain held.
 Source mismatches must never be waived to increase reclaim totals.
 

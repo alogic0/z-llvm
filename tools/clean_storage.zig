@@ -3,14 +3,21 @@ const std = @import("std");
 const u = @import("validation/common.zig");
 const core = @import("storage_cleanup/engine.zig");
 const mutation = @import("storage_cleanup/mutation.zig");
+const coverage = @import("storage_cleanup/coverage.zig");
+const release = @import("storage_cleanup/release.zig");
 const p = core.p;
 const usage =
-    \\usage: tools/clean-storage [--apply] [--policy FILE]
+    \\usage: tools/clean-storage [--minimal] [--apply] [--policy FILE]
     \\       tools/clean-storage exec -- COMMAND [ARG...]
+    \\       tools/clean-storage maintain -- COMMAND [ARG...]
+    \\       tools/clean-storage release-trace --audit FILE --build FILE --reason TEXT
     \\
     \\Without --apply, writes a review with reasons and makes no artifact changes.
     \\--apply discovers again and collects eligible completed private caches and
     \\explicitly released artifacts. Unknown or pinned files are retained.
+    \\--minimal removes the optional idle delay and reviews up to 1024 candidates;
+    \\all provenance, pins, consumers and the policy's byte limit still apply.
+    \\maintain runs a command under the reader lease, then applies minimal cleanup.
     \\Policy defaults to docs/storage_cleanup_policy.json. JSON reports are saved
     \\under local-state/retirements/automatic-storage-cleanup/.
     \\Use exec for builds/readers to hold the shared cleanup lock. Add queued
@@ -22,12 +29,21 @@ pub fn main(init: std.process.Init) !void {
     errdefer if (c.diagnostic) |d| c.print("{s}\n", .{d}) catch {};
     const args = try init.minimal.args.toSlice(c.a);
     var apply = false;
+    var minimal = false;
     var policy_path: []const u8 = "docs/storage_cleanup_policy.json";
-    var i: usize = 1;
+    const release_trace = args.len > 1 and std.mem.eql(u8, args[1], "release-trace");
+    var audit_path: ?[]const u8 = null;
+    var build_path: ?[]const u8 = null;
+    var reason: ?[]const u8 = null;
+    var i: usize = if (release_trace) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
             apply = true;
+            continue;
+        }
+        if (std.mem.eql(u8, args[i], "--minimal")) {
+            minimal = true;
             continue;
         }
         if (std.mem.eql(u8, args[i], "--policy") and i + 1 < args.len) {
@@ -35,8 +51,26 @@ pub fn main(init: std.process.Init) !void {
             policy_path = args[i];
             continue;
         }
+        if (release_trace and i + 1 < args.len) {
+            if (std.mem.eql(u8, args[i], "--audit")) {
+                i += 1;
+                audit_path = args[i];
+                continue;
+            }
+            if (std.mem.eql(u8, args[i], "--build")) {
+                i += 1;
+                build_path = args[i];
+                continue;
+            }
+            if (std.mem.eql(u8, args[i], "--reason")) {
+                i += 1;
+                reason = args[i];
+                continue;
+            }
+        }
         return error.UnknownArgument;
     }
+    if (release_trace and (apply or minimal or audit_path == null or build_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
     const policy_absolute = try c.join(&.{policy_path});
     var policy_dir = try core.fa.metadata.openRoot(c.io, std.fs.path.dirname(policy_absolute).?);
@@ -46,8 +80,9 @@ pub fn main(init: std.process.Init) !void {
     const bytes = try core.fa.metadata.readFile(c.gpa, c.io, policy_dir, policy_name, policy_metadata, 1024 * 1024);
     defer c.gpa.free(bytes);
     const policy_sha256 = try u.digestBytes(c.a, bytes);
-    const config = try std.json.parseFromSlice(p.Config, c.a, bytes, .{});
-    try p.validate(config.value);
+    const parsed_config = try std.json.parseFromSlice(p.Config, c.a, bytes, .{});
+    try p.validate(parsed_config.value);
+    const config = if (minimal or release_trace) p.minimal(parsed_config.value) else parsed_config.value;
     const state = "local-state/storage-cleanup";
     try std.Io.Dir.cwd().createDirPath(c.io, try c.join(&.{state}));
     var state_dir = try core.fa.metadata.openRoot(c.io, try c.join(&.{state}));
@@ -60,55 +95,55 @@ pub fn main(init: std.process.Init) !void {
     const output = try c.fmt("local-state/retirements/automatic-storage-cleanup/{d}-{d}", .{ std.Io.Clock.real.now(c.io).nanoseconds, std.os.linux.getpid() });
     _ = try c.newOutput(output);
     const zigrep = c.env.get("ZIGREP") orelse "zigrep";
-    var e = core.Engine.init(&c, config.value, output, zigrep);
+    var e = core.Engine.init(&c, config, output, zigrep);
     e.collector_binary_sha256 = try c.digest("/proc/self/exe");
     e.collector_sources = try collectorSources(&c);
     var status: []const u8 = "failed";
-    defer report(&e, status, apply) catch {};
+    defer report(&e, status, apply, minimal) catch {};
     try e.check(.{ .path = policy_path, .sha256 = policy_sha256 });
     try e.addControl(policy_path);
+    if (release_trace) {
+        try e.currentManifests(true);
+        const published = try release.trace(&e, audit_path.?, build_path.?, reason.?);
+        status = "release-published";
+        try c.print("Published verified trace release: {s}\nRun tools/clean-storage --minimal --apply to collect it.\n", .{published});
+        return;
+    }
     try c.print("Discovering completed runs and release records...\n", .{});
     try e.discover();
     try e.loadHolds();
-    try c.print("Checking retention pins for {d} candidates...\n", .{e.actions.items.len});
-    try e.pins();
-    try c.print("Verifying {d} required integrity manifests...\n", .{config.value.current_manifests.len});
-    try e.currentManifests(true);
+    // Required control files must still exist on a no-op pass. Expensive
+    // target/alias checks are needed only if provenance admits any candidate.
+    try e.currentManifests(false);
     try c.print("Checking active consumers and retained source/build evidence...\n", .{});
     try e.consumers();
-    var admitted: usize = 0;
-    var total: u64 = 0;
     for (e.actions.items, 0..) |*a, index| {
         if (a.status != .discovered) continue;
-        if (admitted >= config.value.max_candidates) {
-            a.status = .skipped;
-            a.reason = "per-run candidate limit";
-            continue;
-        }
         e.qualify(index) catch |err| {
             a.status = .skipped;
             a.reason = try c.fmt("{s}", .{@errorName(err)});
             continue;
         };
-        if (total + a.allocated_bytes > config.value.max_reclaim_bytes) {
-            a.status = .skipped;
-            a.reason = "per-run allocated-byte limit";
-            continue;
-        }
-        total += a.allocated_bytes;
-        admitted += 1;
-        try c.print("Eligible: {s} ({d} file bytes)\n", .{ a.path, a.allocated_bytes });
     }
-    // Any retained evidence wins over any other action, independent of order.
-    for (e.actions.items) |*a| {
-        if (a.status != .ready) continue;
-        for (e.actions.items) |other| for (other.retained) |ev| if (p.overlaps(try e.absolute(a.path), try e.absolute(ev.path))) {
-            a.status = .skipped;
-            a.reason = "retained evidence of another candidate";
+    try e.protectRetained();
+    if (e.hasReady()) {
+        try c.print("Checking retention pins for {d} candidates...\n", .{e.actions.items.len});
+        try e.pins();
+        try c.print("Verifying {d} required integrity manifests...\n", .{config.current_manifests.len});
+        try e.currentManifests(true);
+    } else try c.print("No provenance-qualified candidates; no deletion checks needed.\n", .{});
+    // Limits count eligible candidates only, so pins cannot starve later runs.
+    e.applyLimits();
+    for (e.actions.items) |a| if (a.status == .ready) try c.print("Eligible: {s} ({d} file bytes)\n", .{ a.path, a.allocated_bytes });
+    for (e.actions.items, 0..) |*a, index| {
+        if (a.status != .skipped or a.measured) continue;
+        e.measureHeld(index) catch |err| {
+            try c.print("Could not measure held path {s}: {s}\n", .{ a.path, @errorName(err) });
         };
     }
-    try report(&e, "reviewed", apply);
-    if (apply) {
+    try coverage.write(&e, "before");
+    try report(&e, "reviewed", apply, minimal);
+    if (apply and e.hasReady()) {
         try e.pinRevisions();
         for (e.actions.items, 0..) |*a, index| {
             if (a.status != .ready) continue;
@@ -119,7 +154,7 @@ pub fn main(init: std.process.Init) !void {
             try e.consumers();
             if (a.status != .ready) continue;
             try mutation.apply(&e, index);
-            try report(&e, "applying", apply);
+            try report(&e, "applying", apply, minimal);
             try c.print("Removed: {s} ({d} allocated file bytes)\n", .{ a.path, a.reclaimed_file_bytes });
         }
         e.hash_cache.clearRetainingCapacity();
@@ -127,8 +162,9 @@ pub fn main(init: std.process.Init) !void {
         for (e.controls.items) |row| try e.check(row);
     }
     try e.compactSnapshots();
+    if (apply) try coverage.write(&e, "after");
     status = "complete";
-    try report(&e, status, apply);
+    try report(&e, status, apply, minimal);
     var ready: usize = 0;
     var kept: usize = 0;
     var removed: usize = 0;
@@ -145,19 +181,24 @@ pub fn main(init: std.process.Init) !void {
     try c.print("Eligible: {d}; kept: {d}; removed: {d}; reclaimed allocated file bytes: {d}\n", .{ ready, kept, removed, reclaimed });
     try c.print("{s}: {s}/report.json\n", .{ if (apply) "Cleanup complete" else "Review complete", output });
 }
-fn report(e: *core.Engine, status: []const u8, apply: bool) !void {
+fn report(e: *core.Engine, status: []const u8, apply: bool, minimal: bool) !void {
     var ready: usize = 0;
     var skipped: usize = 0;
     var removed: usize = 0;
     var proposed: u64 = 0;
     var reclaimed: u64 = 0;
+    var held_bytes: u64 = 0;
+    var unmeasured: usize = 0;
     for (e.actions.items) |a| {
         switch (a.status) {
             .ready => {
                 ready += 1;
                 proposed += a.allocated_bytes;
             },
-            .skipped => skipped += 1,
+            .skipped => {
+                skipped += 1;
+                if (a.measured) held_bytes += a.allocated_bytes else unmeasured += 1;
+            },
             .removed => {
                 removed += 1;
                 reclaimed += a.reclaimed_file_bytes;
@@ -165,7 +206,7 @@ fn report(e: *core.Engine, status: []const u8, apply: bool) !void {
             else => {},
         }
     }
-    try e.write(try e.c.fmt("{s}/report.json", .{e.output}), .{ .schema = "zllvm-storage-cleanup-v1", .status = status, .mode = if (apply) "apply" else "review", .ready = ready, .skipped = skipped, .removed = removed, .proposed_allocated_file_bytes = proposed, .reclaimed_allocated_file_bytes = reclaimed, .producer_reports = e.producer_reports, .release_records = e.released_records, .pin_files_checked = e.checked_manifests, .collector = .{ .binary_sha256 = e.collector_binary_sha256, .zig_version = @import("builtin").zig_version_string, .compiled_sources = e.collector_sources }, .source_revisions = e.revisions.items, .controls = e.controls.items, .actions = e.actions.items });
+    try e.write(try e.c.fmt("{s}/report.json", .{e.output}), .{ .schema = "zllvm-storage-cleanup-v1", .status = status, .mode = if (apply) "apply" else "review", .retention = if (minimal) "minimal" else "policy", .effective_policy = e.config, .ready = ready, .skipped = skipped, .removed = removed, .proposed_allocated_file_bytes = proposed, .held_allocated_file_bytes = held_bytes, .unmeasured_candidates = unmeasured, .reclaimed_allocated_file_bytes = reclaimed, .producer_reports = e.producer_reports, .release_records = e.released_records, .pin_files_checked = e.checked_manifests, .current_integrity_verified = e.current_integrity_verified, .collector = .{ .binary_sha256 = e.collector_binary_sha256, .zig_version = @import("builtin").zig_version_string, .compiled_sources = e.collector_sources }, .source_revisions = e.revisions.items, .controls = e.controls.items, .actions = e.actions.items });
 }
 fn collectorSources(c: *u.Context) ![]const core.Evidence {
     const Source = struct { path: []const u8, bytes: []const u8 };
@@ -174,6 +215,8 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/engine.zig", .bytes = @embedFile("storage_cleanup/engine.zig") },
         .{ .path = "tools/storage_cleanup/mutation.zig", .bytes = @embedFile("storage_cleanup/mutation.zig") },
         .{ .path = "tools/storage_cleanup/policy.zig", .bytes = @embedFile("storage_cleanup/policy.zig") },
+        .{ .path = "tools/storage_cleanup/coverage.zig", .bytes = @embedFile("storage_cleanup/coverage.zig") },
+        .{ .path = "tools/storage_cleanup/release.zig", .bytes = @embedFile("storage_cleanup/release.zig") },
         .{ .path = "tools/validation/common.zig", .bytes = @embedFile("validation/common.zig") },
         .{ .path = "tools/vendor/file_audit.SHA256SUMS", .bytes = @embedFile("vendor/file_audit.SHA256SUMS") },
         .{ .path = "tools/vendor/process.SHA256SUMS", .bytes = @embedFile("vendor/process.SHA256SUMS") },

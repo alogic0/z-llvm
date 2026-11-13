@@ -7,6 +7,7 @@ invocation, without interactive approval:
 ```sh
 tools/clean-storage
 tools/clean-storage --apply
+tools/clean-storage --minimal --apply
 ```
 
 The first command writes a JSON report with eligible paths, allocated file bytes
@@ -14,6 +15,29 @@ and reasons for keeping candidates. The second discovers and checks everything
 again; it does not trust an old inventory. Both print the report location under
 `local-state/retirements/automatic-storage-cleanup/`. Repeating apply is safe:
 already removed paths are absent from the next discovery.
+
+The project policy now uses minimal retention by default. Use `--minimal --apply`
+to request that mode explicitly even with a custom policy. It removes the optional
+waiting period and raises the candidate
+limit to 1,024, while retaining the policy's byte limit and **all** source/hash,
+pin, active-consumer and mutation checks. A recently completed private build can
+therefore lose its regenerable caches immediately. A source mismatch still
+blocks removal. This is a minimum under verified rules, not a claim that every
+remaining byte is necessary: unsupported evidence formats remain visible for
+investigation.
+
+For ongoing maintenance, run jobs through:
+
+```sh
+tools/clean-storage maintain -- YOUR_BUILD_COMMAND ARGUMENTS
+```
+
+This holds the shared storage lease while the job runs, releases it, and runs a
+fresh minimal apply afterward, including when the job fails. Failed jobs keep
+their original exit status and diagnostics. If the job succeeds but cleanup
+fails or is busy, the wrapper returns the cleanup error. Background descendants
+that still hold the lease prevent collection. Queued jobs still need holds.
+This command is the integration point for the job runner; no timer is installed.
 
 The shell entry point builds a reusable **ReleaseFast** native Zig helper in
 `local-state/storage-cleanup/`. It uses the project's pinned Zig version,
@@ -23,7 +47,7 @@ metadata and hashing, and standard Linux tools (`lsof`, `ps`, `sha256sum`, `git`
 Python or Node runtime is used. `jqz` can inspect the resulting reports:
 
 ```sh
-jqz '{mode,ready,skipped,removed,reclaimed_allocated_file_bytes}' REPORT.json
+jqz '{mode,retention,ready,skipped,removed,reclaimed_allocated_file_bytes,held_allocated_file_bytes}' REPORT.json
 jqz '.actions | each | where(.status == "skipped") | {path,reason}' REPORT.json
 ```
 
@@ -32,7 +56,7 @@ jqz '.actions | each | where(.status == "skipped") | {path,reason}' REPORT.json
 | Category | Required evidence |
 | --- | --- |
 | Completed private compiler caches | A passed isolated compiler `report.json`, every source hash, the compiler hash, successful build commands binding source/output paths, original logs, and the Zig toolchain hash. Cache arguments must name direct children of that report's run directory. |
-| Superseded raw event streams | An explicit release record, an accepted successor, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler and complete build/source evidence, and the auditor sources. |
+| Released raw event streams | An explicit owner release, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler and complete build/source evidence, and the auditor sources. An audited failure retains its original outcome and diagnostics; it does not require a passed successor. |
 | Superseded executable/object files | An explicit release record, accepted successor, complete source/build/input/result evidence and matching bytes. Only the supported output names and ELF/archive formats qualify. |
 | Obsolete logs | An explicit release record, accepted successor, complete build/source/input/result evidence, and retained diagnostics for a failed producer. |
 
@@ -49,22 +73,26 @@ the rules. Use the artifact store's collector for unreachable store objects.
 Hardlink aliases, symlinks, special files, foreign owners, mounted subtrees,
 frozen cache directories and changed metadata/content prevent admission.
 
-The default policy adds a **24-hour idle period**, at most **64 candidates** and
-**32 GiB of allocated file bytes per invocation**. These are additional limits;
-age alone never makes a file eligible. Change the reviewed policy if the desired
-idle period or batch size changes.
+The project policy allows **zero idle hours**, at most **1,024 candidates** and
+**32 GiB of allocated file bytes per invocation**. Age alone never makes a file
+eligible. A custom policy can add a delay or smaller batch size; `--minimal`
+overrides only those first two limits, and reports its effective policy explicitly.
+The byte limit still bounds each pass; another fresh pass collects any remaining
+eligible candidates after that cap is reached.
 
-Current release integration is manual: production validation tools do not yet
-emit `storage-release.json`, and the collector does not translate earlier audit
-and retirement formats. The 24-hour default can also hold private caches that
-pass the other checks. The [follow-up plan](plans/2026-11-13-storage-cleanup-followups.md)
-records the measured coverage gaps and the changes needed to address them.
+`release-trace` translates the existing `zllvm-native-event-audit-v1` format into
+a qualified owner release. Other production tools do not yet emit output
+releases. Historical source-reconstruction formats and per-path pin retirement
+decisions still need dedicated adapters; they are not treated as automatically
+equivalent to the complete isolated build evidence. The
+[follow-up plan](plans/2026-11-13-storage-cleanup-followups.md) records those gaps.
 
 ## Current work and retention pins
 
 [storage_cleanup_policy.json](storage_cleanup_policy.json) records the five
 current integrity manifests and known protected directories. Their complete
-hash checks must pass. A missing or changed required control blocks apply.
+hash checks must pass before any removal. A missing or changed required control
+blocks apply.
 The collector also discovers checksum manifests, artifact manifests and retained
 paths in retirement records. Newly introduced references are checked before
 each mutation. Relative checksum paths are resolved against possible ancestor
@@ -102,7 +130,8 @@ after a check. Use the lease for unattended operation alongside producers.
 ## Releasing traces, binaries and logs
 
 The owner of a completed run writes `storage-release.json` inside that run when
-an accepted successor makes selected outputs obsolete. This is an explicit
+an accepted successor makes selected outputs obsolete, or a complete trace
+audit and preserved replay evidence replace the raw event detail. This is an explicit
 lifecycle declaration, not a conclusion the collector guesses from filenames.
 Every digest below must be the actual SHA-256; the placeholders are deliberately
 invalid so copying this example cannot delete anything.
@@ -135,6 +164,25 @@ supported isolated build report: the collector verifies its entire source map,
 compiler and successful command binding. Role labels alone are insufficient.
 All retained evidence wins over deletion candidates, including across records.
 
+The successor requirement above applies to `state:"superseded"`. For raw traces,
+the owner can instead publish a verified `state:"audited"` release:
+
+```sh
+tools/clean-storage release-trace \
+  --audit local-state/retirements/AUDIT/results/N.json \
+  --build local-state/validations/SUITE/BATCH/COMPILER/report.json \
+  --reason 'Completed experiment: retain audit, failure details and replay evidence'
+tools/clean-storage --minimal --apply
+```
+
+The publishing command verifies the full audit, complete build sources,
+compiler, input/report bindings, pins, holds and consumers before creating a
+release. It retains all other regular files in the original run, the producer's
+external logs when declared, and the build logs/toolchain. It neither removes
+the raw trace nor overwrites an existing owner decision. Actual cleanup repeats
+the checks. Audited releases may contain **only raw traces**; binaries and logs
+continue to require an accepted successor. Failed producer outcomes stay failed.
+
 For `raw_trace`, the artifact name must be `profile.events.jsonl`, with an `audit`
 path and retained `audit` and `compiler` roles. The audit must use
 `zllvm-native-event-audit-v1`, validate the entire closed stream and bind its raw
@@ -164,6 +212,29 @@ and identities; completed snapshots are losslessly gzip-compressed with a
 decompression/hash comparison. No duplicate archive of the original run is
 created. The small helper binary/cache is reused across invocations.
 
+The report includes measured held bytes, idle ages and unmeasured candidate
+counts. `footprint-before.json` and, for apply, `footprint-after.json` show the
+whole `local-state` allocation by top-level directory and distinguish protected
+roots from unassessed storage. Those `du` observations include directories and
+concurrent work; they are not deletion inventories or exact savings claims.
+Unknown files are never silently counted as necessary. The effective policy
+and each held candidate's specific reason remain in `report.json`.
+
+For repeated pin checks, parsed manifests are reused only while their full
+identity/metadata matches. Changed manifests abort the pass. Discovery still
+finds new manifests before each mutation, and path/alias resolution is refreshed
+each time, including previously missing parents. No persistent negative-path
+cache can hide a newly created pin.
+
+When no candidate passes provenance/ownership checks, the tool has nothing to
+delete and skips the expensive pin-target and integrity-target scans. Required
+control files must still exist and their own hashes are recorded. Such a report
+explicitly has `current_integrity_verified:false`; it does not claim the target
+hashes were checked. Every pass that can remove artifacts performs those checks
+in full, including again after collection. Batch limits are applied after pin
+checks, so pinned candidates do not prevent later eligible ones from being
+collected.
+
 Reported savings count allocated **regular-file** bytes on final-link removal.
 Directory blocks are excluded; existing hardlinks are rejected, and filesystem
 reflinks/shared extents are not measured. Free-space movement also includes
@@ -190,7 +261,9 @@ failed release records, incomplete trace audits and directory permissions.
 Guarded reads bind parsed controls to their exact bytes and identity, including
 when a report is atomically replaced. Previous numbered retirement records pin
 their retained evidence in later runs. CLI
-checks exercise the shared lease, an interrupted operation and empty apply.
+checks exercise the shared lease, an interrupted operation, empty apply,
+ordinary fresh-cache retention, a bad current manifest, actual minimal
+collection, idempotence and maintenance after successful/failed jobs.
 They do not remove project artifacts.
 
 For unattended execution, call `tools/clean-storage --apply` from the existing

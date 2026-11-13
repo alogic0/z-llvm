@@ -155,7 +155,10 @@ See [storage](docs/zllvm_artifact_retention_contract.md) and
 [retention](docs/retention_headroom_policy.md) for publication and cleanup.
 The [automatic storage collector](docs/storage_cleanup.md) reviews completed
 private caches and explicitly released artifacts, then removes verified
-candidates with `tools/clean-storage --apply`.
+candidates with `tools/clean-storage --apply`. The project policy keeps the
+minimum verified state without an arbitrary idle delay. Use
+`tools/clean-storage maintain -- COMMAND` to collect after a job under the shared
+storage lease; unknown evidence and active/queued work remain protected.
 
 The Git repository contains source, fixtures, and acceptance summaries.
 Large raw validation runs, build caches, installed binaries, and scratch

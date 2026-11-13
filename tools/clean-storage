@@ -8,13 +8,20 @@ if [[ -L "$project_root/local-state" || -L "$storage_state" ]]; then
     exit 2
 fi
 mkdir -p -- "$storage_state"
-if [[ ${1:-} == exec ]]; then
+if [[ ${1:-} == exec || ${1:-} == maintain ]]; then
+    cleanup_mode=$1
     shift
     if [[ ${1:-} == -- ]]; then shift; fi
     if [[ $# == 0 ]]; then printf 'usage: tools/clean-storage exec -- COMMAND [ARG...]\n' >&2; exit 2; fi
     # The collector takes an exclusive flock on this same file.
     cd -- "$project_root"
-    exec flock --shared "$storage_state/cleanup.lock" "$@"
+    if [[ $cleanup_mode == exec ]]; then exec flock --shared "$storage_state/cleanup.lock" "$@"; fi
+    cleanup_command_status=0
+    flock --shared "$storage_state/cleanup.lock" "$@" || cleanup_command_status=$?
+    cleanup_collection_status=0
+    "$source_root/tools/clean-storage" --minimal --apply || cleanup_collection_status=$?
+    if (( cleanup_command_status != 0 )); then exit "$cleanup_command_status"; fi
+    exit "$cleanup_collection_status"
 fi
 cd -- "$source_root"
 cleanup_zig=${ZIG:-zig}

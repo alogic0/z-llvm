@@ -11,16 +11,24 @@ pub const Config = struct {
     retired_manifests: []const Evidence = &.{},
     holds_file: []const u8 = "local-state/storage-cleanup/holds.json",
 };
+/// Minimal retention changes batching and the optional waiting period only.
+/// Provenance, pins, ownership, consumers and mutation checks are identical.
+pub fn minimal(c: Config) Config {
+    var result = c;
+    result.minimum_idle_hours = 0;
+    result.max_candidates = 1024;
+    return result;
+}
 pub const Holds = struct { schema: u32 = 1, paths: []const []const u8 = &.{} };
 pub const Retained = struct { path: []const u8, sha256: []const u8, role: enum { source, input, build, result, diagnostic, audit, compiler, other } };
 pub const Artifact = struct { path: []const u8, sha256: []const u8, kind: enum { raw_trace, build_output, log }, audit: ?[]const u8 = null };
 pub const Release = struct {
     schema: []const u8,
-    state: enum { held, superseded },
+    state: enum { held, superseded, audited },
     run_root: []const u8,
     reason: []const u8,
     producer: Evidence,
-    successor: Evidence,
+    successor: ?Evidence = null,
     retained: []const Retained,
     artifacts: []const Artifact,
 };

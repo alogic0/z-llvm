@@ -3,6 +3,7 @@ const t = std.testing;
 const u = @import("../validation/common.zig");
 const core = @import("engine.zig");
 const mutation = @import("mutation.zig");
+const releases = @import("release.zig");
 const p = core.p;
 const run = "local-state/validations/test/build";
 const cache = run ++ "/zig-local-cache";
@@ -526,5 +527,199 @@ test "storage cleanup: a fresh pin pass observes changed symlink targets" {
     try f.tmp.dir.deleteFile(t.io, "pin-alias");
     try f.tmp.dir.symLink(t.io, cache ++ "/o/object", "pin-alias", .{});
     try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: minimal lifecycle admits completed fresh cache without waiving source checks" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    e.config.minimum_idle_hours = 24;
+    try e.discover();
+    try t.expectError(error.TooRecent, e.qualify(0));
+    try e.measureHeld(0);
+    try t.expect(e.actions.items[0].measured);
+    try t.expect(e.actions.items[0].allocated_bytes > 0);
+    e.config = p.minimal(e.config);
+    // Fresh engine to avoid carrying the observational held byte measurement.
+    var minimal = core.Engine.init(&f.c, e.config, output, e.zigrep);
+    minimal.now_ns = e.now_ns;
+    try minimal.discover();
+    try minimal.qualify(0);
+    try t.expectEqual(.ready, minimal.actions.items[0].status);
+    try f.write("local-state/validations/test/source/main.zig", "changed source");
+    var changed = f.engine();
+    changed.config = p.minimal(changed.config);
+    try changed.discover();
+    try t.expectError(error.EvidenceHashMismatch, changed.qualify(0));
+}
+
+test "storage cleanup: missing pin parent is refreshed on every pass" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try e.discover();
+    try f.write(run ++ "/pins.sha256", try e.c.fmt("{s}  future/pin-alias\n", .{try e.digest(cache ++ "/o/object")}));
+    try e.pins();
+    try t.expectEqual(.discovered, e.actions.items[0].status);
+    try f.tmp.dir.createDir(t.io, "future", .default_dir);
+    try f.tmp.dir.symLink(t.io, "../" ++ cache ++ "/o/object", "future/pin-alias", .{});
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: changed cached pin manifest aborts refresh" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try e.discover();
+    try f.write(run ++ "/pins.sha256", "# no pins yet\n");
+    try e.pins();
+    try f.write(run ++ "/pins.sha256", try e.c.fmt("{s}  {s}\n", .{ try e.digest(cache ++ "/o/object"), cache ++ "/o/object" }));
+    try t.expectError(error.PinManifestChanged, e.pins());
+}
+
+test "storage cleanup: another candidate's retained evidence always wins" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try e.discover();
+    try e.qualify(0);
+    try e.actions.append(f.c.a, .{ .path = released ++ "/unrelated.log", .run_root = released, .producer = report, .kind = .log, .status = .skipped, .retained = &.{.{ .path = try e.absolute(cache ++ "/o/object"), .sha256 = try e.digest(cache ++ "/o/object") }} });
+    try e.protectRetained();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: owner can publish audited failed trace without a passed successor" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    _ = try f.release(&e, .raw_trace, true, false, true);
+    try f.tmp.dir.deleteFile(t.io, released ++ "/storage-release.json");
+    e = f.engine();
+    const published = try releases.trace(&e, released ++ "/audit.json", report, "Raw detail is audited; preserve the failure and replay inputs");
+    try t.expectEqualStrings(released ++ "/storage-release.json", published);
+    // Publishing is an ownership transition only.
+    _ = try e.metadata(released ++ "/profile.events.jsonl");
+    var collector = f.engine();
+    try collector.discover();
+    for (collector.actions.items, 0..) |a, i| {
+        if (a.kind != .raw_trace) continue;
+        try collector.qualify(i);
+        try mutation.apply(&collector, i);
+    }
+    try t.expectError(error.FileNotFound, collector.metadata(released ++ "/profile.events.jsonl"));
+    var producer = try collector.load(t.allocator, released ++ "/producer.json");
+    defer producer.deinit();
+    try t.expectEqual(@as(i64, 1), try core.integer(producer.value, "actual_returncode"));
+    try t.expect(core.eq(producer.value, "status", "finished"));
+}
+
+test "storage cleanup: incomplete audit cannot publish a release" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    _ = try f.release(&e, .raw_trace, false, false, true);
+    try f.tmp.dir.deleteFile(t.io, released ++ "/storage-release.json");
+    e = f.engine();
+    try t.expectError(error.IncompleteTraceAudit, releases.trace(&e, released ++ "/audit.json", report, "Insufficient audit"));
+    try t.expectError(error.FileNotFound, e.metadata(released ++ "/storage-release.json"));
+    _ = try e.metadata(released ++ "/profile.events.jsonl");
+}
+
+test "storage cleanup: audited state cannot release binaries or logs" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    _ = try f.release(&e, .log, true, true, false);
+    var v = try e.load(t.allocator, released ++ "/storage-release.json");
+    defer v.deinit();
+    v.value.object.getPtr("state").?.* = .{ .string = "audited" };
+    try e.write(released ++ "/storage-release.json", v.value);
+    e = f.engine();
+    try e.discover();
+    for (e.actions.items, 0..) |a, i| {
+        if (a.kind == .log) try t.expectError(error.AuditedReleaseOnlyTraces, e.qualify(i));
+    }
+}
+
+test "storage cleanup: indexed pins cover ancestors and missing descendants but respect boundaries" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    for ([_][]const u8{ run, cache ++ "/future/file", cache ++ "-neighbor/file" }) |target| {
+        var e = f.engine();
+        try f.build(&e);
+        try e.discover();
+        try f.write(run ++ "/index.sha256", try e.c.fmt("{s}  {s}\n", .{ try e.digest(cache ++ "/o/object"), target }));
+        try e.pins();
+        try t.expectEqual(if (std.mem.eql(u8, target, cache ++ "-neighbor/file")) @as(@FieldType(core.Action, "status"), .discovered) else .skipped, e.actions.items[0].status);
+    }
+}
+
+test "storage cleanup: minimal mode preserves byte limits and protection declarations" {
+    const config: p.Config = .{ .max_reclaim_bytes = 4096, .protected_paths = &.{run}, .current_manifests = &.{"required.sha256"}, .holds_file = "queue.json" };
+    const minimal = p.minimal(config);
+    try t.expectEqual(@as(u32, 0), minimal.minimum_idle_hours);
+    try t.expectEqual(@as(usize, 1024), minimal.max_candidates);
+    try t.expectEqual(config.max_reclaim_bytes, minimal.max_reclaim_bytes);
+    try t.expectEqualStrings(run, minimal.protected_paths[0]);
+    try t.expectEqualStrings("required.sha256", minimal.current_manifests[0]);
+    try t.expectEqualStrings(config.holds_file, minimal.holds_file);
+}
+
+test "storage cleanup: pinned candidates do not consume the collection budget" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    e.config.max_candidates = 1;
+    e.config.max_reclaim_bytes = 4096;
+    for ([_]@FieldType(core.Action, "status"){ .skipped, .ready, .ready }) |status| try e.actions.append(f.c.a, .{ .path = cache, .run_root = run, .producer = report, .kind = .cache, .status = status, .allocated_bytes = 4096 });
+    e.applyLimits();
+    try t.expectEqual(.ready, e.actions.items[1].status);
+    try t.expectEqual(.skipped, e.actions.items[2].status);
+    try t.expect(e.hasReady());
+}
+
+test "storage cleanup: directory pin aliases are resolved anew for each mutation" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try e.discover();
+    try f.tmp.dir.createDirPath(t.io, "unrelated/o");
+    try f.write("unrelated/o/object", "other");
+    try f.tmp.dir.symLink(t.io, "unrelated", "directory-alias", .{ .is_directory = true });
+    try f.write(run ++ "/directory.sha256", try e.c.fmt("{s}  directory-alias/o/object\n", .{try e.digest("unrelated/o/object")}));
+    try e.pins();
+    try t.expectEqual(.discovered, e.actions.items[0].status);
+    try f.tmp.dir.deleteFile(t.io, "directory-alias");
+    try f.tmp.dir.symLink(t.io, cache, "directory-alias", .{ .is_directory = true });
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: pin resolution remains correct beyond the directory descriptor budget" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try e.discover();
+    var lines: std.ArrayList(u8) = .empty;
+    for (0..140) |i| {
+        const dir = try e.c.fmt("pin-directories/d{d}", .{i});
+        try f.tmp.dir.createDirPath(t.io, dir);
+        const path = try e.c.fmt("{s}/file", .{dir});
+        try f.write(path, "unrelated");
+        try lines.appendSlice(f.c.a, try e.c.fmt("{s}  {s}\n", .{ try e.digest(path), path }));
+    }
+    try f.tmp.dir.symLink(t.io, "../../" ++ cache ++ "/o/object", "pin-directories/d139/last-alias", .{});
+    try lines.appendSlice(f.c.a, try e.c.fmt("{s}  pin-directories/d139/last-alias\n", .{try e.digest(cache ++ "/o/object")}));
+    try f.write(run ++ "/many-pins.sha256", lines.items);
+    try e.pins();
+    try t.expect(e.pin_open_directories <= 128);
     try t.expectEqual(.skipped, e.actions.items[0].status);
 }

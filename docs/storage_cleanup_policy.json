@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "minimum_idle_hours": 24,
-  "max_candidates": 64,
+  "minimum_idle_hours": 0,
+  "max_candidates": 1024,
   "max_candidate_entries": 250000,
   "max_reclaim_bytes": 34359738368,
   "current_manifests": [

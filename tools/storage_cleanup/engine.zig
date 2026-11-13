@@ -6,6 +6,13 @@ const D = std.Io.Dir;
 pub const Evidence = p.Evidence;
 pub const Revision = struct { commit: []const u8, tree: []const u8, reference: []const u8 };
 const Observed = struct { metadata: fa.Metadata, sha256: []const u8 };
+const Pin = struct { path: []const u8, direct: bool = false };
+const PinManifest = struct { metadata: fa.Metadata, targets: []const Pin };
+const PinIndex = struct {
+    roots: std.StringHashMap(usize),
+    ancestors: std.StringHashMap(std.ArrayList(usize)),
+};
+const PinDirectory = struct { dir: ?D, canonical: []const u8 };
 pub const Action = struct {
     path: []const u8,
     run_root: []const u8,
@@ -21,6 +28,8 @@ pub const Action = struct {
     allocated_bytes: u64 = 0,
     file_count: usize = 0,
     reclaimed_file_bytes: u64 = 0,
+    measured: bool = false,
+    idle_seconds: ?i64 = null,
 };
 pub const Engine = struct {
     c: *u.Context,
@@ -32,6 +41,7 @@ pub const Engine = struct {
     controls: std.ArrayList(Evidence) = .empty,
     held: std.ArrayList([]const u8) = .empty,
     checked_manifests: usize = 0,
+    current_integrity_verified: bool = false,
     producer_reports: usize = 0,
     released_records: usize = 0,
     revisions: std.ArrayList(Revision) = .empty,
@@ -41,9 +51,17 @@ pub const Engine = struct {
     hash_cache: std.AutoHashMap(fa.metadata.Identity, Observed),
     observed_reads: std.StringHashMap(Observed),
     pin_paths: ?*std.StringHashMap(void) = null,
+    pin_parents: ?*std.StringHashMap(?PinDirectory) = null,
+    pin_target_capacity: usize = 0,
+    pin_open_directories: usize = 0,
+    pin_manifests: std.StringHashMap(PinManifest),
+    collecting_pins: ?*std.ArrayList(Pin) = null,
+    pin_bases: ?*std.StringHashMap([]const []const u8) = null,
+    pin_allocator: ?std.mem.Allocator = null,
+    pin_index: ?*PinIndex = null,
 
     pub fn init(c: *u.Context, config: p.Config, output: []const u8, zigrep: []const u8) Engine {
-        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a) };
+        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a) };
     }
     pub fn absolute(e: *Engine, path: []const u8) ![]const u8 {
         return e.c.join(&.{path});
@@ -256,23 +274,73 @@ pub const Engine = struct {
                 if (p.relative(path)) try e.held.append(e.c.a, try e.c.a.dupe(u8, path));
             }
         } else |err| if (err != error.FileNotFound) return err;
-        for (e.actions.items) |*a| for (e.held.items) |held| if (p.overlaps(held, a.path)) {
+        for (e.actions.items) |*a| for (e.held.items) |held| if (a.status != .removed and p.overlaps(held, a.path)) {
             a.status = .skipped;
             a.reason = try e.c.fmt("protected by hold: {s}", .{held});
             break;
         };
     }
     fn pinResolved(e: *Engine, path: []const u8, source: []const u8) !void {
+        if (e.pin_index) |index| {
+            if (index.ancestors.get(path)) |children| {
+                for (children.items) |i| try e.markPinned(i, source);
+                return;
+            }
+            var parent = std.fs.path.dirname(path);
+            while (parent) |name| {
+                if (index.roots.get(name)) |i| {
+                    try e.markPinned(i, source);
+                    return;
+                }
+                parent = std.fs.path.dirname(name);
+            }
+            return;
+        }
         for (e.actions.items) |*a| if (a.status != .removed and p.overlaps(a.path, path)) {
             a.status = .skipped;
             a.reason = try e.c.fmt("pinned by {s}", .{source});
         };
     }
+    fn markPinned(e: *Engine, i: usize, source: []const u8) !void {
+        const a = &e.actions.items[i];
+        if (a.status != .discovered and a.status != .ready) return;
+        a.status = .skipped;
+        a.reason = try e.c.fmt("pinned by {s}", .{source});
+    }
+    // Cache missing directory prefixes, not millions of speculative missing
+    // leaves. This cache lasts ONE pin pass, so a newly created alias is seen
+    // on the next refresh. Resolving existing leaves remains mandatory.
+    fn pinDirectory(e: *Engine, path: []const u8) anyerror!?PinDirectory {
+        const parents = e.pin_parents.?;
+        if (parents.get(path)) |cached| return cached;
+        if (!std.mem.eql(u8, path, "/")) {
+            if (try e.pinDirectory(std.fs.path.dirname(path) orelse "/") == null) return null;
+        }
+        var dir = D.openDirAbsolute(e.c.io, path, .{}) catch |err| switch (err) {
+            error.FileNotFound, error.NotDir => {
+                try parents.put(try e.c.gpa.dupe(u8, path), null);
+                return null;
+            },
+            else => return err,
+        };
+        errdefer dir.close(e.c.io);
+        const canonical = try e.pinRealPath(dir, ".");
+        errdefer e.c.gpa.free(canonical);
+        const keep_open = e.pin_open_directories < 128;
+        const result: PinDirectory = .{ .dir = if (keep_open) dir else null, .canonical = canonical };
+        try parents.put(try e.c.gpa.dupe(u8, path), result);
+        if (keep_open) e.pin_open_directories += 1 else dir.close(e.c.io);
+        return result;
+    }
+    fn pinParentExists(e: *Engine, path: []const u8) !bool {
+        if (e.pin_parents == null) return true;
+        return try e.pinDirectory(path) != null;
+    }
     fn pinCanonical(e: *Engine, absolute_path: []const u8, source: []const u8) !void {
         if (e.pin_paths) |seen| {
             if (seen.contains(absolute_path)) return;
         }
-        const canonical = D.cwd().realPathFileAlloc(e.c.io, absolute_path, e.c.gpa) catch |err| switch (err) {
+        const canonical = e.resolvePin(absolute_path) catch |err| switch (err) {
             error.FileNotFound, error.NotDir => return,
             else => return err,
         };
@@ -285,12 +353,85 @@ pub const Engine = struct {
             try seen.put(owned, {});
         }
         if (std.mem.eql(u8, canonical, e.c.root)) return e.pinResolved("local-state/validations", source);
+        // The lexical path was already tested by pin(). Only aliases need a
+        // second lookup. Parent descriptors are discarded at every refresh.
+        if (std.mem.eql(u8, canonical, absolute_path)) return;
         if (p.within(e.c.root, canonical) and canonical.len > e.c.root.len) try e.pinResolved(canonical[e.c.root.len + 1 ..], source);
     }
+    fn resolvePin(e: *Engine, path: []const u8) ![]const u8 {
+        if (e.pin_parents == null) return e.pinRealPath(D.cwd(), path);
+        const parent = (try e.pinDirectory(std.fs.path.dirname(path) orelse "/")) orelse return error.FileNotFound;
+        var directory = parent.dir orelse try D.openDirAbsolute(e.c.io, std.fs.path.dirname(path) orelse "/", .{});
+        defer if (parent.dir == null) directory.close(e.c.io);
+        if (parent.dir == null) {
+            const canonical = try directory.realPathFileAlloc(e.c.io, ".", e.c.gpa);
+            defer e.c.gpa.free(canonical);
+            if (!std.mem.eql(u8, canonical, parent.canonical)) return error.PinDirectoryChanged;
+        }
+        const name = std.fs.path.basename(path);
+        if (name.len == 0 or std.mem.eql(u8, path, "/")) return e.c.gpa.dupe(u8, "/");
+        const m = try fa.metadata.child(e.c.gpa, directory, name);
+        if (m.kind == .symlink) return e.pinRealPath(directory, name);
+        return std.fs.path.join(e.c.gpa, &.{ parent.canonical, name });
+    }
+    fn pinRealPath(e: *Engine, dir: D, path: []const u8) ![]const u8 {
+        const terminated = try dir.realPathFileAlloc(e.c.io, path, e.c.gpa);
+        defer e.c.gpa.free(terminated);
+        return e.c.gpa.dupe(u8, terminated);
+    }
     pub fn pin(e: *Engine, raw: []const u8, source: []const u8) !void {
+        if (e.collecting_pins) |list| {
+            try list.append(e.c.a, .{ .path = try e.c.a.dupe(u8, raw) });
+            return;
+        }
         if (std.fs.path.isAbsolute(raw)) {
+            if (e.pin_paths) |seen| if (seen.contains(raw)) return;
             if (p.within(e.c.root, raw) and raw.len > e.c.root.len) try e.pinResolved(raw[e.c.root.len + 1 ..], source);
             try e.pinCanonical(raw, source);
+            return;
+        }
+        // Most ledgers contain canonical project-relative paths. Resolve only
+        // ancestor bases in which the first component exists (or can overlap
+        // a candidate). Missing-prefix knowledge is shared across a manifest,
+        // and rebuilt for every refresh, including after each removal.
+        if (p.relative(raw) and e.pin_bases != null and std.mem.indexOfScalar(u8, raw, '/') != null) {
+            const allocator = e.pin_allocator.?;
+            const first = raw[0..std.mem.indexOfScalar(u8, raw, '/').?];
+            const source_parent = std.fs.path.dirname(source) orelse ".";
+            const key = try std.fmt.allocPrint(e.c.gpa, "{s}\n{s}", .{ source_parent, first });
+            defer e.c.gpa.free(key);
+            var bases: []const []const u8 = undefined;
+            if (e.pin_bases.?.get(key)) |cached| {
+                bases = cached;
+            } else {
+                var list: std.ArrayList([]const u8) = .empty;
+                var parent = source_parent;
+                while (true) {
+                    const base = try std.fs.path.resolve(allocator, &.{ e.c.root, parent });
+                    const prefix = try std.fs.path.join(e.c.gpa, &.{ base, first });
+                    defer e.c.gpa.free(prefix);
+                    var relevant = false;
+                    if (p.within(e.c.root, prefix) and prefix.len > e.c.root.len) {
+                        const rel = prefix[e.c.root.len + 1 ..];
+                        for (e.actions.items) |a| if (p.overlaps(a.path, rel)) {
+                            relevant = true;
+                            break;
+                        };
+                    }
+                    if (relevant or try e.pinParentExists(prefix)) try list.append(allocator, base);
+                    if (std.mem.eql(u8, parent, ".")) break;
+                    parent = std.fs.path.dirname(parent) orelse ".";
+                }
+                bases = try list.toOwnedSlice(allocator);
+                try e.pin_bases.?.put(try allocator.dupe(u8, key), bases);
+            }
+            for (bases) |base| {
+                const absolute_path = try std.fs.path.join(e.c.gpa, &.{ base, raw });
+                defer e.c.gpa.free(absolute_path);
+                if (e.pin_paths) |seen| if (seen.contains(absolute_path)) continue;
+                if (p.within(e.c.root, absolute_path) and absolute_path.len > e.c.root.len) try e.pinResolved(absolute_path[e.c.root.len + 1 ..], source);
+                try e.pinCanonical(absolute_path, source);
+            }
             return;
         }
         if (p.relative(raw)) try e.pinResolved(raw, source);
@@ -319,12 +460,48 @@ pub const Engine = struct {
         // Repeated references resolve once per pass. A fresh map on every
         // refresh still observes newly changed symlink aliases before mutation.
         var seen = std.StringHashMap(void).init(e.c.gpa);
+        try seen.ensureTotalCapacity(@intCast(e.pin_target_capacity));
+        var parents = std.StringHashMap(?PinDirectory).init(e.c.gpa);
+        e.pin_open_directories = 0;
+        var arena = std.heap.ArenaAllocator.init(e.c.gpa);
+        defer arena.deinit();
+        var bases = std.StringHashMap([]const []const u8).init(arena.allocator());
+        var index: PinIndex = .{ .roots = .init(arena.allocator()), .ancestors = .init(arena.allocator()) };
+        for (e.actions.items, 0..) |a, i| {
+            if (a.status != .discovered and a.status != .ready) continue;
+            try index.roots.put(a.path, i);
+            var parent: ?[]const u8 = a.path;
+            while (parent) |name| {
+                const entry = try index.ancestors.getOrPut(name);
+                if (!entry.found_existing) entry.value_ptr.* = .empty;
+                try entry.value_ptr.append(arena.allocator(), i);
+                parent = std.fs.path.dirname(name);
+            }
+        }
+        e.pin_index = &index;
+        e.pin_bases = &bases;
+        e.pin_allocator = arena.allocator();
         e.pin_paths = &seen;
+        e.pin_parents = &parents;
         defer {
             e.pin_paths = null;
+            e.pin_parents = null;
+            e.pin_bases = null;
+            e.pin_allocator = null;
+            e.pin_index = null;
+            e.pin_target_capacity = seen.count();
             var keys = seen.keyIterator();
             while (keys.next()) |key| e.c.gpa.free(key.*);
             seen.deinit();
+            var parent_it = parents.iterator();
+            while (parent_it.next()) |entry| {
+                e.c.gpa.free(entry.key_ptr.*);
+                if (entry.value_ptr.*) |directory| {
+                    if (directory.dir) |dir| dir.close(e.c.io);
+                    e.c.gpa.free(directory.canonical);
+                }
+            }
+            parents.deinit();
         }
         const listing = try e.discoverPaths(&.{ "-g", "*.sha256", "-g", "*.SHA256SUMS", "-g", "SHA256SUMS", "-g", "record.json", "-g", "record-*.json", "-g", "artifact-manifest.json" }, &.{ "docs", "local-state/validations", "local-state/retirements", "local-state/artifacts/manifests" });
         var lines = std.mem.tokenizeScalar(u8, listing, '\n');
@@ -338,8 +515,20 @@ pub const Engine = struct {
                 break;
             };
             if (historical) continue;
+            const m = try e.metadata(path);
+            if (e.pin_manifests.get(path)) |cached| {
+                if (!cached.metadata.eql(m)) return error.PinManifestChanged;
+                for (cached.targets) |target| {
+                    if (target.direct) try e.pinResolved(target.path, path) else try e.pin(target.path, path);
+                }
+                e.checked_manifests += 1;
+                continue;
+            }
             const bytes = try e.read(e.c.gpa, path, 512 * 1024 * 1024);
             defer e.c.gpa.free(bytes);
+            var targets: std.ArrayList(Pin) = .empty;
+            e.collecting_pins = &targets;
+            defer e.collecting_pins = null;
             if (std.mem.endsWith(u8, path, ".json")) {
                 var parsed = try std.json.parseFromSlice(u.Value, e.c.gpa, bytes, .{});
                 defer parsed.deinit();
@@ -361,7 +550,7 @@ pub const Engine = struct {
                     if (checksumHash(std.mem.trim(u8, line, " \t"))) {
                         // Historical fingerprints contain a bare digest, with
                         // no named file. Hold their entire containing run.
-                        try e.pinResolved(std.fs.path.dirname(path) orelse "local-state/validations", path);
+                        try targets.append(e.c.a, .{ .path = try e.c.a.dupe(u8, std.fs.path.dirname(path) orelse "local-state/validations"), .direct = true });
                     } else if (line.len >= 66 and checksumHash(line[0..64]) and (line[64] == ' ' or line[64] == '\t')) {
                         var target = std.mem.trimStart(u8, line[64..], " \t");
                         if (target.len > 0 and target[0] == '*') target = target[1..];
@@ -372,13 +561,42 @@ pub const Engine = struct {
                     } else return e.c.fail("Unrecognized checksum manifest entry in {s}; retaining candidates until the format is reviewed.", .{path});
                 }
             }
+            e.collecting_pins = null;
+            const owned_targets = try targets.toOwnedSlice(e.c.a);
+            try e.pin_manifests.put(try e.c.a.dupe(u8, path), .{ .metadata = m, .targets = owned_targets });
+            for (owned_targets) |target| {
+                if (target.direct) try e.pinResolved(target.path, path) else try e.pin(target.path, path);
+            }
             e.checked_manifests += 1;
         }
     }
     pub fn currentManifests(e: *Engine, verify: bool) !void {
+        e.current_integrity_verified = false;
         for (e.config.current_manifests) |path| {
             try e.addControl(path);
             if (verify) _ = try e.c.capture(&.{ "sha256sum", "--check", "--quiet", "--strict", "--", path });
+        }
+        e.current_integrity_verified = verify;
+    }
+    pub fn hasReady(e: *const Engine) bool {
+        for (e.actions.items) |a| if (a.status == .ready) return true;
+        return false;
+    }
+    pub fn applyLimits(e: *Engine) void {
+        var admitted: usize = 0;
+        var bytes: u64 = 0;
+        for (e.actions.items) |*a| {
+            if (a.status != .ready) continue;
+            if (admitted >= e.config.max_candidates) {
+                a.status = .skipped;
+                a.reason = "per-run candidate limit";
+            } else if (a.allocated_bytes > e.config.max_reclaim_bytes - bytes) {
+                a.status = .skipped;
+                a.reason = "per-run allocated-byte limit";
+            } else {
+                admitted += 1;
+                bytes += a.allocated_bytes;
+            }
         }
     }
     pub fn consumers(e: *Engine) !void {
@@ -448,8 +666,8 @@ pub const Engine = struct {
         var rp = try std.json.parseFromValue(p.Release, e.c.gpa, parsed.value, .{});
         defer rp.deinit();
         const r = rp.value;
-        if (r.state != .superseded) return error.ReleaseHeld;
-        for ([_]Evidence{ r.producer, r.successor }) |ev| {
+        if (r.state == .held) return error.ReleaseHeld;
+        for ([_]Evidence{r.producer}) |ev| {
             if (!p.relative(ev.path)) return error.InvalidEvidencePath;
             try e.keep(list, ev.path, ev.sha256);
         }
@@ -457,9 +675,18 @@ pub const Engine = struct {
         defer producer.deinit();
         try e.sourceRevisions(producer.value);
         if (!eq(producer.value, "status", "finished") and !eq(producer.value, "status", "passed") and !eq(producer.value, "status", "complete")) return error.ProducerNotTerminal;
-        var successor = try e.load(e.c.gpa, r.successor.path);
-        defer successor.deinit();
-        if (std.mem.eql(u8, r.producer.path, r.successor.path) or !eq(successor.value, "status", "passed")) return error.NoAcceptedSuccessor;
+        if (r.state == .superseded) {
+            const next = r.successor orelse return error.NoAcceptedSuccessor;
+            if (!p.relative(next.path)) return error.InvalidEvidencePath;
+            try e.keep(list, next.path, next.sha256);
+            var successor = try e.load(e.c.gpa, next.path);
+            defer successor.deinit();
+            if (std.mem.eql(u8, r.producer.path, next.path) or !eq(successor.value, "status", "passed")) return error.NoAcceptedSuccessor;
+        } else {
+            // A complete audit can replace raw tracing detail even for a
+            // failed compilation. It never authorizes deleting other outputs.
+            for (r.artifacts) |artifact| if (artifact.kind != .raw_trace) return error.AuditedReleaseOnlyTraces;
+        }
         var roles: std.EnumSet(@FieldType(p.Retained, "role")) = .empty;
         for (r.retained) |row| {
             if (!p.relative(row.path)) return error.InvalidEvidencePath;
@@ -528,13 +755,17 @@ pub const Engine = struct {
         const a = &e.actions.items[index];
         if (a.status != .discovered) return;
         const m = try e.metadata(a.path);
+        a.metadata = m;
         if (m.uid != std.os.linux.getuid()) return error.ForeignOwner;
-        if (!e.oldEnough(m) or !e.oldEnough(try e.metadata(a.producer))) return error.TooRecent;
+        const producer_metadata = try e.metadata(a.producer);
+        a.idle_seconds = @intCast(@divFloor(e.now_ns - @max(@max(m.mtime_ns, m.ctime_ns), @max(producer_metadata.mtime_ns, producer_metadata.ctime_ns)), std.time.ns_per_s));
+        if (!e.oldEnough(m) or !e.oldEnough(producer_metadata)) return error.TooRecent;
         var kept: std.ArrayList(Evidence) = .empty;
         if (a.kind == .cache) try e.buildEvidence(a.producer, &kept, null) else try e.releaseEvidence(a, &kept);
+        const absolute_candidate = try e.absolute(a.path);
         for (kept.items) |ev| {
             const abs = try e.absolute(ev.path);
-            if (p.within(try e.absolute(a.path), abs)) return error.RetentionOverlap;
+            if (p.within(absolute_candidate, abs)) return error.RetentionOverlap;
         }
         a.retained = try kept.toOwnedSlice(e.c.a);
         a.metadata = m;
@@ -563,6 +794,51 @@ pub const Engine = struct {
             a.file_count = 1;
         }
         a.status = .ready;
+        a.measured = true;
+    }
+    /// All retained evidence wins across actions. Normalize each unique path
+    /// once, instead of allocating inside the candidate × evidence loops.
+    pub fn protectRetained(e: *Engine) !void {
+        var evidence = std.StringHashMap(void).init(e.c.gpa);
+        defer evidence.deinit();
+        for (e.actions.items) |a| for (a.retained) |ev| try evidence.put(ev.path, {});
+        var it = evidence.keyIterator();
+        var normalized: std.ArrayList([]const u8) = .empty;
+        while (it.next()) |path| try normalized.append(e.c.a, try e.absolute(path.*));
+        for (e.actions.items) |*a| {
+            if (a.status != .ready) continue;
+            const abs = try e.absolute(a.path);
+            for (normalized.items) |path| if (p.overlaps(abs, path)) {
+                a.status = .skipped;
+                a.reason = "retained evidence of another candidate";
+                break;
+            };
+        }
+    }
+    pub fn measureHeld(e: *Engine, index: usize) !void {
+        const a = &e.actions.items[index];
+        if (a.measured) return;
+        const m = try e.metadata(a.path);
+        a.metadata = m;
+        if (a.idle_seconds == null) a.idle_seconds = @intCast(@divFloor(e.now_ns - @max(m.mtime_ns, m.ctime_ns), std.time.ns_per_s));
+        a.allocated_bytes = 0;
+        a.file_count = 0;
+        if (m.kind == .directory) {
+            var snapshot = try fa.scan(e.c.gpa, e.c.io, try e.absolute(a.path), .{ .max_entries = e.config.max_candidate_entries });
+            defer snapshot.deinit();
+            var seen = std.AutoHashMap(fa.metadata.Identity, void).init(e.c.gpa);
+            defer seen.deinit();
+            for (snapshot.value.entries) |entry| {
+                if (entry.metadata.kind != .file) continue;
+                if ((try seen.getOrPut(fa.metadata.identity(entry.metadata))).found_existing) continue;
+                a.allocated_bytes += entry.metadata.allocated_bytes;
+                a.file_count += 1;
+            }
+        } else if (m.kind == .file) {
+            a.allocated_bytes = m.allocated_bytes;
+            a.file_count = 1;
+        }
+        a.measured = true;
     }
     pub fn checkCache(e: *Engine, s: fa.Snapshot) !void {
         if (s.entries.len == 0) return error.EmptySnapshot;
