@@ -83,7 +83,7 @@ pub fn walk(r: anytype, code: []machine.Instruction, old_frame: u32) Error!void 
         if (@hasDecl(@typeInfo(@TypeOf(r)).pointer.child, "beginInstruction")) try r.beginInstruction(inst.*, index, depth);
         if (adjustment(inst.*)) |change| {
             if (!change.subtract and depth == 0 and change.bytes == old_frame) {
-                if (r.delta != 0) inst.* = .{ .add_rsp_imm32 = old_frame - r.delta };
+                if (r.delta != 0) inst.* = .{ .add_rsp_imm32 = if (@hasDecl(@typeInfo(@TypeOf(r)).pointer.child, "frameBytes")) try r.frameBytes(old_frame) else old_frame - r.delta };
             } else if (change.subtract) {
                 depth = std.math.add(u32, depth, change.bytes) catch return error.InvalidStackDepth;
             } else depth = std.math.sub(u32, depth, change.bytes) catch return error.InvalidStackDepth;
@@ -116,7 +116,11 @@ pub fn walk(r: anytype, code: []machine.Instruction, old_frame: u32) Error!void 
                 const name = @tagName(tag);
                 var next = payload;
                 try r.frameFields(&next, depth);
-                if (comptime std.mem.startsWith(u8, name, "load_stack_") or
+                if (comptime (std.mem.eql(u8, name, "push_stack_disp8") or std.mem.eql(u8, name, "push_stack_disp32")) and
+                    @hasDecl(@typeInfo(@TypeOf(r)).pointer.child, "stackArgument"))
+                {
+                    try r.stackArgument(&next, depth);
+                } else if (comptime std.mem.startsWith(u8, name, "load_stack_") or
                     std.mem.startsWith(u8, name, "store_eax_stack_") or
                     std.mem.startsWith(u8, name, "store_al_stack_") or
                     std.mem.eql(u8, name, "push_stack_disp8") or std.mem.eql(u8, name, "push_stack_disp32"))
@@ -165,6 +169,7 @@ fn appendAllocation(a: std.mem.Allocator, code: *std.ArrayList(machine.Instructi
 }
 
 pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !void {
+    if (try separateSpills(selector, function)) return;
     if (selector.stack_frame_bytes < 32768) return;
     const old_frame = selector.stack_frame_bytes;
     if (old_frame % 16 != 8) return;
@@ -230,6 +235,105 @@ pub fn compact(selector: *state.ComposedBlockSelector, function: ir.Function) !v
     selector.machine.instructions.deinit(selector.allocator);
     selector.machine.instructions = candidate;
     selector.stack_frame_bytes = old_frame - delta;
+}
+
+// Planned homes do not include every address value preserved during lowering.
+// Keep successful layouts unchanged. If the final spill cursor reaches an
+// owned object, move the complete object region above those homes before the
+// machine function can be published. Spill cells retain their locations.
+const ObjectGrowth = struct {
+    object_base: u32,
+    old_frame: u32,
+    delta: u32,
+
+    pub fn frameBytes(g: *ObjectGrowth, old_frame: u32) Error!u32 {
+        return std.math.add(u32, old_frame, g.delta) catch error.InvalidFrameSetup;
+    }
+    fn offset(g: *ObjectGrowth, value: anytype, depth: u32, _: u32, _: bool) Error!void {
+        const T = @typeInfo(@TypeOf(value)).pointer.child;
+        const raw = std.math.cast(u32, value.*) orelse return error.OpaqueStackUse;
+        if (raw < depth or raw - depth < g.object_base) return;
+        const moved = std.math.add(u32, raw, g.delta) catch return error.OpaqueStackUse;
+        value.* = std.math.cast(T, moved) orelse return error.OpaqueStackUse;
+    }
+    fn frameFields(g: *ObjectGrowth, payload: anytype, depth: u32) Error!void {
+        const T = @typeInfo(@TypeOf(payload)).pointer.child;
+        if (T == FrameIndex) {
+            var raw = payload.byteOffset() catch return error.OpaqueStackUse;
+            // These typed cells belong to private spills or borrowed incoming
+            // arguments. Only the incoming arguments move with frame growth.
+            try g.stackArgument(&raw, depth);
+            payload.* = FrameIndex.fromSlot(raw / 4) catch return error.OpaqueStackUse;
+        } else if (@typeInfo(T) == .@"struct") {
+            inline for (@typeInfo(T).@"struct".field_names) |field| {
+                if (@FieldType(T, field) == FrameIndex) try g.frameFields(&@field(payload, field), depth);
+            }
+        }
+    }
+    pub fn stackArgument(g: *ObjectGrowth, value: anytype, depth: u32) Error!void {
+        const T = @typeInfo(@TypeOf(value)).pointer.child;
+        const raw = std.math.cast(u32, value.*) orelse return error.OpaqueStackUse;
+        // Scalar outgoing arguments borrow private spill cells or incoming
+        // words, never owned-object addresses. Retain the former even when
+        // their offsets crossed the original object base.
+        if (raw >= depth and raw - depth >= g.old_frame) {
+            const moved = std.math.add(u32, raw, g.delta) catch return error.OpaqueStackUse;
+            value.* = std.math.cast(T, moved) orelse return error.OpaqueStackUse;
+        }
+    }
+};
+
+fn separateSpills(selector: *state.ComposedBlockSelector, function: ir.Function) !bool {
+    const old_frame = selector.stack_frame_bytes;
+    if (old_frame == 0) return false;
+    var base: ?u32 = null;
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.kind != .alloca) continue;
+        const location = state.valueLoc(selector, inst.result orelse return false) orelse return false;
+        const object: u32 = switch (location) {
+            .stack_scalar => |slot| slot.base_disp,
+            .stack128 => |offset| offset,
+            .stack_i32_array => |array| array.base_disp,
+            .stack_f32_pair_ptr => |pair| pair.object_base_disp,
+            else => return false,
+        };
+        base = @min(base orelse object, object);
+    };
+    const object_base = base orelse return false;
+    const spill_bytes = std.math.mul(u32, std.math.cast(u32, selector.next_spill_slot) orelse return error.InvalidFrameSetup, 8) catch return error.InvalidFrameSetup;
+    if (spill_bytes <= object_base) return false;
+    const gap = std.mem.alignForward(u32, spill_bytes - object_base, 16);
+    const new_frame = std.math.add(u32, old_frame, gap) catch return error.InvalidFrameSetup;
+    if (new_frame > @import("selector_types.zig").max_stack_frame_bytes or old_frame % 16 != 8) return error.InvalidFrameSetup;
+    const begin = selector.frame_setup_begin;
+    const end = selector.frame_setup_end;
+    if (end <= begin or end > selector.machine.instructions.items.len) return error.InvalidFrameSetup;
+    var reserved: u32 = 0;
+    for (selector.machine.instructions.items[begin..end]) |inst| {
+        if (adjustment(inst)) |change| {
+            if (!change.subtract) return error.InvalidFrameSetup;
+            reserved = std.math.add(u32, reserved, change.bytes) catch return error.InvalidFrameSetup;
+        } else if (inst == .push_imm32 and inst.push_imm32 == 0) {
+            reserved = std.math.add(u32, reserved, 8) catch return error.InvalidFrameSetup;
+        } else return error.InvalidFrameSetup;
+    }
+    if (reserved != old_frame) return error.InvalidFrameSetup;
+    var candidate: std.ArrayList(machine.Instruction) = .empty;
+    errdefer candidate.deinit(selector.allocator);
+    try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[0..begin]);
+    try appendAllocation(selector.allocator, &candidate, new_frame);
+    const body = candidate.items.len;
+    try candidate.appendSlice(selector.allocator, selector.machine.instructions.items[end..]);
+    var growth: ObjectGrowth = .{ .object_base = object_base, .old_frame = old_frame, .delta = gap };
+    // Opaque addressing cannot justify publishing an overlapping frame.
+    try walk(&growth, candidate.items[body..], old_frame);
+    var checked = selector.machine.*;
+    checked.instructions = candidate;
+    try @import("../verify.zig").verifyFunction(checked);
+    selector.machine.instructions.deinit(selector.allocator);
+    selector.machine.instructions = candidate;
+    selector.stack_frame_bytes = new_frame;
+    return true;
 }
 
 fn compactHomes(selector: *state.ComposedBlockSelector, old_frame: u32, object_base: u32, begin: usize, end: usize, unused_delta: u32) !bool {

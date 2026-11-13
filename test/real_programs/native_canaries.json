@@ -13536,6 +13536,39 @@
       ],
       "observations": 13824,
       "stdout": "bounded-local-identities observations=13824 independent-c-memory-oracle=private-local-identities=513-652-1024-byte-names=plain-and-quoted-and-escaped-spellings=unchanged-512-byte-action-limit=collision-safe-retry=phi-and-switch-and-select=call-arguments-and-gep-indices=live-values-after-clobbers=source-and-neighbor-bytes=guard-pages=preserved\n"
+    },
+    {
+      "population": "spill_object_separation",
+      "fixture": "spill_object_separation",
+      "prefix": "spill-object-separation",
+      "functions": [
+        "spill_object_probe_0",
+        "spill_object_probe_1",
+        "spill_object_probe_2",
+        "spill_object_probe_3",
+        "spill_object_probe_4",
+        "spill_object_probe_5",
+        "spill_object_probe_6",
+        "spill_object_probe_7",
+        "spill_object_probe_8",
+        "spill_object_probe_9",
+        "spill_object_probe_10",
+        "spill_object_probe_11",
+        "spill_object_probe_12",
+        "spill_object_probe_13",
+        "spill_object_probe_14",
+        "spill_object_probe_15",
+        "spill_object_probe_16",
+        "spill_object_probe_17",
+        "spill_object_probe_18",
+        "spill_object_probe_19",
+        "spill_object_probe_20",
+        "spill_object_probe_21",
+        "spill_object_probe_22",
+        "spill_object_probe_23"
+      ],
+      "observations": 12288,
+      "stdout": "spill-object-separation observations=12288 independent-c-byte-goldens=late-address-spills=live-owned-arrays=constant-vector-stores=forward-and-reverse-observation=call-clobbers=exact-memory-extents=guard-pages=preserved\n"
     }
   ]
 }

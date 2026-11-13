@@ -658,11 +658,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    literal decoder for scalar float codegen so signaling NaNs keep their bits.
    Require the complete 7,874-definition census and object, ELF/event/owner
    audits, both unit builds, eight readiness procedures, all 17 gates, both
-   complete 223-population native suites and all 6,616 required faults. Compare
+   complete 224-population native suites and all 6,670 required faults. Compare
    every preceding outcome and artifact explicitly before accepting this
    successor checkpoint. Private complete objects and targeted execution runs
-   are available; cumulative acceptance remains open. Both private 2,359-test
-   builds pass. Targeted runs for the twenty-seven additions pass all 1,458 of their
+   are available; cumulative acceptance remains open. Both private 2,363-test
+   builds pass. Targeted runs for the twenty-eight additions pass all 1,512 of their
    required fault controls across both compiler builds. Maintained generators
    reproduce the qualified fixtures byte-for-byte in Debug and ReleaseFast.
    Vector range facts validate
@@ -725,12 +725,24 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    not establish the final compiler-generation matrices. The three optimized
    modes now deliver complete runtime and behavior objects: 904 retained behavior
    definitions in ReleaseSafe, 743 in ReleaseFast and 1,014 in ReleaseSmall.
-   Each executes all 2,097 tests. Safe fails vector reduction; Fast fails vector
-   `@intCast` and vector reduction; Small fails vector `@intCast` and signed-vector
-   `@abs`. These execution runs remain unaccepted. Close each with independent
-   execution coverage, keep all failed captures explicit, and rerun the complete
-   optimized modes before final acceptance. The latest Debug replay still
-   matches all 2,097 reference outcomes.
+   Each executes all 2,097 tests. The latest Debug and Small replays match every
+   named reference outcome. Safe and Fast still fail vector reduction. Keep
+   these failed captures explicit and close the remaining failure with
+   independent execution coverage before repeating the complete modes.
+   The cast and absolute-value failures now reproduce in exact extracted
+   optimized bodies with independent LLVM execution. Saved GEP addresses
+   overwrite live owned-array bytes after dynamic spills cross their planned
+   reserve. A private late frame repair separates the two regions while
+   preserving alignment, page touching and the existing limits. An independent
+   native regression caught incorrect rebasing of private outgoing-argument
+   reads in the first candidate; that version remains unaccepted. The adopted
+   repair distinguishes private cells from incoming words and passes four
+   focused executable/negative controls, both full unit suites, both native
+   builds and all 54 fault controls. Twenty-four native cases cover eight- to
+   64-bit constant lanes, 16/40/72 live arrays, forward/reverse observation and
+   clobbering calls. The preceding backend fails its independent byte oracle.
+   Complete cumulative validation for this repair and close vector reduction
+   before final compiler generations.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
