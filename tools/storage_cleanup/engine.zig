@@ -1,18 +1,35 @@
 const std = @import("std");
 const u = @import("../validation/common.zig");
+const historical = @import("historical.zig");
 pub const fa = @import("../vendor/file_audit/src/root.zig");
 pub const p = @import("policy.zig");
 const D = std.Io.Dir;
 pub const Evidence = p.Evidence;
 pub const Revision = struct { commit: []const u8, tree: []const u8, reference: []const u8 };
+pub const PinReference = struct { candidate: []const u8, manifest: Evidence, reference: ?[]const u8, sha256: ?[]const u8, retired: bool };
 const Observed = struct { metadata: fa.Metadata, sha256: []const u8 };
-const Pin = struct { path: []const u8, direct: bool = false };
+const Pin = struct { path: []const u8, direct: bool = false, sha256: ?[]const u8 = null };
 const PinManifest = struct { metadata: fa.Metadata, targets: []const Pin };
 const PinIndex = struct {
     roots: std.StringHashMap(usize),
     ancestors: std.StringHashMap(std.ArrayList(usize)),
 };
 const PinDirectory = struct { dir: ?D, canonical: []const u8 };
+pub fn commandUsesRun(processes: []const u8, run_root: []const u8, collector_pid: std.os.linux.pid_t) bool {
+    var lines = std.mem.tokenizeScalar(u8, processes, '\n');
+    while (lines.next()) |line| {
+        const trimmed = std.mem.trimStart(u8, line, " \t");
+        const boundary = std.mem.indexOfAny(u8, trimmed, " \t") orelse continue;
+        const pid = std.fmt.parseInt(std.os.linux.pid_t, trimmed[0..boundary], 10) catch {
+            if (std.mem.indexOf(u8, trimmed, run_root) != null) return true;
+            continue;
+        };
+        // Publishing a release names its own producer on this command line.
+        // Ignore only this collector, never another reader or a parent job.
+        if (pid != collector_pid and std.mem.indexOf(u8, trimmed[boundary..], run_root) != null) return true;
+    }
+    return false;
+}
 pub const Action = struct {
     path: []const u8,
     run_root: []const u8,
@@ -30,6 +47,7 @@ pub const Action = struct {
     reclaimed_file_bytes: u64 = 0,
     measured: bool = false,
     idle_seconds: ?i64 = null,
+    retired_pins: []const p.PinTransition = &.{},
 };
 pub const Engine = struct {
     c: *u.Context,
@@ -59,9 +77,16 @@ pub const Engine = struct {
     pin_bases: ?*std.StringHashMap([]const []const u8) = null,
     pin_allocator: ?std.mem.Allocator = null,
     pin_index: ?*PinIndex = null,
+    pin_hash: ?[]const u8 = null,
+    pin_reference: ?[]const u8 = null,
+    git_sources: std.StringHashMap(std.StringHashMap([]const u8)),
+    libraries: std.ArrayList(historical.Library) = .empty,
+    pin_references: std.ArrayList(PinReference) = .empty,
+    retained_declarations: std.ArrayList([]const u8) = .empty,
+    release_holds: std.ArrayList([]const u8) = .empty,
 
     pub fn init(c: *u.Context, config: p.Config, output: []const u8, zigrep: []const u8) Engine {
-        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a) };
+        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a), .git_sources = .init(c.a) };
     }
     pub fn absolute(e: *Engine, path: []const u8) ![]const u8 {
         return e.c.join(&.{path});
@@ -141,7 +166,7 @@ pub const Engine = struct {
         try e.controls.append(e.c.a, .{ .path = owned, .sha256 = sha });
         try e.control_hashes.put(owned, sha);
     }
-    fn keep(e: *Engine, list: *std.ArrayList(Evidence), raw: []const u8, expected: ?[]const u8) !void {
+    pub fn keep(e: *Engine, list: *std.ArrayList(Evidence), raw: []const u8, expected: ?[]const u8) !void {
         const path = try e.c.a.dupe(u8, raw);
         const sha = try e.digest(path);
         if (expected) |want| if (!p.hash(want) or !std.mem.eql(u8, sha, want)) return error.EvidenceHashMismatch;
@@ -170,7 +195,7 @@ pub const Engine = struct {
             const before = e.actions.items.len;
             if (std.mem.endsWith(u8, name, "/storage-release.json")) {
                 e.released_records += 1;
-                try e.discoverRelease(name);
+                try e.discoverRelease(name, false);
             } else {
                 e.producer_reports += 1;
                 try e.discoverBuild(name);
@@ -206,14 +231,18 @@ pub const Engine = struct {
             }
         }
     }
-    fn discoverRelease(e: *Engine, name: []const u8) !void {
+    pub fn discoverRelease(e: *Engine, name: []const u8, staged: bool) !void {
         var parsed = try e.load(e.c.gpa, name);
         defer parsed.deinit();
         var r = try std.json.parseFromValue(p.Release, e.c.gpa, parsed.value, .{});
         defer r.deinit();
         if (!std.mem.eql(u8, r.value.schema, "zllvm-storage-release-v1")) return error.UnknownReleaseSchema;
-        if (r.value.state == .held) return;
-        if (!p.candidate(r.value.run_root) or !std.mem.eql(u8, std.fs.path.dirname(name).?, r.value.run_root) or r.value.reason.len == 0) return error.InvalidReleaseScope;
+        if (!p.candidate(r.value.run_root) or (!staged and !std.mem.eql(u8, std.fs.path.dirname(name).?, r.value.run_root)) or r.value.reason.len == 0) return error.InvalidReleaseScope;
+        if (r.value.state == .held) {
+            try e.release_holds.append(e.c.a, try e.c.a.dupe(u8, r.value.run_root));
+            return;
+        }
+        var present = false;
         for (r.value.artifacts) |a| {
             if (!p.artifactName(a) or !p.within(r.value.run_root, a.path)) return error.InvalidReleaseArtifact;
             _ = e.metadata(a.path) catch |err| switch (err) {
@@ -225,7 +254,12 @@ pub const Engine = struct {
                 .build_output => .build_output,
                 .log => .log,
             }, a.sha256);
+            present = true;
         }
+        if (present) for (r.value.retained) |row| {
+            if (!p.relative(row.path)) return error.InvalidEvidencePath;
+            try e.retained_declarations.append(e.c.a, try e.c.a.dupe(u8, row.path));
+        };
     }
     pub fn discoverPaths(e: *Engine, filters: []const []const u8, roots: []const []const u8) ![]const u8 {
         var args: std.ArrayList([]const u8) = .empty;
@@ -250,6 +284,7 @@ pub const Engine = struct {
     pub fn loadHolds(e: *Engine) !void {
         e.held.clearRetainingCapacity();
         for (e.config.protected_paths) |s| try e.held.append(e.c.a, s);
+        try e.held.appendSlice(e.c.a, e.release_holds.items);
         if (e.metadata(e.config.holds_file)) |_| {
             try e.addControl(e.config.holds_file);
             var parsed = try e.load(e.c.gpa, e.config.holds_file);
@@ -297,15 +332,46 @@ pub const Engine = struct {
             return;
         }
         for (e.actions.items) |*a| if (a.status != .removed and p.overlaps(a.path, path)) {
+            if (e.transitioned(a.*, source)) continue;
             a.status = .skipped;
             a.reason = try e.c.fmt("pinned by {s}", .{source});
         };
     }
     fn markPinned(e: *Engine, i: usize, source: []const u8) !void {
         const a = &e.actions.items[i];
+        var recorded = false;
+        for (e.pin_references.items) |old| if (std.mem.eql(u8, old.candidate, a.path) and std.mem.eql(u8, old.manifest.path, source) and
+            std.mem.eql(u8, old.reference orelse "", e.pin_reference orelse ""))
+        {
+            recorded = true;
+            break;
+        };
+        if (!recorded) try e.pin_references.append(e.c.a, .{ .candidate = a.path, .manifest = .{ .path = try e.c.a.dupe(u8, source), .sha256 = try e.digest(source) }, .reference = if (e.pin_reference) |r| try e.c.a.dupe(u8, r) else null, .sha256 = if (e.pin_hash) |h| try e.c.a.dupe(u8, h) else null, .retired = e.transitioned(a.*, source) });
         if (a.status != .discovered and a.status != .ready) return;
+        if (e.transitioned(a.*, source)) return;
         a.status = .skipped;
         a.reason = try e.c.fmt("pinned by {s}", .{source});
+    }
+    fn transitioned(e: *Engine, a: Action, manifest: []const u8) bool {
+        if (a.status != .ready) return false;
+        const sha = e.pin_hash orelse return false;
+        const reference = e.pin_reference orelse return false;
+        for (a.retired_pins) |r| {
+            if (std.mem.eql(u8, manifest, r.manifest.path) and std.mem.eql(u8, reference, r.reference) and
+                std.mem.eql(u8, a.path, r.target.path) and std.ascii.eqlIgnoreCase(sha, r.target.sha256)) return true;
+        }
+        return false;
+    }
+    fn pinHash(e: *Engine, raw: []const u8, source: []const u8, sha: ?[]const u8) !void {
+        const previous_hash = e.pin_hash;
+        const previous_reference = e.pin_reference;
+        e.pin_hash = sha;
+        e.pin_reference = raw;
+        defer {
+            e.pin_hash = previous_hash;
+            e.pin_reference = previous_reference;
+        }
+        try e.pin(raw, source);
     }
     // Cache missing directory prefixes, not millions of speculative missing
     // leaves. This cache lasts ONE pin pass, so a newly created alias is seen
@@ -345,18 +411,39 @@ pub const Engine = struct {
             else => return err,
         };
         defer e.c.gpa.free(canonical);
-        if (e.pin_paths) |seen| {
+        // A target still eligible after an exempted historical reference must
+        // be checked again if another manifest references it. Irrelevant or
+        // already held targets remain reusable across manifests in this pass.
+        var reusable = true;
+        if (p.within(e.c.root, canonical) and canonical.len > e.c.root.len) {
+            const relative_target = canonical[e.c.root.len + 1 ..];
+            reusable = !e.indexedOverlap(relative_target);
+        }
+        if (reusable) if (e.pin_paths) |seen| {
             // Cache only existing targets. Speculative ancestor resolutions
             // often do not exist and otherwise dominate memory on old ledgers.
             const owned = try e.c.gpa.dupe(u8, absolute_path);
             errdefer e.c.gpa.free(owned);
             try seen.put(owned, {});
-        }
+        };
         if (std.mem.eql(u8, canonical, e.c.root)) return e.pinResolved("local-state/validations", source);
         // The lexical path was already tested by pin(). Only aliases need a
         // second lookup. Parent descriptors are discarded at every refresh.
         if (std.mem.eql(u8, canonical, absolute_path)) return;
         if (p.within(e.c.root, canonical) and canonical.len > e.c.root.len) try e.pinResolved(canonical[e.c.root.len + 1 ..], source);
+    }
+    fn indexedOverlap(e: *Engine, path: []const u8) bool {
+        if (e.pin_index) |index| {
+            if (index.ancestors.contains(path)) return true;
+            var parent = std.fs.path.dirname(path);
+            while (parent) |name| {
+                if (index.roots.contains(name)) return true;
+                parent = std.fs.path.dirname(name);
+            }
+            return false;
+        }
+        for (e.actions.items) |action| if (p.overlaps(action.path, path)) return true;
+        return false;
     }
     fn resolvePin(e: *Engine, path: []const u8) ![]const u8 {
         if (e.pin_parents == null) return e.pinRealPath(D.cwd(), path);
@@ -381,7 +468,7 @@ pub const Engine = struct {
     }
     pub fn pin(e: *Engine, raw: []const u8, source: []const u8) !void {
         if (e.collecting_pins) |list| {
-            try list.append(e.c.a, .{ .path = try e.c.a.dupe(u8, raw) });
+            try list.append(e.c.a, .{ .path = try e.c.a.dupe(u8, raw), .sha256 = if (e.pin_hash) |h| try e.c.a.dupe(u8, h) else null });
             return;
         }
         if (std.fs.path.isAbsolute(raw)) {
@@ -448,7 +535,7 @@ pub const Engine = struct {
     fn jsonPins(e: *Engine, v: u.Value, source: []const u8) anyerror!void {
         switch (v) {
             .object => {
-                if (v.object.get("path")) |path| if (path == .string) try e.pin(path.string, source);
+                if (v.object.get("path")) |path| if (path == .string) try e.pinHash(path.string, source, str(v, "sha256") catch null);
                 var it = v.object.iterator();
                 while (it.next()) |kv| try e.jsonPins(kv.value_ptr.*, source);
             },
@@ -503,23 +590,25 @@ pub const Engine = struct {
             }
             parents.deinit();
         }
-        const listing = try e.discoverPaths(&.{ "-g", "*.sha256", "-g", "*.SHA256SUMS", "-g", "SHA256SUMS", "-g", "record.json", "-g", "record-*.json", "-g", "artifact-manifest.json" }, &.{ "docs", "local-state/validations", "local-state/retirements", "local-state/artifacts/manifests" });
+        const discovered = try e.discoverPaths(&.{ "-g", "*.sha256", "-g", "*.SHA256SUMS", "-g", "SHA256SUMS", "-g", "record.json", "-g", "record-*.json", "-g", "artifact-manifest.json" }, &.{ "docs", "local-state/validations", "local-state/retirements", "local-state/artifacts/manifests" });
+        // Required current manifests are pins regardless of name or location.
+        const listing = try e.c.fmt("{s}\n{s}", .{ discovered, try std.mem.join(e.c.a, "\n", e.config.current_manifests) });
         var lines = std.mem.tokenizeScalar(u8, listing, '\n');
         e.checked_manifests = 0;
         while (lines.next()) |path| {
             if (p.within(e.output, path)) continue;
-            var historical = false;
+            var retired_manifest = false;
             for (e.config.retired_manifests) |retired| if (std.mem.eql(u8, path, retired.path)) {
                 try e.check(retired);
-                historical = true;
+                retired_manifest = true;
                 break;
             };
-            if (historical) continue;
+            if (retired_manifest) continue;
             const m = try e.metadata(path);
             if (e.pin_manifests.get(path)) |cached| {
                 if (!cached.metadata.eql(m)) return error.PinManifestChanged;
                 for (cached.targets) |target| {
-                    if (target.direct) try e.pinResolved(target.path, path) else try e.pin(target.path, path);
+                    if (target.direct) try e.pinResolved(target.path, path) else try e.pinHash(target.path, path, target.sha256);
                 }
                 e.checked_manifests += 1;
                 continue;
@@ -539,7 +628,7 @@ pub const Engine = struct {
                     } else try e.jsonPins(v, path);
                 } else if (has(v, "root", .string) and has(v, "files", .object)) {
                     var it = (try get(v, "files")).object.iterator();
-                    while (it.next()) |kv| try e.pin(try e.c.fmt("{s}/{s}", .{ try str(v, "root"), kv.key_ptr.* }), path);
+                    while (it.next()) |kv| try e.pinHash(try e.c.fmt("{s}/{s}", .{ try str(v, "root"), kv.key_ptr.* }), path, if (kv.value_ptr.* == .string) kv.value_ptr.string else null);
                 }
             } else {
                 var entries = std.mem.tokenizeScalar(u8, bytes, '\n');
@@ -555,9 +644,9 @@ pub const Engine = struct {
                         var target = std.mem.trimStart(u8, line[64..], " \t");
                         if (target.len > 0 and target[0] == '*') target = target[1..];
                         if (target.len == 0) return error.EmptyChecksumPath;
-                        try e.pin(target, path);
+                        try e.pinHash(target, path, line[0..64]);
                     } else if (std.mem.startsWith(u8, line, "SHA256 (") and line.len > 76 and checksumHash(line[line.len - 64 ..]) and std.mem.eql(u8, line[line.len - 68 .. line.len - 64], ") = ")) {
-                        try e.pin(line[8 .. line.len - 68], path);
+                        try e.pinHash(line[8 .. line.len - 68], path, line[line.len - 64 ..]);
                     } else return e.c.fail("Unrecognized checksum manifest entry in {s}; retaining candidates until the format is reviewed.", .{path});
                 }
             }
@@ -565,7 +654,7 @@ pub const Engine = struct {
             const owned_targets = try targets.toOwnedSlice(e.c.a);
             try e.pin_manifests.put(try e.c.a.dupe(u8, path), .{ .metadata = m, .targets = owned_targets });
             for (owned_targets) |target| {
-                if (target.direct) try e.pinResolved(target.path, path) else try e.pin(target.path, path);
+                if (target.direct) try e.pinResolved(target.path, path) else try e.pinHash(target.path, path, target.sha256);
             }
             e.checked_manifests += 1;
         }
@@ -605,7 +694,7 @@ pub const Engine = struct {
         for (e.actions.items) |*a| {
             if (a.status == .removed or a.status == .absent or a.status == .skipped) continue;
             const absolute_run = try e.absolute(a.run_root);
-            var busy = std.mem.indexOf(u8, processes, a.run_root) != null;
+            var busy = commandUsesRun(processes, a.run_root, std.os.linux.getpid());
             var lines = std.mem.tokenizeScalar(u8, listing, '\n');
             while (lines.next()) |line| if (line.len > 1 and line[0] == 'n' and p.within(absolute_run, line[1..])) {
                 busy = true;
@@ -617,10 +706,33 @@ pub const Engine = struct {
             }
         }
     }
-    fn buildEvidence(e: *Engine, report: []const u8, list: *std.ArrayList(Evidence), retiring: ?[]const u8) !void {
+    fn closedCache(e: *Engine, a: Action, list: *std.ArrayList(Evidence)) !void {
+        var parsed = try e.load(e.c.gpa, a.producer);
+        defer parsed.deinit();
+        const v = parsed.value;
+        if (!eq(v, "status", "passed")) return error.ProducerNotSuccessful;
+        const commands = try get(v, "commands");
+        if (commands != .array or commands.array.items.len == 0) return error.MissingBuildCommand;
+        var bound = false;
+        for (commands.array.items) |command| {
+            if (!eq(command, "outcome", "completed") or try integer(command, "actual_returncode") != 0) return error.IncompleteBuildCommand;
+            const argv = try get(command, "argv");
+            if (argv != .array) return error.MissingBuildCommand;
+            for (argv.array.items, 0..) |arg, i| {
+                if (arg != .string) return error.MissingBuildCommand;
+                if (!std.mem.eql(u8, arg.string, "--cache-dir") and !std.mem.eql(u8, arg.string, "--global-cache-dir")) continue;
+                if (i + 1 >= argv.array.items.len or argv.array.items[i + 1] != .string) return error.InvalidBuildCacheArgument;
+                if (std.mem.eql(u8, try e.relative(argv.array.items[i + 1].string), a.path)) bound = true;
+            }
+        }
+        if (!bound or !p.cacheOwned(a.run_root, a.path)) return error.UnboundDisposableCache;
+        try e.keep(list, a.producer, null);
+    }
+    pub fn buildEvidence(e: *Engine, report: []const u8, list: *std.ArrayList(Evidence), retiring: ?[]const u8, reconstructions: []const Evidence) !void {
         var parsed = try e.load(e.c.gpa, report);
         defer parsed.deinit();
         const v = parsed.value;
+        if (eq(v, "schema", "zllvm-compiler-build-v1")) return historical.canonical(e, report, v, list, retiring, reconstructions);
         if (!eq(v, "status", "passed")) return error.ProducerNotSuccessful;
         try e.sourceRevisions(v);
         const source = try e.relative(try str(v, "source_root"));
@@ -673,8 +785,31 @@ pub const Engine = struct {
         }
         var producer = try e.load(e.c.gpa, r.producer.path);
         defer producer.deinit();
+        if (r.state == .disposable) {
+            // Closed ordinary binaries/objects are temporary outputs. Source
+            // reconstruction is not a prerequisite for discarding them.
+            // Active use, pins, ownership and exact artifact checks still apply.
+            if (a.kind != .build_output) return error.DisposableOnlyBuildOutputs;
+            for (r.artifacts) |artifact| if (artifact.kind != .build_output) return error.DisposableOnlyBuildOutputs;
+            if (!p.within(r.run_root, r.producer.path)) return error.UnboundDisposableProducer;
+            if (eq(producer.value, "schema", "zllvm-compiler-build-v1")) {
+                const command = try get(producer.value, "command");
+                if (!eq(command, "outcome", "completed") or try integer(command, "actual_returncode") != 0) return error.ProducerNotTerminal;
+            } else if (!eq(producer.value, "status", "passed") and !eq(producer.value, "status", "finished") and
+                !eq(producer.value, "status", "complete") and !eq(producer.value, "status", "failed")) return error.ProducerNotTerminal;
+            for (r.retained) |row| {
+                if (!p.relative(row.path)) return error.InvalidEvidencePath;
+                for (r.artifacts) |artifact| if (p.overlaps(artifact.path, row.path)) return error.RetentionOverlap;
+                try e.keep(list, row.path, row.sha256);
+            }
+            try e.releaseTransitions(a, list, r);
+            try e.keep(list, a.producer, null);
+            return;
+        }
         try e.sourceRevisions(producer.value);
-        if (!eq(producer.value, "status", "finished") and !eq(producer.value, "status", "passed") and !eq(producer.value, "status", "complete")) return error.ProducerNotTerminal;
+        const canonical_producer = eq(producer.value, "schema", "zllvm-compiler-build-v1");
+        if (!canonical_producer and !eq(producer.value, "status", "finished") and !eq(producer.value, "status", "passed") and !eq(producer.value, "status", "complete")) return error.ProducerNotTerminal;
+        if (canonical_producer) try e.buildEvidence(r.producer.path, list, if (a.kind == .build_output) a.path else null, r.source_reconstructions);
         if (r.state == .superseded) {
             const next = r.successor orelse return error.NoAcceptedSuccessor;
             if (!p.relative(next.path)) return error.InvalidEvidencePath;
@@ -697,8 +832,10 @@ pub const Engine = struct {
         for ([_]@FieldType(p.Retained, "role"){ .source, .input, .build, .result }) |role| if (!roles.contains(role)) return error.MissingRetentionRole;
         // A label alone is not source reconstruction: verify the complete build
         // source map and command/output binding through the same cache rule.
-        for (r.retained) |row| if (row.role == .build) try e.buildEvidence(row.path, list, if (a.kind == .build_output) a.path else null);
-        if (!eq(producer.value, "status", "passed") and !roles.contains(.diagnostic)) return error.MissingFailureEvidence;
+        for (r.retained) |row| if (row.role == .build) try e.buildEvidence(row.path, list, if (a.kind == .build_output) a.path else null, r.source_reconstructions);
+        if (!canonical_producer and !eq(producer.value, "status", "passed") and !roles.contains(.diagnostic)) return error.MissingFailureEvidence;
+        for (r.source_reconstructions) |ev| try e.keep(list, ev.path, ev.sha256);
+        try e.releaseTransitions(a, list, r);
         try e.keep(list, a.producer, null);
         if (a.kind == .raw_trace) {
             if (!roles.contains(.audit) or !roles.contains(.compiler)) return error.MissingTraceReplayEvidence;
@@ -751,6 +888,21 @@ pub const Engine = struct {
             }
         }
     }
+    fn releaseTransitions(e: *Engine, a: *Action, list: *std.ArrayList(Evidence), r: p.Release) !void {
+        for (r.retired_pins) |transition| {
+            if (!p.relative(transition.manifest.path) or !p.hash(transition.manifest.sha256) or
+                transition.reference.len == 0 or transition.reason.len == 0) return error.InvalidPinTransition;
+            for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, transition.manifest.path)) return error.CurrentManifestCannotBeRetired;
+            var matches = false;
+            for (r.artifacts) |artifact| if (std.mem.eql(u8, artifact.path, transition.target.path) and std.mem.eql(u8, artifact.sha256, transition.target.sha256)) {
+                matches = true;
+                break;
+            };
+            if (!matches) return error.PinTransitionNotAnArtifact;
+            try e.keep(list, transition.manifest.path, transition.manifest.sha256);
+        }
+        a.retired_pins = (try std.json.parseFromSlice([]const p.PinTransition, e.c.a, try std.json.Stringify.valueAlloc(e.c.a, r.retired_pins, .{}), .{ .allocate = .alloc_always })).value;
+    }
     pub fn qualify(e: *Engine, index: usize) !void {
         const a = &e.actions.items[index];
         if (a.status != .discovered) return;
@@ -761,7 +913,9 @@ pub const Engine = struct {
         a.idle_seconds = @intCast(@divFloor(e.now_ns - @max(@max(m.mtime_ns, m.ctime_ns), @max(producer_metadata.mtime_ns, producer_metadata.ctime_ns)), std.time.ns_per_s));
         if (!e.oldEnough(m) or !e.oldEnough(producer_metadata)) return error.TooRecent;
         var kept: std.ArrayList(Evidence) = .empty;
-        if (a.kind == .cache) try e.buildEvidence(a.producer, &kept, null) else try e.releaseEvidence(a, &kept);
+        if (a.kind == .cache) {
+            if (e.config.cache_evidence == .closed_producer) try e.closedCache(a.*, &kept) else try e.buildEvidence(a.producer, &kept, null, &.{});
+        } else try e.releaseEvidence(a, &kept);
         const absolute_candidate = try e.absolute(a.path);
         for (kept.items) |ev| {
             const abs = try e.absolute(ev.path);
@@ -802,6 +956,7 @@ pub const Engine = struct {
         var evidence = std.StringHashMap(void).init(e.c.gpa);
         defer evidence.deinit();
         for (e.actions.items) |a| for (a.retained) |ev| try evidence.put(ev.path, {});
+        for (e.retained_declarations.items) |path| try evidence.put(path, {});
         var it = evidence.keyIterator();
         var normalized: std.ArrayList([]const u8) = .empty;
         while (it.next()) |path| try normalized.append(e.c.a, try e.absolute(path.*));
@@ -873,8 +1028,9 @@ pub const Engine = struct {
         for (e.controls.items) |row| try e.check(row);
         for (a.retained) |row| try e.check(row);
         try e.verifyRevisions();
+        try historical.verifyLibraries(e);
     }
-    fn sourceRevisions(e: *Engine, v: u.Value) !void {
+    pub fn sourceRevisions(e: *Engine, v: u.Value) !void {
         for ([_][]const u8{ "project_revision", "source_head" }) |key| {
             if (!has(v, key, .string)) continue;
             const revision = try str(v, key);

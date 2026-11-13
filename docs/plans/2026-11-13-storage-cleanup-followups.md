@@ -1,7 +1,9 @@
 # Complete the storage cleanup workflow
 
-Status: minimal mode and the audited-trace release workflow implemented;
-additional historical evidence adapters remain pending.
+Status: minimal mode, audited traces, canonical build/source reconstruction,
+exact historical pin transitions, staged batches and full-tree allocation
+accounting implemented. The execution and remaining evidence gaps are tracked
+in [completed-run retention](2026-11-13-completed-run-retention.md).
 
 The initial collector has guarded removal, pin checks and provenance validation,
 but its first real apply run reclaimed zero bytes. Its source and tests belong
@@ -25,7 +27,9 @@ remained enabled:
   (3.88 GiB). The first 64 ready candidates totaled about 2.53 GiB.
 - Two caches for the v825 Debug build remained held: two of its 642 recorded
   source hashes disagreed with the source tree. Compiler and toolchain hashes
-  matched. These integrity failures must remain blocking.
+  matched. These integrity failures block a claim of preserved replay. Under
+  the user's later disposable-build policy they do not, by themselves, require
+  keeping a completed private cache.
 
 The original cache roots occupied about 3.81 GiB including directory blocks,
 only 2.54% of the contemporaneous 150.03-GiB `local-state` footprint. The rest
@@ -63,19 +67,23 @@ Implemented in the minimal-retention follow-up:
   against every candidate. Empty passes explicitly skip deletion-only target
   checks. Limits count eligible paths after pin checks, avoiding starvation.
 
-Still needed for broader historical coverage:
+Historical coverage advanced in the completed-run retention follow-up:
 
-1. Qualify historical source-reconstruction ledgers and standalone canonical
-   build receipts as additional adapters. Missing original source files must be
-   reconstructable and verified, never excused by age.
-2. Integrate explicit per-file historical pin transitions. Only two entire
-   historical seals currently have exact-hash exemptions; other references
-   remain blocking until their retention contract is reconciled.
-3. Wire producers that create test objects, binaries and logs to explicit
-   accepted-successor releases. The maintenance wrapper cannot infer that an
-   unresolved failure's unique diagnostic is redundant.
-4. Add finer file-purpose coverage for storage outside the supported candidates.
-   Top-level footprints expose the gap but do not classify every historical file.
+1. Canonical receipts now verify exact Git sources or saved ledger overrides,
+   completed commands and full toolchain identities. Isolated source mismatches
+   remain blockers for replay-qualified releases. Missing retired compilers and unsupported legacy command
+   formats still need additional reconstruction evidence.
+2. Per-file transitions bind original manifest, reference string and target hash.
+   Completed retirement records have a review adapter; current manifests and
+   unrelated targets stay pinned. Other validation-suite pins require review.
+3. `release-build`, `release --request` and `maintain --release-request` provide
+   producer lifecycle integration. Ordinary closed build outputs use the
+   `disposable` contract without source reconstruction or an accepted successor;
+   the optional stronger `superseded` contract retains both requirements.
+   Unique unresolved failure diagnostics cannot be inferred redundant.
+4. `inventory` counts each observed inode once and groups every file family by
+   current contract, eligibility or unresolved reason. This exposes coverage
+   without declaring all remaining bytes necessary or storing payload archives.
 
 ## Acceptance checks
 
@@ -84,10 +92,11 @@ Regressions cover minimal lifecycle, changed/missing pin aliases, cross-candidat
 retention, failed trace releases, real collection, idempotence and the maintenance
 wrapper. A completed private cache should qualify when its approved lifecycle
 permits removal; busy, queued, pinned or changed candidates must remain held.
-Source mismatches must never be waived to increase reclaim totals.
+Source mismatches must never be represented as verified replay. The user's
+disposable-build policy does not require replay for ordinary temporary outputs.
 
-Use a fresh review before any apply, preserve exact source/build/result/hash
-evidence, and verify current integrity manifests afterward. A review must
+Use a fresh review before any apply, preserve the evidence required by the
+selected retention contract, and verify current integrity manifests afterward. A review must
 distinguish eligible, held, unsupported and unassessed storage. The observations
 above are a dated diagnostic result, not a reusable deletion authorization.
 

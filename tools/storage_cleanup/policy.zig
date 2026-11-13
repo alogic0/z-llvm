@@ -6,6 +6,7 @@ pub const Config = struct {
     max_candidates: usize = 64,
     max_candidate_entries: usize = 250_000,
     max_reclaim_bytes: u64 = 32 * 1024 * 1024 * 1024,
+    cache_evidence: enum { replay, closed_producer } = .replay,
     current_manifests: []const []const u8 = &.{},
     protected_paths: []const []const u8 = &.{},
     retired_manifests: []const Evidence = &.{},
@@ -22,15 +23,23 @@ pub fn minimal(c: Config) Config {
 pub const Holds = struct { schema: u32 = 1, paths: []const []const u8 = &.{} };
 pub const Retained = struct { path: []const u8, sha256: []const u8, role: enum { source, input, build, result, diagnostic, audit, compiler, other } };
 pub const Artifact = struct { path: []const u8, sha256: []const u8, kind: enum { raw_trace, build_output, log }, audit: ?[]const u8 = null };
+pub const PinTransition = struct {
+    manifest: Evidence,
+    reference: []const u8,
+    target: Evidence,
+    reason: []const u8,
+};
 pub const Release = struct {
     schema: []const u8,
-    state: enum { held, superseded, audited },
+    state: enum { held, disposable, superseded, audited },
     run_root: []const u8,
     reason: []const u8,
     producer: Evidence,
     successor: ?Evidence = null,
     retained: []const Retained,
     artifacts: []const Artifact,
+    source_reconstructions: []const Evidence = &.{},
+    retired_pins: []const PinTransition = &.{},
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');

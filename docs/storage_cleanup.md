@@ -1,13 +1,17 @@
 # Automatic project storage cleanup
 
 Run the collector to review completed private compiler caches and explicitly
-released artifacts. Apply mode performs the review and verified removal in one
+released artifacts. Ordinary old compiler/test binaries and objects are temporary;
+their deletion does not require reconstructing source or build configuration.
+Current uses, adopted baselines, queued holds and investigations requiring the
+exact executable remain protected. Apply mode performs the review and removal in one
 invocation, without interactive approval:
 
 ```sh
 tools/clean-storage
 tools/clean-storage --apply
 tools/clean-storage --minimal --apply
+tools/clean-storage inventory
 ```
 
 The first command writes a JSON report with eligible paths, allocated file bytes
@@ -19,10 +23,12 @@ already removed paths are absent from the next discovery.
 The project policy now uses minimal retention by default. Use `--minimal --apply`
 to request that mode explicitly even with a custom policy. It removes the optional
 waiting period and raises the candidate
-limit to 1,024, while retaining the policy's byte limit and **all** source/hash,
-pin, active-consumer and mutation checks. A recently completed private build can
-therefore lose its regenerable caches immediately. A source mismatch still
-blocks removal. This is a minimum under verified rules, not a claim that every
+limit to 1,024, while retaining the policy's byte limit and the applicable
+artifact-hash, pin, active-consumer and mutation checks. The project uses
+`cache_evidence:"closed_producer"`: a completed private cache needs its closed
+producer and exact command ownership, without reconstructing old sources or
+keeping its compiler. Custom policies can use `cache_evidence:"replay"` for the
+earlier stronger reproduction contract. This is a minimum under verified rules, not a claim that every
 remaining byte is necessary: unsupported evidence formats remain visible for
 investigation.
 
@@ -38,6 +44,31 @@ their original exit status and diagnostics. If the job succeeds but cleanup
 fails or is busy, the wrapper returns the cleanup error. Background descendants
 that still hold the lease prevent collection. Queued jobs still need holds.
 This command is the integration point for the job runner; no timer is installed.
+
+When a successful producer also closes an obsolete run, it can write a release
+request and publish it as part of the same maintenance workflow:
+
+```sh
+tools/clean-storage maintain --release-request REQUEST.json -- YOUR_JOB ARGUMENTS
+tools/clean-storage release-build --build OLD_BUILD.json \
+  --reason 'Completed temporary compiler is no longer used'
+```
+
+`maintain` publishes the request only when the job exits successfully. A failed
+job retains its original exit code and does not publish its request. Publication
+failure prevents that invocation's collection and returns an error. The shared
+lease covers the producer; the collector takes the exclusive lease afterward.
+Current baselines remain pinned until their consumers advance. The owner
+identifies which completed builds are disposable; age alone is insufficient.
+
+Without `--successor`, `release-build` uses `state:"disposable"`: only closed
+producer evidence, exact output bytes, current consumers and pins are required.
+It neither reads nor archives the build's sources or toolchain. Existing producer
+receipts and deletion hashes remain as small accounting records. Supplying
+`--successor FILE` explicitly selects the optional stronger `superseded` contract
+with complete rebuild evidence and a passed successor. `release --request FILE` accepts
+the full release format below for objects, logs and traces as well. Publishing
+never removes the payload or overwrites an existing release.
 
 The shell entry point builds a reusable **ReleaseFast** native Zig helper in
 `local-state/storage-cleanup/`. It uses the project's pinned Zig version,
@@ -55,14 +86,24 @@ jqz '.actions | each | where(.status == "skipped") | {path,reason}' REPORT.json
 
 | Category | Required evidence |
 | --- | --- |
-| Completed private compiler caches | A passed isolated compiler `report.json`, every source hash, the compiler hash, successful build commands binding source/output paths, original logs, and the Zig toolchain hash. Cache arguments must name direct children of that report's run directory. |
+| Completed private compiler caches | A passed isolated compiler `report.json` and completed commands whose cache arguments name direct children of that run. The default project policy does not require source/configuration reconstruction; `cache_evidence:"replay"` optionally adds it. |
 | Released raw event streams | An explicit owner release, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler and complete build/source evidence, and the auditor sources. An audited failure retains its original outcome and diagnostics; it does not require a passed successor. |
 | Superseded executable/object files | An explicit release record, accepted successor, complete source/build/input/result evidence and matching bytes. Only the supported output names and ELF/archive formats qualify. |
+| Disposable executable/object files | An explicit `disposable` release, a closed producer in the owning run, and exact output hashes. No source/configuration reconstruction or accepted successor is required. Only compiled ELF/archive output can qualify. |
 | Obsolete logs | An explicit release record, accepted successor, complete build/source/input/result evidence, and retained diagnostics for a failed producer. |
 
 The cache report adapter matches the isolated prototype build reports used by
-the current compiler work. Other report formats, standalone canonical build
-receipts and shared caches require another qualified adapter or explicit review.
+the current compiler work. For releases that require replay, the collector also supports standalone
+`zllvm-compiler-build-v1` receipts. This adapter checks the successful command,
+output prefix, compiler hash, toolchain binary and complete library identity.
+Every recorded source hash must match the receipt's Git revision or an explicit
+source-reconstruction ledger's Git blob or saved override. The ledger's
+`verified` flag is never sufficient: the actual bytes are checked. Used commits
+are pinned with local Git refs, and used overrides and ledgers remain retained.
+The live checkout may have advanced. Isolated prototype reports used as replay
+proof still require their recorded source files unchanged. Disposable outputs
+do not use this adapter, so an old source mismatch does not retain a temporary binary.
+Other report formats and shared caches require another adapter or explicit review.
 The collector does not infer that a failed parent succeeded because a child
 command passed. It does not infer diagnostic redundancy from version numbers,
 equal sizes, elapsed time, or an old document reference.
@@ -81,11 +122,65 @@ The byte limit still bounds each pass; another fresh pass collects any remaining
 eligible candidates after that cap is reached.
 
 `release-trace` translates the existing `zllvm-native-event-audit-v1` format into
-a qualified owner release. Other production tools do not yet emit output
-releases. Historical source-reconstruction formats and per-path pin retirement
-decisions still need dedicated adapters; they are not treated as automatically
-equivalent to the complete isolated build evidence. The
+a qualified owner release. Use repeated `--reconstruction FILE` arguments for
+canonical builds with historical source overrides. The supported ledger format
+has a `sources` array containing `sha256`, `revision`, `path` and/or `saved`.
+Unresolved entries remain blockers. A missing original compiler binary still
+blocks trace release; source reconstruction is not a claim that a replacement
+binary has already been built. Producer adoption of the release commands is
+explicit; ordinary build invocations do not automatically declare prior runs
+obsolete. The
 [follow-up plan](plans/2026-11-13-storage-cleanup-followups.md) records those gaps.
+
+## Reviewing historical batches
+
+Prepare explicit requests from a newline-delimited list of completed build
+reports, then review them. Preparation writes only small request files under
+the new cleanup output directory:
+
+```sh
+tools/clean-storage prepare-builds --builds BUILDS.txt \
+  --reason 'Completed temporary compilers are no longer used'
+tools/clean-storage --requests PREPARATION/requests.json
+tools/clean-storage prepare-pins --requests PREPARATION/requests.json \
+  --review REVIEW/report.json
+tools/clean-storage --requests PIN_PREPARATION/requests.json
+tools/clean-storage --apply --requests PIN_PREPARATION/requests.json
+```
+
+Each command prints its actual output location. Request lists bind every release
+file by SHA-256. Review and apply both rediscover state and verify all evidence.
+`prepare-pins` handles only hash-bound references in completed retirement records
+or checksum ledgers under `local-state/retirements/`, after a bound review has
+qualified the candidate under its selected retention contract. It does not transition current
+manifests, unfinished records, bare fingerprints, mismatched hashes, or other
+validation-suite pins. The resulting exact transitions are reviewable; nothing
+is removed during preparation. `pin-references.json` identifies matching pins.
+
+Release records may contain `retired_pins`: each entry names the original
+`manifest` path/hash, the exact `reference` string in it, the artifact `target`
+path/hash, and a `reason`. Only that reference to that artifact is exempted.
+Other files in the manifest and references from other manifests remain protected.
+Original manifests stay unchanged. Current manifests are pins regardless of
+their filename or location. Current holds and retained dependencies always win,
+including dependencies declared by a release that cannot itself qualify.
+
+## Accounting for the remaining tree
+
+`tools/clean-storage inventory` runs a review and writes `inventory.json`. It
+observes every accessible same-filesystem entry and counts each device/inode
+allocation once, including hardlink aliases. Buckets identify run, file family,
+allocated bytes and a retention reason. A bounded list identifies the 64 largest
+files. It writes no full payload copy or million-row archive.
+
+The three dispositions are `required_by_current_contract`, `eligible`, and
+`unresolved`. The first means an explicit current manifest, queued hold, or
+verified reproduction dependency; it is not proof that the contract itself
+cannot be reduced. Generic protected roots and historical references alone do
+not establish necessity. Across hardlink aliases, required takes precedence over
+eligible, which takes precedence over unresolved. Concurrent changes and skipped
+foreign devices are reported; the inventory is observational, not a deletion list.
+Use `inventory --requests FILE` to account for a prepared historical batch too.
 
 ## Current work and retention pins
 

@@ -3,7 +3,15 @@ set -euo pipefail
 cleanup_binary=$(realpath -e -- "${1:?pass the compiled cleanup binary}")
 cleanup_launcher=$(realpath -e -- "$(dirname -- "${BASH_SOURCE[0]}")/../clean-storage")
 cleanup_fixture=$(mktemp -d /tmp/zllvm-storage-cli-XXXXXXXX)
-trap 'rm -r -- "$cleanup_fixture"' EXIT
+cleanup_cli_finish() {
+    cleanup_cli_status=$?
+    if (( cleanup_cli_status != 0 )); then
+        printf 'CLI qualification failed with status %s. Captured diagnostics:\n' "$cleanup_cli_status" >&2
+        tail -n 12 "$cleanup_fixture/"*.log >&2 || true
+    fi
+    rm -r -- "$cleanup_fixture"
+}
+trap cleanup_cli_finish EXIT
 mkdir -p "$cleanup_fixture/src" "$cleanup_fixture/local-state/storage-cleanup"
 printf '0.17.0\n' > "$cleanup_fixture/.zigversion"
 printf 'pub fn main() void {}\n' > "$cleanup_fixture/src/main.zig"
@@ -68,4 +76,43 @@ test "$cleanup_job_status" -eq 7
 "${ZIGREP:-zigrep}" --no-config -q -F 'Cleanup complete:' "$cleanup_fixture/maintain-failure.log"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain -- true > "$cleanup_fixture/maintain-success.log" 2>&1
 "${ZIGREP:-zigrep}" --no-config -q -F 'Cleanup complete:' "$cleanup_fixture/maintain-success.log"
-printf 'Nine isolated CLI checks passed: interruption, shared lease, empty apply, fresh-cache hold, current-manifest failure, minimal collection, idempotence, failed-job maintenance, successful-job maintenance.\n'
+cleanup_released="$cleanup_fixture/local-state/validations/cli/batch/released"
+mkdir -p "$cleanup_released"
+printf 'obsolete diagnostic detail from a passed experiment\n' > "$cleanup_released/old.log"
+printf '{"status":"passed"}\n' > "$cleanup_released/successor.json"
+cleanup_old_sha=$(sha256sum "$cleanup_released/old.log"); cleanup_old_sha=${cleanup_old_sha%% *}
+cleanup_report_sha=$(sha256sum "$cleanup_run/report.json"); cleanup_report_sha=${cleanup_report_sha%% *}
+cleanup_successor_sha=$(sha256sum "$cleanup_released/successor.json"); cleanup_successor_sha=${cleanup_successor_sha%% *}
+printf '%s  %s\n%s  %s\n' "$cleanup_old_sha" local-state/validations/cli/batch/released/old.log "$cleanup_source_sha" local-state/validations/cli/source/main.zig > "$cleanup_fixture/historical.sha256"
+cleanup_manifest_sha=$(sha256sum "$cleanup_fixture/historical.sha256"); cleanup_manifest_sha=${cleanup_manifest_sha%% *}
+# Pin discovery uses docs/ and the validation/retirement roots.
+mv -- "$cleanup_fixture/historical.sha256" "$cleanup_fixture/docs/historical.sha256"
+cat > "$cleanup_fixture/request.json" <<EOF
+{"schema":"zllvm-storage-release-v1","state":"superseded","run_root":"local-state/validations/cli/batch/released","reason":"Accepted successor; preserve inputs and results","producer":{"path":"local-state/validations/cli/build/report.json","sha256":"$cleanup_report_sha"},"successor":{"path":"local-state/validations/cli/batch/released/successor.json","sha256":"$cleanup_successor_sha"},"retained":[{"path":"local-state/validations/cli/build/report.json","sha256":"$cleanup_report_sha","role":"build"},{"path":"local-state/validations/cli/build/report.json","sha256":"$cleanup_report_sha","role":"result"},{"path":"local-state/validations/cli/source/main.zig","sha256":"$cleanup_source_sha","role":"source"},{"path":"local-state/validations/cli/source/main.zig","sha256":"$cleanup_source_sha","role":"input"}],"artifacts":[{"path":"local-state/validations/cli/batch/released/old.log","sha256":"$cleanup_old_sha","kind":"log"}],"retired_pins":[{"manifest":{"path":"docs/historical.sha256","sha256":"$cleanup_manifest_sha"},"reference":"local-state/validations/cli/batch/released/old.log","target":{"path":"local-state/validations/cli/batch/released/old.log","sha256":"$cleanup_old_sha"},"reason":"Verified passed successor replaces this log only"}]}
+EOF
+cleanup_job_status=0
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain --release-request request.json -- bash -c 'exit 7' > "$cleanup_fixture/failed-release.log" 2>&1 || cleanup_job_status=$?
+test "$cleanup_job_status" -eq 7
+test ! -e "$cleanup_released/storage-release.json"
+test -f "$cleanup_released/old.log"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain --release-request request.json -- true > "$cleanup_fixture/completed-release.log" 2>&1
+test -f "$cleanup_released/storage-release.json"
+test ! -e "$cleanup_released/old.log"
+test -f "$cleanup_source/main.zig"
+test -f "$cleanup_fixture/docs/historical.sha256"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" inventory --policy policy.json > "$cleanup_fixture/inventory.log"
+"${ZIGREP:-zigrep}" --no-config -q -F 'Inventory:' "$cleanup_fixture/inventory.log"
+"${ZIGREP:-zigrep}" --no-config -q -F '"unresolved_bytes"' "$cleanup_fixture/local-state/retirements"
+if ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain --release-request nonexistent.json -- true > "$cleanup_fixture/rejected-release.log" 2>&1; then
+    printf 'FAIL: rejected publication returned success\n' >&2; exit 1
+fi
+cleanup_disposable="$cleanup_fixture/local-state/validations/cli/batch/disposable"
+mkdir -p "$cleanup_disposable"
+printf '\177ELFtemporary compiler fixture\n' > "$cleanup_disposable/z_llvm"
+cleanup_disposable_sha=$(sha256sum "$cleanup_disposable/z_llvm"); cleanup_disposable_sha=${cleanup_disposable_sha%% *}
+printf '{"status":"passed","compiler":"%s/z_llvm","compiler_sha256":"%s","source_root":"missing-old-sources"}\n' "$cleanup_disposable" "$cleanup_disposable_sha" > "$cleanup_disposable/report.json"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" release-build --build local-state/validations/cli/batch/disposable/report.json --reason 'Temporary compiler requires no source reconstruction' --policy policy.json > "$cleanup_fixture/disposable-release.log"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --policy policy.json > "$cleanup_fixture/disposable-apply.log"
+test ! -e "$cleanup_disposable/z_llvm"
+test -f "$cleanup_disposable/report.json"
+printf 'Fourteen isolated CLI checks passed, including disposable binaries without source reconstruction, exact pin retirement, failed-job protection, inventory and publication failure.\n'

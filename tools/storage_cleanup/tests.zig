@@ -4,8 +4,9 @@ const u = @import("../validation/common.zig");
 const core = @import("engine.zig");
 const mutation = @import("mutation.zig");
 const releases = @import("release.zig");
+const batches = @import("batch.zig");
 const p = core.p;
-const run = "local-state/validations/test/build";
+const run = "local-state/validations/test/batch/build";
 const cache = run ++ "/zig-local-cache";
 const report = run ++ "/report.json";
 const output = "local-state/retirements/test-cleanup";
@@ -49,6 +50,28 @@ const Fixture = struct {
         const source = try e.absolute("local-state/validations/test/source");
         const compiler = try e.absolute(run ++ "/z_llvm");
         try e.write(report, .{ .status = "passed", .source_root = source, .compiler = compiler, .compiler_sha256 = try e.digest(compiler), .source_sha256 = .{ .@"main.zig" = try e.digest("local-state/validations/test/source/main.zig") }, .zig = try e.absolute("toolchain/zig"), .zig_sha256 = try e.digest("toolchain/zig"), .commands = .{.{ .actual_returncode = 0, .outcome = "completed", .argv = [_][]const u8{ "zig", "build-exe", "--cache-dir", try e.absolute(cache), try e.c.fmt("-Mroot={s}/main.zig", .{source}), try e.c.fmt("-femit-bin={s}", .{compiler}) }, .stdout = try e.absolute(run ++ "/build.stdout"), .stderr = try e.absolute(run ++ "/build.stderr") }} });
+    }
+    fn canonical(f: *Fixture, e: *core.Engine) !void {
+        try f.build(e);
+        try f.tmp.dir.createDirPath(t.io, run ++ "/bin");
+        try f.tmp.dir.createDirPath(t.io, "toolchain/lib");
+        try f.write(run ++ "/bin/z_llvm", "\x7fELFsynthetic-compiler");
+        try f.write("toolchain/lib/std.zig", "pub const example = 1;");
+        _ = try f.c.capture(&.{ "git", "init", "-q" });
+        _ = try f.c.capture(&.{ "git", "add", "--", "local-state/validations/test/source/main.zig" });
+        _ = try f.c.capture(&.{ "git", "-c", "user.name=Storage Test", "-c", "user.email=storage@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "source fixture" });
+        const argv = [_][]const u8{ try e.absolute("toolchain/zig"), "build", "--prefix", try e.absolute(run) };
+        const command = .{ .argv = argv, .actual_returncode = 0, .outcome = "completed", .stdout = try e.absolute(run ++ "/build.stdout"), .stderr = try e.absolute(run ++ "/build.stderr") };
+        try e.write(report, .{
+            .schema = "zllvm-compiler-build-v1",
+            .compiler = try e.absolute(run ++ "/bin/z_llvm"),
+            .compiler_sha256 = try e.digest(run ++ "/bin/z_llvm"),
+            .source_head = u.trim(try f.c.capture(&.{ "git", "rev-parse", "HEAD" })),
+            .source_sha256 = .{ .@"local-state/validations/test/source/main.zig" = try e.digest("local-state/validations/test/source/main.zig") },
+            .argv = argv,
+            .command = command,
+            .zig = .{ .path = argv[0], .sha256 = try e.digest("toolchain/zig"), .library = try @import("../validation/toolchain.zig").libraryIdentity(&f.c, try e.absolute("toolchain/lib")) },
+        });
     }
     fn release(f: *Fixture, e: *core.Engine, kind: @FieldType(p.Artifact, "kind"), complete: bool, successor_passed: bool, failed_without_diagnostic: bool) !usize {
         try f.build(e);
@@ -103,6 +126,313 @@ const Fixture = struct {
         return error.MissingTestCandidate;
     }
 };
+
+test "storage cleanup: canonical receipt reconstructs sources from Git after checkout changes" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.canonical(&e);
+    try f.write("local-state/validations/test/source/main.zig", "different current checkout");
+    var retained: std.ArrayList(core.Evidence) = .empty;
+    try e.buildEvidence(report, &retained, run ++ "/bin/z_llvm", &.{});
+    try t.expectEqual(@as(usize, 1), e.revisions.items.len);
+    try e.pinRevisions();
+    try e.verifyRevisions();
+    for (retained.items) |ev| {
+        try t.expect(!std.mem.eql(u8, ev.path, run ++ "/bin/z_llvm"));
+        try e.check(ev);
+    }
+    try f.write("toolchain/lib/std.zig", "changed toolchain");
+    try t.expectError(error.ToolchainLibraryChanged, @import("historical.zig").verifyLibraries(&e));
+}
+
+test "storage cleanup: historical reconstruction checks saved overrides instead of trusting verified flags" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.canonical(&e);
+    const original = try f.c.load(try e.absolute(report));
+    var modified = original;
+    try f.write(output ++ "/override.zig", "historical uncommitted source");
+    const sha = try e.digest(output ++ "/override.zig");
+    var hashes = try core.get(modified, "source_sha256");
+    try hashes.object.put(f.c.a, "local-state/validations/test/source/main.zig", u.s(sha));
+    try modified.object.put(f.c.a, "source_sha256", hashes);
+    try e.write(report, modified);
+    try e.write(output ++ "/reconstruction.json", .{ .sources = .{.{ .sha256 = sha, .saved = output ++ "/override.zig", .verified = true }} });
+    var fresh = f.engine();
+    var retained: std.ArrayList(core.Evidence) = .empty;
+    try t.expectError(error.SourceReconstructionMissing, fresh.buildEvidence(report, &retained, null, &.{}));
+    const ledger = core.Evidence{ .path = output ++ "/reconstruction.json", .sha256 = try fresh.digest(output ++ "/reconstruction.json") };
+    try fresh.buildEvidence(report, &retained, null, &.{ledger});
+    try f.write(output ++ "/override.zig", "wrong bytes");
+    var changed = f.engine();
+    try t.expectError(error.EvidenceHashMismatch, changed.buildEvidence(report, &retained, null, &.{ledger}));
+}
+
+test "storage cleanup: canonical receipts reject failed or redirected commands" {
+    for ([_]bool{ false, true }) |failed| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        try f.canonical(&e);
+        var value = try f.c.load(try e.absolute(report));
+        var command = try core.get(value, "command");
+        if (failed) {
+            try command.object.put(f.c.a, "actual_returncode", .{ .integer = 1 });
+        } else {
+            var argv = try core.get(command, "argv");
+            argv.array.items[3] = u.s("local-state/validations/test/wrong");
+            try value.object.put(f.c.a, "argv", argv);
+            try command.object.put(f.c.a, "argv", argv);
+        }
+        try value.object.put(f.c.a, "command", command);
+        try e.write(report, value);
+        var fresh = f.engine();
+        var retained: std.ArrayList(core.Evidence) = .empty;
+        try t.expectError(if (failed) error.IncompleteBuildCommand else error.SourceCompilerCommandNotBound, fresh.buildEvidence(report, &retained, null, &.{}));
+    }
+}
+
+fn transitionFixture(f: *Fixture, e: *core.Engine, extra_manifest: bool, current: bool, wrong_hash: bool) !core.Engine {
+    const index = try f.release(e, .build_output, true, true, false);
+    const artifact = e.actions.items[index];
+    const manifest = "local-state/retirements/historical.sha256";
+    try f.write(manifest, try e.c.fmt("{s}  {s}\n{s}  {s}/o/object\n", .{ artifact.sha256.?, artifact.path, try e.digest(cache ++ "/o/object"), cache }));
+    const value = try f.c.load(try e.absolute(released ++ "/storage-release.json"));
+    var parsed = try std.json.parseFromValue(p.Release, f.c.a, value, .{});
+    parsed.value.retired_pins = &.{.{ .manifest = .{ .path = manifest, .sha256 = try e.digest(manifest) }, .reference = artifact.path, .target = .{ .path = artifact.path, .sha256 = if (wrong_hash) "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" else artifact.sha256.? }, .reason = "Verified accepted successor replaces this output" }};
+    try e.write(released ++ "/storage-release.json", parsed.value);
+    if (extra_manifest) try f.write("local-state/retirements/new-pin.sha256", try e.c.fmt("{s}  {s}\n", .{ artifact.sha256.?, artifact.path }));
+    var fresh = f.engine();
+    if (current) fresh.config.current_manifests = &.{manifest};
+    try fresh.discover();
+    return fresh;
+}
+
+test "storage cleanup: pin transition exempts only its exact file and manifest" {
+    for ([_]bool{ false, true }) |extra| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var original = f.engine();
+        var e = try transitionFixture(f, &original, extra, false, false);
+        for (e.actions.items, 0..) |_, i| try e.qualify(i);
+        try e.pins();
+        for (e.actions.items) |action| {
+            if (action.kind == .cache) try t.expectEqual(.skipped, action.status) else try t.expectEqual(@as(@FieldType(core.Action, "status"), if (extra) .skipped else .ready), action.status);
+        }
+        // Reusing parsed manifests must make the identical decision.
+        try e.pins();
+    }
+}
+
+test "storage cleanup: current manifests outside discovery globs still pin retired historical targets" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var original = f.engine();
+    var e = try transitionFixture(f, &original, false, false, false);
+    for (e.actions.items, 0..) |action, i| {
+        try e.qualify(i);
+        if (action.kind == .build_output) try f.write("current-inputs", try e.c.fmt("{s}  {s}\n", .{ action.sha256.?, action.path }));
+    }
+    e.config.current_manifests = &.{"current-inputs"};
+    try e.pins();
+    for (e.actions.items) |action| if (action.kind == .build_output) try t.expectEqual(.skipped, action.status);
+}
+
+test "storage cleanup: pin transitions reject current manifests, wrong hashes and changed seals" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var original = f.engine();
+        var e = try transitionFixture(f, &original, false, case == 0, case == 1);
+        if (case == 2) try f.write("local-state/retirements/historical.sha256", "changed manifest\n");
+        for (e.actions.items, 0..) |action, i| if (action.kind == .build_output) {
+            try t.expectError(switch (case) {
+                0 => error.CurrentManifestCannotBeRetired,
+                1 => error.PinTransitionNotAnArtifact,
+                else => error.EvidenceHashMismatch,
+            }, e.qualify(i));
+        };
+    }
+}
+
+test "storage cleanup: staged historical requests verify hashes and retire only reviewed completed-record pins" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    const index = try f.release(&initial, .build_output, true, true, false);
+    const artifact = initial.actions.items[index];
+    const request_path = output ++ "/original-request.json";
+    const original_release = try f.c.load(try initial.absolute(released ++ "/storage-release.json"));
+    try initial.write(request_path, original_release);
+    try f.tmp.dir.deleteFile(t.io, released ++ "/storage-release.json");
+    try initial.write(output ++ "/requests.json", .{ .schema = "zllvm-storage-requests-v1", .requests = .{.{ .path = request_path, .sha256 = try initial.digest(request_path) }} });
+    try initial.write("local-state/retirements/record-old.json", .{ .status = "complete", .retained = .{.{ .path = artifact.path, .sha256 = artifact.sha256.? }} });
+    var review = f.engine();
+    try review.discover();
+    try batches.discover(&review, output ++ "/requests.json");
+    for (review.actions.items, 0..) |_, i| try review.qualify(i);
+    try review.pins();
+    try review.write(output ++ "/review.json", .{ .status = "complete", .mode = "review", .controls = review.controls.items, .actions = review.actions.items });
+    try review.write(output ++ "/pin-references.json", review.pin_references.items);
+    try f.tmp.dir.createDirPath(t.io, output ++ "/prepared");
+    var prepare = f.engine();
+    prepare.output = output ++ "/prepared";
+    try batches.historicalPins(&prepare, output ++ "/requests.json", output ++ "/review.json");
+    try f.tmp.dir.createDirPath(t.io, output ++ "/apply");
+    var apply = f.engine();
+    apply.output = output ++ "/apply";
+    try batches.discover(&apply, output ++ "/prepared/requests.json");
+    try t.expectEqual(@as(usize, 1), apply.actions.items.len);
+    try apply.qualify(0);
+    try apply.pins();
+    try t.expectEqual(.ready, apply.actions.items[0].status);
+    try mutation.apply(&apply, 0);
+    try t.expectError(error.FileNotFound, apply.metadata(artifact.path));
+    _ = try apply.metadata("local-state/retirements/record-old.json");
+    _ = try apply.metadata(cache ++ "/o/object");
+    try f.write(request_path, "changed request");
+    var changed = f.engine();
+    try t.expectError(error.EvidenceHashMismatch, batches.discover(&changed, output ++ "/requests.json"));
+}
+
+test "storage cleanup: failed release qualification still protects its declared dependencies" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    _ = try f.release(&initial, .build_output, true, false, false);
+    var value = try f.c.load(try initial.absolute(released ++ "/storage-release.json"));
+    var retained = try core.get(value, "retained");
+    try retained.array.append(try u.toValue(f.c.a, p.Retained{ .path = cache ++ "/o/object", .sha256 = try initial.digest(cache ++ "/o/object"), .role = .other }));
+    try value.object.put(f.c.a, "retained", retained);
+    try initial.write(released ++ "/storage-release.json", value);
+    var e = f.engine();
+    try e.discover();
+    for (e.actions.items, 0..) |action, i| {
+        if (action.kind == .cache) try e.qualify(i) else try t.expectError(error.NoAcceptedSuccessor, e.qualify(i));
+    }
+    try e.protectRetained();
+    for (e.actions.items) |action| if (action.kind == .cache) try t.expectEqual(.skipped, action.status);
+}
+
+test "storage cleanup: producer compiler release preserves canonical rebuild evidence and accepted successor" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.canonical(&e);
+    try e.write(output ++ "/successor.json", .{ .status = "passed" });
+    const destination = try releases.compilerBuild(&e, report, output ++ "/successor.json", "New accepted compiler", &.{});
+    try t.expectEqualStrings(run ++ "/storage-release.json", destination);
+    var apply = f.engine();
+    try apply.discover();
+    try t.expectEqual(@as(usize, 1), apply.actions.items.len);
+    try apply.qualify(0);
+    try apply.pinRevisions();
+    try mutation.apply(&apply, 0);
+    try t.expectError(error.FileNotFound, apply.metadata(run ++ "/bin/z_llvm"));
+    _ = try apply.metadata(report);
+    _ = try apply.metadata(output ++ "/successor.json");
+    _ = try apply.metadata("toolchain/lib/std.zig");
+}
+
+test "storage cleanup: inventory counts hardlinks once and respects a required alias" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.write(run ++ "/required", "one allocation with two names");
+    _ = try f.c.capture(&.{ "ln", try e.absolute(run ++ "/required"), try e.absolute(output ++ "/alias") });
+    try e.held.append(f.c.a, run ++ "/required");
+    try @import("inventory.zig").write(&e);
+    const result = try f.c.load(try e.absolute(output ++ "/inventory.json"));
+    try t.expectEqual((try e.metadata(run ++ "/required")).allocated_bytes, @as(u64, @intCast(try core.integer(result, "required_by_current_contract_bytes"))));
+    try t.expectEqual(@as(i64, 0), try core.integer(result, "eligible_bytes"));
+}
+
+test "storage cleanup: own release command is not a consumer but other processes remain protected" {
+    const own = "    PID COMMAND\n  123 clean-storage release-build --build " ++ report ++ "\n";
+    try t.expect(!core.commandUsesRun(own, run, 123));
+    try t.expect(core.commandUsesRun(own ++ "  124 reader " ++ run ++ "/z_llvm\n", run, 123));
+    try t.expect(core.commandUsesRun(own ++ "  122 parent-job " ++ report ++ "\n", run, 123));
+}
+
+test "storage cleanup: disposable compiler needs no source, toolchain or successor reconstruction" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try f.canonical(&initial);
+    try f.tmp.dir.deleteFile(t.io, "local-state/validations/test/source/main.zig");
+    try f.tmp.dir.deleteFile(t.io, "toolchain/zig");
+    var e = f.engine();
+    const request = try releases.disposableBuild(&e, report, "User classifies this closed compiler as temporary");
+    _ = try releases.publish(&e, request);
+    try t.expectEqual(@as(usize, 0), e.revisions.items.len);
+    try t.expectEqual(@as(usize, 0), e.libraries.items.len);
+    var apply = f.engine();
+    try apply.discover();
+    try apply.qualify(0);
+    try mutation.apply(&apply, 0);
+    try t.expectError(error.FileNotFound, apply.metadata(run ++ "/bin/z_llvm"));
+    _ = try apply.metadata(report);
+}
+
+test "storage cleanup: disposable outputs require closed producer and never include raw traces or logs" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var initial = f.engine();
+        const kind: @FieldType(p.Artifact, "kind") = if (case == 2) .raw_trace else if (case == 3) .log else .build_output;
+        _ = try f.release(&initial, kind, true, false, true);
+        if (case == 1) try initial.write(released ++ "/producer.json", .{ .status = "running" });
+        var value = try f.c.load(try initial.absolute(released ++ "/storage-release.json"));
+        var parsed = try std.json.parseFromValue(p.Release, f.c.a, value, .{});
+        parsed.value.state = .disposable;
+        parsed.value.retained = &.{};
+        parsed.value.successor = null;
+        var hash = f.engine();
+        parsed.value.producer.sha256 = try hash.digest(released ++ "/producer.json");
+        try initial.write(released ++ "/storage-release.json", parsed.value);
+        var e = f.engine();
+        try e.discover();
+        for (e.actions.items, 0..) |action, index| if (action.kind != .cache) {
+            if (case == 0) try e.qualify(index) else try t.expectError(if (case == 1) error.ProducerNotTerminal else error.DisposableOnlyBuildOutputs, e.qualify(index));
+        };
+        // Keep this parsed input live through publication above.
+        _ = &value;
+    }
+}
+
+test "storage cleanup: disposable compiler still obeys current pins" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try f.canonical(&initial);
+    const request = try releases.disposableBuild(&initial, report, "Temporary build");
+    try initial.write(run ++ "/storage-release.json", request);
+    try f.write("current-inputs", try initial.c.fmt("{s}  {s}\n", .{ request.artifacts[0].sha256, request.artifacts[0].path }));
+    var e = f.engine();
+    e.config.current_manifests = &.{"current-inputs"};
+    try e.discover();
+    try e.qualify(0);
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+test "storage cleanup: completed private caches may be disposable without old source or compiler" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try f.build(&initial);
+    try f.tmp.dir.deleteFile(t.io, "local-state/validations/test/source/main.zig");
+    try f.tmp.dir.deleteFile(t.io, run ++ "/z_llvm");
+    var e = f.engine();
+    e.config.cache_evidence = .closed_producer;
+    try e.discover();
+    try e.qualify(0);
+    try mutation.apply(&e, 0);
+    try t.expectError(error.FileNotFound, e.metadata(cache));
+    _ = try e.metadata(report);
+}
 
 test "storage cleanup: parsed control bytes cannot be rebound to changed or replaced files" {
     const f = try Fixture.init();
@@ -601,6 +931,7 @@ test "storage cleanup: owner can publish audited failed trace without a passed s
     _ = try f.release(&e, .raw_trace, true, false, true);
     try f.tmp.dir.deleteFile(t.io, released ++ "/storage-release.json");
     e = f.engine();
+    e.now_ns = std.Io.Clock.real.now(t.io).nanoseconds - std.time.ns_per_s;
     const published = try releases.trace(&e, released ++ "/audit.json", report, "Raw detail is audited; preserve the failure and replay inputs");
     try t.expectEqualStrings(released ++ "/storage-release.json", published);
     // Publishing is an ownership transition only.

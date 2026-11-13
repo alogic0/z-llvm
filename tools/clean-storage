@@ -11,6 +11,12 @@ mkdir -p -- "$storage_state"
 if [[ ${1:-} == exec || ${1:-} == maintain ]]; then
     cleanup_mode=$1
     shift
+    cleanup_release_request=
+    if [[ $cleanup_mode == maintain && ${1:-} == --release-request ]]; then
+        if [[ $# -lt 3 ]]; then printf 'maintain --release-request needs a file and a command.\n' >&2; exit 2; fi
+        cleanup_release_request=$2
+        shift 2
+    fi
     if [[ ${1:-} == -- ]]; then shift; fi
     if [[ $# == 0 ]]; then printf 'usage: tools/clean-storage exec -- COMMAND [ARG...]\n' >&2; exit 2; fi
     # The collector takes an exclusive flock on this same file.
@@ -19,7 +25,12 @@ if [[ ${1:-} == exec || ${1:-} == maintain ]]; then
     cleanup_command_status=0
     flock --shared "$storage_state/cleanup.lock" "$@" || cleanup_command_status=$?
     cleanup_collection_status=0
-    "$source_root/tools/clean-storage" --minimal --apply || cleanup_collection_status=$?
+    if (( cleanup_command_status == 0 )) && [[ -n $cleanup_release_request ]]; then
+        "$source_root/tools/clean-storage" release --request "$cleanup_release_request" || cleanup_collection_status=$?
+    fi
+    if (( cleanup_collection_status == 0 )); then
+        "$source_root/tools/clean-storage" --minimal --apply || cleanup_collection_status=$?
+    fi
     if (( cleanup_command_status != 0 )); then exit "$cleanup_command_status"; fi
     exit "$cleanup_collection_status"
 fi

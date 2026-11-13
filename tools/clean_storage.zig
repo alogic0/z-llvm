@@ -5,12 +5,23 @@ const core = @import("storage_cleanup/engine.zig");
 const mutation = @import("storage_cleanup/mutation.zig");
 const coverage = @import("storage_cleanup/coverage.zig");
 const release = @import("storage_cleanup/release.zig");
+const inventory = @import("storage_cleanup/inventory.zig");
+const batch = @import("storage_cleanup/batch.zig");
 const p = core.p;
 const usage =
     \\usage: tools/clean-storage [--minimal] [--apply] [--policy FILE]
     \\       tools/clean-storage exec -- COMMAND [ARG...]
     \\       tools/clean-storage maintain -- COMMAND [ARG...]
+    \\       tools/clean-storage maintain --release-request FILE -- COMMAND [ARG...]
     \\       tools/clean-storage release-trace --audit FILE --build FILE --reason TEXT
+    \\           [--reconstruction FILE ...]
+    \\       tools/clean-storage release --request FILE
+    \\       tools/clean-storage release-build --build FILE --reason TEXT [--successor FILE]
+    \\           [--reconstruction FILE ...]
+    \\       tools/clean-storage inventory [--policy FILE]
+    \\       tools/clean-storage prepare-builds --builds FILE --reason TEXT [--successor FILE]
+    \\       tools/clean-storage prepare-pins --requests FILE --review FILE
+    \\       tools/clean-storage [--apply] --requests FILE
     \\
     \\Without --apply, writes a review with reasons and makes no artifact changes.
     \\--apply discovers again and collects eligible completed private caches and
@@ -32,10 +43,22 @@ pub fn main(init: std.process.Init) !void {
     var minimal = false;
     var policy_path: []const u8 = "docs/storage_cleanup_policy.json";
     const release_trace = args.len > 1 and std.mem.eql(u8, args[1], "release-trace");
+    const release_request = args.len > 1 and std.mem.eql(u8, args[1], "release");
+    const release_build = args.len > 1 and std.mem.eql(u8, args[1], "release-build");
+    const publishing = release_trace or release_request or release_build;
+    const inventory_requested = args.len > 1 and std.mem.eql(u8, args[1], "inventory");
+    const prepare_builds = args.len > 1 and std.mem.eql(u8, args[1], "prepare-builds");
+    const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
+    var requests_path: ?[]const u8 = null;
+    var builds_path: ?[]const u8 = null;
+    var review_path: ?[]const u8 = null;
+    var request_path: ?[]const u8 = null;
+    var successor_path: ?[]const u8 = null;
     var audit_path: ?[]const u8 = null;
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
-    var i: usize = if (release_trace) 2 else 1;
+    var reconstruction_paths: std.ArrayList([]const u8) = .empty;
+    var i: usize = if (publishing or inventory_requested or prepare_builds or prepare_pins) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -51,7 +74,32 @@ pub fn main(init: std.process.Init) !void {
             policy_path = args[i];
             continue;
         }
-        if (release_trace and i + 1 < args.len) {
+        if (std.mem.eql(u8, args[i], "--requests") and i + 1 < args.len) {
+            i += 1;
+            requests_path = args[i];
+            continue;
+        }
+        if (prepare_builds and std.mem.eql(u8, args[i], "--builds") and i + 1 < args.len) {
+            i += 1;
+            builds_path = args[i];
+            continue;
+        }
+        if (prepare_pins and std.mem.eql(u8, args[i], "--review") and i + 1 < args.len) {
+            i += 1;
+            review_path = args[i];
+            continue;
+        }
+        if ((release_trace or release_build or prepare_builds) and i + 1 < args.len) {
+            if ((release_build or prepare_builds) and std.mem.eql(u8, args[i], "--successor")) {
+                i += 1;
+                successor_path = args[i];
+                continue;
+            }
+            if (std.mem.eql(u8, args[i], "--reconstruction")) {
+                i += 1;
+                try reconstruction_paths.append(c.a, args[i]);
+                continue;
+            }
             if (std.mem.eql(u8, args[i], "--audit")) {
                 i += 1;
                 audit_path = args[i];
@@ -68,9 +116,21 @@ pub fn main(init: std.process.Init) !void {
                 continue;
             }
         }
+        if (release_request and std.mem.eql(u8, args[i], "--request") and i + 1 < args.len) {
+            i += 1;
+            request_path = args[i];
+            continue;
+        }
         return error.UnknownArgument;
     }
     if (release_trace and (apply or minimal or audit_path == null or build_path == null or reason == null)) return error.InvalidReleaseArguments;
+    if (release_request and (apply or minimal or request_path == null)) return error.InvalidReleaseArguments;
+    if (release_build and (apply or minimal or build_path == null or reason == null or audit_path != null)) return error.InvalidReleaseArguments;
+    if (inventory_requested and apply) return error.InventoryIsReadOnly;
+    if ((prepare_builds or prepare_pins) and (apply or minimal)) return error.PreparationIsReadOnly;
+    if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
+    if (prepare_pins and (requests_path == null or review_path == null)) return error.InvalidReleaseArguments;
+    if (publishing and requests_path != null) return error.InvalidReleaseArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
     const policy_absolute = try c.join(&.{policy_path});
     var policy_dir = try core.fa.metadata.openRoot(c.io, std.fs.path.dirname(policy_absolute).?);
@@ -82,7 +142,7 @@ pub fn main(init: std.process.Init) !void {
     const policy_sha256 = try u.digestBytes(c.a, bytes);
     const parsed_config = try std.json.parseFromSlice(p.Config, c.a, bytes, .{});
     try p.validate(parsed_config.value);
-    const config = if (minimal or release_trace) p.minimal(parsed_config.value) else parsed_config.value;
+    const config = if (minimal or publishing) p.minimal(parsed_config.value) else parsed_config.value;
     const state = "local-state/storage-cleanup";
     try std.Io.Dir.cwd().createDirPath(c.io, try c.join(&.{state}));
     var state_dir = try core.fa.metadata.openRoot(c.io, try c.join(&.{state}));
@@ -102,15 +162,26 @@ pub fn main(init: std.process.Init) !void {
     defer report(&e, status, apply, minimal) catch {};
     try e.check(.{ .path = policy_path, .sha256 = policy_sha256 });
     try e.addControl(policy_path);
-    if (release_trace) {
+    if (prepare_builds or prepare_pins) {
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else try batch.historicalPins(&e, requests_path.?, review_path.?);
+        status = "prepared";
+        return;
+    }
+    if (publishing) {
         try e.currentManifests(true);
-        const published = try release.trace(&e, audit_path.?, build_path.?, reason.?);
+        var reconstructions: std.ArrayList(p.Evidence) = .empty;
+        for (reconstruction_paths.items) |path| {
+            if (!p.relative(path)) return error.InvalidEvidencePath;
+            try reconstructions.append(c.a, .{ .path = path, .sha256 = try e.digest(path) });
+        }
+        const published = if (release_trace) try release.traceWithSources(&e, audit_path.?, build_path.?, reason.?, reconstructions.items) else if (release_build) if (successor_path) |accepted| try release.compilerBuild(&e, build_path.?, accepted, reason.?, reconstructions.items) else try release.publish(&e, try release.disposableBuild(&e, build_path.?, reason.?)) else try release.request(&e, request_path.?);
         status = "release-published";
-        try c.print("Published verified trace release: {s}\nRun tools/clean-storage --minimal --apply to collect it.\n", .{published});
+        try c.print("Published verified release: {s}\nRun tools/clean-storage --minimal --apply to collect it.\n", .{published});
         return;
     }
     try c.print("Discovering completed runs and release records...\n", .{});
     try e.discover();
+    if (requests_path) |path| try batch.discover(&e, path);
     try e.loadHolds();
     // Required control files must still exist on a no-op pass. Expensive
     // target/alias checks are needed only if provenance admits any candidate.
@@ -142,6 +213,7 @@ pub fn main(init: std.process.Init) !void {
         };
     }
     try coverage.write(&e, "before");
+    if (inventory_requested) try inventory.write(&e);
     try report(&e, "reviewed", apply, minimal);
     if (apply and e.hasReady()) {
         try e.pinRevisions();
@@ -182,6 +254,7 @@ pub fn main(init: std.process.Init) !void {
     try c.print("{s}: {s}/report.json\n", .{ if (apply) "Cleanup complete" else "Review complete", output });
 }
 fn report(e: *core.Engine, status: []const u8, apply: bool, minimal: bool) !void {
+    if (e.pin_references.items.len != 0) try e.write(try e.c.fmt("{s}/pin-references.json", .{e.output}), e.pin_references.items);
     var ready: usize = 0;
     var skipped: usize = 0;
     var removed: usize = 0;
@@ -217,6 +290,10 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/policy.zig", .bytes = @embedFile("storage_cleanup/policy.zig") },
         .{ .path = "tools/storage_cleanup/coverage.zig", .bytes = @embedFile("storage_cleanup/coverage.zig") },
         .{ .path = "tools/storage_cleanup/release.zig", .bytes = @embedFile("storage_cleanup/release.zig") },
+        .{ .path = "tools/storage_cleanup/historical.zig", .bytes = @embedFile("storage_cleanup/historical.zig") },
+        .{ .path = "tools/storage_cleanup/inventory.zig", .bytes = @embedFile("storage_cleanup/inventory.zig") },
+        .{ .path = "tools/storage_cleanup/batch.zig", .bytes = @embedFile("storage_cleanup/batch.zig") },
+        .{ .path = "tools/validation/toolchain.zig", .bytes = @embedFile("validation/toolchain.zig") },
         .{ .path = "tools/validation/common.zig", .bytes = @embedFile("validation/common.zig") },
         .{ .path = "tools/vendor/file_audit.SHA256SUMS", .bytes = @embedFile("vendor/file_audit.SHA256SUMS") },
         .{ .path = "tools/vendor/process.SHA256SUMS", .bytes = @embedFile("vendor/process.SHA256SUMS") },
@@ -227,5 +304,8 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
     return result.toOwnedSlice(c.a);
 }
 comptime {
-    if (@import("builtin").is_test) _ = @import("storage_cleanup/tests.zig");
+    if (@import("builtin").is_test) {
+        _ = @import("storage_cleanup/tests.zig");
+        _ = @import("storage_cleanup/inventory.zig");
+    }
 }

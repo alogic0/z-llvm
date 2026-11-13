@@ -6,14 +6,18 @@ Historical frozen INBOX roots and the exact 43-worktree inventory are retired.
 ## Retained state
 
 The [automatic collector](storage_cleanup.md) implements the reviewed rules for
-completed private build caches and explicitly superseded generated outputs.
+completed private build caches and explicitly released generated outputs.
 Run `tools/clean-storage` for a review or `tools/clean-storage --apply` for
 verified collection. Use `tools/clean-storage --minimal --apply` to remove the
 optional idle delay for verified candidates. Use
 `tools/clean-storage maintain -- COMMAND` to collect after a leased job.
 Its [policy](storage_cleanup_policy.json), current pins,
-queued-work holds and shared reader lease govern each invocation. Source/input
-reconstruction, trace audits and accepted replacement evidence remain required;
+queued-work holds and shared reader lease govern each invocation. As clarified
+by the user on 2026-11-13, ordinary old compiler/test binaries and objects are
+temporary. Their disposal does not require preserving or reconstructing their
+build configuration or source. Current uses, adopted baselines and investigations
+requiring the exact executable remain protected. Source/input reconstruction and
+trace audits remain required for replay-qualified trace releases;
 unknown diagnostics are kept for review. Complete audited trace releases retain
 failed outcomes and replay evidence without requiring a passed successor.
 
@@ -120,9 +124,10 @@ observed outputs, native IR comparisons, focused validation and the next metadat
 plan. The 13 original probes remain unchanged; this slice creates no archives
 and retires no caches.
 
-Before removing an old run, preserve unique source edits/commits and the minimum
+Before removing an entire old run, preserve unique source edits/commits and the minimum
 source/log/input evidence necessary for accepted results or unresolved failures.
-Discard reproducible build binaries, cache generations, and verified duplicate
+Discard closed temporary build binaries without requiring source reconstruction,
+completed private cache generations, and verified duplicate
 AIR exports. Exclude active processes and runs. Record the classified paths,
 retained evidence, remaining exceptions, and measured physical space reclaimed.
 Do not create a permanent duplicate archive of the original run trees.
