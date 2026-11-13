@@ -139,4 +139,53 @@ test -f "$cleanup_private/evidence/unit.log"
 "${ZIGREP:-zigrep}" --no-config -q -F 'removed: 1;' "$cleanup_fixture/cache-apply.log"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_cache_requests" --policy policy.json > "$cleanup_fixture/cache-repeat.log"
 "${ZIGREP:-zigrep}" --no-config -q -F 'removed: 0;' "$cleanup_fixture/cache-repeat.log"
-printf 'Sixteen isolated CLI checks passed, including closed private test caches, retained failure diagnostics, disposable binaries, exact pin retirement, maintenance leases and repeated collection.\n'
+cleanup_trace_compiler="$cleanup_fixture/local-state/validations/cli/batch/trace-compiler"
+cleanup_trace_run="$cleanup_fixture/local-state/validations/cli/batch/trace"
+mkdir -p "$cleanup_trace_compiler" "$cleanup_trace_run"
+printf '\177ELFretired compiler fixture\n' > "$cleanup_trace_compiler/z_llvm"
+printf 'completed build\n' > "$cleanup_trace_compiler/build.stdout"
+: > "$cleanup_trace_compiler/build.stderr"
+cleanup_trace_compiler_sha=$(sha256sum "$cleanup_trace_compiler/z_llvm"); cleanup_trace_compiler_sha=${cleanup_trace_compiler_sha%% *}
+cat > "$cleanup_trace_compiler/report.json" <<EOF
+{"status":"passed","compiler":"$cleanup_trace_compiler/z_llvm","compiler_sha256":"$cleanup_trace_compiler_sha","source_root":"$cleanup_source","source_sha256":{"main.zig":"$cleanup_source_sha"},"zig":"$cleanup_fixture/toolchain/zig","zig_sha256":"$cleanup_zig_sha","commands":[{"outcome":"completed","actual_returncode":0,"argv":["zig","build-exe","-Mroot=$cleanup_source/main.zig","-femit-bin=$cleanup_trace_compiler/z_llvm"],"stdout":"$cleanup_trace_compiler/build.stdout","stderr":"$cleanup_trace_compiler/build.stderr"}]}
+EOF
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" release-build --build local-state/validations/cli/batch/trace-compiler/report.json --reason 'Closed compiler before trace compaction' --policy policy.json > "$cleanup_fixture/trace-build-release.log"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --policy policy.json > "$cleanup_fixture/trace-build-apply.log"
+test ! -e "$cleanup_trace_compiler/z_llvm"
+cleanup_trace_report=$(tail -n 1 "$cleanup_fixture/trace-build-apply.log")
+cleanup_trace_report=${cleanup_trace_report#Cleanup complete: }
+cleanup_retirement_absolute=$("${JQZ:-jqz}" -r 'where(.status == "complete" and .action.kind == "build_output" and .action.status == "removed" and .action.path == "local-state/validations/cli/batch/trace-compiler/z_llvm") | input_filename()' "$cleanup_fixture/${cleanup_trace_report%/report.json}"/record-*.json)
+test -f "$cleanup_retirement_absolute"
+cleanup_retirement=${cleanup_retirement_absolute#"$cleanup_fixture/"}
+printf 'audited raw fixture\n' > "$cleanup_trace_run/profile.events.jsonl"
+printf 'original input\n' > "$cleanup_trace_run/input.ll"
+printf 'original failed compilation diagnostic\n' > "$cleanup_trace_run/producer.log"
+printf '{"status":"finished","actual_returncode":1,"log":"%s/producer.log"}\n' "$cleanup_trace_run" > "$cleanup_trace_run/producer.json"
+printf '{"backend":{"path":"%s/z_llvm","sha256":"%s"}}\n' "$cleanup_trace_compiler" "$cleanup_trace_compiler_sha" > "$cleanup_trace_run/report.json"
+printf '{"status":"failed","diagnostic":"retained original failure"}\n' > "$cleanup_trace_run/backend.json"
+cleanup_raw_sha=$(sha256sum "$cleanup_trace_run/profile.events.jsonl"); cleanup_raw_sha=${cleanup_raw_sha%% *}
+cleanup_input_sha=$(sha256sum "$cleanup_trace_run/input.ll"); cleanup_input_sha=${cleanup_input_sha%% *}
+cleanup_producer_sha=$(sha256sum "$cleanup_trace_run/producer.json"); cleanup_producer_sha=${cleanup_producer_sha%% *}
+cleanup_top_sha=$(sha256sum "$cleanup_trace_run/report.json"); cleanup_top_sha=${cleanup_top_sha%% *}
+cleanup_backend_sha=$(sha256sum "$cleanup_trace_run/backend.json"); cleanup_backend_sha=${cleanup_backend_sha%% *}
+cat > "$cleanup_trace_run/audit.json" <<EOF
+{"schema":"zllvm-native-event-audit-v1","status":"verified","path":"local-state/validations/cli/batch/trace/profile.events.jsonl","sha256":"$cleanup_raw_sha","whole_stream_read":true,"whole_stream_semantically_valid":true,"report_binding_verified":true,"complete":true,"stream_metadata_unchanged":true,"recorded_hash_matches":true,"producer":{"path":"local-state/validations/cli/batch/trace/producer.json","sha256":"$cleanup_producer_sha"},"top_report":{"path":"local-state/validations/cli/batch/trace/report.json","sha256":"$cleanup_top_sha"},"backend_report":{"path":"local-state/validations/cli/batch/trace/backend.json","sha256":"$cleanup_backend_sha"},"input":{"path":"local-state/validations/cli/batch/trace/input.ll","sha256":"$cleanup_input_sha"},"core_source":"local-state/validations/cli/source/main.zig","core_sha256":"$cleanup_source_sha","driver_source":"local-state/validations/cli/source/main.zig","driver_sha256":"$cleanup_source_sha"}
+EOF
+cat > "$cleanup_fixture/traces.json" <<EOF
+{"schema":"zllvm-trace-retirement-plan-v1","traces":[{"audit":"local-state/validations/cli/batch/trace/audit.json","build":"local-state/validations/cli/batch/trace-compiler/report.json","compiler_retirement":"$cleanup_retirement"}]}
+EOF
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" prepare-traces --traces traces.json --reason 'Complete audit retains retired compiler identity' --policy policy.json > "$cleanup_fixture/trace-plan.log"
+cleanup_trace_requests=$(tail -n 1 "$cleanup_fixture/trace-plan.log")
+cleanup_trace_requests=${cleanup_trace_requests#tools/clean-storage --requests }
+test -f "$cleanup_trace_run/profile.events.jsonl"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_trace_requests" --policy policy.json > "$cleanup_fixture/trace-apply.log"
+test ! -e "$cleanup_trace_run/profile.events.jsonl"
+test -f "$cleanup_trace_run/input.ll"
+test -f "$cleanup_trace_run/producer.log"
+test -f "$cleanup_trace_run/audit.json"
+test -f "$cleanup_source/main.zig"
+test -f "$cleanup_fixture/$cleanup_retirement"
+"${ZIGREP:-zigrep}" --no-config -q -F 'removed: 1;' "$cleanup_fixture/trace-apply.log"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_trace_requests" --policy policy.json > "$cleanup_fixture/trace-repeat.log"
+"${ZIGREP:-zigrep}" --no-config -q -F 'removed: 0;' "$cleanup_fixture/trace-repeat.log"
+printf 'Eighteen isolated CLI checks passed, including verified retired compiler identities for audited traces, preserved failure diagnostics, private test caches, exact pin retirement, maintenance leases and repeated collection.\n'

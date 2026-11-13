@@ -5,6 +5,31 @@ const release = @import("release.zig");
 const private_cache = @import("private_cache.zig");
 const p = core.p;
 const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests: []const p.Evidence };
+pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
+
+pub fn traces(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void {
+    if (!p.relative(plan_path) or reason.len == 0) return error.InvalidEvidencePath;
+    try e.addControl(plan_path);
+    var parsed = try e.load(e.c.gpa, plan_path);
+    defer parsed.deinit();
+    const Plan = struct { schema: []const u8, traces: []const TraceEntry };
+    var plan = try std.json.parseFromValue(Plan, e.c.gpa, parsed.value, .{});
+    defer plan.deinit();
+    if (!std.mem.eql(u8, plan.value.schema, "zllvm-trace-retirement-plan-v1") or plan.value.traces.len == 0 or plan.value.traces.len > 1024) return error.InvalidTracePlan;
+    var requests: std.ArrayList(p.Evidence) = .empty;
+    for (plan.value.traces) |entry| {
+        const retired: ?p.Evidence = if (entry.compiler_retirement) |path| blk: {
+            if (!p.relative(path)) return error.InvalidEvidencePath;
+            break :blk .{ .path = path, .sha256 = try e.digest(path) };
+        } else null;
+        const candidate = try release.traceRequest(e, entry.audit, entry.build, reason, entry.source_reconstructions, retired);
+        const destination = try e.c.fmt("{s}/request-{d}.json", .{ e.output, requests.items.len });
+        try e.write(destination, candidate);
+        try requests.append(e.c.a, .{ .path = destination, .sha256 = try e.digest(destination) });
+    }
+    try e.write(try e.c.fmt("{s}/requests.json", .{e.output}), List{ .requests = requests.items });
+    try e.c.print("Prepared {d} audited-trace requests; no payloads changed. Review with:\ntools/clean-storage --requests {s}/requests.json\n", .{ requests.items.len, e.output });
+}
 
 pub fn caches(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void {
     if (!p.relative(plan_path) or reason.len == 0) return error.InvalidEvidencePath;

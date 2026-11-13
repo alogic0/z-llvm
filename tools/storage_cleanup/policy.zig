@@ -45,6 +45,7 @@ pub const Release = struct {
     source_reconstructions: []const Evidence = &.{},
     retired_pins: []const PinTransition = &.{},
     cache_owner: ?CacheOwner = null,
+    compiler_retirement: ?Evidence = null,
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');

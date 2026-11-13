@@ -88,7 +88,7 @@ jqz '.actions | each | where(.status == "skipped") | {path,reason}' REPORT.json
 | --- | --- |
 | Completed private compiler caches | A passed isolated compiler `report.json` and completed commands whose cache arguments name direct children of that run. The default project policy does not require source/configuration reconstruction; `cache_evidence:"replay"` optionally adds it. |
 | Released private test caches | An explicit disposable release bound to a terminal `run_checked` receipt, its working directory and exact cache arguments. The producer log remains hash-bound outside the cache, including for failed/canceled tests. |
-| Released raw event streams | An explicit owner release, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler and complete build/source evidence, and the auditor sources. An audited failure retains its original outcome and diagnostics; it does not require a passed successor. |
+| Released raw event streams | An explicit owner release, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler or its verified guarded retirement, complete build/source evidence, and the auditor sources. An audited failure retains its original outcome and diagnostics; it does not require a passed successor. |
 | Superseded executable/object files | An explicit release record, accepted successor, complete source/build/input/result evidence and matching bytes. Only the supported output names and ELF/archive formats qualify. |
 | Disposable executable/object files | An explicit `disposable` release, a closed producer in the owning run, and exact output hashes. No source/configuration reconstruction or accepted successor is required. Only compiled ELF/archive output can qualify. |
 | Obsolete logs | An explicit release record, accepted successor, complete build/source/input/result evidence, and retained diagnostics for a failed producer. |
@@ -126,9 +126,10 @@ eligible candidates after that cap is reached.
 a qualified owner release. Use repeated `--reconstruction FILE` arguments for
 canonical builds with historical source overrides. The supported ledger format
 has a `sources` array containing `sha256`, `revision`, `path` and/or `saved`.
-Unresolved entries remain blockers. A missing original compiler binary still
-blocks trace release; source reconstruction is not a claim that a replacement
-binary has already been built. Producer adoption of the release commands is
+Unresolved entries remain blockers. An absent original compiler needs a verified
+completed retirement record, supplied with `--compiler-retirement RECORD.json`;
+absence alone does not qualify. This preserves its recorded identity without
+rebuilding an obsolete executable. Producer adoption of the release commands is
 explicit; ordinary build invocations do not automatically declare prior runs
 obsolete. The
 [follow-up plan](plans/2026-11-13-storage-cleanup-followups.md) records those gaps.
@@ -210,6 +211,39 @@ Private-cache artifacts use `kind:"private_cache"` and omit the single-file
 whole-cache removal checks used for compiler caches apply. Source/configuration
 reconstruction is not required. Logs, receipts, current pins, queued holds,
 active consumers and retained dependencies remain protected.
+
+### Traces whose original compiler was retired
+
+`prepare-traces --traces PLAN.json --reason TEXT` prepares requests for an
+explicit trace list. Review and apply the resulting `requests.json` as above.
+For example:
+
+```json
+{
+  "schema": "zllvm-trace-retirement-plan-v1",
+  "traces": [{
+    "audit": "local-state/retirements/AUDIT/results/N.json",
+    "build": "local-state/validations/SUITE/BATCH/COMPILER/report.json",
+    "compiler_retirement": "local-state/retirements/automatic-storage-cleanup/RUN/record-N.json"
+  }]
+}
+```
+
+Omit `compiler_retirement` when the original compiler remains available. An
+entry can also supply `source_reconstructions` as path/hash evidence pairs.
+Preparation writes small request files; the subsequent review qualifies the
+full audit, evidence, pins and consumers. A prepared request is not permission
+to skip those checks.
+
+A retired compiler must have a completed guarded `build_output` removal with
+matching identity and reclaimed allocation, a hash-bound disposable owner
+request, and the unchanged original build receipt retained by that record.
+The original path must remain absent. The build, audited run and retirement
+must all name the same compiler path and SHA-256. The collector retains this
+proof chain and rechecks it before and after mutation. A changed or incomplete
+record, unbound build, reappeared executable or changed source prevents removal.
+This option applies only to audited raw traces; it does not excuse missing
+source, input, audit, toolchain or failure evidence.
 
 ## Accounting for the remaining tree
 
@@ -321,11 +355,14 @@ compiler, input/report bindings, pins, holds and consumers before creating a
 release. It retains all other regular files in the original run, the producer's
 external logs when declared, and the build logs/toolchain. It neither removes
 the raw trace nor overwrites an existing owner decision. Actual cleanup repeats
-the checks. Audited releases may contain **only raw traces**; binaries and logs
-continue to require an accepted successor. Failed producer outcomes stay failed.
+the checks. Audited releases may contain **only raw traces**. Disposable build
+outputs use their separate completed-producer contract; superseded logs require
+an accepted successor. Failed producer outcomes stay failed.
 
 For `raw_trace`, the artifact name must be `profile.events.jsonl`, with an `audit`
-path and retained `audit` and `compiler` roles. The audit must use
+path and a retained `audit` role. Keep the original executable in a `compiler`
+row, or supply the verified `compiler_retirement` evidence described above.
+The audit must use
 `zllvm-native-event-audit-v1`, validate the entire closed stream and bind its raw
 hash, producer, backend/top reports and input. Retain those bound files with
 their exact hashes. The top report's compiler must match the preserved build.
@@ -404,7 +441,8 @@ when a report is atomically replaced. Previous numbered retirement records pin
 their retained evidence in later runs. CLI
 checks exercise the shared lease, an interrupted operation, empty apply,
 ordinary fresh-cache retention, a bad current manifest, actual minimal
-collection, idempotence and maintenance after successful/failed jobs.
+collection, idempotence, maintenance after successful/failed jobs, and an
+audited failure whose original compiler has already been retired.
 They do not remove project artifacts.
 
 For unattended execution, call `tools/clean-storage --apply` from the existing

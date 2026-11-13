@@ -18,6 +18,9 @@ pub fn trace(e: *core.Engine, audit_path: []const u8, build_path: []const u8, re
     return traceWithSources(e, audit_path, build_path, reason, &.{});
 }
 pub fn traceWithSources(e: *core.Engine, audit_path: []const u8, build_path: []const u8, reason: []const u8, reconstructions: []const p.Evidence) ![]const u8 {
+    return publish(e, try traceRequest(e, audit_path, build_path, reason, reconstructions, null));
+}
+pub fn traceRequest(e: *core.Engine, audit_path: []const u8, build_path: []const u8, reason: []const u8, reconstructions: []const p.Evidence, compiler_retirement: ?p.Evidence) !p.Release {
     if (!p.relative(audit_path) or !p.relative(build_path) or reason.len == 0) return error.InvalidReleaseArguments;
     var audit = try e.load(e.c.gpa, audit_path);
     defer audit.deinit();
@@ -54,7 +57,9 @@ pub fn traceWithSources(e: *core.Engine, audit_path: []const u8, build_path: []c
     }
     var build = try e.load(e.c.gpa, build_path);
     defer build.deinit();
-    try row(e, &rows, try core.str(build.value, "compiler"), try core.str(build.value, "compiler_sha256"), .compiler);
+    if (compiler_retirement) |record| {
+        try row(e, &rows, record.path, record.sha256, .other);
+    } else try row(e, &rows, try core.str(build.value, "compiler"), try core.str(build.value, "compiler_sha256"), .compiler);
     const sources = try core.get(build.value, "source_sha256");
     if (sources != .object or sources.object.count() == 0) return error.MissingSourceEvidence;
     var source_it = sources.object.iterator();
@@ -88,8 +93,11 @@ pub fn traceWithSources(e: *core.Engine, audit_path: []const u8, build_path: []c
         .retained = rows.items,
         .artifacts = &.{.{ .path = raw, .sha256 = raw_sha, .kind = .raw_trace, .audit = audit_path }},
         .source_reconstructions = reconstructions,
+        .compiler_retirement = compiler_retirement,
     };
-    return publish(e, release);
+    // Returned requests must own strings originally borrowed from parsed
+    // audit/build documents and the local artifact array.
+    return (try std.json.parseFromSlice(p.Release, e.c.a, try std.json.Stringify.valueAlloc(e.c.a, release, .{}), .{ .allocate = .alloc_always })).value;
 }
 
 pub fn request(e: *core.Engine, path: []const u8) ![]const u8 {

@@ -64,6 +64,14 @@ bytes (10.29 GiB). Twelve other private-cache roots remain held under the
 current tail-owner and legacy-tail test projects. No historical pin transition
 was needed for the 70 admitted caches.
 
+All 70 qualified caches have now been removed. The first pass removed 43
+(6,651,994,112 bytes); a fresh pass removed the other 27 (4,393,304,064 bytes).
+Both passes subsequently stopped when controls changed, with no pending
+mutation and no partially reclaimed action. Completed records remain valid:
+
+- `1794570765801491596-3667800/report.json`
+- `1794572128285454410-3709751/report.json`
+
 Implementation commits: `8584a487`, `cd595a6e`. Native qualification passes
 74 tests in Debug and ReleaseFast. All 16 isolated CLI checks pass again after
 the source-link correction; real-batch results are recorded below.
@@ -76,24 +84,34 @@ Raw event streams explain compiler selection, failures, counters and timing.
 They are different from executable build outputs. Complete semantic audits,
 summaries, original outcomes and failure diagnostics already exist for many.
 
-A specific blocker is now established for **24 isolated-prototype traces,
-22,711,975,936 bytes (21.15 GiB)**. All 24 original compiler binaries are absent
-after earlier retirement. A fresh check of all **15,384 source-hash entries**
-from their build reports passed with zero mismatches. They are not being kept
-because those source trees have been lost. The current trace adapter requires
-the original executable as well as the audit and source/build evidence.
+**Correction to the initial investigation:** the 24 isolated-prototype traces
+in `unlinked-trace-audit-20261113/file-findings.json` were already removed by
+`strong-trace-cleanup-20261113/record.json`. That completed record reports
+22,711,975,936 bytes and 24 actions; all 24 paths are now absent. The earlier
+version of this report incorrectly treated that old catalog as a live candidate
+list. Its 21.15 GiB is historical reclaim, not additional space available or freed
+in this investigation. Fresh checks of 15,384 old source hashes and original
+compiler retirement bindings were valid but did not establish raw-file presence.
 
-The next supported transition should authenticate the completed compiler
-retirement record against the compiler identity in the audited run and build
-receipt. Merely accepting a missing executable or an unverified JSON status is
-insufficient. A rebuilt executable must not be claimed to exist. This review
-does not weaken the trace contract or remove these streams.
+The live filesystem scan instead finds **89 distinct raw-trace inodes totaling
+30,662,504,448 bytes**. Large surviving behavior traces include newer v733–v921
+experiments that are absent from that older audit catalog. They need fresh
+semantic audits and current build/input bindings. Some large original-compiler
+streams have multiple aliases; current accepted and queued streams remain held.
+The 22 surviving entries from the old 48-stream catalog occupy only
+737,046,528 bytes: 14 canonical traces and eight legacy command/source cases.
 
-There are also canonical build receipts and eight older traces with legacy
-command/source bindings. The old audit's eight legacy entries total only
-176,824,320 bytes. They should not distract from the much larger, precisely
-identified missing-compiler case. Historical audit classifications are not
-relabelled as fresh release qualification.
+The collector's new retired-compiler transition authenticates a completed
+guarded retirement against the original build receipt and audited compiler
+identity. It verifies allocation, the hash-bound owner request, unchanged build
+receipt and continued absence of the executable. Complete source, input,
+toolchain, audit and diagnostic checks still apply. No replacement executable is
+built. The implementation passes 82 native tests in Debug and ReleaseFast and
+all 18 CLI checks. The initial CLI run caught an unsupported dynamic array-index
+query in the test script; selecting the matching retirement file with
+`input_filename()` corrected it, and the full CLI suite passed afterward.
+This is usable for live newer traces after
+their full audits, rather than another retirement of the already absent group.
 
 ## Integrated comparison runs
 
@@ -119,6 +137,17 @@ those command/output bindings and release only generated outputs, preserving
 IR, sources and result records. Blanket deletion of an integrated root would
 mix these different roles.
 
+Closer inspection of this example found seven separate `capture-zllvm`
+executables of about 19 MB each and generated `linked-harness.s` files of about
+14.6 MB each. These are concrete output families, rather than unexplained
+"other" bytes. Some commands intentionally return 2 for negative test inputs;
+the comparison records matching local/reference results. An adapter must bind
+the successful build commands separately from these expected execution
+outcomes, rather than requiring every command to return zero. Executables named
+`local`, `reference` and `capture-zllvm` also need explicit output ownership;
+the current filename allowlist does not treat arbitrary extensionless files as
+disposable binaries.
+
 ## Duplicate large IR inputs
 
 A fresh scan of `input.ll` files at least 400,000,000 bytes found 68 paths but
@@ -142,15 +171,21 @@ paths were removed by this investigation.
 The broader survey found 41 present canonical compiler install paths with
 closed successful build commands. They occupy 36 distinct inodes and
 3,776,917,504 allocated bytes; eight paths have multiple hardlink aliases.
-This is not yet an eligible-byte count: current manifests, historical pins,
-alias ownership and actual compiler identities still require review. The
-receipt and inode lists are saved beside the cache investigation.
+Nineteen qualified binaries were removed, reclaiming 2,221,797,376 bytes:
+four in `1794572128285454410-3709751/report.json` and fifteen in the completed
+`1794573262184771142-3757407/report.json`. Fifty exact historical references were
+transitioned; current validation manifests still protect their targets. The
+completed pass verified all five integrity manifests and left no pending
+mutation. Other paths remain pinned, aliased or discrepant. The receipt and
+inode lists are saved beside the cache investigation.
 
-Two batch-30 v3 compilers belong to the current accepted-artifact manifest and
-remain baselines. Other old selection outputs are referenced by batch-11,
-batch-13, batch-14 or batch-30 v1 manifests. Those need explicit transitions
-for their specific historical contracts; the collector does not treat every
-accepted manifest as expired.
+The batch-30 current accepted-artifact manifest references both v3 compilers
+and the earlier v1 compilers. Seeing `expected-binaries-v1.sha256` as the first
+reported pin did not mean it was their only pin. Other old selection outputs
+are referenced by batch-11, batch-13 and batch-14 manifests. These contracts
+need specific review; age and a newer compiler version do not automatically
+expire them. Being required by a checksum contract is also distinct from
+proving that an executable still has a live consumer.
 
 The batch-11 Debug v4 mismatch is explained by
 `batch-11/binary-review-v5/inspection-incident.json`: GNU objcopy repacked the
@@ -187,7 +222,7 @@ payload archive. The pin optimization was measured on 100,000 repeated absent
 references: 0.59 s before and 0.50 s after in one isolated run. That narrow
 measurement is not a claim that historical full-project cleanup is fast.
 
-After the private-cache batch, prioritize authenticated retired-compiler
-identity for the 21.15-GiB trace group, terminal command/output ownership for
-integrated runs, and immutable input deduplication. Keep unresolved allocation
+After the private-cache and compiler batches, prioritize fresh audits of live
+newer traces, terminal command/output ownership for integrated runs, and
+immutable input deduplication. Keep unresolved allocation
 visible; neither age nor a zero-candidate cleanup report proves necessity.

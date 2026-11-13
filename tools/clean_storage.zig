@@ -15,12 +15,14 @@ const usage =
     \\       tools/clean-storage maintain --release-request FILE -- COMMAND [ARG...]
     \\       tools/clean-storage release-trace --audit FILE --build FILE --reason TEXT
     \\           [--reconstruction FILE ...]
+    \\           [--compiler-retirement RECORD.json]
     \\       tools/clean-storage release --request FILE
     \\       tools/clean-storage release-build --build FILE --reason TEXT [--successor FILE]
     \\           [--reconstruction FILE ...]
     \\       tools/clean-storage inventory [--policy FILE]
     \\       tools/clean-storage prepare-builds --builds FILE --reason TEXT [--successor FILE]
     \\       tools/clean-storage prepare-caches --caches FILE --reason TEXT
+    \\       tools/clean-storage prepare-traces --traces FILE --reason TEXT
     \\       tools/clean-storage prepare-pins --requests FILE --review FILE
     \\       tools/clean-storage [--apply] --requests FILE
     \\
@@ -50,10 +52,13 @@ pub fn main(init: std.process.Init) !void {
     const inventory_requested = args.len > 1 and std.mem.eql(u8, args[1], "inventory");
     const prepare_builds = args.len > 1 and std.mem.eql(u8, args[1], "prepare-builds");
     const prepare_caches = args.len > 1 and std.mem.eql(u8, args[1], "prepare-caches");
+    const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
     const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
     var requests_path: ?[]const u8 = null;
     var builds_path: ?[]const u8 = null;
     var caches_path: ?[]const u8 = null;
+    var traces_path: ?[]const u8 = null;
+    var compiler_retirement_path: ?[]const u8 = null;
     var review_path: ?[]const u8 = null;
     var request_path: ?[]const u8 = null;
     var successor_path: ?[]const u8 = null;
@@ -61,7 +66,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or prepare_builds or prepare_pins or prepare_caches) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or prepare_builds or prepare_pins or prepare_caches or prepare_traces) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -92,7 +97,17 @@ pub fn main(init: std.process.Init) !void {
             caches_path = args[i];
             continue;
         }
-        if (prepare_caches and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
+        if (prepare_traces and std.mem.eql(u8, args[i], "--traces") and i + 1 < args.len) {
+            i += 1;
+            traces_path = args[i];
+            continue;
+        }
+        if (release_trace and std.mem.eql(u8, args[i], "--compiler-retirement") and i + 1 < args.len) {
+            i += 1;
+            compiler_retirement_path = args[i];
+            continue;
+        }
+        if ((prepare_caches or prepare_traces) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
             i += 1;
             reason = args[i];
             continue;
@@ -140,8 +155,9 @@ pub fn main(init: std.process.Init) !void {
     if (release_request and (apply or minimal or request_path == null)) return error.InvalidReleaseArguments;
     if (release_build and (apply or minimal or build_path == null or reason == null or audit_path != null)) return error.InvalidReleaseArguments;
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
-    if ((prepare_builds or prepare_pins or prepare_caches) and (apply or minimal)) return error.PreparationIsReadOnly;
+    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces) and (apply or minimal)) return error.PreparationIsReadOnly;
     if (prepare_caches and (caches_path == null or reason == null)) return error.InvalidReleaseArguments;
+    if (prepare_traces and (traces_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_pins and (requests_path == null or review_path == null)) return error.InvalidReleaseArguments;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
@@ -176,8 +192,8 @@ pub fn main(init: std.process.Init) !void {
     defer report(&e, status, apply, minimal) catch {};
     try e.check(.{ .path = policy_path, .sha256 = policy_sha256 });
     try e.addControl(policy_path);
-    if (prepare_builds or prepare_pins or prepare_caches) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else try batch.historicalPins(&e, requests_path.?, review_path.?);
+    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces) {
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else try batch.historicalPins(&e, requests_path.?, review_path.?);
         status = "prepared";
         return;
     }
@@ -188,7 +204,11 @@ pub fn main(init: std.process.Init) !void {
             if (!p.relative(path)) return error.InvalidEvidencePath;
             try reconstructions.append(c.a, .{ .path = path, .sha256 = try e.digest(path) });
         }
-        const published = if (release_trace) try release.traceWithSources(&e, audit_path.?, build_path.?, reason.?, reconstructions.items) else if (release_build) if (successor_path) |accepted| try release.compilerBuild(&e, build_path.?, accepted, reason.?, reconstructions.items) else try release.publish(&e, try release.disposableBuild(&e, build_path.?, reason.?)) else try release.request(&e, request_path.?);
+        const compiler_retirement: ?p.Evidence = if (compiler_retirement_path) |path| blk: {
+            if (!p.relative(path)) return error.InvalidEvidencePath;
+            break :blk .{ .path = path, .sha256 = try e.digest(path) };
+        } else null;
+        const published = if (release_trace) try release.publish(&e, try release.traceRequest(&e, audit_path.?, build_path.?, reason.?, reconstructions.items, compiler_retirement)) else if (release_build) if (successor_path) |accepted| try release.compilerBuild(&e, build_path.?, accepted, reason.?, reconstructions.items) else try release.publish(&e, try release.disposableBuild(&e, build_path.?, reason.?)) else try release.request(&e, request_path.?);
         status = "release-published";
         try c.print("Published verified release: {s}\nRun tools/clean-storage --minimal --apply to collect it.\n", .{published});
         return;
@@ -308,6 +328,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/inventory.zig", .bytes = @embedFile("storage_cleanup/inventory.zig") },
         .{ .path = "tools/storage_cleanup/batch.zig", .bytes = @embedFile("storage_cleanup/batch.zig") },
         .{ .path = "tools/storage_cleanup/private_cache.zig", .bytes = @embedFile("storage_cleanup/private_cache.zig") },
+        .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
         .{ .path = "tools/validation/toolchain.zig", .bytes = @embedFile("validation/toolchain.zig") },
         .{ .path = "tools/validation/common.zig", .bytes = @embedFile("validation/common.zig") },
         .{ .path = "tools/vendor/file_audit.SHA256SUMS", .bytes = @embedFile("vendor/file_audit.SHA256SUMS") },

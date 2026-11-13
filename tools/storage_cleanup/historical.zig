@@ -4,6 +4,7 @@ const core = @import("engine.zig");
 const u = @import("../validation/common.zig");
 const toolchain = @import("../validation/toolchain.zig");
 const p = core.p;
+const retired_compiler = @import("retired_compiler.zig");
 pub const Library = struct { path: []const u8, sha256: []const u8, files: i64 };
 
 fn gitSources(e: *core.Engine, revision: []const u8) !std.StringHashMap([]const u8) {
@@ -78,11 +79,18 @@ pub fn verifyLibraries(e: *core.Engine) !void {
 }
 
 pub fn canonical(e: *core.Engine, report: []const u8, v: u.Value, retained: *std.ArrayList(core.Evidence), retiring: ?[]const u8, reconstructions: []const core.Evidence) !void {
+    return canonicalWithRetirement(e, report, v, retained, retiring, reconstructions, null);
+}
+pub fn canonicalWithRetirement(e: *core.Engine, report: []const u8, v: u.Value, retained: *std.ArrayList(core.Evidence), retiring: ?[]const u8, reconstructions: []const core.Evidence, proof: ?retired_compiler.Proof) !void {
     try e.keep(retained, report, null);
     const compiler = try e.relative(try core.str(v, "compiler"));
     const compiler_sha = try core.str(v, "compiler_sha256");
-    try e.check(.{ .path = compiler, .sha256 = compiler_sha });
-    if (retiring == null or !std.mem.eql(u8, retiring.?, compiler)) try e.keep(retained, compiler, compiler_sha);
+    if (proof) |identity| {
+        try retired_compiler.bind(e, identity, report, compiler, compiler_sha);
+    } else {
+        try e.check(.{ .path = compiler, .sha256 = compiler_sha });
+        if (retiring == null or !std.mem.eql(u8, retiring.?, compiler)) try e.keep(retained, compiler, compiler_sha);
+    }
     const command = try core.get(v, "command");
     if (!core.eq(command, "outcome", "completed") or try core.integer(command, "actual_returncode") != 0) return error.IncompleteBuildCommand;
     const argv = try core.get(command, "argv");

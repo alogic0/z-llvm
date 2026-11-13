@@ -2,6 +2,7 @@ const std = @import("std");
 const u = @import("../validation/common.zig");
 const historical = @import("historical.zig");
 const private_cache = @import("private_cache.zig");
+const retired_compiler = @import("retired_compiler.zig");
 pub const fa = @import("../vendor/file_audit/src/root.zig");
 pub const p = @import("policy.zig");
 const D = std.Io.Dir;
@@ -50,6 +51,7 @@ pub const Action = struct {
     idle_seconds: ?i64 = null,
     replay_required: bool = true,
     released_cache: bool = false,
+    retired_compiler: ?Evidence = null,
     retired_pins: []const p.PinTransition = &.{},
 };
 pub const Engine = struct {
@@ -749,18 +751,25 @@ pub const Engine = struct {
         try e.keep(list, a.producer, null);
     }
     pub fn buildEvidence(e: *Engine, report: []const u8, list: *std.ArrayList(Evidence), retiring: ?[]const u8, reconstructions: []const Evidence) !void {
+        return e.buildEvidenceWithRetirement(report, list, retiring, reconstructions, null);
+    }
+    fn buildEvidenceWithRetirement(e: *Engine, report: []const u8, list: *std.ArrayList(Evidence), retiring: ?[]const u8, reconstructions: []const Evidence, proof: ?retired_compiler.Proof) !void {
         var parsed = try e.load(e.c.gpa, report);
         defer parsed.deinit();
         const v = parsed.value;
-        if (eq(v, "schema", "zllvm-compiler-build-v1")) return historical.canonical(e, report, v, list, retiring, reconstructions);
+        if (eq(v, "schema", "zllvm-compiler-build-v1")) return historical.canonicalWithRetirement(e, report, v, list, retiring, reconstructions, proof);
         if (!eq(v, "status", "passed")) return error.ProducerNotSuccessful;
         try e.sourceRevisions(v);
         const source = try e.relative(try str(v, "source_root"));
         const compiler = try e.relative(try str(v, "compiler"));
         try e.keep(list, report, null);
         const compiler_hash = try str(v, "compiler_sha256");
-        try e.check(.{ .path = compiler, .sha256 = compiler_hash });
-        if (retiring == null or !std.mem.eql(u8, retiring.?, compiler)) try e.keep(list, compiler, compiler_hash);
+        if (proof) |identity| {
+            try retired_compiler.bind(e, identity, report, compiler, compiler_hash);
+        } else {
+            try e.check(.{ .path = compiler, .sha256 = compiler_hash });
+            if (retiring == null or !std.mem.eql(u8, retiring.?, compiler)) try e.keep(list, compiler, compiler_hash);
+        }
         const hashes = try get(v, "source_sha256");
         if (hashes != .object or hashes.object.count() == 0) return error.MissingSourceEvidence;
         var it = hashes.object.iterator();
@@ -799,6 +808,12 @@ pub const Engine = struct {
         defer rp.deinit();
         const r = rp.value;
         if (r.state == .held) return error.ReleaseHeld;
+        var compiler_proof: ?retired_compiler.Proof = null;
+        if (r.compiler_retirement) |record| {
+            if (r.state != .audited or a.kind != .raw_trace) return error.RetiredCompilerOnlyAuditedTrace;
+            compiler_proof = try retired_compiler.verify(e, record, list);
+            a.retired_compiler = compiler_proof.?.compiler;
+        }
         if (a.released_cache and r.state != .disposable) return error.PrivateCacheRequiresDisposable;
         for ([_]Evidence{r.producer}) |ev| {
             if (!p.relative(ev.path)) return error.InvalidEvidencePath;
@@ -832,7 +847,7 @@ pub const Engine = struct {
         try e.sourceRevisions(producer.value);
         const canonical_producer = eq(producer.value, "schema", "zllvm-compiler-build-v1");
         if (!canonical_producer and !eq(producer.value, "status", "finished") and !eq(producer.value, "status", "passed") and !eq(producer.value, "status", "complete")) return error.ProducerNotTerminal;
-        if (canonical_producer) try e.buildEvidence(r.producer.path, list, if (a.kind == .build_output) a.path else null, r.source_reconstructions);
+        if (canonical_producer) try e.buildEvidenceWithRetirement(r.producer.path, list, if (a.kind == .build_output) a.path else null, r.source_reconstructions, compiler_proof);
         if (r.state == .superseded) {
             const next = r.successor orelse return error.NoAcceptedSuccessor;
             if (!p.relative(next.path)) return error.InvalidEvidencePath;
@@ -855,13 +870,13 @@ pub const Engine = struct {
         for ([_]@FieldType(p.Retained, "role"){ .source, .input, .build, .result }) |role| if (!roles.contains(role)) return error.MissingRetentionRole;
         // A label alone is not source reconstruction: verify the complete build
         // source map and command/output binding through the same cache rule.
-        for (r.retained) |row| if (row.role == .build) try e.buildEvidence(row.path, list, if (a.kind == .build_output) a.path else null, r.source_reconstructions);
+        for (r.retained) |row| if (row.role == .build) try e.buildEvidenceWithRetirement(row.path, list, if (a.kind == .build_output) a.path else null, r.source_reconstructions, compiler_proof);
         if (!canonical_producer and !eq(producer.value, "status", "passed") and !roles.contains(.diagnostic)) return error.MissingFailureEvidence;
         for (r.source_reconstructions) |ev| try e.keep(list, ev.path, ev.sha256);
         try e.releaseTransitions(a, list, r);
         try e.keep(list, a.producer, null);
         if (a.kind == .raw_trace) {
-            if (!roles.contains(.audit) or !roles.contains(.compiler)) return error.MissingTraceReplayEvidence;
+            if (!roles.contains(.audit) or (!roles.contains(.compiler) and compiler_proof == null)) return error.MissingTraceReplayEvidence;
             var artifact: ?p.Artifact = null;
             for (r.artifacts) |item| if (std.mem.eql(u8, item.path, a.path)) {
                 artifact = item;
@@ -1055,6 +1070,7 @@ pub const Engine = struct {
         e.hash_cache.clearRetainingCapacity();
         for (e.controls.items) |row| try e.check(row);
         for (a.retained) |row| try e.check(row);
+        if (a.retired_compiler) |compiler| try retired_compiler.absent(e, compiler.path);
         if (a.replay_required) {
             try e.verifyRevisions();
             try historical.verifyLibraries(e);

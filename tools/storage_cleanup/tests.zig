@@ -6,6 +6,7 @@ const mutation = @import("mutation.zig");
 const releases = @import("release.zig");
 const batches = @import("batch.zig");
 const private_cache = @import("private_cache.zig");
+const retired_compiler = @import("retired_compiler.zig");
 const p = core.p;
 const run = "local-state/validations/test/batch/build";
 const cache = run ++ "/zig-local-cache";
@@ -43,7 +44,7 @@ const Fixture = struct {
     }
     fn build(f: *Fixture, e: *core.Engine) !void {
         try f.write(cache ++ "/o/object", "cache object");
-        try f.write(run ++ "/z_llvm", "compiler");
+        try f.write(run ++ "/z_llvm", "\x7fELFsynthetic compiler");
         try f.write(run ++ "/build.stdout", "successful build output");
         try f.write(run ++ "/build.stderr", "");
         try f.write("local-state/validations/test/source/main.zig", "pub fn main() void {}");
@@ -84,6 +85,38 @@ const Fixture = struct {
         const args: []const []const u8 = if (env_args) &.{ "env", "ZIG_LOCAL_CACHE_DIR=evidence/zig-local-Debug-v1", "zig", "build", "test" } else &.{ "zig", "test", "--cache-dir", "evidence/zig-local-Debug-v1", "src/tests.zig" };
         try e.write(run ++ "/evidence/unit.json", .{ .argv = args, .cwd = if (legacy) null else try e.absolute(run), .status = "finished", .outcome = if (code < 0) "canceled" else "completed", .actual_returncode = code, .started_ns = 1, .finished_ns = 2, .log = try e.absolute(run ++ "/evidence/unit.log") });
         return (try private_cache.request(e, .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run, .legacy_working_directory_review = if (legacy) "Reviewed copied project markers, run log and matching private cache arguments" else null }, "Closed temporary native-test cache")).?;
+    }
+    fn retireCompiler(f: *Fixture, build_report: []const u8) !p.Evidence {
+        const retirement_output = "local-state/retirements/automatic-storage-cleanup/fixture";
+        try f.tmp.dir.createDirPath(t.io, retirement_output);
+        var prepare = f.engine();
+        const request = try releases.disposableBuild(&prepare, build_report, "Completed temporary compiler");
+        const request_path = try f.c.fmt("{s}/request.json", .{retirement_output});
+        try prepare.write(request_path, request);
+        var deletion = f.engine();
+        deletion.output = retirement_output;
+        try deletion.discoverRelease(request_path, true);
+        try deletion.qualify(0);
+        try mutation.apply(&deletion, 0);
+        const path = retirement_output ++ "/record-0.json";
+        return .{ .path = path, .sha256 = try deletion.digest(path) };
+    }
+    fn retiredTrace(f: *Fixture) !p.Evidence {
+        var initial = f.engine();
+        _ = try f.release(&initial, .raw_trace, true, true, false);
+        const receipt = try f.retireCompiler(report);
+        var parsed = try initial.load(f.c.a, released ++ "/storage-release.json");
+        const record = (try std.json.parseFromValue(p.Release, f.c.a, parsed.value, .{})).value;
+        var replacement = record;
+        replacement.state = .audited;
+        replacement.successor = null;
+        replacement.compiler_retirement = receipt;
+        var rows: std.ArrayList(p.Retained) = .empty;
+        for (record.retained) |row| if (row.role != .compiler) try rows.append(f.c.a, row);
+        replacement.retained = rows.items;
+        try initial.write(released ++ "/storage-release.json", replacement);
+        parsed.deinit();
+        return receipt;
     }
     fn release(f: *Fixture, e: *core.Engine, kind: @FieldType(p.Artifact, "kind"), complete: bool, successor_passed: bool, failed_without_diagnostic: bool) !usize {
         try f.build(e);
@@ -139,6 +172,141 @@ const Fixture = struct {
         return error.MissingTestCandidate;
     }
 };
+
+test "storage cleanup: audited trace accepts exact guarded compiler retirement and preserves replay evidence" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const receipt = try f.retiredTrace();
+    var e = f.engine();
+    try e.discoverRelease(released ++ "/storage-release.json", true);
+    try e.qualify(0);
+    try t.expect(e.actions.items[0].retired_compiler != null);
+    try t.expect(e.actions.items[0].replay_required);
+    try mutation.apply(&e, 0);
+    try t.expectError(error.FileNotFound, e.metadata(released ++ "/profile.events.jsonl"));
+    try t.expectError(error.FileNotFound, e.metadata(run ++ "/z_llvm"));
+    _ = try e.metadata("local-state/validations/test/source/main.zig");
+    _ = try e.metadata(released ++ "/input.ll");
+    _ = try e.metadata(released ++ "/audit.json");
+    _ = try e.metadata(receipt.path);
+    var retained: std.ArrayList(core.Evidence) = .empty;
+    // A proof is local to its audited release, never a global missing-file waiver.
+    try t.expectError(error.FileNotFound, e.buildEvidence(report, &retained, null, &.{}));
+}
+
+test "storage cleanup: incomplete or unrelated compiler retirement cannot replace original bytes" {
+    for (0..5) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const original = try f.retiredTrace();
+        var edit = f.engine();
+        var parsed = try edit.load(f.c.a, original.path);
+        switch (case) {
+            0 => try u.put(f.c.a, &parsed.value, "status", u.s("pending")),
+            1 => try u.put(f.c.a, parsed.value.object.getPtr("action").?, "status", u.s("ready")),
+            2 => try u.put(f.c.a, parsed.value.object.getPtr("action").?, "sha256", u.s("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")),
+            3 => try u.put(f.c.a, parsed.value.object.getPtr("action").?, "reclaimed_file_bytes", u.n(0)),
+            4 => try u.put(f.c.a, &parsed.value, "retained", u.array(f.c.a)),
+            else => unreachable,
+        }
+        try edit.write(original.path, parsed.value);
+        var e = f.engine();
+        var retained: std.ArrayList(core.Evidence) = .empty;
+        const receipt: p.Evidence = .{ .path = original.path, .sha256 = try e.digest(original.path) };
+        const result = retired_compiler.verify(&e, receipt, &retained);
+        if (result) |_| return error.InvalidRetirementWasAccepted else |_| {}
+        _ = try e.metadata(released ++ "/profile.events.jsonl");
+    }
+}
+
+test "storage cleanup: retired compiler proof requires unchanged owner request and build receipt" {
+    for ([_][]const u8{ report, "local-state/retirements/automatic-storage-cleanup/fixture/request.json" }) |path| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const receipt = try f.retiredTrace();
+        try f.write(path, "{\"status\":\"passed\"}\n");
+        var e = f.engine();
+        var retained: std.ArrayList(core.Evidence) = .empty;
+        try t.expectError(error.EvidenceHashMismatch, retired_compiler.verify(&e, receipt, &retained));
+    }
+}
+
+test "storage cleanup: retired compiler proof is bound to one build and only audited trace releases" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const receipt = try f.retiredTrace();
+    var initial = f.engine();
+    var retained: std.ArrayList(core.Evidence) = .empty;
+    const proof = try retired_compiler.verify(&initial, receipt, &retained);
+    try t.expectError(error.RetiredCompilerBuildMismatch, retired_compiler.bind(&initial, proof, "different-build.json", proof.compiler.path, proof.compiler.sha256));
+    var parsed = try initial.load(f.c.a, released ++ "/storage-release.json");
+    try u.put(f.c.a, &parsed.value, "state", u.s("superseded"));
+    try initial.write(released ++ "/storage-release.json", parsed.value);
+    var e = f.engine();
+    try e.discoverRelease(released ++ "/storage-release.json", true);
+    try t.expectError(error.RetiredCompilerOnlyAuditedTrace, e.qualify(0));
+    parsed.deinit();
+}
+
+test "storage cleanup: retired compiler and proof records are rechecked before trace mutation" {
+    for ([_]bool{ false, true }) |compiler_reappears| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const receipt = try f.retiredTrace();
+        var e = f.engine();
+        try e.discoverRelease(released ++ "/storage-release.json", true);
+        try e.qualify(0);
+        if (compiler_reappears) try f.write(run ++ "/z_llvm", "replacement executable") else try f.write(receipt.path, "{\"status\":\"complete\"}");
+        const result = mutation.apply(&e, 0);
+        if (result) |_| return error.ChangedRetirementWasAccepted else |_| {}
+        _ = try e.metadata(released ++ "/profile.events.jsonl");
+        try t.expectError(error.FileNotFound, e.metadata(mutation.pending_path));
+    }
+}
+
+test "storage cleanup: retired compiler identity does not excuse changed source or incomplete audit" {
+    for ([_]bool{ false, true }) |source_changed| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        _ = try f.retiredTrace();
+        if (source_changed) try f.write("local-state/validations/test/source/main.zig", "changed source") else try f.write(released ++ "/audit.json", "{\"status\":\"verified\",\"complete\":false}");
+        var e = f.engine();
+        try e.discoverRelease(released ++ "/storage-release.json", true);
+        const result = e.qualify(0);
+        if (result) |_| return error.InvalidReplayWasAccepted else |_| {}
+    }
+}
+
+test "storage cleanup: canonical build sources still qualify after verified compiler retirement" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try f.canonical(&initial);
+    const receipt = try f.retireCompiler(report);
+    var e = f.engine();
+    var retained: std.ArrayList(core.Evidence) = .empty;
+    const proof = try retired_compiler.verify(&e, receipt, &retained);
+    var parsed = try e.load(f.c.a, report);
+    try @import("historical.zig").canonicalWithRetirement(&e, report, parsed.value, &retained, null, &.{}, proof);
+    try t.expectEqual(@as(usize, 1), e.revisions.items.len);
+    try f.write("toolchain/lib/std.zig", "changed toolchain");
+    try t.expectError(error.ToolchainLibraryChanged, @import("historical.zig").verifyLibraries(&e));
+    parsed.deinit();
+}
+
+test "storage cleanup: trace preparation owns its audit data and binds retirement proof" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const receipt = try f.retiredTrace();
+    var e = f.engine();
+    try e.write("trace-plan.json", .{ .schema = "zllvm-trace-retirement-plan-v1", .traces = [_]batches.TraceEntry{.{ .audit = released ++ "/audit.json", .build = report, .compiler_retirement = receipt.path }} });
+    try batches.traces(&e, "trace-plan.json", "Complete audit and retired original identity");
+    var fresh = f.engine();
+    try batches.discover(&fresh, output ++ "/requests.json");
+    try fresh.qualify(0);
+    try t.expect(fresh.actions.items[0].retired_compiler != null);
+    _ = try fresh.metadata(released ++ "/profile.events.jsonl");
+}
 
 test "storage cleanup: canonical receipt reconstructs sources from Git after checkout changes" {
     const f = try Fixture.init();

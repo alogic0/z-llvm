@@ -1,9 +1,11 @@
 # Complete the storage cleanup workflow
 
 Status: minimal mode, audited traces, canonical build/source reconstruction,
-exact historical pin transitions, staged batches and full-tree allocation
-accounting implemented. The execution and remaining evidence gaps are tracked
-in [completed-run retention](2026-11-13-completed-run-retention.md).
+exact historical pin transitions, staged batches, explicit private-test caches,
+retired-compiler identity verification and full-tree allocation accounting
+implemented. The execution and remaining evidence gaps are tracked in
+[completed-run retention](2026-11-13-completed-run-retention.md) and the
+[remaining-storage investigation](2026-11-13-remaining-storage-investigation.md).
 
 The initial collector has guarded removal, pin checks and provenance validation,
 but its first real apply run reclaimed zero bytes. Its source and tests belong
@@ -71,8 +73,10 @@ Historical coverage advanced in the completed-run retention follow-up:
 
 1. Canonical receipts now verify exact Git sources or saved ledger overrides,
    completed commands and full toolchain identities. Isolated source mismatches
-   remain blockers for replay-qualified releases. Missing retired compilers and unsupported legacy command
-   formats still need additional reconstruction evidence.
+   remain blockers for replay-qualified releases. Audited traces can now bind a
+   missing original compiler to its completed guarded retirement and unchanged
+   original build receipt. This does not rebuild an old executable or waive
+   source verification. Unsupported legacy command formats still need review.
 2. Per-file transitions bind original manifest, reference string and target hash.
    Completed retirement records have a review adapter; current manifests and
    unrelated targets stay pinned. Other validation-suite pins require review.
