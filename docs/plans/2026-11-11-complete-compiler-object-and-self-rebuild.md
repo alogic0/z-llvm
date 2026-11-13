@@ -636,6 +636,21 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
    Close the fourteen remaining original Debug failures and complete its object
    before the final generations and full behavior matrices in step 12.
+   The completion candidate adds six populations: one-bit checked vectors,
+   odd-width vector shifts, closed internal vector calls, memory bitcasts,
+   bounded large-integer memory views and integer global data. Independent C
+   models cover each admitted form; generators and driver templates belong in
+   `tools/` and must reproduce the qualified fixtures exactly. Keep ordinary
+   ABI, stack-object, frame and Source/value-use limits unchanged. Explicit
+   `.rodata` annotations require read-only section placement and relocation
+   ownership. Replace the former integer-vector global rejection control with
+   an unsupported pointer-vector control while retaining positive coverage.
+   Require the complete 7,874-definition census and object, ELF/event/owner
+   audits, both unit builds, eight readiness procedures, all 17 gates, both
+   complete 202-population native suites and all 5,482 required faults. Compare
+   every preceding outcome and artifact explicitly before accepting this
+   successor checkpoint. Private complete objects and targeted execution runs
+   are available; cumulative acceptance remains open.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the

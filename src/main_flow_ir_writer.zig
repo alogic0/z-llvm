@@ -508,6 +508,13 @@ pub fn emitCodegenModule(
         });
         try stderr_writer.interface.flush();
     }
+    var private_call_arena = std.heap.ArenaAllocator.init(allocator);
+    defer private_call_arena.deinit();
+    const private_calls = if (options.generic_cfg_selector)
+        try @import("codegen/x86_64/closed_vector_calls.zig").prepare(private_call_arena.allocator(), module)
+    else
+        null;
+    const lowering_functions = if (private_calls) |view| view.functions else module.functions.items;
     const module_context: codegen.x86_64.ReadOnlyModuleContext = .{
         .globals = if (reachable != null) selected_globals.items else module.globals.items,
         .aliases = if (reachable != null) selected_aliases.items else all_aliases,
@@ -515,7 +522,7 @@ pub fn emitCodegenModule(
         .target_datalayout = module.target_datalayout,
         .emit_all_globals = options.codegen_reachable,
         .require_resolved_aliases = options.codegen_reachable or assembly_aliases != null,
-        .functions = module.functions.items,
+        .functions = lowering_functions,
         .declarations = module.declarations.items,
     };
     var required = try @import("codegen/x86_64/direct_callees.zig").Queue.init(allocator, module.functions.items);
@@ -526,7 +533,8 @@ pub fn emitCodegenModule(
     }
     var next_function: usize = 0;
     while (next_function < required.items.items.len) : (next_function += 1) {
-        const function = module.functions.items[required.items.items[next_function]];
+        const original_function = module.functions.items[required.items.items[next_function]];
+        const function = lowering_functions[required.items.items[next_function]];
         if (options.codegen_reachable) switch (function.linkage) {
             .default, .external, .internal, .private => {},
             else => return error.UnsupportedFunctionLinkage,
@@ -537,8 +545,8 @@ pub fn emitCodegenModule(
         const profiling = @import("compilation_profile.zig");
         const function_scope = if (options.profile) |p| blk: {
             var instructions: usize = 0;
-            for (function.blocks.items) |block| instructions += block.instructions.items.len;
-            break :blk try p.beginFunction(function.name, function.blocks.items.len, instructions);
+            for (original_function.blocks.items) |block| instructions += block.instructions.items.len;
+            break :blk try p.beginFunction(original_function.name, original_function.blocks.items.len, instructions);
         } else profiling.FunctionScope{};
         defer function_scope.end();
         const selection_scope = profiling.enter(options.profile, .select);

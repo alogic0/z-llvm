@@ -1,11 +1,27 @@
 const std = @import("std");
+comptime {
+    _ = @import("analysis/direct_symbol_closure_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/memory_bytes_tests.zig");
+}
 
-test { _ = @import("codegen/x86_64/generic_cfg/limb_integers_tests.zig"); }
-comptime { _ = @import("codegen/x86_64/generic_cfg/fp_frame_preservation_tests.zig"); }
-comptime { _ = @import("codegen/x86_64/module_asm_aliases_tests.zig"); }
-comptime { _ = @import("ir/wide_integers_tests.zig"); }
-comptime { _ = @import("codegen/x86_64/generic_cfg/variadic_values_tests.zig"); }
-comptime { _ = @import("codegen/x86_64/generic_cfg/floating_atomics_tests.zig"); }
+test {
+    _ = @import("codegen/x86_64/generic_cfg/limb_integers_tests.zig");
+}
+comptime {
+    _ = @import("codegen/x86_64/generic_cfg/fp_frame_preservation_tests.zig");
+}
+comptime {
+    _ = @import("codegen/x86_64/module_asm_aliases_tests.zig");
+}
+comptime {
+    _ = @import("ir/wide_integers_tests.zig");
+}
+comptime {
+    _ = @import("codegen/x86_64/generic_cfg/variadic_values_tests.zig");
+}
+comptime {
+    _ = @import("codegen/x86_64/generic_cfg/floating_atomics_tests.zig");
+}
 
 comptime {
     _ = @import("ir/vector_constant.zig");
@@ -76,6 +92,7 @@ comptime {
     _ = @import("air_export_cache.zig");
     _ = @import("codegen/x86_64/symbol_address.zig");
     _ = @import("mc/global_data.zig");
+    _ = @import("mc/elf.zig");
     _ = @import("codegen/x86_64/generic_cfg/runtime_pair_pressure_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/floating_vectors_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/incoming_byval80.zig");

@@ -189,9 +189,15 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     // The ordinary two-register multiply action uses a word
                     // carrier. Truncation retains the original modular result.
                     try candidate.begin(&block, block_index, instruction_index);
-                    const wide: ir.Type = .{ .int = if (value.ty.int <= 32 and value.op != .mul) 32 else 64 };
+                    // Dynamic i24 shifts use native word definitions for both
+                    // the arithmetic and the ownership of the outgoing value.
+                    const odd_shift = value.ty.int == 24 and (value.op == .shl or value.op == .lshr or value.op == .ashr);
+                    const wide: ir.Type = .{ .int = if (value.ty.int <= 32 and value.op != .mul and !odd_shift) 32 else 64 };
                     const is_signed = value.op == .ashr or value.op == .sdiv or value.op == .srem;
-                    const lhs = if (is_signed) try signed(allocator, function, &block, &serial, value.ty, wide, value.lhs) else try unsigned(allocator, function, &block, &serial, value.ty, wide, value.lhs);
+                    const incoming_lhs = if (is_signed) try signed(allocator, function, &block, &serial, value.ty, wide, value.lhs) else try unsigned(allocator, function, &block, &serial, value.ty, wide, value.lhs);
+                    // A zero-extension may borrow its narrow source location.
+                    // Publish an ordinary native definition before a named shift.
+                    const lhs = if (odd_shift and !is_signed) try binary(allocator, function, &block, &serial, wide, .@"and", incoming_lhs, .{ .int = 0xffffff }) else incoming_lhs;
                     const rhs = if (value.op == .sdiv or value.op == .srem) try signed(allocator, function, &block, &serial, value.ty, wide, value.rhs) else try unsigned(allocator, function, &block, &serial, value.ty, wide, value.rhs);
                     const answer = if (value.op == .sdiv or value.op == .srem) try signedDivision(allocator, function, &block, &serial, wide, value.op, lhs, rhs) else try binary(allocator, function, &block, &serial, wide, value.op, lhs, rhs);
                     // Width-specific overflow and exact flags constrain defined

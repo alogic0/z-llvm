@@ -166,9 +166,15 @@ const Encoder = struct {
         }
         if (ty == .vector) {
             const scalar = ty.vector.elem_ty.toType();
-            if (scalar != .half and scalar != .float and scalar != .double and scalar != .x86_fp80 and scalar != .fp128)
+            if (scalar == .int) {
+                if (scalar.int == 0 or scalar.int > 128 or ty.vector.len == 0) return encoder.reject(.integer_width, ty);
+                // Integer vectors are densely packed bits. No scalar ABI or
+                // stack layout authority is inferred from this data encoding.
+                var parts = std.mem.splitScalar(u8, encoder.layout.text, '-');
+                while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return encoder.reject(.scalar_alignment, ty);
+            } else if (scalar != .half and scalar != .float and scalar != .double and scalar != .x86_fp80 and scalar != .fp128)
                 return encoder.reject(.scalar_type, ty);
-            _ = try encoder.typeLayout(scalar, depth + 1);
+            if (scalar != .int) _ = try encoder.typeLayout(scalar, depth + 1);
             const alignment_bits = try encoder.layout.typeAbiAlignmentBits(ty);
             if (alignment_bits < 8 or alignment_bits / 8 > 4096) return encoder.reject(.scalar_alignment, ty);
             return .{
@@ -293,7 +299,22 @@ const Encoder = struct {
         for (0..ty.vector.len) |index| {
             const item = repeated orelse try typedField(items.next() orelse return error.UnsupportedGlobalData);
             if (!item.ty.eql(element)) return error.UnsupportedGlobalData;
-            try encoder.text(element, item.after, offset + @as(u32, @intCast(index * stride)), depth + 1);
+            if (element == .int) {
+                const lane_value = parser.parseValue(trim(item.after)) catch return error.UnsupportedGlobalData;
+                if (lane_value != .undef and lane_value != .poison and lane_value != .zero_initializer) {
+                    if (lane_value != .int) return encoder.reject(.integer_value, element);
+                    if (element.int < 128) {
+                        const minimum = -(@as(i128, 1) << @as(u7, @intCast(element.int - 1)));
+                        const maximum = (@as(u128, 1) << @as(u7, @intCast(element.int))) - 1;
+                        if (lane_value.int < minimum or (lane_value.int >= 0 and @as(u128, @intCast(lane_value.int)) > maximum)) return encoder.reject(.integer_range, element);
+                    }
+                }
+                const pattern: u128 = if (lane_value == .int) @bitCast(lane_value.int) else 0;
+                for (0..element.int) |bit| {
+                    const destination = index * @as(usize, element.int) + bit;
+                    if ((pattern >> @as(u7, @intCast(bit))) & 1 != 0) encoder.bytes[offset + destination / 8] |= @as(u8, 1) << @as(u3, @intCast(destination % 8));
+                }
+            } else try encoder.text(element, item.after, offset + @as(u32, @intCast(index * stride)), depth + 1);
         }
         if (items.next() != null) return error.UnsupportedGlobalData;
     }
@@ -495,6 +516,45 @@ test "global data refines poison cells while preserving defined neighbors and re
     try std.testing.expectEqualStrings("right", data.relocations[1].address.symbol);
 }
 
+test "global integer vectors pack bit lanes and preserve aggregate allocation padding" {
+    const a = std.testing.allocator;
+    const source = "@bits = constant <4 x i5> <i5 1,i5 2,i5 3,i5 4>\n@mask = constant <4 x i1> <i1 true,i1 false,i1 true,i1 true>\n@nested = constant {i8,[2 x <3 x i32>],i8} {i8 7,[2 x <3 x i32>] [<3 x i32> <i32 1,i32 2,i32 3>,<3 x i32> <i32 4,i32 5,i32 6>],i8 9}\n";
+    var module = try ir.Module.parse(a, source);
+    defer module.deinit();
+    try module.verify();
+    const context: constants.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = null };
+    var bit_data = try decode(a, context, module.globals.items[0]);
+    defer bit_data.deinit(a);
+    try std.testing.expectEqualSlices(u8, &.{ 0x41, 0x0c, 0x02, 0 }, bit_data.bytes);
+    var mask_data = try decode(a, context, module.globals.items[1]);
+    defer mask_data.deinit(a);
+    try std.testing.expectEqualSlices(u8, &.{0x0d}, mask_data.bytes);
+    var nested = try decode(a, context, module.globals.items[2]);
+    defer nested.deinit(a);
+    try std.testing.expectEqual(@as(usize, 64), nested.bytes.len);
+    try std.testing.expectEqual(@as(u32, 16), nested.alignment);
+    try std.testing.expectEqual(@as(u8, 7), nested.bytes[0]);
+    try std.testing.expectEqual(@as(u8, 9), nested.bytes[48]);
+    for (0..2) |vector| {
+        for (0..3) |lane| try std.testing.expectEqual(@as(u32, @intCast(vector * 3 + lane + 1)), std.mem.readInt(u32, nested.bytes[16 + vector * 16 + lane * 4 ..][0..4], .little));
+        try std.testing.expectEqualSlices(u8, &.{ 0, 0, 0, 0 }, nested.bytes[28 + vector * 16 ..][0..4]);
+    }
+}
+
+test "global aggregate fields ignore unmatched braces and commas inside byte strings" {
+    const a = std.testing.allocator;
+    const source = "@left = constant {[3 x i8],i8} {[3 x i8] c\"{,X\",i8 7}\n@right = constant {[3 x i8],i8} {[3 x i8] c\"},Y\",i8 9}\n";
+    var module = try ir.Module.parse(a, source);
+    defer module.deinit();
+    try module.verify();
+    const context: constants.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = null };
+    for (module.globals.items, [_][]const u8{ &.{ 0x7b, 0x2c, 0x58, 7 }, &.{ 0x7d, 0x2c, 0x59, 9 } }) |global, expected| {
+        var data = try decode(a, context, global);
+        defer data.deinit(a);
+        try std.testing.expectEqualSlices(u8, expected, data.bytes);
+    }
+}
+
 test "global data diagnostics identify a nested unsupported scalar layout" {
     var module = try ir.Module.parse(std.testing.allocator, "@table = constant [1 x <2 x ptr>] zeroinitializer\n");
     defer module.deinit();
@@ -670,7 +730,7 @@ test "global data rejects incomplete unsupported and unbounded definitions" {
         "@bad = global [2 x i8] [i8 1]",
         "@bad = global { i8, i64 } { i8 1 }",
         "@bad = global { i8 } { i16 1 }",
-        "@bad = global <2 x i32> zeroinitializer",
+        "@bad = global <2 x ptr> zeroinitializer",
         "@bad = global float 0x3FF0000000000001",
         "@bad = global fp128 0xL1234",
         "target datalayout = \"e-f64:32\"\n@bad = global double 1.0",

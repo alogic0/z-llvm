@@ -61,6 +61,8 @@ pub const Stage = enum {
     @"narrow_abi.zig.legalizeSelfTail",
     @"narrow_abi.zig.legalizeSigned",
     @"narrow_abi.zig.legalizeTail",
+    @"memory_bitcasts.zig.legalize",
+    @"memory_bytes.zig.legalize",
 };
 
 pub const Rewrite = struct {
@@ -86,8 +88,10 @@ pub fn next(allocator: std.mem.Allocator, function: ir.Function, context: ?*cons
     if (try apply(.@"narrow_abi.zig.legalizeSelfTail", allocator, function, context, profile)) |rewrite| return rewrite;
     if (try apply(.@"narrow_abi.zig.legalizeTail", allocator, function, context, profile)) |rewrite| return rewrite;
     if (try apply(.@"narrow_abi.zig.legalizeSigned", allocator, function, context, profile)) |rewrite| return rewrite;
+    if (try apply(.@"memory_bytes.zig.legalize", allocator, function, context, profile)) |rewrite| return rewrite;
+    if (try apply(.@"memory_bitcasts.zig.legalize", allocator, function, context, profile)) |rewrite| return rewrite;
     inline for (std.enums.values(Stage)) |stage| {
-        if (stage == .@"narrow_abi.zig.legalizeSelfTail" or stage == .@"narrow_abi.zig.legalizeSigned" or stage == .@"narrow_abi.zig.legalizeTail") continue;
+        if (stage == .@"narrow_abi.zig.legalizeSelfTail" or stage == .@"narrow_abi.zig.legalizeSigned" or stage == .@"narrow_abi.zig.legalizeTail" or stage == .@"memory_bitcasts.zig.legalize" or stage == .@"memory_bytes.zig.legalize") continue;
         if (try apply(stage, allocator, function, context, profile)) |rewrite| return rewrite;
     }
     return null;
@@ -153,6 +157,8 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
         .@"narrow_abi.zig.legalizeSelfTail" => @import("narrow_abi.zig").legalizeSelfTail(measured, function),
         .@"narrow_abi.zig.legalizeSigned" => @import("narrow_abi.zig").legalizeSigned(measured, function),
         .@"narrow_abi.zig.legalizeTail" => @import("narrow_abi.zig").legalizeTail(measured, function),
+        .@"memory_bitcasts.zig.legalize" => @import("memory_bitcasts.zig").legalize(measured, function, context),
+        .@"memory_bytes.zig.legalize" => @import("memory_bytes.zig").legalize(measured, function, context),
     };
     attempt.outcome = if (candidate != null) .rewritten else .unchanged;
     return if (candidate) |rewritten| .{
@@ -183,7 +189,7 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
             => true,
             else => false,
         },
-        .retain_all_labels = stage == .@"narrow_abi.zig.legalizeSelfTail",
+        .retain_all_labels = stage == .@"narrow_abi.zig.legalizeSelfTail" or stage == .@"memory_bytes.zig.legalize",
         .retain_labels = switch (stage) {
             .@"variadic_values.zig.legalize" => true,
             .@"floating_atomics.zig.legalize" => true,

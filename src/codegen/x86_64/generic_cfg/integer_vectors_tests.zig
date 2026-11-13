@@ -73,7 +73,7 @@ test "pair vector saturation preserves aligned owned storage and exact lane resu
 }
 
 test "pair vector owned storage keeps larger dynamic and excessive alignment closed" {
-    for ([_][]const u8{ "alloca <64 x i128>,align 1024", "alloca <4 x i128>,i64 %n,align 64", "alloca <4 x i128>,align 8192" }) |expression| {
+    for ([_][]const u8{ "alloca <65 x i128>,align 2048", "alloca <4 x i128>,i64 %n,align 64", "alloca <4 x i128>,align 8192" }) |expression| {
         const text = try std.fmt.allocPrint(std.testing.allocator, "define void @closed(i64 %n) {{\nentry:\n %slot = {s}\n ret void\n}}\n", .{expression});
         defer std.testing.allocator.free(text);
         var module = try ir.Module.parse(std.testing.allocator, text);

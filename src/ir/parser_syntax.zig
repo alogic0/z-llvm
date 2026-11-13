@@ -133,17 +133,7 @@ pub fn findMatchingBracket(text: []const u8, open_index: usize) ?usize {
 }
 
 pub fn findMatchingBrace(text: []const u8, open_index: usize) ?usize {
-    if (open_index >= text.len or text[open_index] != '{') return null;
-    var depth: usize = 0;
-    for (text[open_index..], open_index..) |byte, index| {
-        if (byte == '{') {
-            depth += 1;
-        } else if (byte == '}') {
-            depth -= 1;
-            if (depth == 0) return index;
-        }
-    }
-    return null;
+    return findMatchingDelimiter(text, open_index, '{', '}');
 }
 
 pub fn findMatchingBracketOpen(text: []const u8, close_index: usize) ?usize {

@@ -253,7 +253,7 @@ fn moduleControls(runner: *Runner, directory: []const u8, zllvm: []const u8, env
         .{ .name = "opaque-coverage", .source = try c.fmt("{s}\n!vendor.helpers = !{{!0}}\n!0 = !{{!\"module_dead\"}}\n", .{fixture}), .diagnostic = "coverage=conservative" },
         .{ .name = "alias-cycle", .source = "@a = alias i64 (), ptr @b\n@b = internal alias i64 (), ptr @a\n", .diagnostic = "UnresolvedAliasTarget" },
         .{ .name = "alias-external", .source = "@a = alias i64 (), ptr @external\ndeclare i64 @external()\n", .diagnostic = "UnresolvedAliasTarget" },
-        .{ .name = "unsupported-global", .source = "@value = global <2 x i32> zeroinitializer\n", .diagnostic = "UnsupportedGlobalData" },
+        .{ .name = "unsupported-global", .source = "@value = global <2 x ptr> zeroinitializer\n", .diagnostic = "UnsupportedGlobalData" },
         .{ .name = "weak-alias", .source = try std.mem.replaceOwned(u8, c.a, fixture, "@module_entry = alias", "@module_entry = weak alias"), .diagnostic = "UnsupportedAliasLinkage" },
         .{ .name = "weak-function", .source = try std.mem.replaceOwned(u8, c.a, fixture, "define hidden ptr @module_get_slot", "define weak hidden ptr @module_get_slot"), .diagnostic = "UnsupportedFunctionLinkage" },
         .{ .name = "module-assembly", .source = "module asm \".quad missing\"\n", .diagnostic = "UnsupportedModuleAssembly" },

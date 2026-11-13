@@ -37,6 +37,7 @@ const Relocation = struct {
 
 const DataFixup = struct {
     offset: u64,
+    read_only_section: bool = false,
     address: symbol_address.Address,
     block: ?[]const u8 = null,
     kind: global_data.Relocation.Kind = .absolute64,
@@ -127,6 +128,8 @@ fn buildObjectWithOptionalModuleContext(
     defer data.deinit(allocator);
     var tdata: std.ArrayList(u8) = .empty;
     defer tdata.deinit(allocator);
+    var rodata: std.ArrayList(u8) = .empty;
+    defer rodata.deinit(allocator);
 
     var symbols: std.ArrayList(Symbol) = .empty;
     defer symbols.deinit(allocator);
@@ -161,7 +164,8 @@ fn buildObjectWithOptionalModuleContext(
     defer data_fixups.deinit(allocator);
     var data_alignment: u32 = 16;
     var tdata_alignment: u32 = 4;
-    try appendReachableGlobals(allocator, &data, &data_alignment, &tdata, &tdata_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
+    var rodata_alignment: u32 = 16;
+    try appendReachableGlobals(allocator, &data, &data_alignment, &tdata, &tdata_alignment, &rodata, &rodata_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
     try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals, module_context);
     try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases, if (module_context) |context| context.require_resolved_aliases else false);
@@ -174,6 +178,8 @@ fn buildObjectWithOptionalModuleContext(
     }
     var data_relocations: std.ArrayList(Relocation) = .empty;
     defer data_relocations.deinit(allocator);
+    var rodata_relocations: std.ArrayList(Relocation) = .empty;
+    defer rodata_relocations.deinit(allocator);
     for (data_fixups.items) |fixup| {
         var addend = try std.math.add(i64, fixup.address.addend, fixup.bias);
         if (fixup.block) |block| {
@@ -192,7 +198,8 @@ fn buildObjectWithOptionalModuleContext(
             }
             if (!found) return error.UnresolvedBlockAddress;
         }
-        try data_relocations.append(allocator, .{
+        const table = if (fixup.read_only_section) &rodata_relocations else &data_relocations;
+        try table.append(allocator, .{
             .offset = fixup.offset,
             .symbol_index = try symbolIndexForCall(allocator, &symbols, &symbol_indices, fixup.address.symbol),
             .kind = switch (fixup.kind) {
@@ -225,6 +232,8 @@ fn buildObjectWithOptionalModuleContext(
     const strtab_name = try appendString(&shstrtab, allocator, ".strtab");
     const shstrtab_name = try appendString(&shstrtab, allocator, ".shstrtab");
     const rela_data_name = if (data_relocations.items.len != 0) try appendString(&shstrtab, allocator, ".rela.data") else 0;
+    const rodata_name = if (rodata.items.len != 0) try appendString(&shstrtab, allocator, ".rodata") else 0;
+    const rela_rodata_name = if (rodata_relocations.items.len != 0) try appendString(&shstrtab, allocator, ".rela.rodata") else 0;
 
     const ehdr_size: u64 = 64;
     var cursor = alignForward(ehdr_size, 16);
@@ -238,6 +247,9 @@ fn buildObjectWithOptionalModuleContext(
 
     const tdata_offset = cursor;
     cursor += tdata.items.len;
+    if (rodata.items.len != 0) cursor = alignForward(cursor, rodata_alignment);
+    const rodata_offset = cursor;
+    cursor += rodata.items.len;
     cursor = alignForward(cursor, 8);
 
     const rela_text_offset = cursor;
@@ -248,6 +260,9 @@ fn buildObjectWithOptionalModuleContext(
     const rela_data_offset = cursor;
     const rela_data_size = data_relocations.items.len * 24;
     cursor += rela_data_size;
+    const rela_rodata_offset = cursor;
+    const rela_rodata_size = rodata_relocations.items.len * 24;
+    cursor += rela_rodata_size;
 
     const symtab_offset = cursor;
     const symtab_entry_count = symbols.items.len + 1;
@@ -262,7 +277,7 @@ fn buildObjectWithOptionalModuleContext(
     cursor = alignForward(cursor, 8);
     const shoff = cursor;
 
-    const section_count: u16 = if (data_relocations.items.len == 0) 8 else 9;
+    const section_count: u16 = 8 + @as(u16, @intFromBool(rodata.items.len != 0)) + @as(u16, @intFromBool(data_relocations.items.len != 0)) + @as(u16, @intFromBool(rodata_relocations.items.len != 0));
     const total_size = shoff + section_count * 64;
     var object = try allocator.alloc(u8, total_size);
     errdefer allocator.free(object);
@@ -272,8 +287,10 @@ fn buildObjectWithOptionalModuleContext(
     @memcpy(object[text_offset..][0..text.items.len], text.items);
     @memcpy(object[data_offset..][0..data.items.len], data.items);
     @memcpy(object[tdata_offset..][0..tdata.items.len], tdata.items);
+    @memcpy(object[rodata_offset..][0..rodata.items.len], rodata.items);
     writeRelocationTable(object[rela_text_offset..][0..rela_text_size], relocations.items);
     writeRelocationTable(object[rela_data_offset..][0..rela_data_size], data_relocations.items);
+    writeRelocationTable(object[rela_rodata_offset..][0..rela_rodata_size], rodata_relocations.items);
     writeSymbolTable(object[symtab_offset..][0..symtab_size], symbols.items, symbol_name_offsets);
     @memcpy(object[strtab_offset..][0..strtab.items.len], strtab.items);
     @memcpy(object[shstrtab_offset..][0..shstrtab.items.len], shstrtab.items);
@@ -291,14 +308,40 @@ fn buildObjectWithOptionalModuleContext(
     for (sections, 0..) |section, index| {
         writeSectionHeader(object[shoff + index * 64 ..][0..64], section);
     }
-    if (data_relocations.items.len != 0) writeSectionHeader(object[shoff + 8 * 64 ..][0..64], .{
-        .name_offset = rela_data_name,
+    var next_section: usize = 8;
+    if (rodata.items.len != 0) {
+        writeSectionHeader(object[shoff + next_section * 64 ..][0..64], .{
+            .name_offset = rodata_name,
+            .kind = 1,
+            .flags = 0x2,
+            .offset = rodata_offset,
+            .size = rodata.items.len,
+            .addralign = rodata_alignment,
+        });
+        next_section += 1;
+    }
+    if (data_relocations.items.len != 0) {
+        writeSectionHeader(object[shoff + next_section * 64 ..][0..64], .{
+            .name_offset = rela_data_name,
+            .kind = 4,
+            .flags = 0,
+            .offset = rela_data_offset,
+            .size = rela_data_size,
+            .link = 5,
+            .info = 2,
+            .addralign = 8,
+            .entsize = 24,
+        });
+        next_section += 1;
+    }
+    if (rodata_relocations.items.len != 0) writeSectionHeader(object[shoff + next_section * 64 ..][0..64], .{
+        .name_offset = rela_rodata_name,
         .kind = 4,
         .flags = 0,
-        .offset = rela_data_offset,
-        .size = rela_data_size,
+        .offset = rela_rodata_offset,
+        .size = rela_rodata_size,
         .link = 5,
-        .info = 2,
+        .info = 8,
         .addralign = 8,
         .entsize = 24,
     });
@@ -315,6 +358,8 @@ fn appendReachableGlobals(
     data_alignment: *u32,
     tdata: *std.ArrayList(u8),
     tdata_alignment: *u32,
+    rodata: *std.ArrayList(u8),
+    rodata_alignment: *u32,
     fixups: *std.ArrayList(DataFixup),
     symbols: *std.ArrayList(Symbol),
     indices: *symbol_names.Index,
@@ -333,6 +378,13 @@ fn appendReachableGlobals(
     defer seen.deinit();
     if (context.emit_all_globals) {
         for (context.globals) |global| try queue.append(allocator, global.name);
+    } else {
+        // Keep legacy unannotated data placement byte-identical. An explicit
+        // read-only section always goes through the owned section path.
+        for (context.globals) |global| {
+            const properties = symbol_address.globalProperties(global) catch continue;
+            if (properties.read_only_section) try queue.append(allocator, global.name);
+        }
     }
     for (functions) |function| for (function.instructions.items) |instruction| switch (instruction) {
         .lea_global_offset_rax, .tls_address_rax => |address| {
@@ -397,8 +449,8 @@ fn appendReachableGlobals(
             globalPlacementFailure(name, "tls_relocations", 0, decoded.relocations.len, 0);
             return error.UnsupportedTlsInitializer;
         }
-        const section = if (properties.tls) tdata else data;
-        const section_alignment = if (properties.tls) tdata_alignment else data_alignment;
+        const section = if (properties.tls) tdata else if (properties.read_only_section) rodata else data;
+        const section_alignment = if (properties.tls) tdata_alignment else if (properties.read_only_section) rodata_alignment else data_alignment;
         // Zero-sized symbol placement depends on section/linkage conventions.
         // Keep it outside this ordinary, nonempty global-object envelope.
         if (decoded.bytes.len == 0) {
@@ -418,13 +470,13 @@ fn appendReachableGlobals(
             .name = global.name,
             .value = start,
             .size = decoded.bytes.len,
-            .section_index = if (properties.tls) 3 else 2,
+            .section_index = if (properties.tls) 3 else if (properties.read_only_section) 8 else 2,
             .info = @as(u8, if (decoded.local) 0 else 0x10) | @as(u8, if (properties.tls) 6 else 1),
             .other = decoded.visibility,
         });
         try indices.put(global.name, @intCast(symbols.items.len));
         for (decoded.relocations) |relocation| {
-            try fixups.append(allocator, .{ .offset = start + relocation.offset, .address = relocation.address, .block = relocation.block, .kind = relocation.kind, .bias = relocation.bias });
+            try fixups.append(allocator, .{ .offset = start + relocation.offset, .read_only_section = properties.read_only_section, .address = relocation.address, .block = relocation.block, .kind = relocation.kind, .bias = relocation.bias });
             try queue.append(allocator, relocation.address.symbol);
         }
     }
@@ -449,6 +501,8 @@ pub const GlobalPlacement = struct {
     data_alignment: u32,
     tls_bytes: usize,
     tls_alignment: u32,
+    read_only_bytes: usize,
+    read_only_alignment: u32,
     symbols: usize,
     relocations: usize,
     symbol_budget: usize,
@@ -462,6 +516,8 @@ pub fn inspectGlobalPlacement(allocator: std.mem.Allocator, context: x86_64.Read
     defer data.deinit(allocator);
     var tls: std.ArrayList(u8) = .empty;
     defer tls.deinit(allocator);
+    var rodata: std.ArrayList(u8) = .empty;
+    defer rodata.deinit(allocator);
     var fixups: std.ArrayList(DataFixup) = .empty;
     defer fixups.deinit(allocator);
     var symbols: std.ArrayList(Symbol) = .empty;
@@ -470,8 +526,9 @@ pub fn inspectGlobalPlacement(allocator: std.mem.Allocator, context: x86_64.Read
     defer indices.deinit();
     var data_alignment: u32 = 16;
     var tls_alignment: u32 = 4;
-    try appendReachableGlobals(allocator, &data, &data_alignment, &tls, &tls_alignment, &fixups, &symbols, &indices, &.{}, context.aliases, context);
-    return .{ .data_bytes = data.items.len, .data_alignment = data_alignment, .tls_bytes = tls.items.len, .tls_alignment = tls_alignment, .symbols = symbols.items.len, .relocations = fixups.items.len, .symbol_budget = try globalSymbolBudget(context.globals.len, context.aliases.len, context.functions.len, context.declarations.len) };
+    var rodata_alignment: u32 = 16;
+    try appendReachableGlobals(allocator, &data, &data_alignment, &tls, &tls_alignment, &rodata, &rodata_alignment, &fixups, &symbols, &indices, &.{}, context.aliases, context);
+    return .{ .data_bytes = data.items.len, .data_alignment = data_alignment, .tls_bytes = tls.items.len, .tls_alignment = tls_alignment, .read_only_bytes = rodata.items.len, .read_only_alignment = rodata_alignment, .symbols = symbols.items.len, .relocations = fixups.items.len, .symbol_budget = try globalSymbolBudget(context.globals.len, context.aliases.len, context.functions.len, context.declarations.len) };
 }
 
 test "ELF global symbol budgets preserve a checked module envelope" {
@@ -514,6 +571,48 @@ test "ELF global placement retains the exact section byte boundary" {
     try std.testing.expectError(error.UnsupportedGlobalData, inspectGlobalPlacement(std.testing.allocator, .{ .globals = &globals, .named_types = &.{}, .target_datalayout = null, .emit_all_globals = true }));
 }
 
+test "ELF explicit read-only globals keep section permissions alignment symbols and relocation ownership" {
+    const a = std.testing.allocator;
+    var module = try ir.Module.parse(a, "@w = global i32 17, section \".data\", align 4\n" ++
+        "@r = constant <2 x i32> <i32 1, i32 2>, section \".rodata\", align 32\n" ++
+        "@p = constant ptr @w, section \".rodata\", align 8\n" ++
+        "@q = global ptr @r, section \".data\", align 8\n");
+    defer module.deinit();
+    try module.verify();
+    const object = try buildObjectWithModuleContext(a, &.{}, &.{}, .{
+        .globals = module.globals.items,
+        .named_types = &.{},
+        .target_datalayout = null,
+        .emit_all_globals = true,
+    });
+    defer a.free(object);
+    const read = struct {
+        fn int(comptime T: type, bytes: []const u8, offset: usize) T {
+            return std.mem.readInt(T, bytes[offset..][0..@sizeOf(T)], .little);
+        }
+    }.int;
+    const shoff: usize = @intCast(read(u64, object, 40));
+    try std.testing.expectEqual(@as(u16, 11), read(u16, object, 60));
+    const ro = object[shoff + 8 * 64 ..][0..64];
+    try std.testing.expectEqual(@as(u64, 2), read(u64, ro, 8));
+    try std.testing.expectEqual(@as(u64, 32), read(u64, ro, 48));
+    const ro_offset: usize = @intCast(read(u64, ro, 24));
+    try std.testing.expectEqual(@as(u64, 16), read(u64, ro, 32));
+    try std.testing.expectEqualSlices(u8, &.{ 1, 0, 0, 0, 2, 0, 0, 0 }, object[ro_offset..][0..8]);
+    const data_rela = object[shoff + 9 * 64 ..][0..64];
+    const ro_rela = object[shoff + 10 * 64 ..][0..64];
+    try std.testing.expectEqual(@as(u32, 2), read(u32, data_rela, 44));
+    try std.testing.expectEqual(@as(u32, 8), read(u32, ro_rela, 44));
+    for ([_][]const u8{ data_rela, ro_rela }) |section| {
+        try std.testing.expectEqual(@as(u64, 24), read(u64, section, 32));
+        try std.testing.expectEqual(@as(u32, 5), read(u32, section, 40));
+    }
+    const symtab = object[shoff + 5 * 64 ..][0..64];
+    const symbols_offset: usize = @intCast(read(u64, symtab, 24));
+    const expected = [_]u16{ 2, 8, 8, 2 };
+    for (expected, 1..) |section, index| try std.testing.expectEqual(section, read(u16, object, symbols_offset + index * 24 + 6));
+}
+
 fn orderLocalSymbols(allocator: std.mem.Allocator, symbols: *std.ArrayList(Symbol), indices: *symbol_names.Index) !u32 {
     var count: u32 = 0;
     for (symbols.items) |symbol| if (symbol.info >> 4 == 0) {
@@ -549,6 +648,9 @@ fn appendSupportedGlobals(
 ) !void {
     for (globals) |global| {
         if (symbol_indices.contains(global.name)) continue;
+        if (symbol_address.globalProperties(global) catch null) |properties| {
+            if (properties.read_only_section) return error.UnsupportedGlobalData;
+        }
         if (module_context) |context| if (try constant_table.decodeGlobal(allocator, context, global)) |decoded_value| {
             var decoded = decoded_value;
             defer decoded.deinit(allocator);

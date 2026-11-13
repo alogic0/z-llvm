@@ -126,7 +126,8 @@ fn laneIntrinsic(allocator: std.mem.Allocator, call: ir.CallInst) !?[]const u8 {
         // envelope. New lane operations use the proved scalar<=64 contracts.
         const pair_scalar = s.bits == 128 and (std.mem.eql(u8, name, "uadd.sat") or std.mem.eql(u8, name, "usub.sat") or
             std.mem.eql(u8, name, "sadd.sat") or std.mem.eql(u8, name, "ssub.sat") or std.mem.eql(u8, name, "umin") or
-            std.mem.eql(u8, name, "umax") or std.mem.eql(u8, name, "smin") or std.mem.eql(u8, name, "smax"));
+            std.mem.eql(u8, name, "umax") or std.mem.eql(u8, name, "smin") or std.mem.eql(u8, name, "smax") or
+            std.mem.eql(u8, name, "ctlz") or std.mem.eql(u8, name, "cttz"));
         if (s.bits > 64 and !pair_scalar and !std.mem.eql(u8, name, "fshl") and !std.mem.eql(u8, name, "bswap") and !std.mem.eql(u8, name, "ctpop") and !std.mem.eql(u8, name, "usub.sat")) return error.UnsupportedIntegerVector;
         if (std.mem.eql(u8, name, "bswap") and s.bits % 16 != 0) return error.UnsupportedIntegerVector;
         if (call.args.items.len != arity or call.callee_value != null or call.callee_function_ty != null or
@@ -517,7 +518,10 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                         if (!std.mem.startsWith(u8, text, "align ")) return error.UnsupportedIntegerVector;
                         alignment = @max(alignment, std.fmt.parseUnsigned(u32, text[6..], 10) catch return error.UnsupportedIntegerVector);
                     }
-                    if (alignment > 4096 or alignment == 0 or !std.math.isPowerOfTwo(alignment) or (alignment > 16 and natural > 512)) return error.UnsupportedIntegerVector;
+                    if (alignment > 4096 or alignment == 0 or !std.math.isPowerOfTwo(alignment)) return error.UnsupportedIntegerVector;
+                    // The 1 KiB local vector becomes an ordinary i32 array.
+                    // aligned_stack owns its bounded over-allocation/rounding.
+                    if (alignment > 16 and natural > 512 and !(natural == 1024 and s.len == 64 and s.bits == 128)) return error.UnsupportedIntegerVector;
                     var copy = inst;
                     copy.kind.alloca.allocated_ty = .{ .aggregate = try std.fmt.allocPrint(allocator, "[{d} x i32]", .{@max(natural, 4) / 4}) };
                     copy.kind.alloca.attrs = try std.fmt.allocPrint(allocator, "align {d}", .{@max(alignment, 4)});
@@ -534,6 +538,19 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                             .ptr = try b.address(load.ptr, i * (s.bits / 8)),
                             .attrs = .{ .@"align" = 1 },
                         } });
+                    } else if (s.len * s.bits > 128 and (s.bits == 4 or s.bits == 5)) {
+                        for (lanes.values[0..s.len], 0..) |*lane, index| {
+                            const bit = index * s.bits;
+                            const first = try b.emit(.{ .load = .{ .ty = .{ .int = 8 }, .ptr = try b.address(load.ptr, bit / 8), .attrs = .{ .@"align" = 1 } } });
+                            var word = try b.cast(.zext, .{ .int = 8 }, first, .{ .int = 64 });
+                            if (bit % 8 + s.bits > 8) {
+                                const next = try b.emit(.{ .load = .{ .ty = .{ .int = 8 }, .ptr = try b.address(load.ptr, bit / 8 + 1), .attrs = .{ .@"align" = 1 } } });
+                                const high = try b.binary(.shl, .{ .int = 64 }, try b.cast(.zext, .{ .int = 8 }, next, .{ .int = 64 }), .{ .int = 8 });
+                                word = try b.binary(.@"or", .{ .int = 64 }, word, high);
+                            }
+                            if (bit % 8 != 0) word = try b.binary(.lshr, .{ .int = 64 }, word, .{ .int = @intCast(bit % 8) });
+                            lane.* = try b.cast(.trunc, .{ .int = 64 }, word, s.scalar());
+                        }
                     } else {
                         const bits = s.len * s.bits;
                         if (bits == 8 or bits == 16 or bits == 32 or bits == 64 or bits == 128) {
@@ -567,6 +584,18 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                             .ptr = try b.address(store.ptr, i * (s.bits / 8)),
                             .attrs = .{ .@"align" = 1 },
                         } } });
+                    } else if (s.len * s.bits > 128 and (s.bits == 4 or s.bits == 5)) {
+                        for (0..(s.len * s.bits + 7) / 8) |byte| {
+                            var word: ir.Value = .{ .int = 0 };
+                            for (lanes.values[0..s.len], 0..) |lane, index| {
+                                const bit = index * s.bits;
+                                if (bit >= byte * 8 + 8 or bit + s.bits <= byte * 8) continue;
+                                var part = try b.cast(.zext, s.scalar(), try defined(lane, s.scalar()), .{ .int = 64 });
+                                if (bit < byte * 8) part = try b.binary(.lshr, .{ .int = 64 }, part, .{ .int = @intCast(byte * 8 - bit) }) else if (bit > byte * 8) part = try b.binary(.shl, .{ .int = 64 }, part, .{ .int = @intCast(bit - byte * 8) });
+                                word = try b.binary(.@"or", .{ .int = 64 }, word, part);
+                            }
+                            try block.instructions.append(allocator, .{ .result = null, .kind = .{ .store = .{ .ty = .{ .int = 8 }, .value = try b.cast(.trunc, .{ .int = 64 }, word, .{ .int = 8 }), .ptr = try b.address(store.ptr, byte), .attrs = .{ .@"align" = 1 } } } });
+                        }
                     } else {
                         const bits = s.len * s.bits;
                         const carrier: ir.Type = .{ .int = if (bits > 64) 128 else 64 };
@@ -869,7 +898,7 @@ fn checkedVector(call: ir.CallInst) ?CheckedVector {
         call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
     const ty = call.args.items[0].ty;
     const s = shape(ty) orelse return null;
-    if (s.pointer or (s.bits != 8 and s.bits != 16 and s.bits != 32)) return null;
+    if (s.pointer or (s.bits != 1 and s.bits != 8 and s.bits != 16 and s.bits != 32)) return null;
     for (call.args.items) |arg| if (!arg.ty.eql(ty) or arg.attrs != null) return null;
     abi.rejectUnsupportedCallEnvelope(call) catch return null;
     var buffer: [96]u8 = undefined;

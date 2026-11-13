@@ -175,6 +175,13 @@ pub fn main(init: std.process.Init) !void {
     var module = try ir.Module.parse(a, input);
     defer module.deinit();
     try module.verify();
+    // Production selects owned module-wide ABI views for proved direct-only
+    // internal vector callees. Census the same views, retaining every original
+    // name and denominator. Their arena outlives all borrowed selections.
+    var view_arena = std.heap.ArenaAllocator.init(a);
+    defer view_arena.deinit();
+    const private_view = try @import("codegen/x86_64/closed_vector_calls.zig").prepare(view_arena.allocator(), module);
+    const functions = if (private_view) |view| view.functions else module.functions.items;
     const file = try std.Io.Dir.cwd().createFile(init.io, args[2], .{ .exclusive = true });
     defer file.close(init.io);
     var buffer: [65536]u8 = undefined;
@@ -188,7 +195,7 @@ pub fn main(init: std.process.Init) !void {
         .aliases = module.aliases.items,
         .named_types = module.named_types.items,
         .target_datalayout = module.target_datalayout,
-        .functions = module.functions.items,
+        .functions = functions,
         .declarations = module.declarations.items,
         .emit_all_globals = true,
         .require_resolved_aliases = true,
@@ -198,7 +205,7 @@ pub fn main(init: std.process.Init) !void {
     var observer: observations.Observer = .{ .context = &capture, .reset_fn = Capture.reset, .reject_fn = Capture.reject };
     var selected: usize = 0;
     var failed: usize = 0;
-    for (module.functions.items) |function| {
+    for (functions) |function| {
         if (names) |filters| {
             const matches = for (filters) |name| {
                 if (ir.identifiers.eql(function.name, name)) break true;

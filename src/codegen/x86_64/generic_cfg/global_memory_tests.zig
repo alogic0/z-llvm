@@ -371,7 +371,7 @@ test "global address fixture keeps composed ownership and emits data relocations
 }
 
 test "referenced unsupported globals fail instead of becoming external imports" {
-    const source = "@bad = internal global <2 x i32> zeroinitializer\n@ignored = global { ptr } { ptr @missing }";
+    const source = "@bad = internal global <2 x ptr> zeroinitializer\n@ignored = global { ptr } { ptr @missing }";
     var module = try ir.Module.parse(std.testing.allocator, source);
     defer module.deinit();
     const ctx: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };

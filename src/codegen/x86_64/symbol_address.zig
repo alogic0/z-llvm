@@ -4,10 +4,29 @@ const ir = @import("../../ir.zig");
 const target = @import("../../target.zig");
 
 pub const Address = struct { symbol: []const u8, addend: i32 = 0 };
-pub const GlobalProperties = struct { alignment: ?u32 = null, local: bool = false, visibility: u8 = 0, tls: bool = false };
+pub const GlobalProperties = struct { alignment: ?u32 = null, local: bool = false, visibility: u8 = 0, tls: bool = false, read_only_section: bool = false };
 
 pub fn globalProperties(global: ir.Global) !GlobalProperties {
     return checkedGlobalProperties(global) catch return error.UnsupportedSymbolicGlobal;
+}
+
+test "global standard sections must match owned storage and reject duplicates and TLS" {
+    const a = std.testing.allocator;
+    var module = try ir.Module.parse(a, "@w = global i32 7, section \".data\", align 4\n@r = constant i32 9, section \".rodata\", align 4\n");
+    defer module.deinit();
+    try module.verify();
+    for (module.globals.items) |global| {
+        try std.testing.expectEqual(global.kind == .constant, (try globalProperties(global)).read_only_section);
+        var copy = global;
+        copy.attrs = "section \".data\", section \".data\"";
+        try std.testing.expectError(error.UnsupportedSymbolicGlobal, globalProperties(copy));
+        copy = global;
+        copy.address_attrs = "thread_local";
+        try std.testing.expectError(error.UnsupportedSymbolicGlobal, globalProperties(copy));
+        copy = global;
+        copy.attrs = if (global.kind == .constant) "section \".data\"" else "section \".rodata\"";
+        try std.testing.expectError(error.UnsupportedSymbolicGlobal, globalProperties(copy));
+    }
 }
 
 /// Read-only diagnostic detail from the same property contract used by emission.
@@ -35,6 +54,7 @@ fn checkedGlobalProperties(global: ir.Global) !GlobalProperties {
             !std.mem.eql(u8, attr, "dso_local") and !std.mem.eql(u8, attr, "dso_preemptable"))
             return error.UnsupportedGlobalAddressAttribute;
     }
+    var section_seen = false;
     var attributes = std.mem.splitScalar(u8, global.attrs orelse "", ',');
     while (attributes.next()) |raw| {
         const attr = trim(raw);
@@ -44,6 +64,14 @@ fn checkedGlobalProperties(global: ir.Global) !GlobalProperties {
             const alignment = std.fmt.parseUnsigned(u32, trim(attr[6..]), 10) catch return error.InvalidGlobalAlignment;
             if (alignment == 0 or alignment > 4096 or !std.math.isPowerOfTwo(alignment)) return error.UnsupportedGlobalAlignment;
             result.alignment = alignment;
+        } else if (std.mem.startsWith(u8, attr, "section ")) {
+            if (section_seen or result.tls) return error.UnsupportedGlobalAttribute;
+            // Admit only the two explicitly owned ordinary data sections.
+            // The ELF emitter must honor read-only placement independently.
+            const expected = if (global.kind == .constant) "section \".rodata\"" else "section \".data\"";
+            if (!std.mem.eql(u8, attr, expected)) return error.UnsupportedGlobalAttribute;
+            result.read_only_section = global.kind == .constant;
+            section_seen = true;
         } else if (std.mem.startsWith(u8, attr, "!dbg !")) {
             _ = std.fmt.parseUnsigned(u32, attr[6..], 10) catch return error.InvalidGlobalDebugAttachment;
         } else return error.UnsupportedGlobalAttribute;
