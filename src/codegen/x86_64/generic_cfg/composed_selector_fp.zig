@@ -41,6 +41,12 @@ pub fn lowerFpBinary(selector: *ComposedBlockSelector, result: ?[]const u8, bina
     }
     const result_name = result orelse return .{ .unsupported_value = "composed-block-missing-result" };
     if (binary.ty == .half) {
+        // Half addition calls the conversion provider. Protect caller values
+        // before literal preparation expands through EAX, using the existing
+        // call boundary while leaving its frozen residual body unchanged.
+        if (binary.op == .fadd and halfLiteralFloatBits(binary.lhs) != null and halfLiteralFloatBits(binary.rhs) != null) {
+            if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
+        }
         // Snapshotting a spilled RHS uses XMM0. Keep the simultaneous LHS
         // available through its final use when it currently occupies XMM0.
         const lhs = fpValueReg(selector, binary.lhs, 16);
@@ -84,16 +90,12 @@ fn lowerHalfFadd(selector: *ComposedBlockSelector, result_name: []const u8, bina
         const named_value = if (lhs_named) binary.lhs else binary.rhs;
         const literal_value = if (lhs_named) binary.rhs else binary.lhs;
         if (try lowerHalfValueToFloatXmm0(selector, named_value)) |diagnostic| return diagnostic;
-        try selector_state.clobberAccumulator(selector);
         try selector_state.clobberXmmReg(selector, .xmm1);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm1, .bits = halfLiteralFloatBits(literal_value).? } });
         try selector_state.clobberXmmReg(selector, .xmm0);
         try selector.machine.instructions.append(selector.allocator, .{ .addss_xmm = .{ .dst = .xmm0, .src = .xmm1 } });
         sum_reg = .xmm0;
     } else {
-        // Loading an FP immediate uses EAX in the machine expansion. Preserve
-        // live integer/boolean values before either literal can overwrite it.
-        try selector_state.clobberAccumulator(selector);
         try selector_state.clobberXmmReg(selector, .xmm0);
         try selector_state.clobberXmmReg(selector, .xmm1);
         try selector.machine.instructions.append(selector.allocator, .{ .mov_imm32_xmm = .{ .reg = .xmm0, .bits = halfLiteralFloatBits(binary.lhs).? } });

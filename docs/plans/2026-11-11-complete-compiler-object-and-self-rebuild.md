@@ -745,6 +745,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    Half literal arithmetic now preserves live integer and boolean accumulator
    values before loading FP constants through EAX. The former ordering spilled
    overwritten constant bits and broke composed vector-reduction conditions.
+   The existing call boundary performs this preservation before operand
+   preparation, retaining the frozen residual function byte-for-byte. The
+   preceding freeze failed its fingerprint guard and remains unaccepted.
+   Unit commands now record the candidate working directory explicitly so
+   filesystem-based source guards inspect the source being qualified.
    A focused executable regression checks 32-/64-bit values and aliases; 72
    independent native cases cover live booleans, scalar/vector half addition,
    loaded/literal seeds, signed zero, infinities, NaNs and clobbering calls.
