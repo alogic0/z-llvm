@@ -191,7 +191,10 @@ Old receipts lacking that field require a nonempty
 `legacy_working_directory_review` in the plan, documenting the operator's review
 of the copied project, launch evidence and cache layout. This is an explicit
 ownership declaration, not inferred historical cwd evidence. The copied project
-must also contain owned regular `.zigversion` and `src/main.zig` markers.
+must also contain an owned regular `.zigversion` and an owned `src` directory
+or symlink. The source marker is inspected without following it; older test
+projects intentionally link to a separate research tree. That tree is neither
+reconstructed nor changed by cache retirement.
 
 Supported commands directly invoke Zig `test`, `build`, `build-exe`, `build-lib`
 or `build-obj`, optionally through `env`. Cache paths must appear in

@@ -500,6 +500,24 @@ test "storage cleanup: legacy cache cwd requires explicit review and modern cwd 
     try t.expectError(error.CacheWorkingDirectoryMismatch, private_cache.request(&modern, .{ .producer = run ++ "/evidence/unit.json", .run_root = run, .working_directory = run ++ "/different", .legacy_working_directory_review = "Cannot override a recorded cwd" }, "Temporary cache"));
 }
 
+test "storage cleanup: copied test project may link source outside its private cache" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    const record = try f.privateCache(&initial, true, 1, false);
+    try f.tmp.dir.rename(run ++ "/src", f.tmp.dir, run ++ "/original-source", t.io);
+    try f.tmp.dir.symLink(t.io, "original-source", run ++ "/src", .{ .is_directory = true });
+    try initial.write(run ++ "/storage-release.json", record);
+    var e = f.engine();
+    try e.discover();
+    try e.qualify(0);
+    try mutation.apply(&e, 0);
+    try t.expectError(error.FileNotFound, e.metadata(run ++ "/evidence/zig-local-Debug-v1"));
+    try t.expectEqual(.symlink, (try e.metadata(run ++ "/src")).kind);
+    _ = try e.metadata(run ++ "/original-source/main.zig");
+    _ = try e.metadata(run ++ "/evidence/unit.log");
+}
+
 test "storage cleanup: private caches reject nonterminal producers missing logs and other release states" {
     for (0..3) |case| {
         const f = try Fixture.init();

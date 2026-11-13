@@ -69,10 +69,13 @@ fn owner(e: *core.Engine, run: []const u8, producer: []const u8, binding: p.Cach
         // review of this copied project, its logs and matching private layout.
         const review = binding.legacy_working_directory_review orelse return error.MissingCacheWorkingDirectory;
         if (review.len == 0) return error.MissingCacheWorkingDirectory;
-        for ([_][]const u8{ ".zigversion", "src/main.zig" }) |marker| {
-            const m = try e.metadata(try e.c.fmt("{s}/{s}", .{ cwd, marker }));
-            if (m.kind != .file or m.uid != std.os.linux.getuid()) return error.UnboundPrivateCacheOwner;
-        }
+        const version = try e.metadata(try e.c.fmt("{s}/.zigversion", .{cwd}));
+        if (version.kind != .file or version.uid != std.os.linux.getuid()) return error.UnboundPrivateCacheOwner;
+        // prepare_unit_project links src to the research tree. Inspect the
+        // owned marker itself, never traverse or retain that source tree just
+        // to retire a private cache. Cache paths still reject every symlink.
+        const source = try e.metadata(try e.c.fmt("{s}/src", .{cwd}));
+        if ((source.kind != .directory and source.kind != .symlink) or source.uid != std.os.linux.getuid()) return error.UnboundPrivateCacheOwner;
     }
     const log = try e.relative(try core.str(v, "log"));
     if (!p.within(run, log) or std.mem.eql(u8, run, log)) return error.UnboundPrivateCacheLog;
