@@ -582,7 +582,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 @memset(&xmm_defined_bits, 0);
             },
             .direct_jump => {
-                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                if (!@import("verify_tail_calls.zig").ownsLegacyDirectJump(function, instruction_index) and rsp_mod16 != 8) return error.UnbalancedStackFrame;
                 saw_terminator = true;
             },
             .tail_jump_rax => {

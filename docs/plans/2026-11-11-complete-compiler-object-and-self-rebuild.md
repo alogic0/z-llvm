@@ -606,8 +606,16 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    A preceding full unit run caught call-transaction code moved outside its
    required owner function; retain that failure. The corrected source keeps
    the protected code in its original function and passes the unchanged guards.
+   The first cumulative Small-runtime replay exposed new tail checks applied
+   across a legacy opaque frame sequence. Preserve that failed replay and the
+   superseded jobs. A two-file repair recognizes only the exact seven-instruction
+   legacy remainder envelope and keeps its existing typed frame checks; all
+   other direct and indirect tails retain the full-depth proof. Both 2,314-test
+   builds and all six native runs pass, including 162 faults. Both fresh
+   503-definition Small-runtime objects match the accepted bytes exactly; the
+   original Debug selection and its fourteen failures remain unchanged.
    **Adopted for fresh cumulative validation.** Freeze the committed source,
-   repeat both official 2,312-unit builds, all eight readiness procedures,
+   repeat both official 2,314-unit builds, all eight readiness procedures,
    all 17 gates, both complete 196-population native suites and all 5,158
    required fault controls. Compare against every accepted 193-population
    outcome and artifact; repeat original compiler/runtime production and all
