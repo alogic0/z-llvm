@@ -1,6 +1,6 @@
 # Retire completed validation runs
 
-Status: first execution complete. Further investigations are listed below.
+Status: first execution complete; remaining-storage investigation in progress.
 Requested by the user on 2026-11-13.
 
 ## Objective and starting measurements
@@ -197,6 +197,19 @@ purpose review. The largest filename/mode families are executables
 (24,126,558,208 bytes); these classifications do not prove necessity.
 
 ## Remaining investigations and operating budget
+
+Second execution, requested by the user: investigate the remaining file groups,
+review the 37 closed compiler builds, establish ownership of legacy private test
+caches, and examine the large trace/input/record families. Extend the reusable
+collector where a verified lifecycle is missing. Keep current holds and baselines,
+record concrete reasons for unresolved files, and collect newly verified
+temporary outputs under the existing authorization.
+
+The [remaining-storage investigation](2026-11-13-remaining-storage-investigation.md)
+records the second execution's concrete purposes, completed removals and fresh
+verification. All 37 compiler outputs and four new private compiler caches are
+now removed (3.91 GiB). The private native-test cache adapter qualifies another
+70 roots (10.29 GiB) while preserving current held test projects and diagnostics.
 
 The unclassified executable allocation includes private native-test caches such
 as `sign-extension-units-v1035/evidence/zig-local-Debug-v1039`. Its run receipt
