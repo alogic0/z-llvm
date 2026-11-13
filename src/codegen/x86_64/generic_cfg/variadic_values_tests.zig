@@ -80,3 +80,43 @@ test "variadic floating cursor crosses eight SSE registers into incoming stack" 
     try std.testing.expectEqual(@as(f64, 55), run(10, @as(f64, 1), @as(f64, 2), @as(f64, 3), @as(f64, 4), @as(f64, 5), @as(f64, 6), @as(f64, 7), @as(f64, 8), @as(f64, 9), @as(f64, 10)));
     try module.verify();
 }
+
+test "annotated variadic pointers preserve independent copied cursors and overflow arguments" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\declare void @llvm.va_start.p0(ptr)
+        \\declare void @llvm.va_copy.p0(ptr,ptr)
+        \\declare void @llvm.va_end.p0(ptr)
+        \\attributes #7 = { nounwind }
+        \\define i64 @sum(i32 %count, ...) {
+        \\entry:
+        \\ %list = alloca [24 x i8],align 16
+        \\ %copy = alloca [24 x i8],align 16
+        \\ call void @llvm.va_start.p0(ptr noundef nonnull align 16 dereferenceable(24) %list) #7
+        \\ call void @llvm.va_copy.p0(ptr nonnull %copy,ptr noundef nonnull align 16 dereferenceable(24) %list) #7
+        \\ %first = va_arg ptr %list,i64
+        \\ br label %loop
+        \\loop:
+        \\ %i = phi i32 [0,%entry],[%next,%loop]
+        \\ %sum = phi i64 [0,%entry],[%added,%loop]
+        \\ %value = va_arg ptr %copy,i64
+        \\ %added = add i64 %sum,%value
+        \\ %next = add i32 %i,1
+        \\ %again = icmp ult i32 %next,%count
+        \\ br i1 %again,label %loop,label %exit
+        \\exit:
+        \\ call void @llvm.va_end.p0(ptr nonnull %copy) #7
+        \\ call void @llvm.va_end.p0(ptr nonnull %list) #7
+        \\ %answer = add i64 %added,%first
+        \\ ret i64 %answer
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    const memory = try executable(module);
+    defer std.posix.munmap(memory);
+    const run: *const fn (u32, ...) callconv(.c) u64 = @ptrCast(memory.ptr);
+    try std.testing.expectEqual(@as(u64, 22), run(1, @as(u64, 11)));
+    try std.testing.expectEqual(@as(u64, 56), run(10, @as(u64, 1), @as(u64, 2), @as(u64, 3), @as(u64, 4), @as(u64, 5), @as(u64, 6), @as(u64, 7), @as(u64, 8), @as(u64, 9), @as(u64, 10)));
+    try std.testing.expectEqualStrings("noundef nonnull align 16 dereferenceable(24)", module.functions.items[0].blocks.items[0].instructions.items[2].kind.call.args.items[0].attrs.?);
+    try module.verify();
+}

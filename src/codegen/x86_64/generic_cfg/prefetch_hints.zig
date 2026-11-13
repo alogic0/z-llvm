@@ -13,8 +13,9 @@ fn valid(inst: ir.Instruction) bool {
         call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null or call.native_query != null)
         return false;
     if (call.tail_kind) |tail| if (!std.mem.eql(u8, tail, "tail") and !std.mem.eql(u8, tail, "notail")) return false;
+    @import("../sysv_abi.zig").rejectUnsupportedCallEnvelope(call) catch return false;
     const address = call.args.items[0];
-    if (address.ty != .ptr or address.attrs != null or (address.value != .named and address.value != .null_value)) return false;
+    if (!@import("intrinsic_attrs.zig").pointerArgumentAdvisory(address) or (address.value != .named and address.value != .null_value)) return false;
     for (call.args.items[1..]) |arg| if (!arg.ty.eql(.{ .int = 32 }) or arg.attrs != null or arg.value != .int) return false;
     return call.args.items[1].value.int >= 0 and call.args.items[1].value.int <= 1 and
         call.args.items[2].value.int >= 0 and call.args.items[2].value.int <= 3 and call.args.items[3].value.int == 1;

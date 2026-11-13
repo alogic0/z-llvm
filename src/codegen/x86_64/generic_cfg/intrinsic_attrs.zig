@@ -2,6 +2,31 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const sysv = @import("../sysv_abi.zig");
 
+/// Pointer promises do not change the representation of an intrinsic operand.
+/// Keep ABI payloads excluded even where ordinary calls admit a private view.
+pub fn pointerArgumentAdvisory(arg: ir.CallArg) bool {
+    if (arg.ty != .ptr or arg.abi_x87_memory or arg.abi_split_integer) return false;
+    return if (arg.attrs) |attrs| sysv.pointerCallAttrsAreAdvisory(attrs) else true;
+}
+
+test "pointer intrinsic facts reuse checked promises and exclude ABI payloads" {
+    var arg: ir.CallArg = .{ .ty = .ptr, .value = .{ .named = "address" } };
+    for ([_]?[]const u8{ null, "nonnull", "noundef nonnull align 8 dereferenceable(24)", "nonnull readonly captures(none)", "dereferenceable_or_null(8)" }) |attrs| {
+        arg.attrs = attrs;
+        try std.testing.expect(pointerArgumentAdvisory(arg));
+    }
+    for ([_][]const u8{ "sret(i64)", "byval(i64)", "inreg", "returned", "align 3", "nonnull nonnull", "dereferenceable(-1)", "elementtype(i32)", "unknown" }) |attrs| {
+        arg.attrs = attrs;
+        try std.testing.expect(!pointerArgumentAdvisory(arg));
+    }
+    arg.attrs = null;
+    arg.ty = .{ .int = 64 };
+    try std.testing.expect(!pointerArgumentAdvisory(arg));
+    arg.ty = .ptr;
+    arg.abi_split_integer = true;
+    try std.testing.expect(!pointerArgumentAdvisory(arg));
+}
+
 /// Shared admission for scalar integer intrinsic facts. Each consumer still
 /// proves its exact intrinsic signature and operand forms. The ordinary ABI
 /// validators distinguish advisory facts from representation-changing promises.

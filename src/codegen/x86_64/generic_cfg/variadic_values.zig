@@ -14,7 +14,9 @@ const Builder = struct {
     source: ir.Function,
     names: *forms.TemporaryNames,
     block: *ir.BasicBlock,
-    fn name(b: Builder) ![]const u8 { return forms.temporary(b.a, b.source, b.names); }
+    fn name(b: Builder) ![]const u8 {
+        return forms.temporary(b.a, b.source, b.names);
+    }
     fn emit(b: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
         const next = try b.name();
         try b.block.instructions.append(b.a, .{ .result = next, .kind = kind });
@@ -25,7 +27,9 @@ const Builder = struct {
         try indices.append(b.a, .{ .ty = word, .value = displacement });
         return b.emit(.{ .gep = .{ .source_ty = .{ .int = 8 }, .ptr = ptr, .indices = indices } });
     }
-    fn at(b: Builder, ptr: ir.Value, displacement: i128) !ir.Value { return b.address(ptr, .{ .int = displacement }); }
+    fn at(b: Builder, ptr: ir.Value, displacement: i128) !ir.Value {
+        return b.address(ptr, .{ .int = displacement });
+    }
     fn load(b: Builder, ty: ir.Type, ptr: ir.Value) !ir.Value {
         return b.emit(.{ .load = .{ .ty = ty, .ptr = ptr } });
     }
@@ -41,7 +45,8 @@ fn intrinsic(call: ir.CallInst, name: []const u8, count: usize) bool {
     if (!ir.identifiers.eql(call.callee, name) or call.args.items.len != count or call.ret_ty != .void or
         call.callee_value != null or call.callee_function_ty != null or call.raw_args != null or call.inline_asm != null or
         call.calling_conv != null or call.ret_attrs != null or call.operand_bundle != null) return false;
-    for (call.args.items) |arg| if (arg.ty != .ptr or arg.attrs != null) return false;
+    abi.rejectUnsupportedCallEnvelope(call) catch return false;
+    for (call.args.items) |arg| if (!@import("intrinsic_attrs.zig").pointerArgumentAdvisory(arg)) return false;
     return true;
 }
 
@@ -51,7 +56,10 @@ fn setup(a: std.mem.Allocator, source: ir.Function) !?ir.Function {
     for (source.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.kind != .call) continue;
         const call = inst.kind.call;
-        if (intrinsic(call, "llvm.va_start.p0", 1)) { needed = true; start = true; }
+        if (intrinsic(call, "llvm.va_start.p0", 1)) {
+            needed = true;
+            start = true;
+        }
         if (intrinsic(call, "llvm.va_end.p0", 1) or intrinsic(call, "llvm.va_copy.p0", 2)) needed = true;
     };
     if (!needed or (start and !source.is_varargs) or source.blocks.items.len == 0) return null;
@@ -185,7 +193,9 @@ fn expandArgument(a: std.mem.Allocator, source: ir.Function) !?ir.Function {
             if (instruction.removed or instruction.kind != .phi) continue;
             var phi = &instruction.kind.phi;
             phi.incoming = try phi.incoming.clone(a);
-            for (phi.incoming.items) |*edge| if (ir.identifiers.eql(edge.block, original.name)) { edge.block = tail_name; };
+            for (phi.incoming.items) |*edge| if (ir.identifiers.eql(edge.block, original.name)) {
+                edge.block = tail_name;
+            };
         };
         return result;
     };

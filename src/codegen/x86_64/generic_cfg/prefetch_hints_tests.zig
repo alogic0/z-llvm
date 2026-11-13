@@ -67,3 +67,34 @@ test "prefetch hints reject unproved signatures and envelopes without partial re
         try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].blocks.items[0].instructions.items.len);
     }
 }
+
+test "annotated prefetch pointer facts keep the original operands and observable memory" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "nonnull", "noundef nonnull", "noundef nonnull align 8 dereferenceable(8)" }) |attrs| {
+        const source = try std.fmt.allocPrint(a, "declare void @llvm.prefetch.p0(ptr,i32,i32,i32)\nattributes #7 = {{ nounwind }}\n" ++
+            "define i64 @hint(ptr %address,ptr %out,i64 %value) {{\nentry:\n" ++
+            " call void @llvm.prefetch.p0(ptr {s} %address,i32 0,i32 3,i32 1) #7\n" ++
+            " store i64 %value,ptr %out,align 1\n ret i64 %value\n}}\n", .{attrs});
+        defer a.free(source);
+        var module = try ir.Module.parse(a, source);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var machine = try compilation.select(a, "x86_64-unknown-linux-gnu", original, .{ .generic_cfg_selector = true });
+        defer machine.deinit(a);
+        try verify.verifyFunction(machine);
+        const code = try encoding.encodeFunction(a, machine);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (*const u64, *u64, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        const input: u64 = 0xabcddcba;
+        var output: u64 = 0;
+        try std.testing.expectEqual(@as(u64, 0x123456789abcdef0), run(&input, &output, 0x123456789abcdef0));
+        try std.testing.expectEqual(@as(u64, 0x123456789abcdef0), output);
+        try std.testing.expectEqual(@as(u64, 0xabcddcba), input);
+        try std.testing.expectEqualStrings(attrs, original.blocks.items[0].instructions.items[0].kind.call.args.items[0].attrs.?);
+        try module.verify();
+    }
+}

@@ -806,8 +806,15 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                     }
                     value = lanes;
                 } else if (hasVectorCall(call)) {
-                    if (call.callee_value != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.tail_kind != null or std.mem.startsWith(u8, call.callee, "llvm.")) return error.UnsupportedIntegerVector;
+                    if (call.callee_value != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or std.mem.startsWith(u8, call.callee, "llvm.")) return error.UnsupportedIntegerVector;
+                    var envelope = call;
+                    if (shape(call.ret_ty) != null) envelope.ret_attrs = null;
+                    abi.rejectUnsupportedCallEnvelope(envelope) catch return error.UnsupportedIntegerVector;
                     var copy = inst;
+                    // Optional tail hints grant no obligation after a private
+                    // carrier rewrite. Mandatory tail calls stay excluded.
+                    // https://llvm.org/docs/LangRef.html#call-instruction
+                    copy.kind.call.tail_kind = null;
                     var fragment_arguments = false;
                     for (call.args.items) |arg| fragment_arguments = fragment_arguments or inputParts(arg.ty) != null;
                     if (fragment_arguments) {

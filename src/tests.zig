@@ -155,4 +155,7 @@ comptime {
     _ = @import("tests/adce_operands.zig");
     _ = @import("tests/verifier_allocation.zig");
     _ = @import("codegen/x86_64/generic_cfg/hardware_queries_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/intrinsic_attrs.zig");
+    _ = @import("codegen/x86_64/generic_cfg/vector_tail_calls_tests.zig");
+    _ = @import("codegen/x86_64/generic_cfg/optional_assembly_tests.zig");
 }

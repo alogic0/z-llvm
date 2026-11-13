@@ -82,6 +82,9 @@ pub fn prepare(a: std.mem.Allocator, module: ir.Module) !?View {
                     const call = inst.kind.call;
                     const target = module.functions.items[callee_index];
                     var copy = inst;
+                    // The private snapshot has caller-owned storage; use an
+                    // ordinary call after the direct-only proof admits a hint.
+                    copy.kind.call.tail_kind = null;
                     copy.kind.call.args = try call.args.clone(a);
                     for (copy.kind.call.args.items, target.params.items) |*arg, param| if (needs(param.ty)) {
                         if (!simple(arg.ty, arg.attrs)) return error.UnsupportedClosedVectorArgumentAttributes;

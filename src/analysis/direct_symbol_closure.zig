@@ -181,7 +181,8 @@ pub fn prove(a: std.mem.Allocator, module: ir.Module, names: []const []const u8)
             if (inst.removed or inst.kind != .call or !ir.identifiers.eql(inst.kind.call.callee, name)) continue;
             const call = inst.kind.call;
             calls += 1;
-            if (call.callee_value != null or call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.tail_kind != null or !call.ret_ty.eql(target.ret_ty) or call.args.items.len != target.params.items.len or !optionalEql(call.calling_conv, target.calling_conv)) {
+            const optional_tail = if (call.tail_kind) |tail| std.mem.eql(u8, tail, "tail") or std.mem.eql(u8, tail, "notail") else true;
+            if (call.callee_value != null or call.callee_function_ty != null or call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or !optional_tail or !call.ret_ty.eql(target.ret_ty) or call.args.items.len != target.params.items.len or !optionalEql(call.calling_conv, target.calling_conv)) {
                 valid = false;
                 continue;
             }

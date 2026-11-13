@@ -7,13 +7,14 @@ const clobbers = "~{dirflag},~{fpsr},~{flags}";
 const barrier = "m,~{memory}," ++ clobbers;
 fn pointerAttrs(attrs: ?[]const u8) bool {
     if (attrs == null) return true;
-    return (ir.verifyInlineAsmParameterAttrs(.ptr, attrs) catch return false) != null;
+    const element = ir.verifyInlineAsmParameterAttrs(.ptr, attrs) catch return false;
+    return element != null or @import("../sysv_abi.zig").pointerCallAttrsAreAdvisory(attrs.?);
 }
 pub fn classify(inst: ir.Instruction) ?Plan {
     if (inst.kind != .call) return null;
     const call = inst.kind.call;
     const assembly = call.inline_asm orelse return null;
-    if (call.callee_value != null or call.callee_function_ty != null or call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or call.raw_args != null or call.operand_bundle != null or call.native_query != null or call.va_arg) return null;
+    if (call.callee_value != null or call.callee_function_ty != null or call.calling_conv != null or call.ret_attrs != null or call.raw_args != null or call.operand_bundle != null or call.native_query != null or call.va_arg) return null;
     var envelope = call;
     envelope.inline_asm = null;
     @import("../sysv_abi.zig").rejectUnsupportedCallEnvelope(envelope) catch return null;
@@ -65,6 +66,7 @@ pub fn lower(a: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock,
                 value = .{ .named = name };
             }
             var copy = inst;
+            copy.kind.call.tail_kind = null;
             copy.kind.call.args = .empty;
             copy.kind.call.inline_asm = .{ .template = "", .constraints = barrier, .sideeffect = true, .has_memory_clobber = true, .may_load = true, .may_store = true };
             try copy.kind.call.args.append(a, .{ .ty = .ptr, .value = value });
