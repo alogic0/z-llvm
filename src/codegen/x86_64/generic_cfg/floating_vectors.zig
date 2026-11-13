@@ -110,6 +110,11 @@ fn needed(function: ir.Function) bool {
             .fcmp => |x| {
                 if (fp(x.operand_ty)) return true;
             },
+            .extractelement => |x| {
+                // Packed float pairs have independent scalar lanes and an
+                // eight-byte storage extent; they are not quad carriers.
+                if (packedPair(x.vector_ty)) return true;
+            },
             .select => |x| {
                 // Scalar conditions also select opaque quad XMM carriers.
                 // Only a vector mask establishes floating lane semantics.
@@ -360,7 +365,9 @@ const Builder = struct {
         return .{ .named = name };
     }
     fn pointer(b: Builder, base: ir.Value, offset: usize) !ir.Value {
-        if (offset == 0) return base;
+        // Scalar FP memory actions need an owned register for global bases.
+        const global = base == .named and std.mem.startsWith(u8, base.named, "@");
+        if (offset == 0 and !global) return base;
         var indices: std.ArrayList(ir.GepIndex) = .empty;
         try indices.append(b.a, .{ .ty = .{ .int = 64 }, .value = .{ .int = @intCast(offset) } });
         return b.emit(.{ .gep = .{ .source_ty = .{ .int = 8 }, .ptr = base, .indices = indices } });
@@ -571,14 +578,30 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                     if (x.attrs.isBarrier() or x.ty_addrspace != null or x.ptr_addrspace != null or x.attrs.syncscope != null) return error.UnsupportedFloatingVector;
                     const scalar = x.ty.vector.elem_ty.toType();
                     var lanes: Lanes = .{ .ty = x.ty };
-                    for (0..x.ty.vector.len) |i| lanes.values[i] = try b.emit(.{ .load = .{ .ty = scalar, .ptr = try b.pointer(x.ptr, i * (width(scalar) / 8)), .attrs = .{ .@"align" = 1 } } });
+                    for (0..x.ty.vector.len) |i| {
+                        const pointer_value = try b.pointer(x.ptr, i * (width(scalar) / 8));
+                        lanes.values[i] = if (packedPair(x.ty)) blk: {
+                            const raw_type: ir.Type = .{ .int = 32 };
+                            const raw_value = try b.emit(.{ .load = .{ .ty = raw_type, .ptr = pointer_value, .attrs = .{ .@"align" = 1 } } });
+                            break :blk try b.cast(.bitcast, raw_type, raw_value, scalar);
+                        } else try b.emit(.{ .load = .{ .ty = scalar, .ptr = pointer_value, .attrs = .{ .@"align" = 1 } } });
+                    }
                     lanes_value = lanes;
                 },
                 .store => |x| if (fp(x.ty)) {
                     if (x.attrs.isBarrier() or x.ty_addrspace != null or x.ptr_addrspace != null or x.attrs.syncscope != null) return error.UnsupportedFloatingVector;
                     const scalar = x.ty.vector.elem_ty.toType();
                     const lanes = try b.lanes(x.value, x.ty);
-                    for (0..x.ty.vector.len) |i| try block.instructions.append(a, .{ .result = null, .kind = .{ .store = .{ .ty = scalar, .value = lanes.values[i], .ptr = try b.pointer(x.ptr, i * (width(scalar) / 8)), .attrs = .{ .@"align" = 1 } } } });
+                    for (0..x.ty.vector.len) |i| {
+                        const memory_type: ir.Type = if (packedPair(x.ty)) .{ .int = 32 } else scalar;
+                        const memory_value = if (packedPair(x.ty)) try b.cast(.bitcast, scalar, try stable(lanes.values[i], scalar), memory_type) else lanes.values[i];
+                        try block.instructions.append(a, .{ .result = null, .kind = .{ .store = .{
+                            .ty = memory_type,
+                            .value = memory_value,
+                            .ptr = try b.pointer(x.ptr, i * (width(scalar) / 8)),
+                            .attrs = .{ .@"align" = 1 },
+                        } } });
+                    }
                     continue;
                 },
                 .call => |x| {

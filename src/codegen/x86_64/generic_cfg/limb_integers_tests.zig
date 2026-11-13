@@ -566,3 +566,48 @@ test "bounded limb integers keep unproved returns barriers and layouts closed" {
         try module.verify();
     }
 }
+
+test "memory limb widths preserve source and keep the private view verified" {
+    for ([_]u16{800,896,1024}) |bits| {
+        const text=try std.fmt.allocPrint(std.testing.allocator,"define i1 @f(ptr %x,ptr %y,ptr %out) {{\nentry:\n %a = load i{0d},ptr %x,align 1\n %b = load i{0d},ptr %y,align 1\n %c = icmp ult i{0d} %a,%b\n store i{0d} %a,ptr %out,align 1\n ret i1 %c\n}}\n",.{bits});
+        defer std.testing.allocator.free(text);
+        var module=try ir.Module.parse(std.testing.allocator,text);defer module.deinit();try module.verify();
+        var arena=std.heap.ArenaAllocator.init(std.testing.allocator);defer arena.deinit();
+        const context:machine.ReadOnlyModuleContext=.{.globals=&.{},.named_types=&.{},.target_datalayout=layout};
+        const source=module.functions.items[0];
+        const view=(try limb.legalize(arena.allocator(),source,&context)).?;
+        try std.testing.expectEqual(bits,source.blocks.items[0].instructions.items[0].kind.load.ty.int);
+        try std.testing.expectEqual(source.params.items.len,view.params.items.len);
+        var private=module;private.functions=try module.functions.clone(arena.allocator());private.functions.items[0]=view;
+        try private.verify();try module.verify();
+    }
+}
+test "memory limb extension keeps unproved widths operations and call ABI closed" {
+    const bodies=[_][]const u8{
+        "define i64 @f(ptr %p) {\nentry:\n %x = load i513,ptr %p,align 1\n %r = trunc i513 %x to i64\n ret i64 %r\n}\n",
+        "define i64 @f(ptr %p) {\nentry:\n %x = load i799,ptr %p,align 1\n %r = trunc i799 %x to i64\n ret i64 %r\n}\n",
+        "define i64 @f(ptr %p) {\nentry:\n %x = load i801,ptr %p,align 1\n %r = trunc i801 %x to i64\n ret i64 %r\n}\n",
+        "define i64 @f(i800 %x) {\nentry:\n %r = trunc i800 %x to i64\n ret i64 %r\n}\n",
+        "define i800 @f(ptr %p) {\nentry:\n %x = load i800,ptr %p,align 1\n ret i800 %x\n}\n",
+        "define i64 @f(ptr %p) {\nentry:\n %x = load i800,ptr %p,align 1\n %y = add i800 %x,1\n %r = trunc i800 %y to i64\n ret i64 %r\n}\n",
+        "declare void @g(i800)\ndefine void @f(ptr %p) {\nentry:\n %x = load i800,ptr %p,align 1\n call void @g(i800 %x)\n ret void\n}\n",
+        "define void @f(ptr %p) {\nentry:\n %x = load volatile i800,ptr %p,align 1\n ret void\n}\n",
+    };
+    for(bodies) |text| {
+        var module=try ir.Module.parse(std.testing.allocator,text);defer module.deinit();try module.verify();
+        var arena=std.heap.ArenaAllocator.init(std.testing.allocator);defer arena.deinit();
+        const context:machine.ReadOnlyModuleContext=.{.globals=&.{},.named_types=&.{},.target_datalayout=layout};
+        try std.testing.expect(try limb.legalize(arena.allocator(),module.functions.items[0],&context)==null);
+        try module.verify();
+    }
+}
+
+test "memory limb casts keep unproved nonnative carriers closed" {
+    for([_]u16{1,65,512}) |bits|for([_]bool{false,true}) |up| {
+        const text=try std.fmt.allocPrint(std.testing.allocator,"define void @f(ptr %p,ptr %out) {{\nentry:\n %x = load i{0d},ptr %p,align 1\n %v = {1s} i{0d} %x to i{2d}\n store i{2d} %v,ptr %out,align 1\n ret void\n}}\n",.{if(up)bits else 800,if(up)"zext" else "trunc",if(up)800 else bits});defer std.testing.allocator.free(text);
+        var module=try ir.Module.parse(std.testing.allocator,text);defer module.deinit();try module.verify();
+        var arena=std.heap.ArenaAllocator.init(std.testing.allocator);defer arena.deinit();
+        const context:machine.ReadOnlyModuleContext=.{.globals=&.{},.named_types=&.{},.target_datalayout=layout};
+        try std.testing.expect(try limb.legalize(arena.allocator(),module.functions.items[0],&context)==null);
+    };
+}

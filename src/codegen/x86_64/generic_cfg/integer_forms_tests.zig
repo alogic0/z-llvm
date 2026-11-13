@@ -7,6 +7,33 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "constant overflow and exactness facts remain closed when their inputs are poison" {
+    for ([_][]const u8{
+        "add nuw i64 18446744073709551615,1",
+        "sub nuw i64 0,1",
+        "mul nuw i64 9223372036854775808,2",
+        "add nsw i64 9223372036854775807,1",
+        "sub nsw i64 -9223372036854775808,1",
+        "mul nsw i64 -9223372036854775808,-1",
+        "mul nuw nsw i64 9223372036854775807,2",
+        "udiv exact i64 7,3",
+        "or disjoint i64 1,1",
+    }) |expression| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @closed() {{\nentry:\n %r = {s}\n ret i64 %r\n}}\n", .{expression});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const flags = original.blocks.items[0].instructions.items[0].kind.binary.flags;
+        try std.testing.expect((try forms.legalize(arena.allocator(), original)) == null);
+        try std.testing.expectEqual(flags, original.blocks.items[0].instructions.items[0].kind.binary.flags);
+        try module.verify();
+    }
+}
+
 test "integer constant pairs preserve modular results flags and source definitions" {
     inline for (.{ 1, 3, 8, 17, 32, 64 }) |bits| {
         const U = @Int(.unsigned, bits);
@@ -561,5 +588,58 @@ test "integer forms execute signed narrow arithmetic with live values and dirty 
             };
             try std.testing.expectEqual(expected ^ live, run(input, live));
         };
+    }
+}
+
+test "undef integer stores retain volatile atomic and poison actions" {
+    const a = std.testing.allocator;
+    var module = try ir.Module.parse(a, "define void @ordinary(ptr %p) {\nentry:\n store i64000 undef,ptr %p,align 16\n ret void\n}\n");
+    defer module.deinit();
+    try module.verify();
+    var arena = std.heap.ArenaAllocator.init(a);
+    defer arena.deinit();
+    const original = module.functions.items[0];
+    const view = (try forms.legalize(arena.allocator(), original)).?;
+    try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+    try std.testing.expect(original.blocks.items[0].instructions.items[0].kind.store.value == .undef);
+    try std.testing.expectEqual(@as(usize, 0), view.blocks.items[0].instructions.items.len);
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    private.functions.items[0] = view;
+    try private.verify();
+    try module.verify();
+    for ([_][]const u8{
+        "store volatile i64 undef,ptr %p,align 8",
+        "store atomic i64 undef,ptr %p monotonic,align 8",
+        "store i64 poison,ptr %p,align 8",
+    }) |statement| {
+        const text = try std.fmt.allocPrint(a, "define void @closed(ptr %p) {{\nentry:\n {s}\n ret void\n}}\n", .{statement});
+        defer a.free(text);
+        var closed = try ir.Module.parse(a, text);
+        defer closed.deinit();
+        try closed.verify();
+        try std.testing.expect((try forms.legalize(arena.allocator(), closed.functions.items[0])) == null);
+        try closed.verify();
+    }
+}
+
+test "native literal truncation preserves poison facts and nonnative boundaries" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{
+        "trunc nuw i64 256 to i8",
+        "trunc nsw i64 128 to i8",
+        "trunc i51 7 to i8",
+        "trunc i64 7 to i5",
+    }) |expression| {
+        const to = if (std.mem.endsWith(u8, expression, "i5")) "i5" else "i8";
+        const text = try std.fmt.allocPrint(a, "define {s} @closed() {{\nentry:\n %r = {s}\n ret {s} %r\n}}\n", .{ to, expression, to });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0])) == null);
+        try module.verify();
     }
 }

@@ -6,6 +6,23 @@ const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const intrinsics = @import("integer_intrinsics.zig");
 
+test "unsigned saturation leaves unproved widths outside the byte aligned extension" {
+    for ([_]u16{ 33, 34, 39, 41, 47, 49, 50, 51, 52, 53, 55, 57, 62, 63, 65 }) |bits| for ([_][]const u8{ "uadd", "usub" }) |op| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare i{0d} @llvm.{1s}.sat.i{0d}(i{0d},i{0d})\ndefine i{0d} @closed(i{0d} %x,i{0d} %y) {{\nentry:\n %v = call i{0d} @llvm.{1s}.sat.i{0d}(i{0d} %x,i{0d} %y)\n ret i{0d} %v\n}}\n", .{ bits, op });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        try std.testing.expect((try intrinsics.legalize(arena.allocator(), original)) == null);
+        // Terminators are stored separately from the block instruction list.
+        try std.testing.expectEqual(@as(usize, 1), original.blocks.items[0].instructions.items.len);
+        try module.verify();
+    };
+}
+
 test "native pair saturation and signed extrema preserve full values and live carriers" {
     const samples = [_]u128{ 0, 1, 0xffffffffffffffff, 0x10000000000000000, 0x7fffffffffffffffffffffffffffffff, 0x80000000000000000000000000000000, 0xfffffffffffffffffffffffffffffffe, std.math.maxInt(u128), 0x123456789abcdef0fedcba9876543210 };
     for ([_][]const u8{ "uadd.sat", "usub.sat", "sadd.sat", "ssub.sat", "umin", "umax", "smin", "smax" }, 0..) |op, kind| for (0..4) |literal_mode| {

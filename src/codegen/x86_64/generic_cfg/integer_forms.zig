@@ -61,13 +61,38 @@ fn supported(op: ir.BinaryOp) bool {
 }
 
 fn constantPair(value: ir.BinaryInst) ?u64 {
-    if (!integer(value.ty) or value.lhs != .int or value.rhs != .int or value.flags.any() or
+    if (!integer(value.ty) or value.lhs != .int or value.rhs != .int or value.flags.exact or value.flags.disjoint or
         !operand(value.lhs, value.ty.int) or !operand(value.rhs, value.ty.int)) return null;
     // Keep the established full-word materialization as the terminal form.
     if (value.op == .add and value.rhs.int == 0 and (value.ty.int == 32 or value.ty.int == 64)) return null;
     const sem = @import("../../../analysis/integer_semantics.zig").Integer.init(value.ty).?;
     const x = sem.unsigned(value.lhs.int);
     const y = sem.unsigned(value.rhs.int);
+    if (value.flags.nuw or value.flags.nsw) {
+        // Inputs are at most 64 bits, so these exact checks fit u128/i128.
+        // Fold only defined operations; overflow remains on the existing path.
+        if (value.op != .add and value.op != .sub and value.op != .mul) return null;
+        if (value.flags.nuw) {
+            const exact = switch (value.op) {
+                .add => x + y,
+                .sub => if (x >= y) x - y else return null,
+                .mul => x * y,
+                else => unreachable,
+            };
+            if (exact > sem.unsignedMax()) return null;
+        }
+        if (value.flags.nsw) {
+            const sx = sem.normalize(value.lhs.int);
+            const sy = sem.normalize(value.rhs.int);
+            const exact = switch (value.op) {
+                .add => sx + sy,
+                .sub => sx - sy,
+                .mul => sx * sy,
+                else => unreachable,
+            };
+            if (exact < sem.signedMin() or exact > -sem.signedMin() - 1) return null;
+        }
+    }
     const result = switch (value.op) {
         .add => x +% y,
         .sub => x -% y,
@@ -127,6 +152,18 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.kind == .store) {
+                const store = inst.kind.store;
+                if (store.value == .undef and store.ty == .int and store.ty.int > 0 and
+                    !store.attrs.isBarrier() and store.attrs.syncscope == null and
+                    store.ty_addrspace == null and store.ptr_addrspace == null)
+                {
+                    // Leaving the previous bytes is one valid undef value.
+                    // Volatile and atomic writes retain their observable action.
+                    try candidate.begin(&block, block_index, instruction_index);
+                    continue;
+                }
+            }
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .binary => |value| if (constantPair(value)) |result| {
                     try candidate.begin(&block, block_index, instruction_index);
@@ -162,7 +199,46 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     try finish(allocator, &block, inst, wide, value.ty, answer);
                     continue;
                 },
-                .cast => |cast| if (cast.op == .bitcast and !cast.flags.any() and cast.value == .int and
+                .cast => |cast| if (cast.op == .trunc and !cast.flags.any() and cast.value == .int and
+                    cast.from_ty == .int and (cast.from_ty.int == 16 or cast.from_ty.int == 32 or cast.from_ty.int == 64) and
+                    cast.to_ty == .int and (cast.to_ty.int == 8 or cast.to_ty.int == 16 or cast.to_ty.int == 32) and
+                    cast.from_ty.int > cast.to_ty.int and operand(cast.value, cast.from_ty.int))
+                {
+                    const semantics = @import("../../../analysis/integer_semantics.zig").Integer;
+                    const result = semantics.init(cast.from_ty).?.unsigned(cast.value.int) & semantics.init(cast.to_ty).?.unsignedMax();
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const wide: ir.Type = .{ .int = 32 };
+                    const value = try binary(allocator, function, &block, &serial, wide, .add, .{ .int = @intCast(result) }, .{ .int = 0 });
+                    try finish(allocator, &block, inst, wide, cast.to_ty, value);
+                    continue;
+                } else if (cast.value == .undef and !cast.flags.any() and
+                    integer(cast.from_ty) and integer(cast.to_ty) and
+                    (cast.op == .zext or cast.op == .sext or cast.op == .trunc))
+                {
+                    // Zero is a defined choice of the original undef operand.
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const wide: ir.Type = .{ .int = if (cast.to_ty.int <= 32) 32 else 64 };
+                    const zero = try binary(allocator, function, &block, &serial, wide, .add, .{ .int = 0 }, .{ .int = 0 });
+                    try finish(allocator, &block, inst, wide, cast.to_ty, zero);
+                    continue;
+                } else if ((cast.op == .uitofp or cast.op == .sitofp) and !cast.flags.any() and
+                    cast.from_ty == .int and cast.from_ty.int > 0 and cast.from_ty.int < 32 and
+                    cast.to_ty == .half and operand(cast.value, cast.from_ty.int))
+                {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    const input = try forms.temporary(allocator, function, &serial);
+                    try block.instructions.append(allocator, .{ .result = input, .kind = .{ .cast = .{
+                        .op = if (cast.op == .sitofp) .sext else .zext,
+                        .from_ty = cast.from_ty,
+                        .value = cast.value,
+                        .to_ty = .{ .int = 32 },
+                    } } });
+                    var copy = inst;
+                    copy.kind.cast.from_ty = .{ .int = 32 };
+                    copy.kind.cast.value = .{ .named = input };
+                    try block.instructions.append(allocator, copy);
+                    continue;
+                } else if (cast.op == .bitcast and !cast.flags.any() and cast.value == .int and
                     ((cast.from_ty.eql(.{ .int = 16 }) and cast.to_ty == .half) or
                         (cast.from_ty.eql(.{ .int = 32 }) and cast.to_ty == .float) or
                         (cast.from_ty.eql(.{ .int = 64 }) and cast.to_ty == .double)) and operand(cast.value, cast.from_ty.int))

@@ -214,7 +214,7 @@ fn operation(call: ir.CallInst) ?Operation {
                 for (call.args.items) |arg| facts = facts or arg.attrs != null;
                 if (!facts) return null;
             }
-        } else if ((bits > 32 and bits != 64) or call.args.items.len != 2) return null;
+        } else if ((bits > 32 and bits != 40 and bits != 48 and bits != 56 and bits != 64) or call.args.items.len != 2) return null;
         return op;
     }
     return null;
@@ -318,6 +318,38 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     const above = try emit(allocator, function, &block, &serial, .{ .icmp = .{ .predicate = .sgt, .operand_ty = wide, .lhs = lower, .rhs = maximum } });
                     const clamped = try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = above, .ty = wide, .true_value = maximum, .false_value = lower } });
                     try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = clamped, .to_ty = call.ret_ty } } });
+                } else if ((op == .uadd_sat or op == .usub_sat) and bits > 32 and bits < 64) {
+                    // A word holds the complete unsigned sum for these widths.
+                    const wide: ir.Type = .{ .int = 64 };
+                    const lhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);
+                    const rhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[1].value);
+                    const subtract = op == .usub_sat;
+                    const result = try emit(allocator, function, &block, &serial, .{ .binary = .{
+                        .op = if (subtract) .sub else .add,
+                        .ty = wide,
+                        .lhs = lhs,
+                        .rhs = rhs,
+                    } });
+                    const limit = try extend(allocator, function, &block, &serial, wide, wide, .{ .int = if (subtract) 0 else (@as(i128, 1) << @as(u7, @intCast(bits))) - 1 });
+                    const overflow = try emit(allocator, function, &block, &serial, .{ .icmp = .{
+                        .predicate = if (subtract) .ult else .ugt,
+                        .operand_ty = wide,
+                        .lhs = if (subtract) lhs else result,
+                        .rhs = if (subtract) rhs else limit,
+                    } });
+                    const clamped = try emit(allocator, function, &block, &serial, .{ .select = .{
+                        .cond_ty = .{ .int = 1 },
+                        .cond = overflow,
+                        .ty = wide,
+                        .true_value = limit,
+                        .false_value = result,
+                    } });
+                    try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .cast = .{
+                        .op = .trunc,
+                        .from_ty = wide,
+                        .value = clamped,
+                        .to_ty = call.ret_ty,
+                    } } });
                 } else if (op == .scmp or op == .ucmp) {
                     const operand_ty = call.args.items[0].ty;
                     const lhs = try extend(allocator, function, &block, &serial, operand_ty, operand_ty, call.args.items[0].value);

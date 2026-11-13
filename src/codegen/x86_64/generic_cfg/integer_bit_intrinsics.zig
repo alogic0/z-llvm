@@ -6,7 +6,7 @@ const ir = @import("../../../ir.zig");
 const forms = @import("scalar_forms.zig");
 const attrs = @import("intrinsic_attrs.zig");
 
-pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl, fshr };
+pub const Operation = enum { ctpop, cttz, ctlz, bswap, abs, fshl, fshr, bitreverse };
 
 pub fn operation(call: ir.CallInst) ?Operation {
     if (!std.mem.startsWith(u8, call.callee, "llvm.") or call.ret_ty != .int or call.ret_ty.int == 0 or
@@ -16,8 +16,10 @@ pub fn operation(call: ir.CallInst) ?Operation {
     inline for (std.meta.tags(Operation)) |op| {
         const name = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ @tagName(op), bits }) catch return null;
         if (std.mem.eql(u8, call.callee, name)) {
+            // Keep both established native endpoints and smaller-width owners.
+            if (op == .bitreverse and (bits <= 64 or bits == 128)) return null;
             if (bits > 64 and op != .bswap and !(bits == 128 and (op == .ctlz or op == .cttz or op == .fshl or op == .abs)) and
-                !(bits < 128 and (op == .abs or op == .ctlz or op == .ctpop or op == .cttz))) return null;
+                !(bits < 128 and (op == .abs or op == .ctlz or op == .ctpop or op == .cttz or op == .bitreverse))) return null;
             if (!attrs.scalarIntegerCallSupported(call)) return null;
             const flag = op == .cttz or op == .ctlz or op == .abs;
             if (call.args.items.len != (if (flag) @as(usize, 2) else if (op == .fshl or op == .fshr) @as(usize, 3) else @as(usize, 1))) return null;
@@ -123,6 +125,7 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
             },
             .ctlz => try p.binary(.sub, try p.call(.ctlz, input, true), .{ .int = 128 - bits }),
             .ctpop => try p.call(.ctpop, input, false),
+            .bitreverse => try p.binary(.lshr, try p.call(.bitreverse, input, false), .{ .int = 128 - bits }),
             .cttz => blk: {
                 const low = try p.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = input, .to_ty = word } });
                 const high = try p.emit(.{ .cast = .{ .op = .trunc, .from_ty = pair, .value = try p.binary(.lshr, input, .{ .int = 64 }), .to_ty = word } });
@@ -231,6 +234,7 @@ pub fn expand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.Ba
     }
     const input = try b.widen(bits, call.args.items[0].value);
     const value = switch (op) {
+        .bitreverse => unreachable, // Only the bounded pair branch admits it.
         .ctpop => try b.call(.ctpop, input, false),
         .cttz => try b.call(.cttz, try b.binary(.@"or", input, .{ .int = @as(i128, 1) << @as(u7, @intCast(bits)) }), true),
         .ctlz => try b.binary(.sub, try b.call(.ctlz, input, true), .{ .int = b.wide.int - bits }),

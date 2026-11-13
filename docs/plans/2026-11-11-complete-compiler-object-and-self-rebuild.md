@@ -20,8 +20,10 @@ procedures, all 17 gates, both complete 183-population native suites and all
 per build and every preceding object, owner and optimizer artifact byte-for-byte.
 The unchanged original compiler and runtime objects match the preceding
 checkpoint exactly. The original Debug replay gains 37 selections without loss,
-leaving 51 rejections. Nine subsequent isolated families select 7,843/7,874;
-their canonical adoption and fresh cumulative validation remain open.
+leaving 51 rejections. Ten subsequent families pass both 2,301-unit builds,
+all twenty combined native runs and 540 component faults. They select
+7,846/7,874 original Debug definitions, gaining 23 without loss. Those changes
+are adopted for fresh cumulative validation; 28 original failures remain open.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -550,10 +552,23 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    Continue step 10 with the independently exercised narrow integer-to-half,
    byte-aligned odd unsigned saturation, safe constant flags, pointer constants,
    three-bit input masks, packed float extraction, odd pair bit reversal,
-   undefined integer refinements and native literal truncation. The isolated
-   candidate passes both 2,298-unit builds and selects 7,843/7,874 original
-   Debug definitions, with 31 failures still explicit. Require combined-source
-   native proofs and fresh cumulative validation before adopting those changes.
+   undefined integer refinements, native literal truncation and local wide
+   memory values. **Adopted for fresh cumulative validation.** Both 2,301-unit
+   builds, all twenty combined native runs and all 540 component faults pass.
+   The original Debug replay selects 7,846/7,874, gaining 23 without loss;
+   its actual nonzero result and 28 failures remain explicit. The maintained
+   Zig generator reproduces all 84 files and 41 population entries exactly.
+   Wide memory admits only 800, 896 and 1,024 bits beyond the old 512-bit limit;
+   the call ABI and overflow tuples retain that old limit. Cast counterparts
+   are restricted to the admitted wide widths and native 8/16/32/64/128-bit
+   integers. The failed LLVM reference for dirty `i1` padding is retained;
+   the independent byte oracle remains unchanged. Volatile/atomic stores,
+   unproved widths, extended arithmetic and extended calls remain closed.
+   Freeze the adopted source, repeat both official unit builds, eight readiness
+   procedures, all 17 gates, both complete 193-population native suites and all
+   4,996 required faults. Compare strictly against the accepted 183 populations,
+   repeat original compiler/runtime production and every affected audit, then
+   continue closing the remaining original Debug failures.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the

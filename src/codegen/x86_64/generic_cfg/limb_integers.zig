@@ -11,7 +11,10 @@ const addresses = @import("../symbol_address.zig");
 const stack = @import("stack_arguments.zig");
 const word: ir.Type = .{ .int = 64 };
 const boolean: ir.Type = .{ .int = 1 };
-const max_words = 8;
+const max_abi_bits = 512;
+const max_words = 16;
+fn memoryOnlyWidth(bits: u32) bool { return bits == 800 or bits == 896 or bits == 1024; }
+fn memoryCastWidth(bits: u16) bool { return switch(bits) { 8,16,32,64,128 => true, else => memoryOnlyWidth(bits) }; }
 
 fn divisionTarget(op: ir.BinaryOp) []const u8 {
     return switch (op) {
@@ -43,7 +46,7 @@ fn wide(ty: ir.Type) bool {
 }
 fn width(ty: ir.Type) !u16 {
     const bits = raw.width(ty) orelse return error.UnsupportedLimbInteger;
-    if (bits == 0 or bits > max_words * 64) return error.UnsupportedLimbInteger;
+    if (bits == 0 or bits > max_words * 64 or (bits > max_abi_bits and !memoryOnlyWidth(bits))) return error.UnsupportedLimbInteger;
     return @intCast(bits);
 }
 fn mask(bits: u16) u64 {
@@ -75,7 +78,7 @@ fn tupleBits(ty: ir.Type) ?u16 {
     const first = fields.next() orelse return null;
     if (first.len < 2 or first[0] != 'i' or !std.mem.eql(u8, fields.next() orelse return null, "i1") or fields.next() != null) return null;
     const bits = std.fmt.parseUnsigned(u16, first[1..], 10) catch return null;
-    return if (bits > 128 and bits <= max_words * 64) bits else null;
+    return if (bits > 128 and bits <= max_abi_bits) bits else null;
 }
 fn checkedKind(a: std.mem.Allocator, call: ir.CallInst) !?CheckedKind {
     const bits = tupleBits(call.ret_ty) orelse return null;
@@ -101,6 +104,20 @@ const Touched = struct {
         t.found.* = t.found.* or wide(ty);
     }
 };
+const MemoryOnlyTouched = struct {
+    pub const Error = error{};
+    found: *bool,
+    pub fn visit(t: MemoryOnlyTouched, _: *const ir.Value, ty: ir.Type) Error!void {
+        t.found.* = t.found.* or (raw.width(ty) orelse 0) > max_abi_bits;
+    }
+};
+fn memoryOnlyInstruction(inst: *const ir.Instruction) bool {
+    var found = if (inst.resultType()) |ty| (raw.width(ty) orelse 0) > max_abi_bits else false;
+    _ = ir.operands.instruction(inst, MemoryOnlyTouched{ .found = &found }) catch unreachable;
+    if (inst.kind == .alloca) found = found or (raw.width(inst.kind.alloca.allocated_ty) orelse 0) > max_abi_bits;
+    if (inst.kind == .gep) found = found or (raw.width(inst.kind.gep.source_ty) orelse 0) > max_abi_bits;
+    return found;
+}
 fn touches(inst: *const ir.Instruction) bool {
     var found = if (inst.resultType()) |ty| wide(ty) else false;
     _ = ir.operands.instruction(inst, Touched{ .found = &found }) catch unreachable;
@@ -629,7 +646,7 @@ fn storageType(a: std.mem.Allocator, bits: u16) !ir.Type {
 }
 pub fn privateReturnType(source: ir.Type) ?ir.Type {
     const bits = raw.width(source) orelse return null;
-    return if (bits >= 193 and bits <= max_words * 64) .ptr else null;
+    return if (bits >= 193 and bits <= max_abi_bits) .ptr else null;
 }
 
 pub fn legalize(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
@@ -682,6 +699,7 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
         }
         if (!advisory(param.attrs) or param.abi_incoming_address != null or param.abi_x87_memory or param.abi_split_integer) return error.UnsupportedLimbInteger;
         const bits = try width(param.ty);
+        if (bits > max_abi_bits) return error.UnsupportedLimbInteger;
         const raw_parts = try allocateParts(a, source, &names, bits);
         const normalized = try allocateParts(a, source, &names, bits);
         try incoming.put(param.name, raw_parts);
@@ -746,6 +764,10 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                 try block.instructions.append(a, inst);
                 continue;
             }
+            if (memoryOnlyInstruction(&inst)) switch (inst.kind) {
+                .alloca, .load, .store, .cast, .icmp, .select, .phi, .freeze, .gep => {},
+                else => return error.UnsupportedLimbInteger,
+            };
             switch (inst.kind) {
                 .binary => |x| {
                     if (!wide(x.ty)) return error.UnsupportedLimbInteger;
@@ -765,6 +787,7 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                     if (x.op != .trunc and x.op != .zext and x.op != .sext and x.op != .bitcast) return error.UnsupportedLimbInteger;
                     const from = try width(x.from_ty);
                     const to = try width(x.to_ty);
+                    if ((from > max_abi_bits or to > max_abi_bits) and (!memoryCastWidth(from) or !memoryCastWidth(to))) return error.UnsupportedLimbInteger;
                     if ((x.op == .trunc and from <= to) or ((x.op == .zext or x.op == .sext) and from >= to) or (x.op == .bitcast and from != to)) return error.UnsupportedLimbInteger;
                     const p = try b.resize(try b.get(x.value, x.from_ty), to, x.op == .sext);
                     if (wide(x.to_ty)) try b.define(inst.result.?, p) else try b.copy(inst.result.?, x.to_ty, try b.narrow(p, x.to_ty));
@@ -882,7 +905,7 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                 // Keep every source successor and predecessor identity. A
                 // bounded private tag maps exact limb equality to each case;
                 // zero retains the original default edge.
-                if (x.cases.items.len > 256) return error.UnsupportedLimbInteger;
+                if (x.cases.items.len > 256 or (raw.width(x.cond_ty) orelse 0) > max_abi_bits) return error.UnsupportedLimbInteger;
                 const condition = try b.get(x.cond, x.cond_ty);
                 var tag: ir.Value = .{ .int = 0 };
                 var replacement = x;

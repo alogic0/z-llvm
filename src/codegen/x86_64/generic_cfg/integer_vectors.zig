@@ -65,13 +65,30 @@ fn shape(ty: ir.Type) ?Shape {
 fn defined(value: ir.Value, ty: ir.Type) !ir.Value {
     if (value == .undef or value == .poison or value == .zero_initializer)
         return if (ty == .ptr) .null_value else .{ .int = 0 };
+    if (ty == .ptr and addresses.pointerBits(value) != null) return value;
     if (value != .named and !(if (ty == .ptr) value == .null_value else value == .int)) return error.UnsupportedIntegerVector;
     return value;
+}
+fn pointerConstantLanes(value: ir.Value, ty: ir.Type) ?Lanes {
+    if (ty != .vector or ty.vector.elem_ty != .ptr or ty.vector.len == 0 or ty.vector.len > max_lanes or value != .vector) return null;
+    const text = std.mem.trim(u8, value.vector, " \t\r\n");
+    if (text.len < 2 or text[0] != '<' or text[text.len - 1] != '>') return null;
+    var fields: @import("../../../ir/structure.zig").Fields = .{ .rest = text[1 .. text.len - 1], .packed_type = false };
+    var result: Lanes = .{ .ty = ty, .values = @splat(.poison) };
+    for (result.values[0..ty.vector.len]) |*lane| {
+        const field = std.mem.trim(u8, fields.next() orelse return null, " \t\r\n");
+        if (!std.mem.startsWith(u8, field, "ptr ")) return null;
+        const spelling = std.mem.trim(u8, field[4..], " \t\r\n");
+        lane.* = if (std.mem.eql(u8, spelling, "null")) .null_value else if (std.mem.eql(u8, spelling, "undef")) .undef else if (std.mem.eql(u8, spelling, "poison")) .poison else .{ .constant_expr = spelling };
+        if (lane.* != .undef and lane.* != .poison and addresses.pointerBits(lane.*) == null) return null;
+    }
+    if (fields.next() != null) return null;
+    return result;
 }
 fn constantLanes(value: ir.Value, ty: ir.Type) ?Lanes {
     if (ty != .vector or ty.vector.len > max_lanes) return null;
     inline for (1..max_lanes + 1) |count| if (ty.vector.len == count) {
-        const parsed = ir.vector_constant.parseFixed(count, value, ty.vector) orelse return null;
+        const parsed = ir.vector_constant.parseFixed(count, value, ty.vector) orelse return pointerConstantLanes(value, ty);
         var result: Lanes = .{ .ty = ty, .values = @splat(.poison) };
         for (parsed.lanes, 0..) |lane, i| result.values[i] = if (lane == .zero_initializer)
             (if (ty.vector.elem_ty == .ptr) .null_value else .{ .int = 0 })
@@ -158,7 +175,7 @@ const Builder = struct {
         if (from == .ptr or to == .ptr) {
             const word: ir.Type = .{ .int = 64 };
             if (op == .ptrtoint and from == .ptr and to == .int) {
-                const bits: ir.Value = if (concrete == .null_value) .{ .int = 0 } else try b.emit(.{ .cast = .{ .op = .ptrtoint, .from_ty = .ptr, .value = concrete, .to_ty = word } });
+                const bits: ir.Value = if (addresses.pointerBits(concrete)) |raw| .{ .int = raw } else try b.emit(.{ .cast = .{ .op = .ptrtoint, .from_ty = .ptr, .value = concrete, .to_ty = word } });
                 return b.cast(if (to.int < 64) .trunc else .zext, word, bits, to);
             }
             if (op == .inttoptr and from == .int and to == .ptr) {
@@ -181,8 +198,8 @@ const Builder = struct {
     fn copy(b: Builder, original: ir.Instruction, ty: ir.Type, value: ir.Value) !void {
         const concrete = try defined(value, ty);
         if (ty == .ptr) {
-            if (concrete == .null_value) {
-                try b.block.instructions.append(b.allocator, .{ .result = original.result, .metadata = original.metadata, .kind = .{ .cast = .{ .op = .inttoptr, .from_ty = .{ .int = 64 }, .value = .{ .int = 0 }, .to_ty = .ptr } } });
+            if (addresses.pointerBits(concrete)) |raw| {
+                try b.block.instructions.append(b.allocator, .{ .result = original.result, .metadata = original.metadata, .kind = .{ .cast = .{ .op = .inttoptr, .from_ty = .{ .int = 64 }, .value = .{ .int = raw }, .to_ty = .ptr } } });
             } else {
                 var indices: std.ArrayList(ir.GepIndex) = .empty;
                 try indices.append(b.allocator, .{ .ty = .{ .int = 64 }, .value = .{ .int = 0 } });
@@ -831,7 +848,7 @@ const InputParts = struct { count: usize, lanes_per_piece: usize, physical: ir.T
 fn inputParts(ty: ir.Type) ?InputParts {
     const s = shape(ty) orelse return null;
     if (abiType(ty) != null) return null;
-    if ((s.len == 3 and (s.pointer or s.bits == 8 or s.bits == 16 or s.bits == 64)) or (s.len == 5 and !s.pointer and s.bits == 32))
+    if ((s.len == 3 and (s.pointer or s.bits == 1 or s.bits == 8 or s.bits == 16 or s.bits == 64)) or (s.len == 5 and !s.pointer and s.bits == 32))
         return .{ .count = s.len, .lanes_per_piece = 1, .physical = .{ .int = 64 }, .scalar = true };
     if (s.pointer or (s.bits != 8 and s.bits != 16 and s.bits != 32 and s.bits != 64) or !std.math.isPowerOfTwo(s.len)) return null;
     const total = s.len * s.bits;
