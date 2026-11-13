@@ -323,3 +323,128 @@ ReleaseFast and the original 41-pattern query reduced from 19.53 s to 0.02 s
 with identical results. Its own 1,804,275,712-byte cache retirement occurred
 outside this project's `local-state` and is excluded from the totals above.
 `jqz` 0.33.0 continues to handle exact structured accounting.
+
+## Follow-up: generated files and shared inputs
+
+The follow-up starts from a fresh filesystem scan, not the earlier filename
+catalog. Evidence is in `local-state/storage-cleanup/generated-review/`.
+It found 609 `linked-harness.s` inodes (5,897,609,216 allocated bytes) and
+39 `capture-zllvm` inodes (742,846,464 bytes). Four helper inodes account for
+105 names; the other 35 helpers each have one link. Every alias of those four
+inodes was found under `local-state`, matching the filesystem link counts.
+Seven names in one group are pinned by the current batch-30 acceptance manifest.
+Per-path totals for the 105 aliases count the same allocation repeatedly and
+must not be reported as reclaimable bytes.
+
+All 169 owning reports passed: 29 `execution-breadth-controls-v2` reports and
+140 `real-program-v1` reports. The assembly is temporary executable-harness
+output, produced with `-femit-asm` and consumed by the successful assembler
+command recorded in the row's two producer indexes. The capture helpers are
+copies of the validation runner itself, bound to the report's runner hash.
+They are not copies of the compiler being tested.
+
+The new `prepare-generated` adapter verifies these bindings and only prepares
+explicit output requests. It initially prepared 728 requests. Twenty-one
+assembly files in batch-11 `integrated-v5`, occupying 203,321,344 bytes, were
+rejected because their recorded command logs no longer exist. Investigation
+found all 84 missing logs in the completed
+`reviewed-artifacts-20261112/record.json`: each was an empty file with the empty
+SHA-256 and an applied retirement. This is a known historical-log transition,
+not missing failure diagnostics; the current adapter still requires those logs
+and does not yet consume this older retirement schema. These assembly files
+remain outside the current deletion list.
+
+The first full review qualified 133 files (1,549,967,360 bytes). Preparing
+1,246 exact transitions from historical cleanup records expanded qualification
+to **434 files, 4,530,511,872 bytes (4.219 GiB)**: 399 assemblies and 35 helpers.
+The five current integrity manifests all verified. Requests and reviews:
+
+- Prepared ownership: `1794588289225121077-4117891/requests.json`.
+- Initial review: `1794588386084504213-4120295/report.json`.
+- Historical transitions: `1794588556572342218-4123844/requests.json`.
+- Reviewed transitions: `1794588874576236265-4131581/report.json`.
+
+All paths above are under `local-state/retirements/automatic-storage-cleanup/`.
+Current acceptance contracts are never excused by these historical transitions.
+A further 189 assemblies are pinned by seven selection acceptance manifests and
+the performance/throughput artifact manifests. Six of those selection manifests
+are older milestones, not one of the five explicitly current contracts; their
+continued necessity needs a separate acceptance-lifecycle review. The collector
+does not infer their expiry from age. Four aliased helper inodes remain held.
+
+Collection groups eligible named files from one completed integrated run into
+a guarded transaction. It does not remove the mixed run directory. The durable
+pending record names all original paths, hashes, metadata and quarantine names.
+After quarantine it refreshes pins, holds and consumers before any unlink;
+pre-unlink failure restores every original name. Each removed file receives
+its own completed record. A partial or interrupted batch blocks new cleanup.
+An active parent integrated job also protects already finished subtests.
+
+The large-IR review rehashed all 12 distinct inodes. Eleven still have hash
+`de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e`; the separate
+self-rebuild input retains hash
+`7217b032845c0bb8e653823eac80bfae571707eed60793047c2576e27b849976`.
+The full alias scan found **69 names**, matching every link count. The earlier
+68-name list omitted `whole-compiler-20261107/attempt-4/compiler-module/compiler.ll`,
+which shares the 35-link input inode. This changes the name count, not allocation
+or the 4,436,340,736-byte theoretical saving.
+
+Two duplicate inodes are mode 0444; the remaining duplicate inodes and the
+separate self-rebuild input are writable. The captured input is a run-specific
+replay input: `whole_compiler.zig` copies it into a newly created run directory
+and records its hash. `Context.copy` opens its destination with truncation.
+The artifact store publishes read-only objects but `get` currently copies them
+into new files; it does not migrate existing aliases. A scratch probe on this
+ext4 filesystem confirmed that `cp --reflink=always` is unsupported. Safe sharing
+therefore needs an explicit immutable-input installation/consumer transition,
+with all 69 names and current contracts covered. No input path or permission was
+changed by this review.
+
+Implementation `3a36c17e` passes 94 native checks in Debug and ReleaseFast,
+plus 20 isolated CLI checks. Coverage includes changed producer records,
+failed/unrelated commands, hardlink rejection, parent-job protection, frozen
+parent permissions, rollback on a newly discovered pin, preservation of inputs
+and repeat collection. The first apply
+`1794589246953680298-4138793/report.json` stopped on a changed holds file before
+any removal, with no pending mutation. A fresh pass uses the updated controls.
+
+The qualification's two private caches were removed after tests finished and
+a no-open-consumer/no-hardlink check: 299,638,784 allocated bytes including
+directory blocks. This is separate temporary-tool accounting, not part of the
+4,530,511,872-byte reviewed payload set. Test logs and the compiled helper remain.
+
+To prevent these output families from accumulating again, completed producers
+should declare their temporary outputs to the collector. Future acceptance
+manifest design should distinguish retained reports/inputs from temporary
+assembly and helper executables; current manifests must keep their existing
+meaning until that lifecycle transition is explicitly reviewed.
+
+The fresh apply completed in
+`1794589425429925414-4141890/report.json`: **434 removed, zero eligible remaining,
+4,530,511,872 allocated file bytes reclaimed**. All five current integrity
+manifests verified afterward, with no pending mutation. A fresh path check
+matches the 434 absent names exactly to the 434 completed removal actions.
+The original 749 reviewed names now leave 315 names on 214 inodes:
+
+| Remaining family | Distinct inodes | Allocated bytes | Reason |
+| --- | ---: | ---: | --- |
+| Generated assembly | 210 | 2,033,745,920 | 189 contract-pinned files and 21 files requiring the verified empty-log retirement transition. |
+| Capture helpers | 4 | 76,197,888 | 105 hardlink names; one group includes current accepted paths. |
+
+The qualified ReleaseFast collector is installed at
+`local-state/storage-cleanup/clean-storage`, SHA-256
+`51ee26d3fac62a10d471ed12f86a48454c6c7cf18c0cefeb16011ee13812541e`.
+Replacing the previous helper and removing two qualification executables retired
+another 26,251,264 allocated bytes. The final helper check exposed an unsupported
+`zigrep -x` flag. The original pre-install lsof snapshot was independently
+verified using literal whole-line comparisons: none of the three superseded
+helpers had an open consumer. This was an ad hoc probe issue; the native
+collector rejects zigrep error exits and its completed cleanup was unaffected.
+The utility feature request and implementation follow-up are in the zigrep
+repository. The shared workflow now requires separate match/no-match/error
+handling for cleanup probes.
+
+A concurrent whole-folder `du` sample was 138,503,094,272 allocated bytes
+(about 129 GiB). This is not a new full
+purpose inventory. Other compiler work continued during this investigation,
+so the folder's net change is not the sum of these retirement records.
