@@ -15,6 +15,77 @@ const selector = @import("../generic_cfg_selector.zig");
 const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
+test "atomic constant addresses permit pending original form retries before symbolic normalization" {
+    const a = std.testing.allocator;
+    const text =
+        \\target datalayout = "e-m:e-p:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+        \\%Timeout = type { i128, i8, [15 x i8], i8, [15 x i8] }
+        \\@shared = global [18000 x i8] zeroinitializer,align 16
+        \\define fastcc void @early_retry(ptr %out,ptr %callbacks,i64 %ticks) {
+        \\entry:
+        \\ %timeout = alloca %Timeout,align 16
+        \\ %wide = zext i64 %ticks to i128
+        \\ store i128 %wide,ptr %timeout,align 16
+        \\ %kind = getelementptr i8,ptr %timeout,i64 16
+        \\ store i8 1,ptr %kind,align 16
+        \\ %tag = getelementptr i8,ptr %timeout,i64 32
+        \\ store i8 1,ptr %tag,align 16
+        \\ %context = load ptr,ptr %callbacks,align 8
+        \\ %table_slot = getelementptr i8,ptr %callbacks,i64 8
+        \\ %table = load ptr,ptr %table_slot,align 8
+        \\ %pair = cmpxchg ptr getelementptr inbounds (i8,ptr @shared,i64 16336),i32 0,i32 1 acquire acquire,align 4
+        \\ %won = extractvalue { i32, i1 } %pair,1
+        \\ %old = extractvalue { i32, i1 } %pair,0
+        \\ %different = icmp ne i32 %old,2
+        \\ %ready = select i1 %won,i1 true,i1 %different
+        \\ br i1 %ready,label %wait,label %release
+        \\wait:
+        \\ %function_slot = getelementptr i8,ptr %table,i64 96
+        \\ %function = load ptr,ptr %function_slot,align 8
+        \\ %answer = call fastcc i16 %function(ptr %context,ptr getelementptr inbounds (i8,ptr @shared,i64 16336),i32 1,ptr %timeout)
+        \\ switch i16 %answer,label %invalid [
+        \\  i16 0,label %check
+        \\  i16 18,label %failed
+        \\  i16 49,label %again
+        \\ ]
+        \\check:
+        \\ %state = load atomic i32,ptr getelementptr inbounds (i8,ptr @shared,i64 16336) acquire,align 8
+        \\ %released = icmp eq i32 %state,2
+        \\ br i1 %released,label %release,label %again
+        \\release:
+        \\ store atomic i32 0,ptr getelementptr inbounds (i8,ptr @shared,i64 16336) monotonic,align 8
+        \\ br label %done
+        \\again:
+        \\ store atomic i32 0,ptr getelementptr inbounds (i8,ptr @shared,i64 16336) monotonic,align 8
+        \\ %value = load i16,ptr getelementptr inbounds (i8,ptr @shared,i64 17886),align 2
+        \\ %zero = icmp eq i16 %value,0
+        \\ %flag = zext i1 %zero to i8
+        \\ br label %done
+        \\failed:
+        \\ store i32 18,ptr %out,align 2
+        \\ ret void
+        \\invalid:
+        \\ unreachable
+        \\done:
+        \\ %result = phi i8 [ 1,%release ],[ %flag,%again ]
+        \\ store i16 0,ptr %out,align 2
+        \\ %payload = getelementptr i8,ptr %out,i64 2
+        \\ store i8 %result,ptr %payload,align 2
+        \\ ret void
+        \\}
+    ;
+    var module = try ir.Module.parse(a, text);
+    defer module.deinit();
+    try module.verify();
+    const source = module.functions.items[0];
+    const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items };
+    var selected = try @import("../../../compilation.zig").select(a, "x86_64-unknown-linux-gnu", source, .{ .generic_cfg_selector = true, .module_context = &context });
+    defer selected.deinit(a);
+    try verify.verifyFunction(selected);
+    try std.testing.expect(source.blocks.items[0].instructions.items[10].kind.cmpxchg.ptr == .constant_expr);
+    try module.verify();
+}
+
 fn executable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
     const function = module.functions.items[0];
     var output = machine.MachineFunction.init(function.name, function.ret_ty);

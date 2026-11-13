@@ -840,8 +840,8 @@ test "checked vector expansion rejects escaping aggregates and unproved envelope
 
 test "integer vector products retain modular lanes exact stores and source" {
     const a = std.testing.allocator;
-    inline for ([_]u16{ 8, 16, 24, 32, 48, 64, 128 }) |bits| for ([_]usize{ 4, 64 }) |count| {
-        const text = try std.fmt.allocPrint(a, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndeclare i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}>)\ndefine i64 @product(ptr %out,ptr %input,i64 %salt) {{\nentry:\n %v = load <{1d} x i{0d}>,ptr %input,align 1\n %r = call i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}> %v)\n store i{0d} %r,ptr %out,align 1\n %answer = xor i64 %salt,90\n ret i64 %answer\n}}\n", .{ bits, count });
+    inline for ([_]u16{ 8, 16, 24, 32, 48, 64, 128 }) |bits| for ([_]usize{ 4, 64 }) |count| for ([_][]const u8{ "", "tail ", "notail " }) |hint| {
+        const text = try std.fmt.allocPrint(a, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndeclare i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}>)\ndefine i64 @product(ptr %out,ptr %input,i64 %salt) {{\nentry:\n %v = load <{1d} x i{0d}>,ptr %input,align 1\n %r = {2s}call i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}> %v)\n store i{0d} %r,ptr %out,align 1\n %answer = xor i64 %salt,90\n ret i64 %answer\n}}\n", .{ bits, count, hint });
         defer a.free(text);
         var module = try ir.Module.parse(a, text);
         defer module.deinit();

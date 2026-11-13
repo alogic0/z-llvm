@@ -636,14 +636,15 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
    Close the fourteen remaining original Debug failures and complete its object
    before the final generations and full behavior matrices in step 12.
-   The completion candidate adds nineteen populations: one-bit checked vectors,
+   The completion candidate adds twenty-two populations: one-bit checked vectors,
    odd-width vector shifts, closed internal vector calls, memory bitcasts,
    bounded large-integer memory views, integer global data, function alignment,
    exact floating literal payloads, vector range facts, annotated assembly
    operands, intrinsic pointer facts, optional vector-call tail hints and
    optional assembly contracts, symbolic pointer round trips, floating boolean
    calls, native floating memory in owned byte frames, typed floating frames,
-   unused variadic inputs and optional floating-vector call hints. Independent
+   unused variadic inputs, optional floating-vector call hints, atomic pointer
+   retry checks, hinted integer products and quad floating classification. Independent
    C models cover each admitted form; generators and driver templates belong in
    `tools/` and must reproduce the qualified fixtures exactly. Keep ordinary
    ABI, stack-object, frame and Source/value-use limits unchanged. Explicit
@@ -655,11 +656,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    literal decoder for scalar float codegen so signaling NaNs keep their bits.
    Require the complete 7,874-definition census and object, ELF/event/owner
    audits, both unit builds, eight readiness procedures, all 17 gates, both
-   complete 215-population native suites and all 6,184 required faults. Compare
+   complete 218-population native suites and all 6,346 required faults. Compare
    every preceding outcome and artifact explicitly before accepting this
    successor checkpoint. Private complete objects and targeted execution runs
-   are available; cumulative acceptance remains open. Both private 2,347-test
-   builds pass. Targeted runs for the nineteen additions pass all 1,026 of their
+   are available; cumulative acceptance remains open. Both private 2,349-test
+   builds pass. Targeted runs for the twenty-two additions pass all 1,188 of their
    required fault controls across both compiler builds. Maintained generators
    reproduce the qualified fixtures byte-for-byte in Debug and ReleaseFast.
    Vector range facts validate
@@ -682,12 +683,22 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    unproved attributes and hinted ordinary calling conventions stay closed.
    Independent native checks cover 72 literal and dynamic cases, one or two
    vector arguments, exact payloads and clobbering calls in caller and callee.
+   Original-form atomic retries reject constant-expression pointers before
+   transaction planning, allowing the existing symbolic pointer rewrite to run.
+   A regression reproduces the former early-retry error; independent C models
+   cover 228 scalar and pointer atomic cases. Keep the original absolute-address
+   rejection controls. Optional hints on existing integer product reductions
+   retain their modular lane arithmetic and exact stores. Quad classification
+   extends the existing integer-bit classifier; 1,040 native cases cover every
+   class mask, literal zeros and NaNs, exact payloads and clobbering calls.
+   The preceding overly broad atomic candidate failed the absolute-address unit
+   guard and remains unaccepted; the final repair reuses the existing rewrite.
    The complete Debug local-hook run with the pinned reference frontend now
    matches all 2,097 named reference outcomes under normal resources. This does
    not establish the final compiler-generation matrices. The three optimized
    modes now verify every retained definition: 904 in ReleaseSafe, 743 in
    ReleaseFast and 1,014 in ReleaseSmall. Their complete replays still fail
-   selection with 12, 11 and five failed definitions respectively. Retained
+   selection with seven, six and two failed definitions respectively. Retained
    operation diagnostics identify additional vector forms, wide integer
    intrinsics, extended floating calls, inline assembly and value-use contracts among the
    remaining work. Close each with independent execution coverage, keep all failed

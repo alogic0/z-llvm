@@ -126,6 +126,10 @@ fn rmwInstruction(op: []const u8, bits: u16) machine.Instruction {
 }
 
 pub fn lowerRmw(selector: *Selector, result: ?[]const u8, rmw: core_ir.AtomicRmwInst) !?Diagnostic {
+    // Let the existing symbolic pointer view run after an original-form
+    // attempt. Constant expressions are not named transaction sources.
+    if (rmw.ptr == .constant_expr or (rmw.ty == .ptr and rmw.value == .constant_expr))
+        return .{ .no_emitter = "scalar-atomic-constant-pointer" };
     if (inspectRmw(rmw)) |diagnostic| return diagnostic;
     const name = result orelse return .{ .unsupported_value = "scalar-atomic-rmw-result" };
     const bits = width(rmw.ty).?;
@@ -172,6 +176,8 @@ fn slot(selector: *Selector) !Slot {
 }
 
 pub fn lowerCmpxchg(selector: *Selector, result: ?[]const u8, cmp: core_ir.CmpxchgInst) !?Diagnostic {
+    if (cmp.ptr == .constant_expr or (cmp.ty == .ptr and (cmp.expected == .constant_expr or cmp.replacement == .constant_expr)))
+        return .{ .no_emitter = "scalar-atomic-constant-pointer" };
     if (inspectCmpxchg(cmp)) |diagnostic| return diagnostic;
     const name = result orelse return .{ .unsupported_value = "scalar-atomic-cmpxchg-result" };
     const bits = width(cmp.ty).?;

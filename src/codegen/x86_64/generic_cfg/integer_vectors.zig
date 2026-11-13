@@ -763,7 +763,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                         const product = std.mem.eql(u8, op, "mul");
                         if (product) {
                             if (s.bits != 8 and s.bits != 16 and s.bits != 24 and s.bits != 32 and s.bits != 48 and s.bits != 64 and s.bits != 128) return error.UnsupportedIntegerVector;
-                            if (call.tail_kind != null or call.callee_function_ty != null or call.args.items[0].abi_x87_memory or call.args.items[0].abi_split_integer) return error.UnsupportedIntegerVector;
+                            if (call.callee_function_ty != null or call.args.items[0].abi_x87_memory or call.args.items[0].abi_split_integer) return error.UnsupportedIntegerVector;
                             abi.rejectUnsupportedCallEnvelope(call) catch return error.UnsupportedIntegerVector;
                         }
                         matched = true;
