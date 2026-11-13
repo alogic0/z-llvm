@@ -760,7 +760,16 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
    pinned reference, and audit every delivered hook object before publishing
-   follow-up acceptance and its successor evidence seal.
+   follow-up acceptance and its successor evidence seal. The behavior runner's
+   `--profile-events` option requests ordered events for each local capture and
+   rejects missing or changed event files. Bind this runner separately to the
+   frozen backend source; retain complete event audits for the final matrices.
+   The object auditor's `--capture-directory` selects one complete capture
+   recorded in the enclosing run, including compiler generations and behavior
+   matrices. Unrecorded, ambiguous, incomplete or outside-run paths fail.
+   When Zig has removed temporary frontend IR, require an exact recorded capture
+   and the retained input consumed by the backend command. Existing original
+   inputs still require their recorded hashes; fixed-input audits stay strict.
 
 The [vector checkpoint](../evidence/compiler_behavior_vector_checkpoint_20261111.json)
 accepts code `a328d225` for quoted global references, floating vector data and

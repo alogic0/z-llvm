@@ -61,8 +61,8 @@ pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
     u.installSignals();
     const argv = try init.minimal.args.toSlice(c.a);
-    if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("usage: run_upstream_behavior --output-root DIR --compiler EXE --zig-source DIR --libc-file FILE --mode Debug|ReleaseSafe|ReleaseFast|ReleaseSmall --route llvm|local [--zllvm EXE] [--reference-report FILE] [--resources normal|accepted] [--test-filter TEXT]\n", .{});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "compiler", "zig-source", "libc-file", "mode", "route", "zllvm", "reference-report", "resources", "test-filter" }, &.{});
+    if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("usage: run_upstream_behavior --output-root DIR --compiler EXE --zig-source DIR --libc-file FILE --mode Debug|ReleaseSafe|ReleaseFast|ReleaseSmall --route llvm|local [--zllvm EXE] [--reference-report FILE] [--resources normal|accepted] [--test-filter TEXT] [--profile-events]\n", .{});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "compiler", "zig-source", "libc-file", "mode", "route", "zllvm", "reference-report", "resources", "test-filter" }, &.{"profile-events"});
     const mode = try args.require("mode");
     const route = try args.require("route");
     const resources = args.get("resources") orelse "normal";
@@ -70,6 +70,7 @@ pub fn main(init: std.process.Init) !void {
     if (!u.contains(&.{ "llvm", "local" }, route)) return error.InvalidRoute;
     if (!u.contains(&.{ "normal", "accepted" }, resources)) return error.InvalidResources;
     if (std.mem.eql(u8, route, "local") and args.get("zllvm") == null) return error.MissingBackend;
+    if (args.flag("profile-events") and !std.mem.eql(u8, route, "local")) return error.ProfileEventsRequireLocalRoute;
     const output = try c.newOutput(try args.require("output-root"));
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("upstream-behavior-v1"));
@@ -78,6 +79,7 @@ pub fn main(init: std.process.Init) !void {
     try u.put(c.a, &report, "route", u.s(route));
     try u.put(c.a, &report, "resources", u.s(resources));
     try u.put(c.a, &report, "full_suite", u.b(args.get("test-filter") == null));
+    try u.put(c.a, &report, "profile_events_requested", u.b(args.flag("profile-events")));
     var runner = Runner.init(&c, output);
     execute(&c, args, output, &runner, &report) catch |err| {
         try u.put(c.a, &report, "error", u.s(c.diagnostic orelse @errorName(err)));
@@ -117,6 +119,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     if (local) {
         const backend = try c.join(&.{try args.require("zllvm")});
         try u.put(c.a, report, "backend", try identity(c, backend));
+        if (args.flag("profile-events")) try env.put("ZLLVM_WHOLE_PROFILE_EVENTS", "1");
         for ([_][2][]const u8{
             .{ "ZIG_USE_ZLLVM_OBJECT", "1" },                                                      .{ "ZLLVM_PIPELINE", "postopt" },
             .{ "ZLLVM_EXE", try std.Io.Dir.cwd().realPathFileAlloc(c.io, "/proc/self/exe", c.a) }, .{ "ZLLVM_WHOLE_BACKEND", backend },
@@ -136,7 +139,15 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
         try u.put(c.a, report, "captures", captures);
         if (compiled.code == 0) {
             if (captures.array.items.len == 0 or !u.exists(c.io, try c.join(&.{ output, "hook.marker" }))) return error.MissingLocalCapture;
-            for (captures.array.items) |capture| if (!(try u.get(capture, "object_complete")).bool) return error.IncompleteLocalObject;
+            for (captures.array.items) |capture| {
+                if (!(try u.get(capture, "object_complete")).bool) return error.IncompleteLocalObject;
+                if (args.flag("profile-events")) {
+                    const events = capture.object.get("profile_events") orelse return error.MissingLocalProfileEvents;
+                    const path = try u.str(events, "path");
+                    if ((try u.get(events, "bytes")).integer <= 0 or
+                        !std.mem.eql(u8, try c.digest(path), try u.str(events, "sha256"))) return error.LocalProfileEventsChanged;
+                }
+            }
         }
     }
     if (compiled.code != 0 or !compiled.completed) return error.BehaviorCompileFailed;

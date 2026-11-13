@@ -5,6 +5,32 @@ const u = @import("validation/common.zig");
 const reports = @import("validation/whole_compiler_report.zig");
 const elf = @import("validation/object_contract.zig");
 
+fn validateCaptureDirectory(report: u.Value, root: []const u8, directory: []const u8) !u.Value {
+    if (!u.isWithin(root, directory) or std.mem.eql(u8, root, directory)) return error.CaptureOutsideRun;
+    var matches: usize = 0;
+    var selected: u.Value = .null;
+    for ([_][]const u8{ "captures", "invocations", "self_rebuild_invocations" }) |field| {
+        const captures = report.object.get(field) orelse continue;
+        for (try u.json.array(captures)) |capture| {
+            if (!std.mem.eql(u8, try u.str(capture, "directory"), directory)) continue;
+            if (!(try u.get(capture, "object_complete")).bool) return error.IncompleteRecordedCapture;
+            matches += 1;
+            selected = capture;
+        }
+    }
+    if (matches == 0) return error.UnrecordedCaptureDirectory;
+    if (matches != 1) return error.AmbiguousCaptureDirectory;
+    return selected;
+}
+
+fn validateRecordedCapture(recorded: u.Value, completed: u.Value) !void {
+    if (recorded.object.count() != completed.object.count() + 1) return error.RecordedCaptureChanged;
+    var fields = completed.object.iterator();
+    while (fields.next()) |entry| {
+        if (!u.json.eql(entry.value_ptr.*, recorded.object.get(entry.key_ptr.*) orelse return error.RecordedCaptureChanged)) return error.RecordedCaptureChanged;
+    }
+}
+
 fn objectName(a: std.mem.Allocator, spelling: []const u8) ![]const u8 {
     const name = reports.ownershipName(spelling);
     var bytes: std.ArrayList(u8) = .empty;
@@ -24,11 +50,17 @@ fn objectName(a: std.mem.Allocator, spelling: []const u8) ![]const u8 {
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
     const argv = try init.minimal.args.toSlice(c.a);
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "capture-root", "census", "output-root" }, &.{});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "capture-root", "capture-directory", "census", "output-root" }, &.{});
     const root = try c.join(&.{try args.require("capture-root")});
     const output = try c.newOutput(try args.require("output-root"));
     const original_report = try c.load(try c.join(&.{ root, "report.json" }));
-    const directory = try c.join(&.{ root, "backend" });
+    var recorded_capture: ?u.Value = null;
+    const directory = if (args.get("capture-directory")) |path| explicit: {
+        const selected = try c.join(&.{path});
+        recorded_capture = try validateCaptureDirectory(original_report, root, selected);
+        try validateRecordedCapture(recorded_capture.?, try c.load(try c.join(&.{ selected, "report.json" })));
+        break :explicit selected;
+    } else try c.join(&.{ root, "backend" });
     const invocation = try c.load(try c.join(&.{ directory, "invocation.json" }));
     const commands = try c.load(try c.join(&.{ directory, "commands.json" }));
     if (commands.array.items.len != 1) return error.ExpectedOneBackendCommand;
@@ -44,7 +76,19 @@ pub fn main(init: std.process.Init) !void {
     for (effective.array.items, recorded_argv[recorded_argv.len - effective.array.items.len ..]) |actual, recorded| if (!u.json.eql(actual, recorded)) return error.BackendCommandMismatch;
     const input = try u.get(invocation, "input");
     const input_path = try c.join(&.{ directory, "input.ll" });
-    if (!std.mem.eql(u8, try c.digest(input_path), try u.str(input, "sha256")) or !std.mem.eql(u8, try c.digest(try u.str(invocation, "original_input")), try u.str(input, "sha256"))) return error.InputIdentityChanged;
+    if (!std.mem.eql(u8, try c.digest(input_path), try u.str(input, "sha256"))) return error.InputIdentityChanged;
+    if (!u.json.is(effective.array.items[effective.array.items.len - 1], input_path)) return error.BackendInputMismatch;
+    const original_input = try u.str(invocation, "original_input");
+    const original_available = u.exists(c.io, original_input);
+    // Zig removes temporary frontend IR after delivering the captured object.
+    // Only an exact complete capture recorded by its enclosing run may rely on
+    // the retained input that the recorded backend command actually consumed.
+    if (recorded_capture) |recorded| {
+        if (!u.json.eql(input, try u.get(recorded, "input")) or
+            !u.json.is(try u.get(recorded, "original_input"), original_input)) return error.RecordedCaptureChanged;
+    }
+    if ((original_available or recorded_capture == null) and
+        !std.mem.eql(u8, try c.digest(original_input), try u.str(input, "sha256"))) return error.InputIdentityChanged;
     const profile = try c.load(try c.join(&.{ directory, "profile.json" }));
     const analysis = try reports.analyze(c.a, try c.read(try c.join(&.{ directory, "backend.stderr" })));
     try reports.validateSuccess(c.a, analysis, profile, try c.read(try c.join(&.{ directory, "owners.tsv" })));
@@ -86,6 +130,8 @@ pub fn main(init: std.process.Init) !void {
         .object_complete = true,
         .scope = "Completed backend command, input, profile, ownership, census and ELF; no startup credit",
         .capture_root = root,
+        .capture_directory = directory,
+        .original_input_available = original_available,
         .original_runner_status = try u.str(original_report, "status"),
         .backend_sha256 = try c.digest(backend_path),
         .input_sha256 = try c.digest(input_path),
@@ -102,4 +148,30 @@ test "object audit decodes LLVM escapes exactly once" {
     defer arena.deinit();
     try std.testing.expectEqualStrings("type.\"union\"\\31", try objectName(arena.allocator(), "\"type.\\22union\\22\\5C31\""));
     try std.testing.expectError(error.InvalidSymbolName, objectName(arena.allocator(), "bad\\00"));
+}
+
+test "object audit accepts only one complete capture recorded inside its run" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const capture = .{ .directory = "/run/captures/17", .object_complete = true };
+    var report = try u.toValue(a, .{ .captures = .{capture} });
+    _ = try validateCaptureDirectory(report, "/run", "/run/captures/17");
+    try std.testing.expectError(error.UnrecordedCaptureDirectory, validateCaptureDirectory(report, "/run", "/run/captures/18"));
+    try std.testing.expectError(error.CaptureOutsideRun, validateCaptureDirectory(report, "/elsewhere", "/run/captures/17"));
+    try u.put(a, &report, "invocations", try u.toValue(a, .{capture}));
+    try std.testing.expectError(error.AmbiguousCaptureDirectory, validateCaptureDirectory(report, "/run", "/run/captures/17"));
+    const incomplete = try u.toValue(a, .{ .captures = .{.{ .directory = "/run/captures/17", .object_complete = false }} });
+    try std.testing.expectError(error.IncompleteRecordedCapture, validateCaptureDirectory(incomplete, "/run", "/run/captures/17"));
+}
+
+test "object audit retains every recorded capture field before accepting transient inputs" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const completed = try u.toValue(a, .{ .object_complete = true, .input = .{ .sha256 = "original" } });
+    var recorded = try u.toValue(a, .{ .directory = "/run/captures/17", .object_complete = true, .input = .{ .sha256 = "original" } });
+    try validateRecordedCapture(recorded, completed);
+    try u.put(a, &recorded, "input", try u.toValue(a, .{ .sha256 = "changed" }));
+    try std.testing.expectError(error.RecordedCaptureChanged, validateRecordedCapture(recorded, completed));
 }
