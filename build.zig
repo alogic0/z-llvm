@@ -375,7 +375,8 @@ pub fn build(b: *std.Build) void {
     }) });
     event_audit.step.dependOn(&verify_file_audit.step);
     const event_audit_run = b.addRunArtifact(event_audit);
-    if (b.args) |args| event_audit_run.addArgs(args);
+    event_audit_run.addPassthruArgs();
+    event_audit_run.has_side_effects = true;
     b.step("audit-native-events", "Audit complete live native-event streams without deleting them").dependOn(&event_audit_run.step);
     const event_audit_tests = b.addTest(.{ .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
