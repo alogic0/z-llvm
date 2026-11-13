@@ -9,6 +9,26 @@ const word: ir.Type = .{ .int = 64 };
 const offset_ty: ir.Type = .{ .int = 32 };
 const xmm: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
 
+const TypedUse = struct {
+    pub const Error = error{};
+    name: []const u8,
+    found: *bool,
+    pub fn visit(state: TypedUse, value: *const ir.Value, _: ir.Type) Error!void {
+        if (value.* == .named and ir.identifiers.eql(value.named, state.name)) state.found.* = true;
+    }
+};
+fn hasTypedUse(function: ir.Function, name: []const u8) bool {
+    var found = false;
+    const visitor: TypedUse = .{ .name = name, .found = &found };
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |*inst| if (!inst.removed) {
+            _ = ir.operands.instruction(@as(*const ir.Instruction, inst), visitor) catch unreachable;
+        };
+        if (block.terminator) |*term| _ = ir.operands.terminator(@as(*const ir.Terminator, term), visitor) catch unreachable;
+    }
+    return found;
+}
+
 const Builder = struct {
     a: std.mem.Allocator,
     source: ir.Function,
@@ -90,6 +110,18 @@ fn setup(a: std.mem.Allocator, source: ir.Function) !?ir.Function {
     if (start) {
         result.params = try source.params.clone(a);
         save = try b.emit(.{ .alloca = .{ .allocated_ty = .{ .aggregate = "[176 x i8]" }, .attrs = "align 16" } });
+        // Otherwise unused named registers still need stable entry homes when
+        // va_arg creates framed control flow. Snapshot them in their real SysV
+        // save cells; neither cursor nor the source signature changes. The use
+        // scan only avoids redundant snapshots, not an absence-of-use proof.
+        for (source.params.items, 0..) |param, index| {
+            if (hasTypedUse(source, param.name)) continue;
+            switch (layout.locations[index]) {
+                .register => |reg| try b.store(param.ty, .{ .named = param.name }, try b.at(save, @intCast(reg * 8))),
+                .sse => |reg| try b.store(param.ty, .{ .named = param.name }, try b.at(save, @intCast(48 + reg * 16))),
+                else => {},
+            }
+        }
         for (gp..6) |index| {
             const name = try b.name();
             try result.params.append(a, .{ .ty = word, .name = name });

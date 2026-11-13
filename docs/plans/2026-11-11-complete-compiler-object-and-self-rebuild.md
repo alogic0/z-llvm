@@ -636,13 +636,14 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
    Close the fourteen remaining original Debug failures and complete its object
    before the final generations and full behavior matrices in step 12.
-   The completion candidate adds sixteen populations: one-bit checked vectors,
+   The completion candidate adds eighteen populations: one-bit checked vectors,
    odd-width vector shifts, closed internal vector calls, memory bitcasts,
    bounded large-integer memory views, integer global data, function alignment,
    exact floating literal payloads, vector range facts, annotated assembly
    operands, intrinsic pointer facts, optional vector-call tail hints and
    optional assembly contracts, symbolic pointer round trips, floating boolean
-   calls and native floating memory in owned byte frames. Independent C models cover each admitted form;
+   calls, native floating memory in owned byte frames, typed floating frames
+   and unused variadic inputs. Independent C models cover each admitted form;
    generators and driver templates belong in
    `tools/` and must reproduce the qualified fixtures exactly. Keep ordinary
    ABI, stack-object, frame and Source/value-use limits unchanged. Explicit
@@ -654,11 +655,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    literal decoder for scalar float codegen so signaling NaNs keep their bits.
    Require the complete 7,874-definition census and object, ELF/event/owner
    audits, both unit builds, eight readiness procedures, all 17 gates, both
-   complete 212-population native suites and all 6,022 required faults. Compare
+   complete 214-population native suites and all 6,130 required faults. Compare
    every preceding outcome and artifact explicitly before accepting this
    successor checkpoint. Private complete objects and targeted execution runs
-   are available; cumulative acceptance remains open. Both private 2,345-test
-   builds pass. Targeted runs for the sixteen additions pass all 864 of their
+   are available; cumulative acceptance remains open. Both private 2,346-test
+   builds pass. Targeted runs for the eighteen additions pass all 972 of their
    required fault controls across both compiler builds. Maintained generators
    reproduce the qualified fixtures byte-for-byte in Debug and ReleaseFast.
    Vector range facts validate
@@ -673,14 +674,17 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    bounds. Boolean calls with floating arguments use masked ordinary ABI
    carriers. Native float and half stores retain exact payload bits in owned
    byte frames, including quiet and signaling NaNs.
+   Typed `i32` storage carriers retain the same native floating memory behavior.
+   Otherwise unused named variadic registers receive stable homes in their
+   existing SysV save cells, preserving argument positions and both cursors.
    The complete Debug local-hook run with the pinned reference frontend now
    matches all 2,097 named reference outcomes under normal resources. This does
    not establish the final compiler-generation matrices. The three optimized
    modes now verify every retained definition: 904 in ReleaseSafe, 743 in
    ReleaseFast and 1,014 in ReleaseSmall. Their complete replays still fail
-   selection with 15, 14 and 13 failed definitions respectively. Retained
-   operation diagnostics identify additional vector and padded storage forms,
-   variadic value handling, inline assembly and value-use contracts among the
+   selection with 12, 11 and six failed definitions respectively. Retained
+   operation diagnostics identify additional vector forms, wide integer
+   intrinsics, extended floating calls, inline assembly and value-use contracts among the
    remaining work. Close each with independent execution coverage, keep all failed
    captures explicit, and rerun the complete optimized modes before final
    acceptance. The latest Debug replay still matches all 2,097 reference

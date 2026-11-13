@@ -110,7 +110,7 @@ fn needed(function: ir.Function) bool {
                 owned_storage = owned_storage or fp(x.allocated_ty);
                 if (x.allocated_ty == .aggregate) {
                     const text = std.mem.trim(u8, x.allocated_ty.aggregate, " \t");
-                    byte_storage = byte_storage or (std.mem.startsWith(u8, text, "[") and std.mem.endsWith(u8, text, " x i8]"));
+                    byte_storage = byte_storage or (std.mem.startsWith(u8, text, "[") and (std.mem.endsWith(u8, text, " x i8]") or std.mem.endsWith(u8, text, " x i32]")));
                 }
             },
             .store => |x| {

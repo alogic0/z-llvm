@@ -6,8 +6,8 @@ test "native floating vector stores survive owned byte frames with exact payload
         .{ .ty = "<4 x float>", .value = "<float 1.000000e+00,float -0.000000e+00,float 0x7FF8000020000000,float 0x7FF4000000000000>", .bytes = .{ 0, 0, 0x80, 0x3f, 0, 0, 0, 0x80, 1, 0, 0xc0, 0x7f, 0, 0, 0xa0, 0x7f } },
         .{ .ty = "<8 x half>", .value = "<half 0xH3C00,half 0xH8000,half 0xH7C00,half 0xHFC00,half 0xH7E01,half 0xH7D55,half 0xH0001,half 0xH03FF>", .bytes = .{ 0, 0x3c, 0, 0x80, 0, 0x7c, 0, 0xfc, 1, 0x7e, 0x55, 0x7d, 1, 0, 0xff, 3 } },
     };
-    for (cases) |item| {
-        const source = try std.fmt.allocPrint(a, "define void @probe(ptr %out) {{\nentry:\n %frame = alloca [64 x i8],align 16\n %local = getelementptr i8,ptr %frame,i64 16\n store {0s} {1s},ptr %local,align 16\n %loaded = load {0s},ptr %local,align 16\n store {0s} %loaded,ptr %out,align 1\n ret void\n}}\n", .{ item.ty, item.value });
+    for (cases) |item| for ([_][]const u8{ "[64 x i8]", "[16 x i32]" }) |frame_type| {
+        const source = try std.fmt.allocPrint(a, "define void @probe(ptr %out) {{\nentry:\n %frame = alloca {2s},align 16\n %local = getelementptr i8,ptr %frame,i64 16\n store {0s} {1s},ptr %local,align 16\n %loaded = load {0s},ptr %local,align 16\n store {0s} %loaded,ptr %out,align 1\n ret void\n}}\n", .{ item.ty, item.value, frame_type });
         defer a.free(source);
         var module = try ir.Module.parse(a, source);
         defer module.deinit();
@@ -26,7 +26,7 @@ test "native floating vector stores survive owned byte frames with exact payload
         try std.testing.expectEqualSlices(u8, &item.bytes, &output);
         try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[2].kind.store.ty == .vector);
         try module.verify();
-    }
+    };
 }
 test "byte frames keep opaque quad carriers and volatile native vector stores outside the new trigger" {
     const a = std.testing.allocator;
