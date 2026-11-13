@@ -448,3 +448,17 @@ A concurrent whole-folder `du` sample was 138,503,094,272 allocated bytes
 (about 129 GiB). This is not a new full
 purpose inventory. Other compiler work continued during this investigation,
 so the folder's net change is not the sum of these retirement records.
+
+The utility follow-up is complete: zigrep 0.3.21 adds `-x` / `--line-regexp`,
+with 469 passing tests in Debug and ReleaseFast and 33 installed-binary ripgrep
+comparisons. Its ReleaseFast binary is installed in `~/bin`; the original
+three exact-path queries now return no match (exit 1), agreeing with the literal
+snapshot check. The implementation is zigrep commit `3a7e6e3`, with installation
+and task-cache retirement recorded in `566b0bb`. Its separate 733,945,856-byte
+scratch retirement is outside z_llvm and excluded from the payload total above.
+
+A fresh review through both installed tools completed in
+`1794591539984689209-4183507/report.json`: zero eligible files in the prepared
+set, zero further removals, and all five current integrity manifests verified.
+`generated-review/summary.json` and `installed-validation.json` retain the
+compact machine-readable results alongside the per-path evidence.
