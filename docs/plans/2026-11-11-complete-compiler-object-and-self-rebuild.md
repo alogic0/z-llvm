@@ -770,6 +770,10 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    When Zig has removed temporary frontend IR, require an exact recorded capture
    and the retained input consumed by the backend command. Existing original
    inputs still require their recorded hashes; fixed-input audits stay strict.
+   Use `tools/run_frontend_f80.zig` for the unchanged f80 probe and independent
+   C driver. Require all nine observations, four compile-time layout checks,
+   explicit owned caches and unchanged input/executable hashes for each final
+   compiler generation.
 
 The [vector checkpoint](../evidence/compiler_behavior_vector_checkpoint_20261111.json)
 accepts code `a328d225` for quoted global references, floating vector data and
