@@ -368,6 +368,24 @@ pub fn build(b: *std.Build) void {
     const storage_cleanup_test_step = b.step("test-storage-cleanup", "Run isolated storage retention, mutation and CLI checks");
     storage_cleanup_test_step.dependOn(&storage_cleanup_test_run.step);
     storage_cleanup_test_step.dependOn(&storage_cleanup_cli_tests.step);
+    const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/audit_native_events.zig"),
+        .target = b.graph.host,
+        .optimize = .ReleaseFast,
+    }) });
+    event_audit.step.dependOn(&verify_file_audit.step);
+    const event_audit_run = b.addRunArtifact(event_audit);
+    if (b.args) |args| event_audit_run.addArgs(args);
+    b.step("audit-native-events", "Audit complete live native-event streams without deleting them").dependOn(&event_audit_run.step);
+    const event_audit_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/audit_native_events.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    event_audit_tests.step.dependOn(&verify_file_audit.step);
+    const event_audit_test_run = b.addRunArtifact(event_audit_tests);
+    event_audit_test_run.has_side_effects = true;
+    b.step("test-native-event-audit", "Check event-stream semantics, report bindings and changed inputs").dependOn(&event_audit_test_run.step);
     const inbox206_descriptor_identity_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/zllvm_inbox206_materialize.zig"),

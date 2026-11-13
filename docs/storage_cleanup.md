@@ -245,6 +245,33 @@ record, unbound build, reappeared executable or changed source prevents removal.
 This option applies only to audited raw traces; it does not excuse missing
 source, input, audit, toolchain or failure evidence.
 
+### Auditing live traces
+
+Start from paths that exist now. Historical audit catalogs describe an earlier
+state and may include already retired payloads; reconcile them with completed
+retirement records before estimating reclaim.
+
+`zig build audit-native-events -- --plan PLAN.json` reads an explicit list of
+live streams and creates compact `zllvm-native-event-audit-v1` results. The plan
+uses schema `zllvm-native-event-audit-plan-v1`; each `traces` entry contains a
+`path` and `producer`, `top_report`, and `backend_report` path/SHA-256 pairs.
+All paths are project-relative. Producer receipts must be completed
+`run_checked` jobs whose `--output-root` names the report's run directory.
+
+The auditor holds the shared cleanup lease, checks every event's order and
+scope balance, hashes the entire stream, and compares its final counters and
+failed-function names with the backend report. It verifies input bytes and
+rechecks file identities and report hashes after reading. Failed compilations
+remain failed outcomes. Truncation, mismatched hashes, unrelated producers and
+changed controls cannot produce a verified audit. Results preserve failure
+details, event offsets, source snapshots and the auditor's Git revision.
+It does not delete files or replace the collector's separate source/build,
+retired-compiler, alias, hold and pin checks. Unrecognized producer layouts
+remain explicit review cases.
+
+Run `zig build test-native-event-audit` and the same command with
+`-Doptimize=ReleaseFast` to qualify the stream state machine and report binding.
+
 ## Accounting for the remaining tree
 
 `tools/clean-storage inventory` runs a review and writes `inventory.json`. It
