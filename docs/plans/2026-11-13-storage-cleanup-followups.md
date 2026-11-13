@@ -82,6 +82,17 @@ under these release rules. All five integrity manifests passed. Concurrent
 compiler work explains why the whole-folder decrease differs from the exact
 reclamation above. The unresolved remainder is not a claim of necessity.
 
+The final ReleaseFast collector was installed from `8d6f2fde`, SHA-256
+`3d371ad123eb0ef49f4733c992cbc82aedd4bfa88564e35d08be44593ee68d29`.
+Its installed repeat again found the migrated inputs already shared, and all
+224 removed assembly/helper names were independently confirmed absent. No
+pending mutation remains. This task's qualification caches and superseded
+binaries accounted for another 589,221,888 allocated bytes retired separately;
+these were created during implementation and are excluded from project savings.
+The later whole-folder sample was 140,330,209,280 bytes (130.693 GiB) as compiler
+work continued. `lifecycle-implementation/summary.json` records these separate
+measurements and the installed binary identity.
+
 Final guard review also separates inventory bucket depth from consumer scope:
 older validation layouts without a `batch-*` component protect the actual parent
 job. The regression checks a parent command that has not yet opened its input,
