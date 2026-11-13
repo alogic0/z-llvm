@@ -24,6 +24,17 @@ if [[ ${1:-} == exec || ${1:-} == maintain ]]; then
     if [[ $cleanup_mode == exec ]]; then exec flock --shared "$storage_state/cleanup.lock" "$@"; fi
     cleanup_command_status=0
     flock --shared "$storage_state/cleanup.lock" "$@" || cleanup_command_status=$?
+    # Replace this process before collecting: its old argv still names the
+    # completed run and otherwise looks like a queued consumer to ps.
+    export ZLLVM_CLEANUP_RELEASE_REQUEST="$cleanup_release_request"
+    exec "$source_root/tools/clean-storage" __finish "$cleanup_command_status"
+fi
+if [[ ${1:-} == __finish || ${1:-} == __finish-job ]]; then
+    cleanup_keep_status=$1
+    [[ $# == 2 && $2 =~ ^[0-9]+$ && $2 -le 255 ]] || exit 2
+    cleanup_command_status=$2
+    cleanup_release_request=${ZLLVM_CLEANUP_RELEASE_REQUEST:-}
+    unset ZLLVM_CLEANUP_RELEASE_REQUEST
     cleanup_collection_status=0
     if (( cleanup_command_status == 0 )) && [[ -n $cleanup_release_request ]]; then
         "$source_root/tools/clean-storage" release --request "$cleanup_release_request" || cleanup_collection_status=$?
@@ -32,6 +43,10 @@ if [[ ${1:-} == exec || ${1:-} == maintain ]]; then
         "$source_root/tools/clean-storage" --minimal --apply || cleanup_collection_status=$?
     fi
     if (( cleanup_command_status != 0 )); then exit "$cleanup_command_status"; fi
+    if [[ $cleanup_keep_status == __finish-job ]]; then
+        if (( cleanup_collection_status != 0 )); then printf 'Storage cleanup deferred; completed job status is unchanged.\n' >&2; fi
+        exit "$cleanup_command_status"
+    fi
     exit "$cleanup_collection_status"
 fi
 cd -- "$source_root"

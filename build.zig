@@ -368,6 +368,15 @@ pub fn build(b: *std.Build) void {
     const storage_cleanup_test_step = b.step("test-storage-cleanup", "Run isolated storage retention, mutation and CLI checks");
     storage_cleanup_test_step.dependOn(&storage_cleanup_test_run.step);
     storage_cleanup_test_step.dependOn(&storage_cleanup_cli_tests.step);
+    const storage_checked_runner = b.addExecutable(.{ .name = "storage-checked-runner", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/run_checked.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    const storage_lifecycle_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/lifecycle_cli_tests.sh" });
+    storage_lifecycle_tests.addArtifactArg(storage_cleanup);
+    storage_lifecycle_tests.addArtifactArg(storage_checked_runner);
+    storage_cleanup_test_step.dependOn(&storage_lifecycle_tests.step);
     const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
         .target = b.graph.host,

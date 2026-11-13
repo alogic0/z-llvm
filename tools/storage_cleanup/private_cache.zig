@@ -14,7 +14,7 @@ pub const PlanEntry = struct {
 fn ownedArgument(e: *core.Engine, run: []const u8, cwd: []const u8, raw: []const u8) !?[]const u8 {
     const path = if (std.fs.path.isAbsolute(raw)) e.relative(raw) catch return null else blk: {
         if (!p.relative(raw)) return error.InvalidPrivateCacheArgument;
-        break :blk try e.c.fmt("{s}/{s}", .{ cwd, raw });
+        break :blk if (std.mem.eql(u8, cwd, ".")) raw else try e.c.fmt("{s}/{s}", .{ cwd, raw });
     };
     return if (p.privateCacheOwned(run, cwd, path)) path else null;
 }
@@ -57,12 +57,15 @@ pub fn paths(e: *core.Engine, run: []const u8, cwd: []const u8, v: u.Value) ![]c
 
 fn owner(e: *core.Engine, run: []const u8, producer: []const u8, binding: p.CacheOwner, v: u.Value) ![]const u8 {
     const cwd = binding.working_directory;
-    if (!p.candidate(run) or !p.candidate(cwd) or !p.within(run, cwd) or !p.within(run, producer)) return error.UnboundPrivateCacheOwner;
+    if (!p.candidate(run) or (!std.mem.eql(u8, cwd, ".") and (!p.candidate(cwd) or !p.within(run, cwd))) or !p.within(run, producer)) return error.UnboundPrivateCacheOwner;
     if (!core.eq(v, "status", "finished") or (!core.eq(v, "outcome", "completed") and !core.eq(v, "outcome", "canceled"))) return error.ProducerNotTerminal;
     _ = try core.integer(v, "actual_returncode");
     if (try core.integer(v, "finished_ns") <= try core.integer(v, "started_ns")) return error.ProducerNotTerminal;
     if (core.has(v, "cwd", .string)) {
-        if (!std.mem.eql(u8, cwd, try e.relative(try core.str(v, "cwd")))) return error.CacheWorkingDirectoryMismatch;
+        const actual_cwd = try core.str(v, "cwd");
+        if (std.mem.eql(u8, cwd, ".")) {
+            if (!std.mem.eql(u8, actual_cwd, e.c.root)) return error.CacheWorkingDirectoryMismatch;
+        } else if (!std.mem.eql(u8, cwd, try e.relative(actual_cwd))) return error.CacheWorkingDirectoryMismatch;
     } else {
         // Older run_checked receipts omitted cwd. Never infer it automatically
         // from a missing field: the explicit release records the operator's

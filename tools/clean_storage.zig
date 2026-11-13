@@ -13,6 +13,9 @@ const usage =
     \\       tools/clean-storage exec -- COMMAND [ARG...]
     \\       tools/clean-storage maintain -- COMMAND [ARG...]
     \\       tools/clean-storage maintain --release-request FILE -- COMMAND [ARG...]
+    \\       tools/clean-storage share-inputs --inputs PLAN [--apply]
+    \\       tools/clean-storage prepare-pins --requests FILE --review REPORT [--manifests PLAN]
+    \\       tools/clean-storage --requests FILE --complete-capture-aliases [--apply]
     \\       tools/clean-storage release-trace --audit FILE --build FILE --reason TEXT
     \\           [--reconstruction FILE ...]
     \\           [--compiler-retirement RECORD.json]
@@ -45,12 +48,15 @@ pub fn main(init: std.process.Init) !void {
     const args = try init.minimal.args.toSlice(c.a);
     var apply = false;
     var minimal = false;
+    var capture_aliases = false;
     var policy_path: []const u8 = "docs/storage_cleanup_policy.json";
     const release_trace = args.len > 1 and std.mem.eql(u8, args[1], "release-trace");
     const release_request = args.len > 1 and std.mem.eql(u8, args[1], "release");
     const release_build = args.len > 1 and std.mem.eql(u8, args[1], "release-build");
     const publishing = release_trace or release_request or release_build;
     const inventory_requested = args.len > 1 and std.mem.eql(u8, args[1], "inventory");
+    const share_inputs = args.len > 1 and std.mem.eql(u8, args[1], "share-inputs");
+    var inputs_plan: ?[]const u8 = null;
     const prepare_builds = args.len > 1 and std.mem.eql(u8, args[1], "prepare-builds");
     const prepare_caches = args.len > 1 and std.mem.eql(u8, args[1], "prepare-caches");
     const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
@@ -63,13 +69,14 @@ pub fn main(init: std.process.Init) !void {
     var generated_paths: ?[]const u8 = null;
     var compiler_retirement_path: ?[]const u8 = null;
     var review_path: ?[]const u8 = null;
+    var reviewed_manifests: ?[]const u8 = null;
     var request_path: ?[]const u8 = null;
     var successor_path: ?[]const u8 = null;
     var audit_path: ?[]const u8 = null;
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -78,6 +85,15 @@ pub fn main(init: std.process.Init) !void {
         }
         if (std.mem.eql(u8, args[i], "--minimal")) {
             minimal = true;
+            continue;
+        }
+        if (std.mem.eql(u8, args[i], "--complete-capture-aliases")) {
+            capture_aliases = true;
+            continue;
+        }
+        if (share_inputs and std.mem.eql(u8, args[i], "--inputs") and i + 1 < args.len) {
+            i += 1;
+            inputs_plan = args[i];
             continue;
         }
         if (std.mem.eql(u8, args[i], "--policy") and i + 1 < args.len) {
@@ -125,6 +141,11 @@ pub fn main(init: std.process.Init) !void {
             review_path = args[i];
             continue;
         }
+        if (prepare_pins and std.mem.eql(u8, args[i], "--manifests") and i + 1 < args.len) {
+            i += 1;
+            reviewed_manifests = args[i];
+            continue;
+        }
         if ((release_trace or release_build or prepare_builds) and i + 1 < args.len) {
             if ((release_build or prepare_builds) and std.mem.eql(u8, args[i], "--successor")) {
                 i += 1;
@@ -163,6 +184,7 @@ pub fn main(init: std.process.Init) !void {
     if (release_request and (apply or minimal or request_path == null)) return error.InvalidReleaseArguments;
     if (release_build and (apply or minimal or build_path == null or reason == null or audit_path != null)) return error.InvalidReleaseArguments;
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
+    if (share_inputs and (inputs_plan == null or minimal or requests_path != null)) return error.InvalidSharedInputPlan;
     if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) and (apply or minimal)) return error.PreparationIsReadOnly;
     if (prepare_generated and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_caches and (caches_path == null or reason == null)) return error.InvalidReleaseArguments;
@@ -170,6 +192,7 @@ pub fn main(init: std.process.Init) !void {
     if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_pins and (requests_path == null or review_path == null)) return error.InvalidReleaseArguments;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
+    if (capture_aliases and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_pins)) return error.InvalidCaptureAliasArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
     const policy_absolute = try c.join(&.{policy_path});
     var policy_dir = try core.fa.metadata.openRoot(c.io, std.fs.path.dirname(policy_absolute).?);
@@ -195,14 +218,20 @@ pub fn main(init: std.process.Init) !void {
     _ = try c.newOutput(output);
     const zigrep = c.env.get("ZIGREP") orelse "zigrep";
     var e = core.Engine.init(&c, config, output, zigrep);
+    e.allow_capture_aliases = capture_aliases;
     e.collector_binary_sha256 = try c.digest("/proc/self/exe");
     e.collector_sources = try collectorSources(&c);
     var status: []const u8 = "failed";
     defer report(&e, status, apply, minimal) catch {};
     try e.check(.{ .path = policy_path, .sha256 = policy_sha256 });
     try e.addControl(policy_path);
+    if (share_inputs) {
+        try @import("storage_cleanup/shared_inputs.zig").run(&e, inputs_plan.?, apply);
+        status = "complete";
+        return;
+    }
     if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else try batch.historicalPins(&e, requests_path.?, review_path.?);
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
         status = "prepared";
         return;
     }
@@ -247,7 +276,9 @@ pub fn main(init: std.process.Init) !void {
         try e.currentManifests(true);
     } else try c.print("No provenance-qualified candidates; no deletion checks needed.\n", .{});
     // Limits count eligible candidates only, so pins cannot starve later runs.
+    try e.guardCaptureGroups();
     e.applyLimits();
+    try e.guardCaptureGroups();
     for (e.actions.items) |a| if (a.status == .ready) try c.print("Eligible: {s} ({d} file bytes)\n", .{ a.path, a.allocated_bytes });
     for (e.actions.items, 0..) |*a, index| {
         if (a.status != .skipped or a.measured) continue;
@@ -267,12 +298,15 @@ pub fn main(init: std.process.Init) !void {
             try e.loadHolds();
             try e.pins();
             try e.consumers();
+            try e.guardCaptureGroups();
             if (a.status != .ready) continue;
             var group: std.ArrayList(usize) = .empty;
             if (mutation.generatedAction(a.*)) {
                 const scope = @import("storage_cleanup/generated.zig").consumerRoot(a.run_root);
                 for (e.actions.items, 0..) |other, other_index| {
-                    if (other.status == .ready and mutation.generatedAction(other) and
+                    if (other.status != .ready or !mutation.generatedAction(other)) continue;
+                    const shared = a.metadata.?.links > 1;
+                    if (if (shared) other.metadata.?.device == a.metadata.?.device and other.metadata.?.inode == a.metadata.?.inode else other.metadata.?.links == 1 and
                         std.mem.eql(u8, scope, @import("storage_cleanup/generated.zig").consumerRoot(other.run_root))) try group.append(c.a, other_index);
                 }
             }
@@ -353,6 +387,11 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/private_cache.zig", .bytes = @embedFile("storage_cleanup/private_cache.zig") },
         .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
         .{ .path = "tools/storage_cleanup/generated.zig", .bytes = @embedFile("storage_cleanup/generated.zig") },
+        .{ .path = "tools/storage_cleanup/retired_logs.zig", .bytes = @embedFile("storage_cleanup/retired_logs.zig") },
+        .{ .path = "tools/storage_cleanup/jobs.zig", .bytes = @embedFile("storage_cleanup/jobs.zig") },
+        .{ .path = "tools/storage_cleanup/shared_inputs.zig", .bytes = @embedFile("storage_cleanup/shared_inputs.zig") },
+        .{ .path = "tools/zllvm_artifact_store/store.zig", .bytes = @embedFile("zllvm_artifact_store/store.zig") },
+        .{ .path = "tools/validation/storage_lifecycle.zig", .bytes = @embedFile("validation/storage_lifecycle.zig") },
         .{ .path = "tools/validation/toolchain.zig", .bytes = @embedFile("validation/toolchain.zig") },
         .{ .path = "tools/validation/common.zig", .bytes = @embedFile("validation/common.zig") },
         .{ .path = "tools/vendor/file_audit.SHA256SUMS", .bytes = @embedFile("vendor/file_audit.SHA256SUMS") },

@@ -13,6 +13,9 @@
     "local-state/validations/compiler-object-completion-20261111/batch-01/pinned-upstream-providers-v7.sha256"
   ],
   "protected_paths": ["local-state/caches", "local-state/inputs", "local-state/artifacts", "local-state/worktrees", "local-state/storage-cleanup"],
+  "retired_empty_log_records": [
+    {"path": "local-state/retirements/reviewed-artifacts-20261112/record.json", "sha256": "2804f685d88ef6204182a637021e993d5551a1401191a4704816c7647e5de1c0"}
+  ],
   "retired_manifests": [
     {"path": "local-state/validations/compiler-object-completion-20261111/batch-01/accepted-artifacts.sha256", "sha256": "1e3024a69bf07fb70a9de6907785bffbc9a765f95c690e1c67e7d24d7beea2d6"},
     {"path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/prior-immutable-artifacts-v6.sha256", "sha256": "35e8b3f0354c8290579aef6981e3040660d61eb815d289d616433d7c965e5d28"}

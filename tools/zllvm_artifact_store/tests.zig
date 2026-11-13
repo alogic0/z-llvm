@@ -20,6 +20,48 @@ fn tempPath(tmp: std.testing.TmpDir, buffer: []u8) ![]const u8 {
     return buffer[0..try tmp.dir.realPath(io, buffer)];
 }
 
+test "shared input installation preserves names, permissions and GC references" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var buffer: [4096]u8 = undefined;
+    const path = try tempPath(tmp, &buffer);
+    try tmp.dir.writeFile(io, .{ .sub_path = "source", .data = "hello" });
+    var store = try storage.Store.open(allocator, io, path, true);
+    defer store.deinit();
+    const file = try tmp.dir.openFile(io, "source", .{});
+    defer file.close(io);
+    try store.publishFile(file, hello);
+    const destination = try std.fmt.allocPrint(allocator, "{s}/shared.ll", .{path});
+    defer allocator.free(destination);
+    try store.linkInput(hello_sha, destination);
+    const object = try store.objects.statFile(io, hello_sha, .{});
+    const shared = try tmp.dir.statFile(io, "shared.ll", .{});
+    try std.testing.expectEqual(object.inode, shared.inode);
+    try std.testing.expectEqual(@as(u32, 0o444), shared.permissions.toMode() & 0o7777);
+    try std.testing.expectError(error.PathAlreadyExists, store.linkInput(hello_sha, destination));
+    try std.testing.expectEqual(@as(usize, 0), (try store.collect(true)).files);
+    try tmp.dir.deleteFile(io, "shared.ll");
+    try std.testing.expectEqual(@as(usize, 1), (try store.collect(true)).files);
+}
+
+test "shared input refuses a writable or corrupt store object" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    var buffer: [4096]u8 = undefined;
+    const path = try tempPath(tmp, &buffer);
+    var store = try storage.Store.open(allocator, io, path, true);
+    defer store.deinit();
+    try store.objects.writeFile(io, .{ .sub_path = hello_sha, .data = "hello" });
+    const destination = try std.fmt.allocPrint(allocator, "{s}/shared.ll", .{path});
+    defer allocator.free(destination);
+    try std.testing.expectError(error.WritableSharedObject, store.linkInput(hello_sha, destination));
+    const file = try store.objects.openFile(io, hello_sha, .{ .mode = .read_write });
+    defer file.close(io);
+    try file.writeStreamingAll(io, "wrong");
+    try file.setPermissions(io, .fromMode(0o444));
+    try std.testing.expectError(error.ContentMismatch, store.linkInput(hello_sha, destination));
+}
+
 test "manifest rejects ambiguity unsafe paths unknown fields and conflicting sizes" {
     const bytes = try manifest(&.{hello});
     defer allocator.free(bytes);

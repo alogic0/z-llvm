@@ -33,7 +33,7 @@ fn option(args: []const []const u8, key: []const u8, value: []const u8) bool {
     return false;
 }
 fn commandLogs(e: *core.Engine, command: u.Value, kept: *std.ArrayList(p.Evidence)) !void {
-    for ([_][]const u8{ "stdout", "stderr" }) |key| try e.keep(kept, try core.str(command, key), null);
+    for ([_][]const u8{ "stdout", "stderr" }) |key| try @import("retired_logs.zig").keep(e, try core.str(command, key), kept);
 }
 
 pub fn verify(e: *core.Engine, a: core.Action, r: p.Release, producer: u.Value, kept: *std.ArrayList(p.Evidence)) !void {

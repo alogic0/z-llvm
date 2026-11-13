@@ -141,6 +141,28 @@ pub fn builds(e: *core.Engine, build_list: []const u8, successor: ?[]const u8, r
 /// Only completed retirement ledgers may be transitioned by this adapter.
 /// Validation-suite pins still require individual review and an explicit request.
 pub fn historicalPins(e: *core.Engine, requests_path: []const u8, review_path: []const u8) !void {
+    return reviewedPins(e, requests_path, review_path, null);
+}
+
+/// An explicit reviewed manifest list permits exact target transitions only.
+/// It never retires a whole manifest or exempts a current integrity contract.
+pub fn reviewedPins(e: *core.Engine, requests_path: []const u8, review_path: []const u8, manifests_path: ?[]const u8) !void {
+    var reviewed: []const p.Evidence = &.{};
+    var reviewed_reason: []const u8 = "";
+    if (manifests_path) |path| {
+        if (!p.relative(path)) return error.InvalidEvidencePath;
+        try e.addControl(path);
+        const json = try e.load(e.c.a, path);
+        const Plan = struct { schema: []const u8, reason: []const u8, manifests: []const p.Evidence };
+        const plan = (try std.json.parseFromValue(Plan, e.c.a, json.value, .{})).value;
+        if (!std.mem.eql(u8, plan.schema, "zllvm-reviewed-pin-manifests-v1") or plan.reason.len == 0 or plan.manifests.len == 0) return error.InvalidManifestReview;
+        for (plan.manifests) |manifest| {
+            for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, manifest.path)) return error.CurrentManifestCannotBeRetired;
+            try e.check(manifest);
+        }
+        reviewed = plan.manifests;
+        reviewed_reason = plan.reason;
+    }
     const requests = try load(e, requests_path);
     if (!p.relative(review_path)) return error.InvalidEvidencePath;
     try e.addControl(review_path);
@@ -176,16 +198,20 @@ pub fn historicalPins(e: *core.Engine, requests_path: []const u8, review_path: [
             }
             if (!qualified) continue;
             for (pins.value) |pin| {
+                var explicitly_reviewed = false;
+                for (reviewed) |manifest| if (std.mem.eql(u8, manifest.path, pin.manifest.path) and std.mem.eql(u8, manifest.sha256, pin.manifest.sha256)) {
+                    explicitly_reviewed = true;
+                };
                 if (pin.retired or !std.mem.eql(u8, pin.candidate, artifact.path) or pin.reference == null or pin.sha256 == null or
-                    !std.ascii.eqlIgnoreCase(pin.sha256.?, artifact.sha256) or !p.within("local-state/retirements", pin.manifest.path)) continue;
+                    !std.ascii.eqlIgnoreCase(pin.sha256.?, artifact.sha256) or (!explicitly_reviewed and !p.within("local-state/retirements", pin.manifest.path))) continue;
                 for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, pin.manifest.path)) return error.CurrentManifestCannotBeRetired;
                 try e.check(pin.manifest);
-                if (std.mem.endsWith(u8, pin.manifest.path, ".json")) {
+                if (!explicitly_reviewed and std.mem.endsWith(u8, pin.manifest.path, ".json")) {
                     var old = try e.load(e.c.gpa, pin.manifest.path);
                     defer old.deinit();
                     if (!core.eq(old.value, "status", "complete")) continue;
                 }
-                try transitions.append(e.c.a, .{ .manifest = pin.manifest, .reference = pin.reference.?, .target = .{ .path = artifact.path, .sha256 = artifact.sha256 }, .reason = if (record.value.state == .disposable) "User-authorized disposal of completed temporary build output; this historical reference does not require preserving its binary" else "Completed historical retirement pin replaced by verified source/build/result evidence and the explicitly accepted successor" });
+                try transitions.append(e.c.a, .{ .manifest = pin.manifest, .reference = pin.reference.?, .target = .{ .path = artifact.path, .sha256 = artifact.sha256 }, .reason = if (explicitly_reviewed) reviewed_reason else if (record.value.state == .disposable) "User-authorized disposal of completed temporary build output; this historical reference does not require preserving its binary" else "Completed historical retirement pin replaced by verified source/build/result evidence and the explicitly accepted successor" });
                 transitioned += 1;
             }
         }

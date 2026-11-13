@@ -44,4 +44,40 @@ done
 test ! -e "$cleanup_fixture/local-state/storage-cleanup/pending.json"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --requests "$cleanup_requests" > "$cleanup_fixture/repeat.log"
 "$cleanup_zigrep" -q -F 'removed: 0;' "$cleanup_fixture/repeat.log"
-printf 'Two generated-output CLI checks passed: preparation, grouped removal and repeated collection.\n'
+cleanup_run=local-state/validations/test/batch/integrated-aliases
+for cleanup_case in first second third; do
+    cleanup_owner="$cleanup_run/$cleanup_case"
+    mkdir -p "$cleanup_fixture/$cleanup_owner"
+    if [[ $cleanup_case == first ]]; then
+        printf '\177ELFshared temporary validation runner\n' > "$cleanup_fixture/$cleanup_owner/capture-zllvm"
+    else
+        ln -- "$cleanup_fixture/$cleanup_run/first/capture-zllvm" "$cleanup_fixture/$cleanup_owner/capture-zllvm"
+    fi
+    printf '[]\n' > "$cleanup_fixture/$cleanup_owner/commands.json"
+    cleanup_sha=$(sha256sum -- "$cleanup_fixture/$cleanup_owner/capture-zllvm"); cleanup_sha=${cleanup_sha%% *}
+    "$cleanup_jqz" -n --arg sha "$cleanup_sha" '{schema:"real-program-v1",status:"passed",tool_provenance:{binary_sha256:$sha},rows:[{mode:"ReleaseFast",status:"matched"}]}' > "$cleanup_fixture/$cleanup_owner/report.json"
+    printf '%s/capture-zllvm\n' "$cleanup_owner" >> "$cleanup_fixture/aliases.txt"
+done
+sed -n '1,2p' "$cleanup_fixture/aliases.txt" > "$cleanup_fixture/incomplete.txt"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" prepare-generated --paths incomplete.txt --reason 'Incomplete alias fixture' > "$cleanup_fixture/incomplete-prepare.log"
+cleanup_review=$(tail -n 1 "$cleanup_fixture/incomplete-prepare.log")
+cleanup_requests=${cleanup_review%/generated-review.json}/requests.json
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --complete-capture-aliases --requests "$cleanup_requests" > "$cleanup_fixture/incomplete-apply.log"
+test -f "$cleanup_fixture/$cleanup_run/first/capture-zllvm"
+test -f "$cleanup_fixture/$cleanup_run/second/capture-zllvm"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" prepare-generated --paths aliases.txt --reason 'Complete alias fixture' > "$cleanup_fixture/alias-prepare.log"
+cleanup_review=$(tail -n 1 "$cleanup_fixture/alias-prepare.log")
+cleanup_requests=${cleanup_review%/generated-review.json}/requests.json
+printf '%s  %s\n' "$cleanup_sha" "$cleanup_run/third/capture-zllvm" > "$cleanup_fixture/current.sha256"
+printf '{"schema":1,"minimum_idle_hours":0,"current_manifests":["current.sha256"]}\n' > "$cleanup_fixture/docs/storage_cleanup_policy.json"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --complete-capture-aliases --requests "$cleanup_requests" > "$cleanup_fixture/alias-held.log"
+test -f "$cleanup_fixture/$cleanup_run/first/capture-zllvm"
+test -f "$cleanup_fixture/$cleanup_run/second/capture-zllvm"
+test -f "$cleanup_fixture/$cleanup_run/third/capture-zllvm"
+printf '{"schema":1,"minimum_idle_hours":0}\n' > "$cleanup_fixture/docs/storage_cleanup_policy.json"
+cleanup_blocks=$(stat -c %b "$cleanup_fixture/$cleanup_run/first/capture-zllvm")
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --complete-capture-aliases --requests "$cleanup_requests" > "$cleanup_fixture/alias-apply.log"
+cleanup_report=$(tail -n 1 "$cleanup_fixture/alias-apply.log"); cleanup_report=${cleanup_report#Cleanup complete: }
+"$cleanup_jqz" -e --argjson bytes "$((cleanup_blocks * 512))" '.removed == 3 and .reclaimed_allocated_file_bytes == $bytes' "$cleanup_fixture/$cleanup_report" > /dev/null
+for cleanup_case in first second third; do test ! -e "$cleanup_fixture/$cleanup_run/$cleanup_case/capture-zllvm"; done
+printf 'Five generated-output CLI checks passed: single-link and complete-alias batches, incomplete groups, current pins and repeated collection.\n'

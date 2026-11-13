@@ -95,7 +95,9 @@ ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain --release-req
 test "$cleanup_job_status" -eq 7
 test ! -e "$cleanup_released/storage-release.json"
 test -f "$cleanup_released/old.log"
-ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain --release-request request.json -- true > "$cleanup_fixture/completed-release.log" 2>&1
+# The completed command names the run. Its wrapper must shed this argv before
+# collection, while a genuinely active parent command still protects the run.
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_launcher" maintain --release-request request.json -- bash -c 'test -d "$1"' _ "$cleanup_released" > "$cleanup_fixture/completed-release.log" 2>&1
 test -f "$cleanup_released/storage-release.json"
 test ! -e "$cleanup_released/old.log"
 test -f "$cleanup_source/main.zig"
@@ -189,4 +191,4 @@ test -f "$cleanup_fixture/$cleanup_retirement"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_trace_requests" --policy policy.json > "$cleanup_fixture/trace-repeat.log"
 "${ZIGREP:-zigrep}" --no-config -q -F 'removed: 0;' "$cleanup_fixture/trace-repeat.log"
 bash "$(dirname -- "${BASH_SOURCE[0]}")/generated_cli_tests.sh" "$cleanup_binary"
-printf 'Twenty isolated CLI checks passed, including generated-output batches, retired compiler identities, preserved failure diagnostics, private caches, pin retirement, maintenance leases and repeated collection.\n'
+printf 'Twenty-three isolated CLI checks passed, including complete capture aliases, generated-output batches, retired compiler identities, preserved failure diagnostics, private caches, pin retirement, maintenance leases and repeated collection.\n'

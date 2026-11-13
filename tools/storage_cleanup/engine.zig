@@ -90,6 +90,7 @@ pub const Engine = struct {
     pin_references: std.ArrayList(PinReference) = .empty,
     retained_declarations: std.ArrayList([]const u8) = .empty,
     release_holds: std.ArrayList([]const u8) = .empty,
+    allow_capture_aliases: bool = false,
 
     pub fn init(c: *u.Context, config: p.Config, output: []const u8, zigrep: []const u8) Engine {
         return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a), .git_sources = .init(c.a) };
@@ -208,6 +209,7 @@ pub const Engine = struct {
             }
             _ = before;
         }
+        try @import("jobs.zig").scan(e, true);
     }
     fn discoverBuild(e: *Engine, name: []const u8) !void {
         // Only this report family binds all source files to a preserved compiler.
@@ -294,6 +296,7 @@ pub const Engine = struct {
         e.held.clearRetainingCapacity();
         for (e.config.protected_paths) |s| try e.held.append(e.c.a, s);
         try e.held.appendSlice(e.c.a, e.release_holds.items);
+        try @import("jobs.zig").scan(e, false);
         if (e.metadata(e.config.holds_file)) |_| {
             try e.addControl(e.config.holds_file);
             var parsed = try e.load(e.c.gpa, e.config.holds_file);
@@ -983,7 +986,7 @@ pub const Engine = struct {
             try e.write(snapshot_path, snap.value);
             a.snapshot = .{ .path = snapshot_path, .sha256 = try e.digest(snapshot_path) };
         } else {
-            if (m.kind != .file or m.links != 1) return error.AliasedOrNonRegularArtifact;
+            if (m.kind != .file or (m.links != 1 and !try e.completeCaptureSet(index, m))) return error.AliasedOrNonRegularArtifact;
             try e.check(.{ .path = a.path, .sha256 = a.sha256.? });
             if (a.kind == .build_output) {
                 var f = try D.cwd().openFile(e.c.io, try e.absolute(a.path), .{});
@@ -997,6 +1000,56 @@ pub const Engine = struct {
         }
         a.status = .ready;
         a.measured = true;
+    }
+    fn completeCaptureSet(e: *Engine, index: usize, expected: fa.Metadata) !bool {
+        const action = e.actions.items[index];
+        if (!e.allow_capture_aliases or action.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(action.path), "capture-zllvm")) return false;
+        var count: usize = 0;
+        for (e.actions.items) |other| {
+            if (other.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(other.path), "capture-zllvm")) continue;
+            const m = e.metadata(other.path) catch |err| switch (err) {
+                error.FileNotFound => continue,
+                else => return err,
+            };
+            if (m.device != expected.device or m.inode != expected.inode) continue;
+            if (!m.eql(expected) or other.sha256 == null or !std.mem.eql(u8, other.sha256.?, action.sha256.?)) return false;
+            count += 1;
+        }
+        return count == expected.links;
+    }
+    /// A hold on one alias protects the physical inode. Charge its allocation
+    /// once, to the last name, whose unlink actually releases the data.
+    pub fn guardCaptureGroups(e: *Engine) !void {
+        if (!e.allow_capture_aliases) return;
+        for (e.actions.items) |*a| {
+            if (a.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm") or a.status == .removed or a.status == .absent) continue;
+            if (a.metadata == null) a.metadata = try e.metadata(a.path);
+        }
+        var seen = std.AutoHashMap(fa.metadata.Identity, void).init(e.c.a);
+        for (e.actions.items) |a| {
+            const m = a.metadata orelse continue;
+            if (a.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm") or m.links <= 1 or a.status == .removed or a.status == .absent) continue;
+            if ((try seen.getOrPut(fa.metadata.identity(m))).found_existing) continue;
+            var last: usize = 0;
+            var count: usize = 0;
+            var reason: ?[]const u8 = null;
+            for (e.actions.items, 0..) |other, i| if (other.metadata) |om| {
+                if (om.device != m.device or om.inode != m.inode) continue;
+                count += 1;
+                last = i;
+                if (other.status != .ready) reason = other.reason orelse "capture alias is not qualified";
+            };
+            if (count != m.links) reason = "incomplete capture alias group";
+            for (e.actions.items, 0..) |*other, i| if (other.metadata) |om| {
+                if (om.device != m.device or om.inode != m.inode) continue;
+                other.allocated_bytes = if (i == last) m.allocated_bytes else 0;
+                other.measured = true;
+                if (reason) |why| {
+                    other.status = .skipped;
+                    other.reason = why;
+                }
+            };
+        }
     }
     /// All retained evidence wins across actions. Normalize each unique path
     /// once, instead of allocating inside the candidate × evidence loops.

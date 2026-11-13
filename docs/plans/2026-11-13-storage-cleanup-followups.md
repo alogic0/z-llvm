@@ -1,5 +1,80 @@
 # Complete the storage cleanup workflow
 
+## Implementation follow-through
+
+The next implementation pass connects completed producer jobs to collection,
+refreshes the whole-tree inventory, and reduces repeated input storage. Work is
+ordered as follows:
+
+1. Remove the maintenance wrapper's stale command-line consumer; test terminal
+   handoff, failure status, queued holds and concurrent readers. Add producer
+   completion hooks with explicit job-owned holds. Manual investigation holds
+   do not expire merely because they are old.
+2. Accept hash-bound completed retirement records for missing empty command
+   logs. Review and collect the 21 affected assembly outputs.
+3. Refresh allocation and retention references. Review noncurrent milestone
+   manifests individually; keep current acceptance contracts intact.
+4. Provide immutable shared IR installation and guarded migration of existing
+   duplicate names, preserving content and current checksums. Audit all aliases
+   and consumers before changing any live input.
+5. Qualify Debug and ReleaseFast, exercise installed tools, record actual
+   reclamation, and retire this pass's temporary build products.
+
+Shared helper inodes require a complete alias-group decision; partial unlinking
+must not be reported as reclaimed physical storage.
+
+### Implemented and qualified
+
+- `run_checked` takes a storage lease, registers its own hold, and closes it
+  against the terminal producer receipt. Collection starts after terminal exec,
+  with producer descriptors closed and old job arguments gone. Failed test
+  status and diagnostics survive collection or completion-bookkeeping failures.
+  Storage admission time is excluded from command wall time. Existing manual
+  and queued holds remain independent.
+- Generated-output proof accepts explicitly approved, hash-bound retirement
+  records for missing empty logs. Reviewed noncurrent manifests can release
+  exact artifact references; a current manifest cannot be exempted.
+- Whole-compiler IR capture publishes immutable content once and installs
+  read-only aliases. Existing inputs can be migrated with complete alias,
+  hash, hold and consumer checks, atomic name replacement and rollback. Store
+  GC retains objects with installed aliases. Writable copies remain available.
+- Complete `capture-zllvm` hardlink groups now have an explicit review/apply
+  path. Every owner must qualify; one current pin or hold protects all aliases.
+  Removal charges the physical allocation only on the final unlink.
+
+Qualification: 106 collector tests pass in Debug and ReleaseFast; 11 artifact
+store tests pass in both modes. The installed-utility CLI checks cover 23
+collector scenarios and six producer/input scenarios, including a completion
+write failure that preserves exit 7. The whole-compiler driver builds in Debug;
+the artifact CLI and checked runner build in ReleaseFast. Formatting, shell
+syntax and whitespace checks pass. No external library source was modified.
+
+The fresh initial inventory observed **132.642 GiB**: 43.079 GiB covered by
+current holds/contracts, 0.160 GiB eligible at that instant, and 89.403 GiB
+unresolved. Holds are ownership decisions, not proof that every retained file
+is intrinsically necessary. The compiler agent continues to create artifacts.
+
+Completed live operations so far:
+
+- 147 successful assembly intermediates removed: **1,423,613,952 allocated
+  bytes**. This includes 21 files whose 84 empty logs had verified retirement
+  records, and 126 files from six reviewed selection milestones. All five
+  current integrity manifests passed afterward.
+- Eight duplicate IR inodes, with 16 names, migrated to one shared object.
+  Retired allocation: 3,549,069,312 bytes; new store allocation: 443,629,568 bytes;
+  **net reclaimed: 3,105,439,744 bytes**. Three held inode groups with 52 names
+  stay unchanged; the differently hashed self-rebuild input is excluded.
+  Every filename and content hash remains available, and the five current
+  integrity manifests passed after migration.
+
+Evidence is under
+[`local-state/storage-cleanup/lifecycle-implementation/`](../../local-state/storage-cleanup/lifecycle-implementation/).
+The assembly completion is
+`automatic-storage-cleanup/1794594163771306633-45615/report.json`; the input
+migration is `1794594685164125839-56147/shared-input-review.json` beneath the
+same retirement root. The collector's JSON reports retain exact identities,
+hashes, transitions, checks and allocation accounting.
+
 Status: minimal mode, audited traces, canonical build/source reconstruction,
 exact historical pin transitions, staged batches, explicit private-test caches,
 retired-compiler identity verification and full-tree allocation accounting

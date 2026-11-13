@@ -10,6 +10,7 @@ pub const Config = struct {
     current_manifests: []const []const u8 = &.{},
     protected_paths: []const []const u8 = &.{},
     retired_manifests: []const Evidence = &.{},
+    retired_empty_log_records: []const Evidence = &.{},
     holds_file: []const u8 = "local-state/storage-cleanup/holds.json",
 };
 /// Minimal retention changes batching and the optional waiting period only.
@@ -84,6 +85,7 @@ pub fn privateCacheName(name: []const u8) bool {
         (std.mem.startsWith(u8, name, "zig-global-") and name.len > "zig-global-".len);
 }
 pub fn privateCacheOwned(run: []const u8, cwd: []const u8, path: []const u8) bool {
+    if (std.mem.eql(u8, cwd, ".")) return privateCacheOwned(run, run, path);
     if (!candidate(cwd) or !candidate(path) or !within(run, cwd) or !within(cwd, path) or !privateCacheName(std.fs.path.basename(path))) return false;
     const parent = std.fs.path.dirname(path) orelse return false;
     if (std.mem.eql(u8, parent, cwd)) return true;
@@ -111,6 +113,7 @@ pub fn validate(c: Config) !void {
     }
     for (c.protected_paths) |p| if (!relative(p)) return error.InvalidPolicy;
     for (c.retired_manifests) |p| if (!relative(p.path) or !hash(p.sha256)) return error.InvalidPolicy;
+    for (c.retired_empty_log_records) |record| if (!relative(record.path) or !within("local-state/retirements", record.path) or !hash(record.sha256)) return error.InvalidPolicy;
 }
 test "storage cleanup: scope rejects traversal, source roots, shared caches and non-canonical names" {
     const t = std.testing;

@@ -8,6 +8,14 @@ their committed revisions and exact copied files. Standalone `zig run` commands
 do not require another checkout at runtime.
 The validated host is x86-64 Linux, matching the existing execution gates.
 
+`run_checked` participates in [automatic storage cleanup](storage_cleanup.md):
+it holds a reader lease during a job, closes its own hold against the terminal
+receipt, and hands off to minimal collection after closing job descriptors.
+Storage admission time is excluded from the supervised command's wall time.
+Failed jobs keep their exit code and diagnostics. Manual investigation holds
+remain independent. Whole-compiler `backend/input.ll` captures use verified
+read-only artifact-store aliases, preserving their content hashes and paths.
+
 The [migration acceptance](evidence/python_tools_migration_20261105.json) and
 [gate summary](evidence/python_tools_migration_20261105.summary) bind the source,
 provider digests, output comparisons and cleanup. At `978ffaf9`, all 22 tests

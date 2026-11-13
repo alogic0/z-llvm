@@ -19,6 +19,7 @@ pub fn main(init: std.process.Init) !void {
                 "  verify\n" ++
                 "  gc [--delete] [--pins DIRECTORY]\n" ++
                 "  get SHA256 OUTPUT_FILE\n" ++
+                "  link SHA256 NEW_INPUT_FILE (shared read-only content)\n" ++
                 "All manifests pin their objects. Keep accepted manifests in Git as well.\n",
         );
         return;
@@ -44,7 +45,7 @@ pub fn main(init: std.process.Init) !void {
         try stdout.interface.print("artifact-store {s} ok\n", .{command});
         return;
     }
-    if (!std.mem.eql(u8, command, "verify") and !std.mem.eql(u8, command, "gc") and !std.mem.eql(u8, command, "get")) return error.UnknownCommand;
+    if (!std.mem.eql(u8, command, "verify") and !std.mem.eql(u8, command, "gc") and !std.mem.eql(u8, command, "get") and !std.mem.eql(u8, command, "link")) return error.UnknownCommand;
     var store = try storage.Store.open(allocator, io, root, false);
     defer store.deinit();
     if (std.mem.eql(u8, command, "verify")) {
@@ -69,6 +70,11 @@ pub fn main(init: std.process.Init) !void {
         const destination = args.next() orelse return error.MissingDestination;
         if (args.next() != null) return error.UnknownOption;
         try storage.validHash(hash);
+        if (std.mem.eql(u8, command, "link")) {
+            try store.linkInput(hash, destination);
+            try stdout.interface.writeAll("artifact-store link ok\n");
+            return;
+        }
         const file = try store.objects.openFile(io, hash, .{ .follow_symlinks = false, .allow_directory = false });
         defer file.close(io);
         const identity = try storage.hashFile(io, file);

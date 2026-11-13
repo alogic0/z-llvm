@@ -474,7 +474,7 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     try u.put(c.a, &report, "failure_stage", u.s("capture"));
     try c.writeJson(try c.join(&.{ directory, "invocation.json" }), report);
     const input = try c.join(&.{ directory, "input.ll" });
-    try c.copy(original, input);
+    try @import("shared_input.zig").capture(c, original, input);
     try u.put(c.a, &report, "input", try fileIdentity(c, input));
     if (!std.mem.eql(u8, try c.digest(original), try u.str(try u.get(report, "input"), "sha256"))) return error.InputChangedDuringCapture;
     try u.put(c.a, &report, "text_scan", try scan(c, input));

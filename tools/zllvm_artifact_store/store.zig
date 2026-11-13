@@ -168,6 +168,12 @@ pub const Store = struct {
 
     /// The lock covers the entire operation, including source reads and GC.
     pub fn open(allocator: Allocator, io: Io, path: []const u8, create: bool) !Store {
+        return openWithLock(allocator, io, path, create, true);
+    }
+    pub fn openWaiting(allocator: Allocator, io: Io, path: []const u8, create: bool) !Store {
+        return openWithLock(allocator, io, path, create, false);
+    }
+    fn openWithLock(allocator: Allocator, io: Io, path: []const u8, create: bool, nonblocking: bool) !Store {
         const root = try openDirectory(io, path, create);
         errdefer root.close(io);
         if (create) {
@@ -177,7 +183,7 @@ pub const Store = struct {
             };
             if (created) |file| file.close(io);
         }
-        const lock = try root.openFile(io, "store.lock", .{ .mode = .read_write, .follow_symlinks = false, .allow_directory = false, .lock = .exclusive, .lock_nonblocking = true });
+        const lock = try root.openFile(io, "store.lock", .{ .mode = .read_write, .follow_symlinks = false, .allow_directory = false, .lock = .exclusive, .lock_nonblocking = nonblocking });
         errdefer lock.close(io);
         if ((try lock.stat(io)).kind != .file) return error.InvalidLock;
         const objects = try childDir(io, root, "objects", create);
@@ -207,6 +213,11 @@ pub const Store = struct {
 
     pub fn publishFile(self: *Store, source: Io.File, artifact: Artifact) !void {
         try validHash(artifact.sha256);
+        if (self.verifyObject(artifact)) |_| {
+            // Existing immutable content needs no second temporary payload.
+            try verifyFile(self.io, source, artifact);
+            return;
+        } else |err| if (err != error.FileNotFound) return err;
         // Named temporary files on filesystems without O_TMPFILE must remain
         // collectible after a crash; never leave them among objects/manifests.
         var atomic = try self.incoming.createFileAtomic(self.io, artifact.sha256, .{ .replace = false, .permissions = .fromMode(0o600) });
@@ -228,6 +239,24 @@ pub const Store = struct {
         };
         try syncDir(self.objects);
         try self.verifyObject(artifact);
+    }
+
+    /// Install a new immutable input name, never replacing an existing file.
+    /// Consumers that need to modify content must request an independent copy.
+    pub fn linkInput(self: *Store, hash: []const u8, destination: []const u8) !void {
+        try validHash(hash);
+        const file = try self.objects.openFile(self.io, hash, .{ .follow_symlinks = false, .allow_directory = false });
+        defer file.close(self.io);
+        const before = try file.stat(self.io);
+        if (before.kind != .file or before.permissions.toMode() & 0o222 != 0) return error.WritableSharedObject;
+        const actual = try hashFile(self.io, file);
+        if (!std.mem.eql(u8, &actual.hash, hash)) return error.ContentMismatch;
+        var parent = try openDirectory(self.io, std.fs.path.dirname(destination) orelse ".", false);
+        defer parent.close(self.io);
+        const name = std.fs.path.basename(destination);
+        try validPath(name);
+        try file.hardLink(self.io, parent, name, .{});
+        try syncDir(parent);
     }
 
     /// All objects must exist before the immutable run manifest is published.
@@ -345,6 +374,9 @@ pub const Store = struct {
                     if (live.contains(entry.name)) continue;
                 }
                 const stat = try dir.statFile(self.io, entry.name, .{ .follow_symlinks = false });
+                // Installed input aliases are live references even without a
+                // run manifest. Unlinking the store name would reclaim no data.
+                if (index == 0 and stat.nlink > 1) continue;
                 try candidates.append(allocator, .{ .dir = dir, .name = try allocator.dupe(u8, entry.name), .bytes = stat.size });
                 result.files += 1;
                 result.bytes += stat.size;

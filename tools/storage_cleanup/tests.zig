@@ -455,6 +455,8 @@ test "storage cleanup: staged historical requests verify hashes and retire only 
     try f.tmp.dir.deleteFile(t.io, released ++ "/storage-release.json");
     try initial.write(output ++ "/requests.json", .{ .schema = "zllvm-storage-requests-v1", .requests = .{.{ .path = request_path, .sha256 = try initial.digest(request_path) }} });
     try initial.write("local-state/retirements/record-old.json", .{ .status = "complete", .retained = .{.{ .path = artifact.path, .sha256 = artifact.sha256.? }} });
+    try f.write(run ++ "/milestone.sha256", try f.c.fmt("{s}  {s}\n", .{ artifact.sha256.?, artifact.path }));
+    try initial.write(output ++ "/manifest-review.json", .{ .schema = "zllvm-reviewed-pin-manifests-v1", .reason = "Reviewed completed milestone's temporary output", .manifests = .{.{ .path = run ++ "/milestone.sha256", .sha256 = try initial.digest(run ++ "/milestone.sha256") }} });
     var review = f.engine();
     try review.discover();
     try batches.discover(&review, output ++ "/requests.json");
@@ -465,7 +467,7 @@ test "storage cleanup: staged historical requests verify hashes and retire only 
     try f.tmp.dir.createDirPath(t.io, output ++ "/prepared");
     var prepare = f.engine();
     prepare.output = output ++ "/prepared";
-    try batches.historicalPins(&prepare, output ++ "/requests.json", output ++ "/review.json");
+    try batches.reviewedPins(&prepare, output ++ "/requests.json", output ++ "/review.json", output ++ "/manifest-review.json");
     try f.tmp.dir.createDirPath(t.io, output ++ "/apply");
     var apply = f.engine();
     apply.output = output ++ "/apply";
@@ -481,6 +483,16 @@ test "storage cleanup: staged historical requests verify hashes and retire only 
     try f.write(request_path, "changed request");
     var changed = f.engine();
     try t.expectError(error.EvidenceHashMismatch, batches.discover(&changed, output ++ "/requests.json"));
+}
+
+test "storage cleanup: reviewed milestone adapter cannot exempt a current manifest" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.write(run ++ "/current.sha256", "current contract\n");
+    e.config.current_manifests = &.{run ++ "/current.sha256"};
+    try e.write(output ++ "/manifest-review.json", .{ .schema = "zllvm-reviewed-pin-manifests-v1", .reason = "Rejected current exemption", .manifests = .{.{ .path = run ++ "/current.sha256", .sha256 = try e.digest(run ++ "/current.sha256") }} });
+    try t.expectError(error.CurrentManifestCannotBeRetired, batches.reviewedPins(&e, "unused-requests.json", "unused-review.json", output ++ "/manifest-review.json"));
 }
 
 test "storage cleanup: failed release qualification still protects its declared dependencies" {
@@ -1616,4 +1628,220 @@ test "storage cleanup: generated batch rejects duplicate members and unrelated g
     try t.expectError(error.InvalidGeneratedBatch, mutation.applyGeneratedBatch(&e, &.{ 0, 1 }));
     for (e.actions.items) |a| try t.expect(u.exists(t.io, try e.absolute(a.path)));
     try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+fn retiredLogFixture(f: *Fixture, e: *core.Engine, size: u64, applied: bool) !void {
+    try assemblyFixture(f, e, .none);
+    try f.tmp.dir.deleteFile(t.io, assembly_dir ++ "/compile.stdout");
+    try f.write(output ++ "/approved-audit.json", "{\"reviewed\":true}\n");
+    try e.write(output ++ "/record.json", .{
+        .schema = 1,
+        .status = "complete",
+        .preservation_verified_before = true,
+        .preservation_verified_after = true,
+        .audit_sha256 = try e.digest(output ++ "/approved-audit.json"),
+        .actions = .{.{ .path = assembly_dir ++ "/compile.stdout", .sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", .applied = applied, .info = .{ .size = size, .allocated = 0 } }},
+    });
+    e.config.retired_empty_log_records = try f.c.a.dupe(p.Evidence, &.{.{ .path = output ++ "/record.json", .sha256 = try e.digest(output ++ "/record.json") }});
+}
+
+test "storage cleanup: retired empty diagnostics retain verified ledger and audit" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try retiredLogFixture(f, &e, 0, true);
+    try e.write(run ++ "/generated-release.json", try generated.request(&e, assembly_path, "Verified empty log retirement"));
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try e.qualify(0);
+    try mutation.apply(&e, 0);
+    try t.expect(!u.exists(t.io, try e.absolute(assembly_path)));
+    try t.expect(u.exists(t.io, try e.absolute(output ++ "/record.json")));
+    try t.expect(u.exists(t.io, try e.absolute(output ++ "/approved-audit.json")));
+}
+
+test "storage cleanup: missing or nonempty retired diagnostics stay blocked" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try retiredLogFixture(f, &e, 1, true);
+    try t.expectError(error.NonemptyOrUnretiredLog, generated.request(&e, assembly_path, "Reject nonempty log"));
+    e.config.retired_empty_log_records = &.{};
+    try t.expectError(error.MissingDiagnosticRetirement, generated.request(&e, assembly_path, "Reject unknown missing log"));
+}
+
+test "storage cleanup: changed retired log audit blocks deletion" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try retiredLogFixture(f, &e, 0, true);
+    try e.write(run ++ "/generated-release.json", try generated.request(&e, assembly_path, "Verified empty log retirement"));
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try e.qualify(0);
+    try f.write(output ++ "/approved-audit.json", "changed audit\n");
+    try t.expectError(error.EvidenceHashMismatch, mutation.apply(&e, 0));
+    try t.expect(u.exists(t.io, try e.absolute(assembly_path)));
+}
+
+test "storage cleanup: only a terminal receipt closes a job-owned hold" {
+    const lifecycle = @import("../validation/storage_lifecycle.zig");
+    const jobs = @import("jobs.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    var job: lifecycle.Job = .{ .run_root = run, .working_directory = run, .producer = .{ .path = report, .sha256 = "" }, .started_ns = 1 };
+    try t.expect(!try jobs.validate(&e, job));
+    try e.write(report, .{ .status = "finished", .outcome = "completed", .actual_returncode = 1, .started_ns = 1, .finished_ns = 2, .cwd = try e.absolute(run) });
+    job.state = .finished;
+    job.producer.sha256 = try e.digest(report);
+    try t.expect(try jobs.validate(&e, job));
+    job.started_ns = 9;
+    try t.expectError(error.StorageJobNotTerminal, jobs.validate(&e, job));
+    job.started_ns = 1;
+    try f.write(report, "{}\n");
+    try t.expectError(error.FileChanged, jobs.validate(&e, job));
+}
+
+test "storage cleanup: completed job does not expire manual holds" {
+    const lifecycle = @import("../validation/storage_lifecycle.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.tmp.dir.createDirPath(t.io, lifecycle.jobs_directory);
+    try e.write(report, .{ .status = "finished", .outcome = "completed", .actual_returncode = 0, .started_ns = 1, .finished_ns = 2, .cwd = try e.absolute(run) });
+    const job: lifecycle.Job = .{ .state = .finished, .run_root = run, .working_directory = run, .producer = .{ .path = report, .sha256 = try e.digest(report) }, .started_ns = 1 };
+    try e.write(lifecycle.jobs_directory ++ "/test.json", job);
+    try e.write(e.config.holds_file, p.Holds{ .paths = &.{run} });
+    try e.actions.append(f.c.a, .{ .path = cache, .run_root = run, .producer = report, .kind = .cache });
+    try e.loadHolds();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+    try t.expect(std.mem.indexOf(u8, e.actions.items[0].reason.?, "protected by hold") != null);
+}
+
+test "storage cleanup: shared input migration preserves aliases and rolls back a new hold" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.write(run ++ "/input.ll", "identical retained IR\n");
+    const file = try f.tmp.dir.openFile(t.io, run ++ "/input.ll", .{});
+    try file.hardLink(t.io, f.tmp.dir, run ++ "/alias.ll", .{});
+    const sha = try e.digest(run ++ "/input.ll");
+    const metadata = try e.metadata(run ++ "/input.ll");
+    var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+    defer store.deinit();
+    try store.publishFile(file, .{ .name = "input.ll", .sha256 = sha, .bytes = metadata.size });
+    file.close(t.io);
+    for ([_][]const u8{ run ++ "/input.ll", run ++ "/alias.ll" }) |path|
+        try e.actions.append(f.c.a, .{ .path = path, .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = sha, .metadata = metadata });
+    try e.write(e.config.holds_file, p.Holds{ .paths = &.{run} });
+    try t.expectError(error.SharedInputHeld, shared.migrate(&e, &store, &.{ 0, 1 }, metadata, sha));
+    try t.expectEqual(metadata.inode, (try e.metadata(run ++ "/input.ll")).inode);
+    try t.expectEqual(metadata.inode, (try e.metadata(run ++ "/alias.ll")).inode);
+    try t.expectEqual(metadata.links, (try e.metadata(run ++ "/input.ll")).links);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    try f.tmp.dir.deleteFile(t.io, e.config.holds_file);
+    // Rollback changes ctime; take a fresh observation before retrying.
+    e = f.engine();
+    const retry = try e.metadata(run ++ "/input.ll");
+    for ([_][]const u8{ run ++ "/input.ll", run ++ "/alias.ll" }) |path|
+        try e.actions.append(f.c.a, .{ .path = path, .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = sha, .metadata = retry });
+    try t.expectEqual(retry.allocated_bytes, try shared.migrate(&e, &store, &.{ 0, 1 }, retry, sha));
+    const object = try store.objects.statFile(t.io, sha, .{});
+    for (e.actions.items) |a| {
+        const current = try e.metadata(a.path);
+        try t.expectEqual(object.inode, current.inode);
+        try t.expectEqual(@as(u32, 0o444), current.mode & 0o7777);
+        try t.expectEqualStrings(sha, try e.digest(a.path));
+    }
+}
+
+test "storage cleanup: shared input migration rejects incomplete aliases and changed content" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.write(run ++ "/input.ll", "retained IR\n");
+    const file = try f.tmp.dir.openFile(t.io, run ++ "/input.ll", .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, run ++ "/unknown-alias.ll", .{});
+    const metadata = try e.metadata(run ++ "/input.ll");
+    const sha = try e.digest(run ++ "/input.ll");
+    var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+    defer store.deinit();
+    try e.actions.append(f.c.a, .{ .path = run ++ "/input.ll", .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = sha, .metadata = metadata });
+    try t.expectError(error.IncompleteInputAliases, shared.migrate(&e, &store, &.{0}, metadata, sha));
+    try f.tmp.dir.deleteFile(t.io, run ++ "/unknown-alias.ll");
+    const single = try e.metadata(run ++ "/input.ll");
+    try f.write(run ++ "/input.ll", "changed IR\n");
+    try t.expectError(error.SharedInputChanged, shared.migrate(&e, &store, &.{0}, single, sha));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+fn captureAliasFixture(f: *Fixture, e: *core.Engine) !void {
+    try generatedBatchFixture(f, e);
+    try f.tmp.dir.deleteFile(t.io, e.actions.items[1].path);
+    const file = try f.tmp.dir.openFile(t.io, e.actions.items[0].path, .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, e.actions.items[1].path, .{});
+    e.allow_capture_aliases = true;
+    for (0..2) |i| {
+        e.actions.items[i].status = .discovered;
+        try e.qualify(i);
+    }
+    try e.guardCaptureGroups();
+}
+
+test "storage cleanup: complete capture alias retirement charges one physical inode" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try captureAliasFixture(f, &e);
+    const allocation = e.actions.items[0].metadata.?.allocated_bytes;
+    try t.expectEqual(allocation, e.actions.items[0].allocated_bytes + e.actions.items[1].allocated_bytes);
+    try mutation.applyGeneratedBatch(&e, &.{ 0, 1 });
+    try t.expectEqual(allocation, e.actions.items[0].reclaimed_file_bytes + e.actions.items[1].reclaimed_file_bytes);
+    for (e.actions.items) |a| try t.expect(!u.exists(t.io, try e.absolute(a.path)));
+}
+
+test "storage cleanup: a current pin on one capture alias protects the group" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try captureAliasFixture(f, &e);
+    try f.write(run ++ "/current.sha256", try f.c.fmt("{s}  {s}\n", .{ e.actions.items[1].sha256.?, e.actions.items[1].path }));
+    e.config.current_manifests = &.{run ++ "/current.sha256"};
+    try e.pins();
+    try e.guardCaptureGroups();
+    for (e.actions.items) |a| {
+        try t.expectEqual(.skipped, a.status);
+        try t.expect(u.exists(t.io, try e.absolute(a.path)));
+    }
+}
+
+test "storage cleanup: newly pinned capture aliases roll back every name" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try captureAliasFixture(f, &e);
+    try f.write(run ++ "/new.sha256", try f.c.fmt("{s}  {s}\n", .{ e.actions.items[1].sha256.?, e.actions.items[1].path }));
+    try t.expectError(error.GeneratedBatchBecameHeld, mutation.applyGeneratedBatch(&e, &.{ 0, 1 }));
+    for (e.actions.items) |a| {
+        try t.expectEqual(@as(u64, 2), (try e.metadata(a.path)).links);
+        try t.expectEqual(@as(u64, 0), a.reclaimed_file_bytes);
+    }
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: undeclared capture alias still prevents collection" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try captureAliasFixture(f, &e);
+    const file = try f.tmp.dir.openFile(t.io, e.actions.items[0].path, .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, run ++ "/unlisted-runner", .{});
+    e.actions.items[0].status = .discovered;
+    try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
 }

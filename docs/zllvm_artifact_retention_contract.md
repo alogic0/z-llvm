@@ -25,12 +25,16 @@ zig build artifact-store -- publish manifest.json source-directory
 zig build artifact-store -- pin manifest.json  # restore a manifest for existing objects
 zig build artifact-store -- verify
 zig build artifact-store -- get SHA256 output-file
+zig build artifact-store -- link SHA256 new-read-only-input
 zig build artifact-store -- gc --pins docs/evidence/artifacts
 zig build artifact-store -- gc --delete --pins docs/evidence/artifacts
 zig build artifact-store-test
 ```
 
-`get` never overwrites an existing output. The former `resolve-authority` and
+`get` writes an independent copy. `link` installs a shared read-only input;
+both reject an existing output. Linking verifies the stored content and refuses
+writable objects. Consumers that edit an input must use `get`.
+The former `resolve-authority` and
 `materialize-spec` commands are retired. Existing snapshots are retained
 as ordinary immutable objects; storing new artifacts does not require tar/zstd.
 
@@ -51,14 +55,17 @@ same schema. Pass `--pins docs/evidence/artifacts` during collection to protect 
 manifests even if a local manifest was accidentally removed. The pins directory
 is opened explicitly and checked under the same lock; it may contain non-JSON
 evidence files. Missing or corrupt pinned objects abort collection. Without
-`--pins`, only local manifests protect objects. Removing the last referencing
-manifest from both locations makes an object collectible.
+`--pins`, local manifests and installed hardlink aliases protect objects.
+Removing the last referencing manifest from both locations makes an object
+collectible only after its installed aliases are gone as well.
 
 ## Integrity and collection
 
 A nonblocking exclusive OS lock serializes publication, verification, retrieval,
 and collection. A busy store reports `WouldBlock`; no stale lock-file removal is
 needed after a crashed process. The lock is released by closing its file handle.
+The native `openWaiting` API lets concurrent validation producers wait for that
+same lock. The CLI retains its nonblocking behavior.
 
 Objects are streamed into atomic files, checked against their expected content,
 synchronized, and published without replacement. Existing objects must verify.
@@ -68,7 +75,8 @@ are not part of identity. Directory traversal uses no-follow component opens.
 
 Collection first validates all manifests and pinned objects and constructs its
 complete candidate list. Malformed state aborts before deletion. Extra
-unreferenced objects and abandoned regular files in `incoming/` are candidates;
+unreferenced objects with no installed aliases and abandoned regular files in
+`incoming/` are candidates;
 symlinks and unexpected entries are errors. Dry-run is the default. Application
 uses the same store lock and synchronizes changed directories.
 

@@ -43,7 +43,23 @@ fresh minimal apply afterward, including when the job fails. Failed jobs keep
 their original exit status and diagnostics. If the job succeeds but cleanup
 fails or is busy, the wrapper returns the cleanup error. Background descendants
 that still hold the lease prevent collection. Queued jobs still need holds.
-This command is the integration point for the job runner; no timer is installed.
+The wrapper replaces its process image after the command exits, so the old job
+arguments cannot falsely hold its completed output. No timer is installed.
+
+`tools/run_checked.zig` now uses this lifecycle automatically when it finds the
+project storage policy. It holds a shared lease during execution and records a
+job-owned hold in `local-state/storage-cleanup/jobs/`. The hold closes only when
+the same job has a hash-bound terminal receipt. The next collector discovers its
+private caches and verified generated assembly/capture helpers. Failed tests
+retain their diagnostic log and exit status; cleanup failure is reported as
+deferred and does not alter the test outcome. Launch or supervision failures
+without a terminal child result keep the hold for investigation.
+
+Job holds and manual `holds.json` entries are independent. A finished job cannot
+expire another investigation's hold. Queued work must still be declared before
+it starts. A surviving supervisor or another reader can defer collection until
+a later pass. Compiler builds intended for subsequent validation keep their
+installed output until the pipeline owner publishes a release.
 
 When a successful producer also closes an obsolete run, it can write a release
 request and publish it as part of the same maintenance workflow:
@@ -81,6 +97,58 @@ Python or Node runtime is used. `jqz` can inspect the resulting reports:
 jqz '{mode,retention,ready,skipped,removed,reclaimed_allocated_file_bytes,held_allocated_file_bytes}' REPORT.json
 jqz '.actions | each | where(.status == "skipped") | {path,reason}' REPORT.json
 ```
+
+For generated assembly whose empty command logs were already removed, policy can
+name hash-bound `retired_empty_log_records`. The collector requires a completed
+ledger, successful preservation checks, its unchanged approved audit, and an
+applied action for each exact log path with size/allocation zero and the empty
+SHA-256. Missing or nonempty diagnostics without that proof remain blockers.
+
+An individually reviewed old milestone can be transitioned without retiring its
+whole manifest:
+
+```sh
+tools/clean-storage prepare-pins --requests REQUESTS.json --review REPORT.json \
+  --manifests REVIEWED_MANIFESTS.json
+```
+
+The review file uses `schema:"zllvm-reviewed-pin-manifests-v1"`, a `reason`, and
+`manifests:[{"path":"...","sha256":"..."}]`. Only exact artifact references
+already qualified in the request review are transitioned. Current manifests are
+rejected even if explicitly listed. All other references remain effective.
+
+Whole-compiler IR captures now use the artifact store's immutable `linkInput`
+API. Repeated content shares a read-only object; `get` still supplies an
+independent copy for consumers that need writable content. Object-store GC keeps
+objects with installed aliases, even without a manifest. Concurrent producers
+serialize publication through the store lock.
+
+Existing duplicate IR can be migrated through a reviewed plan:
+
+```sh
+tools/clean-storage share-inputs --inputs INPUTS.json
+tools/clean-storage share-inputs --inputs INPUTS.json --apply
+```
+
+The plan uses `schema:"zllvm-shared-inputs-v1"` and
+`inputs:[{"sha256":"...","paths":["local-state/validations/.../input.ll"]}]`.
+List every name of each original inode. The collector checks content, ownership,
+complete aliases, current holds and consumers. It atomically replaces each name
+with a read-only store alias while retaining temporary rollback names. It checks
+the controls again before unlinking the old data. A new hold rolls back the group;
+an interruption leaves `pending.json` for recovery. Current checksum contracts
+are verified before and after migration. The report separates retired allocation
+from newly created store allocation, so only their difference is net reclamation.
+Original filenames and content hashes remain available. Arbitrary mixed run
+directories are never removed by this operation.
+
+Capture helpers shared across completed runs require every name in the request
+list. After `prepare-generated`, use `--complete-capture-aliases` during both
+review and apply. Every owner must pass the generated-helper proof, every alias
+must be present, and a pin or hold on one name protects the whole inode. Unknown
+aliases block removal. The collector quarantines the complete group, refreshes
+controls, and counts allocation only when the final link is removed. The flag
+applies only to `capture-zllvm`, never arbitrary linked binaries or caches.
 
 ## What is automatic
 

@@ -2,6 +2,8 @@
 const std = @import("std");
 const u = @import("validation/common.zig");
 const telemetry = @import("validation/telemetry.zig");
+const storage = @import("validation/storage_lifecycle.zig");
+var storage_project: ?[]const u8 = null;
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -11,7 +13,9 @@ pub fn main(init: std.process.Init) !void {
         try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("run-checked: {s}\n", .{c.diagnostic orelse @errorName(err)}));
         std.process.exit(2);
     };
-    std.process.exit(@intCast(if (code < 0) 128 - code else code));
+    const exit_code: u8 = @intCast(if (code < 0) 128 - code else code);
+    if (storage_project) |root| storage.collect(&c, root, exit_code);
+    std.process.exit(exit_code);
 }
 
 fn run(c: *u.Context, args: []const []const u8) !i64 {
@@ -30,7 +34,6 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     if (u.exists(c.io, record_path) or u.exists(c.io, log_path)) return error.EvidenceAlreadyExists;
     const log = try c.createLog(log_path, true);
     defer log.close(c.io);
-    const start = std.Io.Clock.awake.now(c.io);
     var record = u.object(c.a);
     try u.put(c.a, &record, "argv", try u.strings(c.a, args[4..]));
     try u.put(c.a, &record, "cwd", u.s(c.root));
@@ -48,7 +51,12 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
         }
         try u.put(c.a, &record, "air_roots", try u.toValue(c.a, .{ .raw = raw_root, .cache = cache_root }));
     }
-    return execute(c, args[4..], record_path, log_path, log, start, &record) catch |err| {
+    const session = try storage.start(c, output, record_path, (try u.get(record, "started_ns")).integer);
+    defer if (session) |s| s.close(c);
+    // Storage admission can wait for a collector; exclude that wait from the
+    // supervised command's wall time.
+    const start = std.Io.Clock.awake.now(c.io);
+    const code = execute(c, args[4..], record_path, log_path, log, start, &record) catch |err| {
         // Retain the primary supervision error even if final evidence writing also fails.
         u.put(c.a, &record, "status", u.s("failed")) catch {};
         u.put(c.a, &record, "outcome", u.s("supervision_failed")) catch {};
@@ -58,6 +66,17 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
         c.writeJson(record_path, record) catch {};
         return err;
     };
+    if (session) |s| {
+        s.finish(c) catch |err| {
+            // A completed test's outcome must survive a cleanup bookkeeping
+            // failure. The original running hold remains for later review.
+            const message = c.fmt("storage completion deferred: {s}; producer status retained\n", .{@errorName(err)}) catch "storage completion deferred; producer status retained\n";
+            std.Io.File.stderr().writeStreamingAll(c.io, message) catch {};
+            return code;
+        };
+        storage_project = s.root;
+    }
+    return code;
 }
 
 fn execute(c: *u.Context, argv: []const []const u8, record_path: []const u8, log_path: []const u8, log: std.Io.File, start: std.Io.Timestamp, record: *u.Value) !i64 {
