@@ -12,6 +12,17 @@ pub const Plan = struct { schema: []const u8 = "zllvm-shared-inputs-v1", inputs:
 const Group = struct { metadata: fa.Metadata, sha256: []const u8, indexes: std.ArrayList(usize) = .empty, status: []const u8 = "review", reclaimed_file_bytes: u64 = 0 };
 const Move = struct { path: []const u8, backup: []const u8, temporary: []const u8, parent_mode: u32 };
 
+/// Older validation trees omit the batch level. Inventory bucket depth is not
+/// a consumer boundary: a queued parent job may not yet have opened its input.
+pub fn consumerRoot(path: []const u8) []const u8 {
+    var parts = std.mem.splitScalar(u8, path, '/');
+    for (0..3) |_| _ = parts.next() orelse return path;
+    const fourth = parts.next() orelse return path;
+    if (std.mem.eql(u8, fourth, "batch") or std.mem.startsWith(u8, fourth, "batch-")) _ = parts.next() orelse return path;
+    const end = parts.index orelse return path;
+    return path[0 .. end - 1];
+}
+
 fn original(e: *core.Engine, path: []const u8, expected: fa.Metadata, hash: []const u8, changed_links: bool) !void {
     const m = try e.metadata(path);
     var want = expected;
@@ -157,7 +168,7 @@ pub fn run(e: *core.Engine, plan_path: []const u8, apply: bool) !void {
                 try groups.append(e.c.a, .{ .metadata = m, .sha256 = try e.c.a.dupe(u8, family.sha256) });
             }
             const index = e.actions.items.len;
-            try e.actions.append(e.c.a, .{ .path = try e.c.a.dupe(u8, path), .run_root = try e.c.a.dupe(u8, @import("inventory.zig").runRoot(path)), .producer = plan_path, .kind = .build_output, .status = .ready, .sha256 = groups.items[group_index.?].sha256, .metadata = m });
+            try e.actions.append(e.c.a, .{ .path = try e.c.a.dupe(u8, path), .run_root = try e.c.a.dupe(u8, consumerRoot(path)), .producer = plan_path, .kind = .build_output, .status = .ready, .sha256 = groups.items[group_index.?].sha256, .metadata = m });
             try groups.items[group_index.?].indexes.append(e.c.a, index);
         }
     }

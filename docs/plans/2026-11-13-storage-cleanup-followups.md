@@ -42,7 +42,7 @@ must not be reported as reclaimed physical storage.
   path. Every owner must qualify; one current pin or hold protects all aliases.
   Removal charges the physical allocation only on the final unlink.
 
-Qualification: 106 collector tests pass in Debug and ReleaseFast; 11 artifact
+Qualification: 107 collector tests pass in Debug and ReleaseFast; 11 artifact
 store tests pass in both modes. The installed-utility CLI checks cover 23
 collector scenarios and six producer/input scenarios, including a completion
 write failure that preserves exit 7. The whole-compiler driver builds in Debug;
@@ -54,7 +54,7 @@ current holds/contracts, 0.160 GiB eligible at that instant, and 89.403 GiB
 unresolved. Holds are ownership decisions, not proof that every retained file
 is intrinsically necessary. The compiler agent continues to create artifacts.
 
-Completed live operations so far:
+Completed live operations:
 
 - 147 successful assembly intermediates removed: **1,423,613,952 allocated
   bytes**. This includes 21 files whose 84 empty logs had verified retirement
@@ -66,13 +66,35 @@ Completed live operations so far:
   stay unchanged; the differently hashed self-rebuild input is excluded.
   Every filename and content hash remains available, and the five current
   integrity manifests passed after migration.
+- 77 capture-helper names from two complete hardlink groups removed:
+  **38,100,992 allocated bytes**, counted once per physical inode. The 28 names
+  belonging to current acceptance and performance contracts remain protected.
+
+Combined net project reclamation is **4,567,154,688 bytes (4.253 GiB)**,
+excluding this task's disposable qualification builds and caches. Those task
+products were retired separately after open-file and command checks. One
+operational ReleaseFast collector remains installed. An installed-tool repeat
+found the migrated inputs already shared, with no additional allocation change.
+
+The final full inventory observed **129.865 GiB**, with 45.248 GiB covered by
+current holds/contracts, 84.617 GiB unresolved, and zero currently eligible bytes
+under these release rules. All five integrity manifests passed. Concurrent
+compiler work explains why the whole-folder decrease differs from the exact
+reclamation above. The unresolved remainder is not a claim of necessity.
+
+Final guard review also separates inventory bucket depth from consumer scope:
+older validation layouts without a `batch-*` component protect the actual parent
+job. The regression checks a parent command that has not yet opened its input,
+and keeps independent jobs in a batch separate.
 
 Evidence is under
 [`local-state/storage-cleanup/lifecycle-implementation/`](../../local-state/storage-cleanup/lifecycle-implementation/).
 The assembly completion is
 `automatic-storage-cleanup/1794594163771306633-45615/report.json`; the input
 migration is `1794594685164125839-56147/shared-input-review.json` beneath the
-same retirement root. The collector's JSON reports retain exact identities,
+same retirement root. Capture-helper completion is
+`1794594984998718767-61796/report.json`, and the final inventory is
+`1794595338276796617-67774/inventory.json`. The collector's JSON reports retain exact identities,
 hashes, transitions, checks and allocation accounting.
 
 Status: minimal mode, audited traces, canonical build/source reconstruction,

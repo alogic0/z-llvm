@@ -1845,3 +1845,13 @@ test "storage cleanup: undeclared capture alias still prevents collection" {
     e.actions.items[0].status = .discovered;
     try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
 }
+
+test "storage cleanup: input sharing recognizes parent jobs without a batch directory" {
+    const shared = @import("shared_inputs.zig");
+    const old = "local-state/validations/selection-census-20261107/compiler-replay-final";
+    try t.expectEqualStrings(old, shared.consumerRoot(old ++ "/backend/input.ll"));
+    try t.expect(core.commandUsesRun("123 runner --output-root " ++ old, shared.consumerRoot(old ++ "/backend/input.ll"), 456));
+    const current = "local-state/validations/compiler-behavior-completion-20261111/batch-01/old-run";
+    try t.expectEqualStrings(current, shared.consumerRoot(current ++ "/backend/input.ll"));
+    try t.expect(!core.commandUsesRun("123 runner --output-root local-state/validations/compiler-behavior-completion-20261111/batch-01/new-run", shared.consumerRoot(current ++ "/backend/input.ll"), 456));
+}

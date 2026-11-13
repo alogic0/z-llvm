@@ -9,7 +9,7 @@ const Bucket = struct { root: []const u8, kind: []const u8, disposition: Disposi
 const Inode = struct { bucket: usize, bytes: u64 };
 const Largest = struct { path: []const u8, identity: fa.metadata.Identity, allocated_bytes: u64, disposition: Disposition = .unresolved, reason: []const u8 = "" };
 
-pub fn runRoot(path: []const u8) []const u8 {
+fn runRoot(path: []const u8) []const u8 {
     const count: usize = if (std.mem.startsWith(u8, path, "local-state/validations/")) 5 else 3;
     var components = std.mem.splitScalar(u8, path, '/');
     for (0..count) |_| _ = components.next() orelse return std.fs.path.dirname(path) orelse path;
