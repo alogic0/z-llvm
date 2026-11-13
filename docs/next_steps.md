@@ -39,15 +39,22 @@ outcomes and owner/optimizer artifacts; individual full-module and execution
 proofs review the changed native, compiler and runtime objects. The original
 Debug input selects 7,733/7,874, with 141 failures and no complete object.
 
-The six independently exercised saturation, absolute-value, sign-extension
-preservation, vector-input and mixed-stack-call repairs are adopted for
-immediate cumulative validation. Both
-isolated 2,281-unit builds and six native populations per backend pass, with
-34 further original selections gained and none lost. The independent old-source
-sign-extension regression fails as expected; its repair needs fresh immediate
-Tier 3. Next, freeze the integrated source, validate all 173 native populations and
-original compiler/runtime objects, then close the remaining 107 Debug
-rejections. Build the final generations and complete both four-mode local-hook
+The [argument checkpoint](evidence/compiler_behavior_arguments_checkpoint_20261112.json)
+accepts the six saturation, absolute-value, sign-extension preservation,
+vector-input and mixed-stack-call repairs at `c3b77e61`. Both official
+2,281-unit builds, all 17 gates, both 173-population native suites and all 3,916
+required faults pass. The complete original compiler object is unchanged;
+changed runtime conversions have exact encoding and independent LLVM/C proofs.
+The original Debug replay gains 34 without loss but retains 107 failures.
+
+Next, adopt the isolated bit-reversal, literal-branch, literal-bitcast and
+checked-vector repairs. Both 2,286-unit builds and all component native checks
+pass; 19 original selections are gained without loss, leaving 88 failures.
+The Zig generator reproduces all 51 fixture files exactly. Freeze and validate
+the 177-population corpus, including all 4,132 required faults and fresh original
+objects, then continue closing the original Debug failures. Bounded double,
+quad and x87 input fragments remain isolated pending independent interop proof.
+Build the final generations and complete both four-mode local-hook
 matrices and the normal-resource rebuild after the repairs are accepted.
 The existing resource and scalar checkpoints retain their separate scopes.
 The entries below retain the preceding checkpoint history.

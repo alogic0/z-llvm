@@ -322,9 +322,24 @@ The original Debug behavior replay still fails: 7,733/7,874 definitions select,
 95 gained without loss, 141 rejected, no complete object. A new independent
 sign-extension probe also exposes a preexisting live-register clobber. Its
 isolated repair preserves the scratch destination through the existing shared
-contract. The next six-population batch passes both 2,281-unit builds and all
-component native checks, reaches 7,767 original selections without loss and
-retains 107 failures. Its maintained Zig generator reproduces all 43 fixtures
-and metadata exactly. Adopt it for fresh immediate Tier 3 before further
-failure-family research. Final compiler generations, both complete local-hook
-matrices and follow-up acceptance remain open.
+contract. The [argument checkpoint](compiler_behavior_arguments_checkpoint_20261112.json)
+accepts its repair and five related populations at `c3b77e61`. Both official
+2,281-unit builds, eight readiness procedures, all 17 gates, both complete
+173-population native suites and all 3,916 required faults pass. All 6,116 prior
+command outcomes per build match. Six changed object copies represent one
+runtime pair: data, symbols and relocations match; all 20 before/after function
+encodings reproduce in the full original runtime module. Five signed-i128
+floating conversion formats also match an independent integer rounding model
+and 4,096 exact LLVM records per object. The full compiler object is unchanged;
+all owners, ELF and balanced-event audits pass, including the separate Small
+runtime. All 3,588 frozen source files remain unchanged through validation.
+
+The original Debug replay reaches 7,767/7,874, gains 34 without loss and still
+fails with 107 rejections. The next isolated four-family repair passes both
+2,286-unit builds and all eight component native runs, detecting 216 faults.
+It gains 19 original selections without loss, leaving 88 failures. Its maintained
+Zig generator reproduces all 51 files and 25 population entries exactly.
+Adopt it and repeat cumulative validation at 177 native populations. Wider
+floating input fragments remain isolated pending full LLVM/C interoperability
+proof. Final compiler generations, both complete local-hook matrices and
+follow-up acceptance remain open.

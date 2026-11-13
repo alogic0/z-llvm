@@ -7,9 +7,12 @@ self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
 remainder error is repaired at `9cb21139`. Twenty behavior-family populations
 pass cumulative validation at `d9148ebc`; eight additional families pass at
 `ca38e3ee`. Fifteen further native populations pass cumulative validation at
-`c1c0ecee`, with 141 unchanged Debug rejections still open. The next
-six-population batch is adopted for immediate cumulative validation; both
-isolated 2,281-unit builds pass and 107 original Debug rejections remain.
+`c1c0ecee`. The six-population argument and arithmetic checkpoint passes at
+`c3b77e61`: both 2,281-unit builds, all 17 integration gates, both complete
+173-population native suites and all 3,916 required fault controls pass.
+The original Debug input still rejects 107 definitions. The next isolated
+four-family repair passes both 2,286-unit builds and gains 19 selections without
+loss, leaving 88 rejections; canonical adoption and cumulative validation follow.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -458,23 +461,52 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    all 324 component faults. The unchanged Debug replay gains 34 and loses
    none against `c1c0ecee`, selecting 7,767/7,874; actual nonzero, 107 failures
    and no complete behavior object remain explicit.
-7. Freeze that adopted source and run fresh immediate Tier 3, both official
+7. **Complete for the six-population checkpoint.** Freeze that adopted source
+   and run fresh immediate Tier 3, both official
    unit builds, all eight readiness procedures, all 17 integration gates,
    both complete 173-population native suites, all 3,916 required faults and
    strict preservation against the 167-population checkpoint. Repeat complete
    original compiler/runtime production and review every changed object,
    function encoding, owner, ELF and event stream. Keep the separate unchanged
    503-definition Small-runtime input alongside the fixed 455 definitions.
+   The fresh 8,928-definition compiler object is byte-identical to the previous
+   checkpoint. Ten changed runtime function symbols reproduce their encodings
+   in the full original module with both retained sources. An independent
+   integer rounding model and LLVM records check all five signed-i128 floating
+   conversions. The six changed native object copies bind to this one audited
+   runtime pair; strict failures remain explicit. See the
+   [argument checkpoint](../evidence/compiler_behavior_arguments_checkpoint_20261112.json).
    Neither isolated component proofs nor formatting authorize object reuse.
-8. Diagnose the remaining unchanged Debug failures in their full original
+8. Adopt the independently exercised four-family repair: normalize native i32
+   bit reversal through the existing i64 terminal owner; materialize literal
+   branch conditions without changing CFG edges or PHI predecessors; preserve
+   integer-to-floating literal bitcasts exactly; and lower bounded checked
+   vector arithmetic through existing lane owners. Preserve every frozen
+   residual function body and one-pass private normalization. Both isolated
+   unit builds pass 2,286 tests; all four native populations pass both builds
+   with 216 component faults detected. The maintained Zig generator reproduces
+   all 51 files and 25 population entries exactly. The original Debug replay
+   gains 19 selections without loss but still fails with 88 rejections.
+9. Freeze the newly adopted source and repeat both official unit builds,
+   readiness, all 17 integration gates, both complete 177-population native
+   suites, all 4,132 required faults and strict preservation against 173.
+   Produce and audit fresh complete original compiler and both fixed runtime
+   objects, with the separate 503-definition Small input retained. Review every
+   changed object through exact input, source, encoding and execution proofs.
+10. Diagnose the remaining unchanged Debug failures in their full original
    context while cumulative runs use retained immutable sources. Inventory
    the actual signature and instruction boundary before extending a family;
-   the current 107 failures do not establish a wide-vector-return frontier.
+   the remaining failures do not establish a wide-vector-return frontier.
    Preserve frozen Source/value-use contracts, 64 KiB stack objects, the 8 MiB
    frame guard and all argument limits. Add independent execution and negative
    controls for each bounded repair and repeat the required cumulative checks.
-   Selection gains cannot close the behavior milestone.
-9. Build the final two compiler generations from the accepted source under
+   Next test bounded four-lane double, quad and x87 input fragments against
+   LLVM and independent physical C callers/providers, including live GP
+   prefixes and stack tails. Keep wide returns and ordinary ninth-SSE calls
+   closed. Admit this family only after full unit, execution, negative and
+   generator checks pass; then repeat cumulative validation at its new corpus
+   size. Selection gains cannot close the behavior milestone.
+11. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
    pinned reference, and audit every delivered hook object before publishing
