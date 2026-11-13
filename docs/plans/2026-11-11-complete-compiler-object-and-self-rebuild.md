@@ -636,7 +636,7 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
    Close the fourteen remaining original Debug failures and complete its object
    before the final generations and full behavior matrices in step 12.
-   The completion candidate adds twenty-three populations: one-bit checked vectors,
+   The completion candidate adds twenty-four populations: one-bit checked vectors,
    odd-width vector shifts, closed internal vector calls, memory bitcasts,
    bounded large-integer memory views, integer global data, function alignment,
    exact floating literal payloads, vector range facts, annotated assembly
@@ -645,7 +645,7 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    calls, native floating memory in owned byte frames, typed floating frames,
    unused variadic inputs, optional floating-vector call hints, atomic pointer
    retry checks, hinted integer products, quad floating classification and
-   symbolic volatile loads. Independent
+   symbolic volatile loads and bounded wide-integer vector values. Independent
    C models cover each admitted form; generators and driver templates belong in
    `tools/` and must reproduce the qualified fixtures exactly. Keep ordinary
    ABI, stack-object, frame and Source/value-use limits unchanged. Explicit
@@ -657,11 +657,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    literal decoder for scalar float codegen so signaling NaNs keep their bits.
    Require the complete 7,874-definition census and object, ELF/event/owner
    audits, both unit builds, eight readiness procedures, all 17 gates, both
-   complete 219-population native suites and all 6,400 required faults. Compare
+   complete 220-population native suites and all 6,454 required faults. Compare
    every preceding outcome and artifact explicitly before accepting this
    successor checkpoint. Private complete objects and targeted execution runs
-   are available; cumulative acceptance remains open. Both private 2,351-test
-   builds pass. Targeted runs for the twenty-three additions pass all 1,242 of their
+   are available; cumulative acceptance remains open. Both private 2,353-test
+   builds pass. Targeted runs for the twenty-four additions pass all 1,296 of their
    required fault controls across both compiler builds. Maintained generators
    reproduce the qualified fixtures byte-for-byte in Debug and ReleaseFast.
    Vector range facts validate
@@ -699,18 +699,26 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    Forty independent native cases check quoted globals, unaligned addresses,
    page boundaries, C mutations and untouched neighboring bytes. Atomic, scoped,
    non-native-layout and wider volatile forms retain their rejection controls.
+   Four-lane `i140` construction and comparison reuse the existing scalar limbs
+   in private SSA views. Keep vector ABI, memory, PHI and dynamic-index forms
+   closed. Sixty native cases use an independent C bit model for `i140`/`i200`
+   saturation, all ten comparison predicates, literal and constructed operands,
+   dirty padding and values live across clobbering calls. Shared scalar helpers
+   keep the fixture within the existing compiler deadline; the earlier timeout
+   remains a failed run with no qualification credit.
    The complete Debug local-hook run with the pinned reference frontend now
    matches all 2,097 named reference outcomes under normal resources. This does
    not establish the final compiler-generation matrices. The three optimized
    modes now verify every retained definition: 904 in ReleaseSafe, 743 in
-   ReleaseFast and 1,014 in ReleaseSmall. Their complete replays still fail
-   selection with six, five and one failed definitions respectively. Retained
-   operation diagnostics identify additional vector forms, wide integer
-   intrinsics, extended floating calls, inline assembly and value-use contracts among the
-   remaining work. Close each with independent execution coverage, keep all failed
+   ReleaseFast and 1,014 in ReleaseSmall. ReleaseSafe and ReleaseFast still fail
+   selection with five and four failed definitions respectively. ReleaseSmall
+   completes both objects and executes all 2,097 tests, exposing two failures:
+   vector `@intCast` and signed-vector `@abs`. These runs remain unaccepted.
+   Retained diagnostics identify native pointer comparisons, annotated register
+   snapshots and overlong local identities among the selection work. Close each
+   selection and execution failure with independent coverage, keep all failed
    captures explicit, and rerun the complete optimized modes before final
-   acceptance. The latest Debug replay still matches all 2,097 reference
-   outcomes after the fact repairs.
+   acceptance. The latest Debug replay still matches all 2,097 reference outcomes.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the

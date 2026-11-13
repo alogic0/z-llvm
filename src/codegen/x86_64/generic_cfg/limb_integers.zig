@@ -13,8 +13,15 @@ const word: ir.Type = .{ .int = 64 };
 const boolean: ir.Type = .{ .int = 1 };
 const max_abi_bits = 512;
 const max_words = 16;
-fn memoryOnlyWidth(bits: u32) bool { return bits == 800 or bits == 896 or bits == 1024; }
-fn memoryCastWidth(bits: u16) bool { return switch(bits) { 8,16,32,64,128 => true, else => memoryOnlyWidth(bits) }; }
+fn memoryOnlyWidth(bits: u32) bool {
+    return bits == 800 or bits == 896 or bits == 1024;
+}
+fn memoryCastWidth(bits: u16) bool {
+    return switch (bits) {
+        8, 16, 32, 64, 128 => true,
+        else => memoryOnlyWidth(bits),
+    };
+}
 
 fn divisionTarget(op: ir.BinaryOp) []const u8 {
     return switch (op) {
@@ -44,6 +51,10 @@ fn validateDivisionProvider(context: ?*const machine.ReadOnlyModuleContext, call
 fn wide(ty: ir.Type) bool {
     return (raw.width(ty) orelse 0) > 128;
 }
+// A private SSA value shape, never a vector ABI or memory representation.
+fn limbVector(ty: ir.Type) bool {
+    return ty == .vector and ty.vector.len == 4 and ty.vector.elem_ty == .int and ty.vector.elem_ty.int == 140;
+}
 fn width(ty: ir.Type) !u16 {
     const bits = raw.width(ty) orelse return error.UnsupportedLimbInteger;
     if (bits == 0 or bits > max_words * 64 or (bits > max_abi_bits and !memoryOnlyWidth(bits))) return error.UnsupportedLimbInteger;
@@ -69,6 +80,7 @@ const Parts = struct {
         return (p.bits + 63) / 64;
     }
 };
+const VectorParts = [4]Parts;
 const OverflowTuple = struct { value: Parts, flag: ir.Value };
 const CheckedKind = struct { bits: u16, op: ir.BinaryOp, signed: bool };
 fn tupleBits(ty: ir.Type) ?u16 {
@@ -101,7 +113,7 @@ const Touched = struct {
     pub const Error = error{};
     found: *bool,
     pub fn visit(t: Touched, _: *const ir.Value, ty: ir.Type) Error!void {
-        t.found.* = t.found.* or wide(ty);
+        t.found.* = t.found.* or wide(ty) or limbVector(ty);
     }
 };
 const MemoryOnlyTouched = struct {
@@ -119,7 +131,7 @@ fn memoryOnlyInstruction(inst: *const ir.Instruction) bool {
     return found;
 }
 fn touches(inst: *const ir.Instruction) bool {
-    var found = if (inst.resultType()) |ty| wide(ty) else false;
+    var found = if (inst.resultType()) |ty| wide(ty) or limbVector(ty) else false;
     _ = ir.operands.instruction(inst, Touched{ .found = &found }) catch unreachable;
     if (inst.kind == .alloca) found = found or wide(inst.kind.alloca.allocated_ty);
     if (inst.kind == .gep) found = found or wide(inst.kind.gep.source_ty);
@@ -133,6 +145,7 @@ const Builder = struct {
     names: *forms.TemporaryNames,
     values: *std.StringHashMap(Parts),
     tuples: *std.StringHashMap(OverflowTuple),
+    vectors: *std.StringHashMap(VectorParts),
 
     fn emit(b: Builder, kind: @FieldType(ir.Instruction, "kind")) !ir.Value {
         const name = try forms.temporary(b.a, b.source, b.names);
@@ -188,6 +201,30 @@ const Builder = struct {
             p.values[1] = try b.cast(.trunc, ty, upper, word);
         } else return error.UnsupportedLimbInteger;
         return p;
+    }
+    fn vector(b: Builder, value: ir.Value, ty: ir.Type) !VectorParts {
+        if (!limbVector(ty)) return error.UnsupportedLimbInteger;
+        if (value == .named) return b.vectors.get(value.named) orelse error.UnsupportedLimbInteger;
+        switch (value) {
+            .undef, .poison, .zero_initializer => return @splat(.{ .bits = 140 }),
+            .vector => |literal| {
+                const text = std.mem.trim(u8, literal, " \t\r\n");
+                if (text.len < 2 or text[0] != '<' or text[text.len - 1] != '>') return error.UnsupportedLimbInteger;
+                var rest = std.mem.trim(u8, text[1 .. text.len - 1], " \t\r\n");
+                var lanes: VectorParts = undefined;
+                for (&lanes, 0..) |*lane, i| {
+                    const comma = @import("../../../ir/parser_syntax.zig").findTopLevelComma(rest);
+                    if ((i < 3) != (comma != null)) return error.UnsupportedLimbInteger;
+                    const field = if (comma) |at| rest[0..at] else rest;
+                    const parsed = @import("../../../ir/parser_types_values.zig").parseTypedValue(field) catch return error.UnsupportedLimbInteger;
+                    if (parsed.ty != .int or parsed.ty.int != 140 or parsed.value == .named) return error.UnsupportedLimbInteger;
+                    lane.* = try b.get(parsed.value, parsed.ty);
+                    rest = if (comma) |at| std.mem.trim(u8, rest[at + 1 ..], " \t\r\n") else "";
+                }
+                return lanes;
+            },
+            else => return error.UnsupportedLimbInteger,
+        }
     }
     fn normalize(b: Builder, p: *Parts) !void {
         if (p.bits % 64 != 0) {
@@ -656,6 +693,8 @@ pub fn legalize(a: std.mem.Allocator, source: ir.Function, context: ?*const mach
     };
 }
 fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.ReadOnlyModuleContext) !?ir.Function {
+    if (limbVector(source.ret_ty)) return error.UnsupportedLimbInteger;
+    for (source.params.items) |param| if (limbVector(param.ty)) return error.UnsupportedLimbInteger;
     var needed = wide(source.ret_ty);
     for (source.params.items) |param| needed = needed or wide(param.ty);
     for (source.blocks.items) |block| for (block.instructions.items) |*inst| if (!inst.removed) {
@@ -678,6 +717,8 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
     defer values.deinit();
     var tuples = std.StringHashMap(OverflowTuple).init(a);
     defer tuples.deinit();
+    var vectors = std.StringHashMap(VectorParts).init(a);
+    defer vectors.deinit();
     var result = source;
     result.blocks = .empty;
     result.params = .empty;
@@ -743,7 +784,7 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
     for (source.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        const b: Builder = .{ .a = a, .source = source, .block = &block, .names = &names, .values = &values, .tuples = &tuples };
+        const b: Builder = .{ .a = a, .source = source, .block = &block, .names = &names, .values = &values, .tuples = &tuples, .vectors = &vectors };
         if (block_index == 0) {
             var it = incoming.iterator();
             while (it.next()) |entry| try b.define(entry.key_ptr.*, entry.value_ptr.*);
@@ -769,6 +810,16 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                 else => return error.UnsupportedLimbInteger,
             };
             switch (inst.kind) {
+                .insertelement => |x| {
+                    if (!limbVector(x.vector_ty) or x.value_ty != .int or x.value_ty.int != 140 or
+                        x.index_ty != .int or (x.index_ty.int != 32 and x.index_ty.int != 64) or
+                        x.index != .int or x.index.int < 0 or x.index.int >= 4) return error.UnsupportedLimbInteger;
+                    var lanes = try b.vector(x.vector, x.vector_ty);
+                    lanes[@intCast(x.index.int)] = try b.get(x.value, x.value_ty);
+                    const entry = try vectors.getOrPut(inst.result orelse return error.UnsupportedLimbInteger);
+                    if (entry.found_existing) return error.UnsupportedLimbInteger;
+                    entry.value_ptr.* = lanes;
+                },
                 .binary => |x| {
                     if (!wide(x.ty)) return error.UnsupportedLimbInteger;
                     const lhs = try b.get(x.lhs, x.ty);
@@ -793,6 +844,26 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                     if (wide(x.to_ty)) try b.define(inst.result.?, p) else try b.copy(inst.result.?, x.to_ty, try b.narrow(p, x.to_ty));
                 },
                 .icmp => |x| {
+                    if (limbVector(x.operand_ty)) {
+                        const left = try b.vector(x.lhs, x.operand_ty);
+                        const right = try b.vector(x.rhs, x.operand_ty);
+                        const mask_ty: ir.Type = .{ .vector = .{ .len = 4, .elem_ty = .{ .int = 1 } } };
+                        var mask_value: ir.Value = .poison;
+                        for (left, right, 0..) |lhs, rhs, lane| {
+                            const name = if (lane == 3) inst.result orelse return error.UnsupportedLimbInteger else try forms.temporary(a, source, &names);
+                            const predicate = try b.comparison(x.predicate, lhs, rhs);
+                            try block.instructions.append(a, .{ .result = name, .kind = .{ .insertelement = .{
+                                .vector_ty = mask_ty,
+                                .vector = mask_value,
+                                .value_ty = boolean,
+                                .value = predicate,
+                                .index_ty = word,
+                                .index = .{ .int = @intCast(lane) },
+                            } } });
+                            mask_value = .{ .named = name };
+                        }
+                        continue;
+                    }
                     const p = try b.comparison(x.predicate, try b.get(x.lhs, x.operand_ty), try b.get(x.rhs, x.operand_ty));
                     try b.copy(inst.result.?, boolean, p);
                 },
@@ -846,6 +917,8 @@ fn lower(a: std.mem.Allocator, source: ir.Function, context: ?*const machine.Rea
                     try block.instructions.append(a, copy);
                 },
                 .call => |x| {
+                    if (limbVector(x.ret_ty)) return error.UnsupportedLimbInteger;
+                    for (x.args.items) |arg| if (limbVector(arg.ty)) return error.UnsupportedLimbInteger;
                     if (try checkedKind(a, x)) |kind| {
                         const computed = try b.checked(x, kind);
                         if (inst.result) |name| {

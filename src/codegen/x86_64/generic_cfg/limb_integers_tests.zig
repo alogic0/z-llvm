@@ -4,6 +4,90 @@ const limb = @import("limb_integers.zig");
 const machine = @import("../machine.zig");
 const layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128";
 
+test "four lane i140 values retain scalar limb saturation and exact comparison masks" {
+    const a = std.testing.allocator;
+    const text =
+        \\declare i140 @llvm.ushl.sat.i140(i140,i140)
+        \\define i32 @wide_vector(ptr %input) {
+        \\entry:
+        \\ %a = load i140,ptr %input,align 1
+        \\ %r = tail call i140 @llvm.ushl.sat.i140(i140 %a,i140 1)
+        \\ %v0 = insertelement <4 x i140> poison,i140 %r,i64 0
+        \\ %v1 = insertelement <4 x i140> %v0,i140 0,i64 1
+        \\ %v2 = insertelement <4 x i140> %v1,i140 -1,i64 2
+        \\ %v3 = insertelement <4 x i140> %v2,i140 5,i64 3
+        \\ %c = icmp eq <4 x i140> %v3,<i140 0,i140 0,i140 -1,i140 5>
+        \\ %mask = bitcast <4 x i1> %c to i4
+        \\ %answer = zext i4 %mask to i32
+        \\ ret i32 %answer
+        \\}
+    ;
+    var module = try ir.Module.parse(a, text);
+    defer module.deinit();
+    try module.verify();
+    const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout, .functions = module.functions.items, .declarations = module.declarations.items };
+    const source = module.functions.items[0];
+    var arena = std.heap.ArenaAllocator.init(a);
+    defer arena.deinit();
+    const view = (try limb.legalize(arena.allocator(), source, &context)) orelse return error.ExpectedWideVectorView;
+    var private = module;
+    private.functions = try module.functions.clone(arena.allocator());
+    private.functions.items[0] = view;
+    try private.verify();
+    var selected = try @import("../../../compilation.zig").select(a, "x86_64-unknown-linux-gnu", source, .{ .generic_cfg_selector = true, .module_context = &context });
+    defer selected.deinit(a);
+    try @import("../verify.zig").verifyFunction(selected);
+    const code = try @import("../../../mc/encoding.zig").encodeFunction(a, selected);
+    defer a.free(code);
+    const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..code.len], code);
+    const run: *const fn (*const u8) callconv(.c) u32 = @ptrCast(memory.ptr);
+    for (0..5) |seed| {
+        var input: [18]u8 = @splat(0);
+        switch (seed) {
+            0 => {},
+            1 => input[0] = 1,
+            2 => input[17] = 8,
+            3 => input[17] = 240,
+            4 => @memset(&input, 255),
+            else => unreachable,
+        }
+        const before = input;
+        try std.testing.expectEqual(@as(u32, if (seed == 0 or seed == 3) 15 else 14), run(&input[0]));
+        try std.testing.expectEqualSlices(u8, &before, &input);
+    }
+    try std.testing.expect(source.blocks.items[0].instructions.items[2].kind == .insertelement);
+    try module.verify();
+}
+
+test "four lane limb vectors keep ABI memory dynamic lanes and other shapes closed" {
+    const cases = [_][]const u8{
+        "define <4 x i140> @closed() {\nentry:\n ret <4 x i140> zeroinitializer\n}\n",
+        "define i32 @closed(<4 x i140> %v) {\nentry:\n %c = icmp eq <4 x i140> %v,zeroinitializer\n %m = bitcast <4 x i1> %c to i4\n %r = zext i4 %m to i32\n ret i32 %r\n}\n",
+        "define i32 @closed(i64 %index) {\nentry:\n %v = insertelement <4 x i140> poison,i140 1,i64 %index\n ret i32 0\n}\n",
+        "define i32 @closed(ptr %p) {\nentry:\n %v = load <4 x i140>,ptr %p,align 1\n ret i32 0\n}\n",
+        "define i32 @closed(ptr %p) {\nentry:\n store <4 x i140> zeroinitializer,ptr %p,align 1\n ret i32 0\n}\n",
+        "declare i32 @consume(<4 x i140>)\ndefine i32 @closed() {\nentry:\n %v = insertelement <4 x i140> poison,i140 1,i32 0\n %r = call i32 @consume(<4 x i140> %v)\n ret i32 %r\n}\n",
+        "declare <4 x i140> @produce()\ndefine i32 @closed() {\nentry:\n %v = call <4 x i140> @produce()\n ret i32 0\n}\n",
+        "define i32 @closed() {\nentry:\n %v = freeze <4 x i140> poison\n ret i32 0\n}\n",
+        "define i32 @closed() {\nentry:\n %v = insertelement <4 x i141> poison,i141 1,i64 0\n ret i32 0\n}\n",
+        "define i32 @closed() {\nentry:\n %v = insertelement <8 x i140> poison,i140 1,i64 0\n ret i32 0\n}\n",
+        "define i32 @closed(i1 %condition) {\nentry:\n %v = select i1 %condition,<4 x i140> zeroinitializer,<4 x i140> poison\n ret i32 0\n}\n",
+        "define i32 @closed(i1 %condition) {\nentry:\n br i1 %condition,label %a,label %b\na:\n br label %join\nb:\n br label %join\njoin:\n %v = phi <4 x i140> [zeroinitializer,%a],[poison,%b]\n ret i32 0\n}\n",
+    };
+    for (cases) |text| {
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = layout, .functions = module.functions.items, .declarations = module.declarations.items };
+        try std.testing.expect((try limb.legalize(arena.allocator(), module.functions.items[0], &context)) == null);
+        try module.verify();
+    }
+}
+
 test "bounded limb switches keep source cases and CFG edges while executing exact wide equality" {
     const minimum = "115792089237316195423570985008687907853269984665640564039457584007913129639936";
     const text = "define i64 @wide_switch(ptr %input,i64 %salt) {\nentry:\n %x = load i257,ptr %input,align 1\n switch i257 %x,label %other [ i257 -125,label %negative\n i257 125,label %positive\n i257 0,label %zero\n i257 " ++ minimum ++ ",label %minimum ]\nnegative:\n br label %join\npositive:\n br label %join\nzero:\n br label %join\nminimum:\n br label %join\nother:\n br label %join\njoin:\n %tag = phi i64 [101,%negative],[202,%positive],[303,%zero],[404,%minimum],[505,%other]\n %result = xor i64 %tag,%salt\n ret i64 %result\n}\n";
