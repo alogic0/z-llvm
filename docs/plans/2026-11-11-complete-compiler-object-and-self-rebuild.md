@@ -20,10 +20,14 @@ procedures, all 17 gates, both complete 183-population native suites and all
 per build and every preceding object, owner and optimizer artifact byte-for-byte.
 The unchanged original compiler and runtime objects match the preceding
 checkpoint exactly. The original Debug replay gains 37 selections without loss,
-leaving 51 rejections. Ten subsequent families pass both 2,301-unit builds,
-all twenty combined native runs and 540 component faults. They select
-7,846/7,874 original Debug definitions, gaining 23 without loss. Those changes
-are adopted for fresh cumulative validation; 28 original failures remain open.
+leaving 51 rejections. The ten-family checkpoint passes at `e4e330b6`: both
+2,301-unit builds, eight readiness procedures, all 17 gates, both complete
+193-population native suites and all 4,996 required faults. Strict comparisons
+preserve all 6,692 preceding outcomes per build and keep 27 changed objects
+explicit; all eight distinct before/after pairs pass full-module encoding and
+ELF reviews. A new 58,431-file seal retains the evidence. The unchanged Debug
+input selects 7,846/7,874 definitions, gaining 23 without loss; 28 failures remain
+open. See the [ten-family checkpoint](../evidence/compiler_behavior_remaining_checkpoint_20261113.json).
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -569,6 +573,41 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    4,996 required faults. Compare strictly against the accepted 183 populations,
    repeat original compiler/runtime production and every affected audit, then
    continue closing the remaining original Debug failures.
+   **Complete for the ten-family adoption at `e4e330b6`.** Fresh qualification
+   passes both official unit builds, all eight readiness procedures, all
+   17 integration gates, both complete 193-population native suites and all
+   4,996 required fault controls. Original
+   compiler production selects 8,928/8,928 definitions and reproduces the
+   accepted object and owners exactly. Both fixed runtimes and the separate
+   Small runtime pass their ELF and ordered-event audits. Detailed reviews
+   reproduce every changed runtime and native function encoding; the strict
+   native comparisons remain failed for 27 individually reviewed objects per
+   build while preserving all 6,692 prior command outcomes, 1,083 preceding
+   objects, 1,101 owner artifacts and 558 optimizer artifacts exactly. Both
+   builds receive separate full reviews: seven object pairs per build, eight
+   distinct pairs in total. Independent integer-to-half
+   and `sincosf` checks match LLVM across 81,920 observations per runtime route.
+   The server-terminated Debug attempt remains failed. Its fresh replacement
+   passes under the user service manager, followed by fresh source verification
+   and a verified 58,431-file seal. The complete 3,651-file source and its
+   retained copy remain bound to every proof. See the
+   [ten-family checkpoint](../evidence/compiler_behavior_remaining_checkpoint_20261113.json).
+   Subsequent private research proves bounded self recursion on a 64 KiB
+   worker stack, signed 8/16-bit argument carriers, and direct/indirect terminal
+   tail transfers with ordinary stack-argument calls before the transfer.
+   Both proper compiler builds and both complete 2,312-test unit runs pass.
+   All six combined native runs pass and detect 162 injected faults; independent
+   models cover promoted arguments, defined return bits, argument cycles,
+   guarded memory and one million transfers on a 64 KiB worker stack.
+   The unchanged Debug replay reaches 7,860/7,874, gaining 14 without loss
+   against the ten-family adoption. Its actual nonzero result and 14 failures
+   remain explicit. A mechanical Zig generator port reproduces 90 files and
+   44 expansion populations exactly, giving 196 total native populations.
+   A preceding full unit run caught call-transaction code moved outside its
+   required owner function; retain that failure. The corrected source keeps
+   the protected code in its original function and passes the unchanged guards.
+   Keep these sources separate until adoption, fresh cumulative qualification
+   and preservation against all 193 accepted populations are complete.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
