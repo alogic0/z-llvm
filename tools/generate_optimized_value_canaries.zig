@@ -6,17 +6,19 @@ pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
     const argv = try init.minimal.args.toSlice(c.a);
     const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "verify-root", "population" }, &.{});
-    const typed_frame = if (args.get("population")) |population| blk: {
-        if (!std.mem.eql(u8, population, "typed_floating_frames")) return error.UnsupportedPopulation;
-        break :blk true;
-    } else false;
+    const population = args.get("population");
+    const typed_frame = if (population) |name| std.mem.eql(u8, name, "typed_floating_frames") else false;
+    const floating_hints = if (population) |name| std.mem.eql(u8, name, "floating_vector_hints") else false;
+    if (population != null and !typed_frame and !floating_hints) return error.UnsupportedPopulation;
     const root = try c.newOutput(try args.require("output-root"));
     var entries = u.array(c.a);
-    if (!typed_frame) {
+    if (floating_hints) {
+        try u.add(&entries, try floatingHints(&c, root));
+    } else if (!typed_frame) {
         try u.add(&entries, try symbolicPointers(&c, root));
         try u.add(&entries, try floatingBooleans(&c, root));
     }
-    try u.add(&entries, try paddedFloating(&c, root, typed_frame));
+    if (!floating_hints) try u.add(&entries, try paddedFloating(&c, root, typed_frame));
     try c.writeJson(try c.join(&.{ root, "native_canaries.json" }), try u.toValue(c.a, .{ .schema = 1, .canaries = entries }));
     if (args.get("verify-root")) |before| {
         const old = try u.json.array(try u.get(try c.load(try c.join(&.{ before, "native_canaries.json" })), "canaries"));
@@ -33,7 +35,51 @@ pub fn main(init: std.process.Init) !void {
             }
         }
     }
-    try c.print("{s}{s}\n", .{ if (typed_frame) "typed floating frames:16 cases/8192 observations per route" else "optimized values:three populations/six fixtures", if (args.get("verify-root") != null) "; byte-exact verification passed" else "" });
+    try c.print("{s}{s}\n", .{ if (floating_hints) "floating vector hints:72 cases/144 definitions/36864 observations per route" else if (typed_frame) "typed floating frames:16 cases/8192 observations per route" else "optimized values:three populations/six fixtures", if (args.get("verify-root") != null) "; byte-exact verification passed" else "" });
+}
+
+fn floatingHints(c: *u.Context, root: []const u8) !u.Value {
+    const contract = "independent-integer-payload-goldens=four-double-x87-and-quad=fastcc-optional-tail-and-notail=literal-and-dynamic-vectors=one-and-two-vector-arguments=caller-and-callee-call-clobbers=source-and-output-guards=preserved";
+    var out = try Output.init(c, "floating-vector-hints", "floating_vector_hints_model.c", contract);
+    const literals = [_][]const u8{
+        "<double 1.000000e+00,double -0.000000e+00,double 0x7FF8000000000001,double -2.000000e+00>",
+        "<x86_fp80 0xK3FFF8000000000000000,x86_fp80 0xK80000000000000000000,x86_fp80 0xK4000C000000000000000,x86_fp80 0xKBFFF8000000000000000>",
+        "<fp128 0xL00000000000000003FFF000000000000,fp128 0xL00000000000000008000000000000000,fp128 0xL000000000000000140007FFF00000000,fp128 0xL0000000000000000C000000000000000>",
+    };
+    for ([_][]const u8{ "double", "x86_fp80", "fp128" }, [_]usize{ 64, 80, 128 }, literals) |ty, bits, literal| for (1..3) |arity| for (0..2) |constant| for (0..2) |facts| for ([_][]const u8{ "", "tail ", "notail " }) |hint| {
+        const body = try c.fmt("floating_hint_body_{d}", .{out.count});
+        const probe = try c.fmt("floating_hint_probe_{d}", .{out.count});
+        const attrs = if (facts != 0) "noundef " else "";
+        const bytes = bits / 8 * 4;
+        const payload = bytes * arity;
+        try u.add(&out.functions, u.s(body));
+        try out.probe(c, probe, bits, arity * 2 + constant);
+        try out.ir.writer.print("define internal fastcc i64 @{s}(ptr %out,<4 x {s}> {s}%a{s},i64 %salt) noinline {{\nentry:\n %token = call i64 @complete_clobber(i64 %salt,i64 2,i64 3,i64 4,i64 5,i64 6,i64 7,i64 8)\n store <4 x {s}> %a,ptr %out,align 1\n", .{ body, ty, attrs, if (arity == 2) try c.fmt(",<4 x {s}> {s}%b", .{ ty, attrs }) else "", ty });
+        if (arity == 2) try out.ir.writer.print(" %next = getelementptr i8,ptr %out,i64 {d}\n store <4 x {s}> %b,ptr %next,align 1\n", .{ bytes, ty });
+        try out.ir.writer.print(" %token_out = getelementptr i8,ptr %out,i64 {d}\n store i64 %token,ptr %token_out,align 1\n ret i64 %token\n}}\ndefine i64 @{s}(ptr %out,ptr %source,ptr %unused,i64 %salt) {{\nentry:\n", .{ payload, probe });
+        if (constant == 0) {
+            try out.ir.writer.print(" %a = load <4 x {s}>,ptr %source,align 1\n", .{ty});
+            if (arity == 2) try out.ir.writer.print(" %next = getelementptr i8,ptr %source,i64 {d}\n %b = load <4 x {s}>,ptr %next,align 1\n", .{ bytes, ty });
+        } else if (facts != 0) {
+            // The existing parser admits vector attributes with SSA operands.
+            // Keep direct literal calls in the unannotated cases and cover
+            // attributed constants through a defined, equivalent SSA value.
+            var lanes = std.mem.splitScalar(u8, literal[1 .. literal.len - 1], ',');
+            for (0..4) |lane| {
+                const name = if (lane == 3) "a" else try c.fmt("literal_{d}", .{lane});
+                const previous = if (lane == 0) "poison" else try c.fmt("%literal_{d}", .{lane - 1});
+                try out.ir.writer.print(" %{s} = insertelement <4 x {s}> {s},{s},i64 {d}\n", .{ name, ty, previous, lanes.next() orelse return error.MissingFloatingLiteralLane, lane });
+            }
+            if (lanes.next() != null) return error.ExtraFloatingLiteralLane;
+        }
+        const left = if (constant != 0 and facts == 0) literal else "%a";
+        const right = if (constant != 0) (if (facts == 0) literal else "%a") else "%b";
+        try out.ir.writer.print(" %r = {s}call fastcc i64 @{s}(ptr %out,<4 x {s}> {s}{s}{s},i64 %salt)\n %token = call i64 @complete_clobber(i64 %salt,i64 2,i64 3,i64 4,i64 5,i64 6,i64 7,i64 8)\n %after = getelementptr i8,ptr %out,i64 {d}\n store <4 x {s}> {s},ptr %after,align 1\n", .{ hint, body, ty, attrs, left, if (arity == 2) try c.fmt(",<4 x {s}> {s}{s}", .{ ty, attrs, right }) else "", payload + 8, ty, left });
+        if (arity == 2) try out.ir.writer.print(" %after2 = getelementptr i8,ptr %after,i64 {d}\n store <4 x {s}> {s},ptr %after2,align 1\n", .{ bytes, ty, right });
+        try out.ir.writer.print(" %last = getelementptr i8,ptr %out,i64 {d}\n store i64 %token,ptr %last,align 1\n %answer = xor i64 %r,%salt\n ret i64 %answer\n}}\n", .{payload * 2 + 8});
+    };
+    if (out.count != 72) return error.FloatingHintInventoryChanged;
+    return out.finish(c, root, "floating_vector_hints", "floating-vector-hints", contract);
 }
 
 fn symbolicPointers(c: *u.Context, root: []const u8) !u.Value {

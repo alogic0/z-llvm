@@ -511,6 +511,49 @@ test "four lane floating inputs retain physical pieces exact payloads and six li
         try std.testing.expect(original.params.items[6].ty == .vector);
     }
 }
+test "floating input piece calls admit optional fastcc hints and preserve source envelopes" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "double", "x86_fp80", "fp128" }) |ty| for ([_][]const u8{ "tail", "notail" }) |hint| for (0..5) |variant| {
+        const text = try std.fmt.allocPrint(a, "declare fastcc void @take(ptr, <4 x {0s}>)\ndefine void @probe(ptr %out,ptr %source) {{\nentry:\n %v = load <4 x {0s}>,ptr %source,align 1\n {1s} call fastcc void @take(ptr %out, <4 x {0s}> %v)\n ret void\n}}\n", .{ ty, hint });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const call = &module.functions.items[0].blocks.items[0].instructions.items[1].kind.call;
+        switch (variant) {
+            0 => {},
+            1 => call.tail_kind = "musttail",
+            2 => call.calling_conv = null,
+            3 => call.args.items[1].attrs = "inreg",
+            4 => call.tail_kind = "unknown",
+            else => unreachable,
+        }
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const view = try vectors.legalize(arena.allocator(), original, null);
+        try std.testing.expectEqualStrings(if (variant == 1) "musttail" else if (variant == 4) "unknown" else hint, call.tail_kind.?);
+        try std.testing.expect(call.args.items[1].ty == .vector);
+        if (variant != 0) {
+            try std.testing.expect(view == null);
+            continue;
+        }
+        var count: usize = 0;
+        for (view.?.blocks.items) |block| for (block.instructions.items) |inst| {
+            if (inst.kind != .call) continue;
+            count += 1;
+            try std.testing.expect(inst.kind.call.tail_kind == null);
+            try std.testing.expectEqual(@as(usize, if (std.mem.eql(u8, ty, "double")) 3 else 5), inst.kind.call.args.items.len);
+        };
+        try std.testing.expectEqual(@as(usize, 1), count);
+        const context: @import("../machine.zig").ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items, .declarations = module.declarations.items };
+        var selected = try compilation.select(a, "x86_64-unknown-linux-gnu", original, .{ .generic_cfg_selector = true, .module_context = &context });
+        defer selected.deinit(a);
+        try verify.verifyFunction(selected);
+        try module.verify();
+    };
+}
+
 test "floating input pieces keep wide returns layouts ABI facts and ninth SSE argument closed" {
     const a = std.testing.allocator;
     for (0..6) |variant| {

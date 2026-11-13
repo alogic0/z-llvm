@@ -681,9 +681,14 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                     for (x.args.items) |arg| has_argument_pieces = has_argument_pieces or inputPieces(arg.ty) != null;
                     if (fp(x.ret_ty)) copy.kind.call.ret_ty = try abiType(x.ret_ty);
                     if (has_argument_pieces) {
-                        if (x.callee_value != null or x.callee_function_ty != null or x.inline_asm != null or x.raw_args != null or x.operand_bundle != null or x.tail_kind != null or x.va_arg or x.native_query != null) return error.UnsupportedFloatingVector;
+                        if (x.callee_value != null or x.callee_function_ty != null or x.inline_asm != null or x.raw_args != null or x.operand_bundle != null or x.va_arg or x.native_query != null) return error.UnsupportedFloatingVector;
                         if (x.calling_conv) |cc| if (!std.mem.eql(u8, cc, "fastcc")) return error.UnsupportedFloatingVector;
+                        // Optional hints do not require a tail transfer. Keep
+                        // their new piecewise admission within the explicit
+                        // fastcc contract; ordinary ABI admission is unchanged.
+                        if (x.tail_kind != null and !std.mem.eql(u8, x.calling_conv orelse return error.UnsupportedFloatingVector, "fastcc")) return error.UnsupportedFloatingVector;
                         sysv.rejectUnsupportedCallEnvelope(x) catch return error.UnsupportedFloatingVector;
+                        copy.kind.call.tail_kind = null;
                         copy.kind.call.args = .empty;
                         for (x.args.items) |arg| {
                             if (inputPieces(arg.ty)) |plan| {
