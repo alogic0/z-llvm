@@ -36,7 +36,7 @@ pub const Action = struct {
     path: []const u8,
     run_root: []const u8,
     producer: []const u8,
-    kind: enum { cache, raw_trace, build_output, log },
+    kind: enum { cache, raw_trace, build_output, generated_assembly, log },
     status: enum { discovered, ready, skipped, removed, absent } = .discovered,
     reason: ?[]const u8 = null,
     metadata: ?fa.Metadata = null,
@@ -258,6 +258,7 @@ pub const Engine = struct {
             const index = try e.add(a.path, r.value.run_root, name, switch (a.kind) {
                 .raw_trace => .raw_trace,
                 .build_output => .build_output,
+                .generated_assembly => .generated_assembly,
                 .log => .log,
                 .private_cache => .cache,
             }, if (a.kind == .private_cache) null else a.sha256);
@@ -715,8 +716,9 @@ pub const Engine = struct {
         const processes = try e.c.capture(&.{ "ps", "-eo", "pid,args" });
         for (e.actions.items) |*a| {
             if (a.status == .removed or a.status == .absent or a.status == .skipped) continue;
-            const absolute_run = try e.absolute(a.run_root);
-            var busy = commandUsesRun(processes, a.run_root, std.os.linux.getpid());
+            const consumer_root = if (a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm")) @import("generated.zig").consumerRoot(a.run_root) else a.run_root;
+            const absolute_run = try e.absolute(consumer_root);
+            var busy = commandUsesRun(processes, consumer_root, std.os.linux.getpid());
             var lines = std.mem.tokenizeScalar(u8, listing, '\n');
             while (lines.next()) |line| if (line.len > 1 and line[0] == 'n' and p.within(absolute_run, line[1..])) {
                 busy = true;
@@ -808,6 +810,8 @@ pub const Engine = struct {
         defer rp.deinit();
         const r = rp.value;
         if (r.state == .held) return error.ReleaseHeld;
+        const generated = a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm");
+        if (generated and r.state != .disposable) return error.GeneratedOutputRequiresDisposable;
         var compiler_proof: ?retired_compiler.Proof = null;
         if (r.compiler_retirement) |record| {
             if (r.state != .audited or a.kind != .raw_trace) return error.RetiredCompilerOnlyAuditedTrace;
@@ -825,8 +829,8 @@ pub const Engine = struct {
             // Closed ordinary binaries/objects are temporary outputs. Source
             // reconstruction is not a prerequisite for discarding them.
             // Active use, pins, ownership and exact artifact checks still apply.
-            if (a.kind != .build_output and !a.released_cache) return error.DisposableOnlyBuildOutputs;
-            for (r.artifacts) |artifact| if (artifact.kind != .build_output and artifact.kind != .private_cache) return error.DisposableOnlyBuildOutputs;
+            if (a.kind != .build_output and a.kind != .generated_assembly and !a.released_cache) return error.DisposableOnlyBuildOutputs;
+            for (r.artifacts) |artifact| if (artifact.kind != .build_output and artifact.kind != .generated_assembly and artifact.kind != .private_cache) return error.DisposableOnlyBuildOutputs;
             if (!p.within(r.run_root, r.producer.path)) return error.UnboundDisposableProducer;
             if (eq(producer.value, "schema", "zllvm-compiler-build-v1")) {
                 const command = try get(producer.value, "command");
@@ -839,6 +843,7 @@ pub const Engine = struct {
                 try e.keep(list, row.path, row.sha256);
             }
             if (a.released_cache) try private_cache.verify(e, a.*, r, producer.value);
+            if (generated) try @import("generated.zig").verify(e, a.*, r, producer.value, list);
             try e.releaseTransitions(a, list, r);
             try e.keep(list, a.producer, null);
             a.replay_required = false;

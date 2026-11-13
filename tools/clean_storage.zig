@@ -23,6 +23,7 @@ const usage =
     \\       tools/clean-storage prepare-builds --builds FILE --reason TEXT [--successor FILE]
     \\       tools/clean-storage prepare-caches --caches FILE --reason TEXT
     \\       tools/clean-storage prepare-traces --traces FILE --reason TEXT
+    \\       tools/clean-storage prepare-generated --paths FILE --reason TEXT
     \\       tools/clean-storage prepare-pins --requests FILE --review FILE
     \\       tools/clean-storage [--apply] --requests FILE
     \\
@@ -53,11 +54,13 @@ pub fn main(init: std.process.Init) !void {
     const prepare_builds = args.len > 1 and std.mem.eql(u8, args[1], "prepare-builds");
     const prepare_caches = args.len > 1 and std.mem.eql(u8, args[1], "prepare-caches");
     const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
+    const prepare_generated = args.len > 1 and std.mem.eql(u8, args[1], "prepare-generated");
     const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
     var requests_path: ?[]const u8 = null;
     var builds_path: ?[]const u8 = null;
     var caches_path: ?[]const u8 = null;
     var traces_path: ?[]const u8 = null;
+    var generated_paths: ?[]const u8 = null;
     var compiler_retirement_path: ?[]const u8 = null;
     var review_path: ?[]const u8 = null;
     var request_path: ?[]const u8 = null;
@@ -66,7 +69,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or prepare_builds or prepare_pins or prepare_caches or prepare_traces) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -107,7 +110,12 @@ pub fn main(init: std.process.Init) !void {
             compiler_retirement_path = args[i];
             continue;
         }
-        if ((prepare_caches or prepare_traces) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
+        if (prepare_generated and std.mem.eql(u8, args[i], "--paths") and i + 1 < args.len) {
+            i += 1;
+            generated_paths = args[i];
+            continue;
+        }
+        if ((prepare_caches or prepare_traces or prepare_generated) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
             i += 1;
             reason = args[i];
             continue;
@@ -155,7 +163,8 @@ pub fn main(init: std.process.Init) !void {
     if (release_request and (apply or minimal or request_path == null)) return error.InvalidReleaseArguments;
     if (release_build and (apply or minimal or build_path == null or reason == null or audit_path != null)) return error.InvalidReleaseArguments;
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
-    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces) and (apply or minimal)) return error.PreparationIsReadOnly;
+    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) and (apply or minimal)) return error.PreparationIsReadOnly;
+    if (prepare_generated and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_caches and (caches_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_traces and (traces_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
@@ -192,8 +201,8 @@ pub fn main(init: std.process.Init) !void {
     defer report(&e, status, apply, minimal) catch {};
     try e.check(.{ .path = policy_path, .sha256 = policy_sha256 });
     try e.addControl(policy_path);
-    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else try batch.historicalPins(&e, requests_path.?, review_path.?);
+    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) {
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else try batch.historicalPins(&e, requests_path.?, review_path.?);
         status = "prepared";
         return;
     }
@@ -259,9 +268,23 @@ pub fn main(init: std.process.Init) !void {
             try e.pins();
             try e.consumers();
             if (a.status != .ready) continue;
-            try mutation.apply(&e, index);
+            var group: std.ArrayList(usize) = .empty;
+            if (mutation.generatedAction(a.*)) {
+                const scope = @import("storage_cleanup/generated.zig").consumerRoot(a.run_root);
+                for (e.actions.items, 0..) |other, other_index| {
+                    if (other.status == .ready and mutation.generatedAction(other) and
+                        std.mem.eql(u8, scope, @import("storage_cleanup/generated.zig").consumerRoot(other.run_root))) try group.append(c.a, other_index);
+                }
+            }
+            if (group.items.len > 1) {
+                try mutation.applyGeneratedBatch(&e, group.items);
+            } else try mutation.apply(&e, index);
             try report(&e, "applying", apply, minimal);
-            try c.print("Removed: {s} ({d} allocated file bytes)\n", .{ a.path, a.reclaimed_file_bytes });
+            if (group.items.len > 1) {
+                var reclaimed_group: u64 = 0;
+                for (group.items) |member| reclaimed_group += e.actions.items[member].reclaimed_file_bytes;
+                try c.print("Removed {d} generated outputs in {s} ({d} allocated file bytes)\n", .{ group.items.len, @import("storage_cleanup/generated.zig").consumerRoot(a.run_root), reclaimed_group });
+            } else try c.print("Removed: {s} ({d} allocated file bytes)\n", .{ a.path, a.reclaimed_file_bytes });
         }
         e.hash_cache.clearRetainingCapacity();
         try e.currentManifests(true);
@@ -329,6 +352,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/batch.zig", .bytes = @embedFile("storage_cleanup/batch.zig") },
         .{ .path = "tools/storage_cleanup/private_cache.zig", .bytes = @embedFile("storage_cleanup/private_cache.zig") },
         .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
+        .{ .path = "tools/storage_cleanup/generated.zig", .bytes = @embedFile("storage_cleanup/generated.zig") },
         .{ .path = "tools/validation/toolchain.zig", .bytes = @embedFile("validation/toolchain.zig") },
         .{ .path = "tools/validation/common.zig", .bytes = @embedFile("validation/common.zig") },
         .{ .path = "tools/vendor/file_audit.SHA256SUMS", .bytes = @embedFile("vendor/file_audit.SHA256SUMS") },

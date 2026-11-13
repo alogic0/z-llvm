@@ -5,6 +5,130 @@ const fa = core.fa;
 const D = std.Io.Dir;
 pub const pending_path = "local-state/storage-cleanup/pending.json";
 
+pub fn generatedAction(a: core.Action) bool {
+    return a.kind == .generated_assembly or (a.kind == .build_output and std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm"));
+}
+const GeneratedMove = struct {
+    action_index: usize,
+    path: []const u8,
+    quarantine: []const u8,
+    metadata: fa.Metadata,
+    sha256: []const u8,
+    parent_mode: u32,
+};
+fn syncDirectory(dir: D) !void {
+    if (std.os.linux.errno(std.os.linux.fsync(dir.handle)) != .SUCCESS) return error.DirectorySyncFailed;
+}
+fn moveGenerated(e: *core.Engine, entry: GeneratedMove, restore: bool, did_move: ?*bool) !void {
+    const original = try e.absolute(entry.path);
+    var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(original).?);
+    defer parent.close(e.c.io);
+    const mode = (try parent.stat(e.c.io)).permissions.toMode();
+    if (mode != entry.parent_mode) return error.ParentPermissionsChanged;
+    if (mode & 0o200 == 0) try parent.setPermissions(e.c.io, .fromMode(mode | 0o200));
+    defer if (mode & 0o200 == 0) parent.setPermissions(e.c.io, .fromMode(mode)) catch {};
+    const name = std.fs.path.basename(original);
+    const qname = std.fs.path.basename(entry.quarantine);
+    if (restore) try parent.renamePreserve(qname, parent, name, e.c.io) else {
+        try unchangedFile(e, parent, name, entry.metadata, e.actions.items[entry.action_index].sha256.?);
+        try parent.renamePreserve(name, parent, qname, e.c.io);
+    }
+    if (did_move) |flag| flag.* = true;
+    try syncDirectory(parent);
+}
+
+/// One explicitly inventoried generation, without deleting its mixed directory.
+/// Quarantine every named file, refresh pins/consumers, then unlink exact files.
+/// Before the first unlink any failure restores all names. An interruption or
+/// partial unlink leaves the durable batch journal for explicit recovery.
+pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
+    if (indexes.len < 2 or indexes.len > 1024) return error.InvalidGeneratedBatch;
+    for (indexes) |index| if (index >= e.actions.items.len) return error.InvalidGeneratedBatch;
+    var entries: std.ArrayList(GeneratedMove) = .empty;
+    const scope = @import("generated.zig").consumerRoot(e.actions.items[indexes[0]].run_root);
+    for (indexes, 0..) |index, n| {
+        for (indexes[0..n]) |old| if (old == index) return error.InvalidGeneratedBatch;
+        const a = e.actions.items[index];
+        if (a.status != .ready or !generatedAction(a) or a.snapshot != null or
+            !std.mem.eql(u8, scope, @import("generated.zig").consumerRoot(a.run_root))) return error.InvalidGeneratedBatch;
+        try e.verifyEvidence(a);
+        const observed = try e.metadata(a.path);
+        if (!observed.eql(a.metadata.?) or observed.kind != .file or observed.links != 1) return error.CandidateChanged;
+        const absolute = try e.absolute(a.path);
+        var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
+        defer parent.close(e.c.io);
+        try unchangedFile(e, parent, std.fs.path.basename(absolute), observed, a.sha256.?);
+        try entries.append(e.c.a, .{ .action_index = index, .path = a.path, .quarantine = try e.c.fmt("{s}/.storage-cleanup-{d}-{d}-{s}", .{ std.fs.path.dirname(a.path).?, std.os.linux.getpid(), index, std.fs.path.basename(a.path) }), .metadata = observed, .sha256 = a.sha256.?, .parent_mode = (try parent.stat(e.c.io)).permissions.toMode() });
+    }
+    try e.write(pending_path, .{ .schema = 1, .status = "pending", .kind = "generated-batch", .output = e.output, .entries = entries.items });
+    var moved: usize = 0;
+    var deleting = false;
+    errdefer if (!deleting) {
+        var restored = true;
+        while (moved > 0) {
+            moved -= 1;
+            moveGenerated(e, entries.items[moved], true, null) catch {
+                restored = false;
+            };
+        }
+        if (restored) D.cwd().deleteFile(e.c.io, e.absolute(pending_path) catch "") catch {};
+    };
+    for (entries.items) |entry| {
+        var did_move = false;
+        moveGenerated(e, entry, false, &did_move) catch |err| {
+            if (did_move) moved += 1;
+            return err;
+        };
+        moved += 1;
+    }
+    // No open descriptors in candidate directories remain during this refresh.
+    // This also catches a newly introduced pin while names were quarantined.
+    e.hash_cache.clearRetainingCapacity();
+    try e.loadHolds();
+    try e.pins();
+    try e.consumers();
+    for (entries.items) |entry| {
+        const a = e.actions.items[entry.action_index];
+        if (a.status != .ready) return error.GeneratedBatchBecameHeld;
+        try e.verifyEvidence(a);
+        const absolute = try e.absolute(entry.quarantine);
+        var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
+        defer parent.close(e.c.io);
+        var expected = entry.metadata;
+        expected.ctime_ns = (try fa.metadata.child(e.c.gpa, parent, std.fs.path.basename(absolute))).ctime_ns;
+        try unchangedFile(e, parent, std.fs.path.basename(absolute), expected, a.sha256.?);
+    }
+    const journal = try u.files.createLog(e.c.io, .{ .path = try e.absolute(try e.c.fmt("{s}/actions.jsonl", .{e.output})), .truncate = false });
+    defer journal.close(e.c.io);
+    for (entries.items) |entry| {
+        const a = &e.actions.items[entry.action_index];
+        const absolute = try e.absolute(entry.quarantine);
+        var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
+        defer parent.close(e.c.io);
+        const mode = (try parent.stat(e.c.io)).permissions.toMode();
+        if (mode != entry.parent_mode) return error.ParentPermissionsChanged;
+        const name = std.fs.path.basename(absolute);
+        var expected = entry.metadata;
+        expected.ctime_ns = (try fa.metadata.child(e.c.gpa, parent, name)).ctime_ns;
+        try unchangedFile(e, parent, name, expected, a.sha256.?);
+        if (mode & 0o200 == 0) try parent.setPermissions(e.c.io, .fromMode(mode | 0o200));
+        defer if (mode & 0o200 == 0) parent.setPermissions(e.c.io, .fromMode(mode)) catch {};
+        deleting = true;
+        try parent.deleteFile(e.c.io, name);
+        if (mode & 0o200 == 0) try parent.setPermissions(e.c.io, .fromMode(mode));
+        if ((try parent.stat(e.c.io)).permissions.toMode() != mode) return error.ParentPermissionsChanged;
+        try syncDirectory(parent);
+        a.reclaimed_file_bytes = entry.metadata.allocated_bytes;
+        if (a.reclaimed_file_bytes != a.allocated_bytes) return error.AllocationMismatch;
+        try e.verifyEvidence(a.*);
+        a.status = .removed;
+        try journal.writeStreamingAll(e.c.io, try e.c.fmt("{{\"action\":{d},\"phase\":\"removed\",\"reclaimed_file_bytes\":{d}}}\n", .{ entry.action_index, a.reclaimed_file_bytes }));
+        try journal.sync(e.c.io);
+        try e.write(try e.c.fmt("{s}/record-{d}.json", .{ e.output, entry.action_index }), .{ .status = "complete", .action = a.*, .retained = a.retained });
+    }
+    try D.cwd().deleteFile(e.c.io, try e.absolute(pending_path));
+}
+
 fn unchangedFile(e: *core.Engine, parent: D, name: []const u8, expected: fa.Metadata, sha: []const u8) !void {
     const m = try fa.metadata.child(e.c.gpa, parent, name);
     if (!m.eql(expected) or m.kind != .file or m.links != 1) return error.CandidateChanged;

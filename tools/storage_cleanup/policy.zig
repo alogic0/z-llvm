@@ -22,7 +22,7 @@ pub fn minimal(c: Config) Config {
 }
 pub const Holds = struct { schema: u32 = 1, paths: []const []const u8 = &.{} };
 pub const Retained = struct { path: []const u8, sha256: []const u8, role: enum { source, input, build, result, diagnostic, audit, compiler, other } };
-pub const Artifact = struct { path: []const u8, sha256: []const u8 = "", kind: enum { raw_trace, build_output, log, private_cache }, audit: ?[]const u8 = null };
+pub const Artifact = struct { path: []const u8, sha256: []const u8 = "", kind: enum { raw_trace, build_output, generated_assembly, log, private_cache }, audit: ?[]const u8 = null };
 pub const CacheOwner = struct {
     working_directory: []const u8,
     legacy_working_directory_review: ?[]const u8 = null,
@@ -97,7 +97,8 @@ pub fn artifactName(a: Artifact) bool {
     const name = std.fs.path.basename(a.path);
     return switch (a.kind) {
         .raw_trace => std.mem.eql(u8, name, "profile.events.jsonl") and a.audit != null,
-        .build_output => std.mem.eql(u8, name, "z_llvm") or std.mem.endsWith(u8, name, ".o") or std.mem.endsWith(u8, name, ".obj") or std.mem.endsWith(u8, name, ".exe") or std.mem.endsWith(u8, name, ".a"),
+        .build_output => std.mem.eql(u8, name, "z_llvm") or std.mem.eql(u8, name, "capture-zllvm") or std.mem.endsWith(u8, name, ".o") or std.mem.endsWith(u8, name, ".obj") or std.mem.endsWith(u8, name, ".exe") or std.mem.endsWith(u8, name, ".a"),
+        .generated_assembly => std.mem.eql(u8, name, "linked-harness.s"),
         .log => std.mem.endsWith(u8, name, ".log") or std.mem.endsWith(u8, name, ".stdout") or std.mem.endsWith(u8, name, ".stderr"),
         .private_cache => unreachable,
     };

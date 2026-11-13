@@ -7,6 +7,33 @@ const p = core.p;
 const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests: []const p.Evidence };
 pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
 
+pub fn generated(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
+    if (!p.relative(paths_file) or reason.len == 0) return error.InvalidEvidencePath;
+    try e.addControl(paths_file);
+    const bytes = try e.read(e.c.gpa, paths_file, 1024 * 1024);
+    defer e.c.gpa.free(bytes);
+    var paths = std.mem.tokenizeScalar(u8, bytes, '\n');
+    var seen = std.StringHashMap(void).init(e.c.a);
+    var requests: std.ArrayList(p.Evidence) = .empty;
+    const Rejected = struct { path: []const u8, reason: []const u8 };
+    var rejected: std.ArrayList(Rejected) = .empty;
+    while (paths.next()) |path| {
+        if (seen.count() >= 1024 or seen.contains(path)) return error.InvalidRequestList;
+        const owned = try e.c.a.dupe(u8, path);
+        try seen.put(owned, {});
+        const candidate = @import("generated.zig").request(e, owned, reason) catch |err| {
+            try rejected.append(e.c.a, .{ .path = owned, .reason = @errorName(err) });
+            continue;
+        };
+        const destination = try e.c.fmt("{s}/request-{d}.json", .{ e.output, requests.items.len });
+        try e.write(destination, candidate);
+        try requests.append(e.c.a, .{ .path = destination, .sha256 = try e.digest(destination) });
+    }
+    try e.write(try e.c.fmt("{s}/generated-review.json", .{e.output}), .{ .prepared = requests.items.len, .rejected = rejected.items });
+    if (requests.items.len != 0) try e.write(try e.c.fmt("{s}/requests.json", .{e.output}), List{ .requests = requests.items });
+    try e.c.print("Prepared {d} generated-output requests; {d} entries need review. No payloads changed.\n{s}/generated-review.json\n", .{ requests.items.len, rejected.items.len, e.output });
+}
+
 pub fn traces(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void {
     if (!p.relative(plan_path) or reason.len == 0) return error.InvalidEvidencePath;
     try e.addControl(plan_path);

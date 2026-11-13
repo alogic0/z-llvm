@@ -7,12 +7,16 @@ const releases = @import("release.zig");
 const batches = @import("batch.zig");
 const private_cache = @import("private_cache.zig");
 const retired_compiler = @import("retired_compiler.zig");
+const generated = @import("generated.zig");
 const p = core.p;
 const run = "local-state/validations/test/batch/build";
 const cache = run ++ "/zig-local-cache";
 const report = run ++ "/report.json";
 const output = "local-state/retirements/test-cleanup";
 const released = "local-state/validations/test/batch/released";
+const assembly_owner = run ++ "/execution-breadth-controls";
+const assembly_dir = assembly_owner ++ "/ReleaseFast/example";
+const assembly_path = assembly_dir ++ "/linked-harness.s";
 const Fixture = struct {
     tmp: t.TmpDir,
     arena: std.heap.ArenaAllocator,
@@ -125,6 +129,7 @@ const Fixture = struct {
             .log => "old.log",
             .raw_trace => "profile.events.jsonl",
             .build_output => "result.o",
+            .generated_assembly => "linked-harness.s",
             .private_cache => unreachable,
         } });
         try f.write(path, if (kind == .build_output and complete) "\x7fELFsynthetic-object" else "original payload");
@@ -1395,4 +1400,220 @@ test "storage cleanup: pin resolution remains correct beyond the directory descr
     try e.pins();
     try t.expect(e.pin_open_directories <= 128);
     try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+const GeneratedFault = enum { none, failed_assemble, wrong_output, bad_index, incomplete, wrong_source };
+fn assemblyFixture(f: *Fixture, e: *core.Engine, fault: GeneratedFault) !void {
+    try f.tmp.dir.createDirPath(t.io, assembly_dir);
+    try f.write(assembly_path, ".text\n# disposable generated assembly\n");
+    try f.write(assembly_dir ++ "/linked.zig", "pub fn main() void {}\n");
+    for ([_][]const u8{ "compile.stdout", "compile.stderr", "assemble.stdout", "assemble.stderr" }) |name|
+        try f.write(try f.c.fmt("{s}/{s}", .{ assembly_dir, name }), "original diagnostic\n");
+    const emitter = "/reviewed/zig";
+    const compile = [_][]const u8{ emitter, "build-exe", try e.absolute(assembly_dir ++ "/linked.zig"), "-fno-emit-bin", try f.c.fmt("-femit-asm={s}", .{try e.absolute(if (fault == .wrong_output) assembly_dir ++ "/unrelated.s" else assembly_path)}) };
+    const assemble = [_][]const u8{ emitter, "cc", "-x", "assembler", "-c", try e.absolute(assembly_path), "-o", try e.absolute(assembly_dir ++ "/linked-harness.o") };
+    try e.write(assembly_owner ++ "/commands.json", .{
+        .{ .argv = compile, .outcome = "completed", .returncode = 0, .actual_returncode = 0, .stdout = try e.absolute(assembly_dir ++ "/compile.stdout"), .stderr = try e.absolute(assembly_dir ++ "/compile.stderr") },
+        .{ .argv = assemble, .outcome = "completed", .returncode = if (fault == .failed_assemble) @as(i32, 2) else 0, .actual_returncode = if (fault == .failed_assemble) @as(i32, 2) else 0, .stdout = try e.absolute(assembly_dir ++ "/assemble.stdout"), .stderr = try e.absolute(assembly_dir ++ "/assemble.stderr") },
+    });
+    try e.write(assembly_owner ++ "/report.json", .{
+        .schema = "execution-breadth-controls-v2",
+        .status = "passed",
+        .rows = .{.{ .mode = "ReleaseFast", .status = if (fault == .incomplete) "failed" else "passed", .harness = .{
+            .source = try e.absolute(if (fault == .wrong_source) assembly_dir ++ "/other.zig" else assembly_dir ++ "/linked.zig"),
+            .object = try e.absolute(assembly_dir ++ "/linked-harness.o"),
+            .producer_commands = [_]usize{ 0, if (fault == .bad_index) 99 else 1 },
+            .emitter = .{ .path = emitter },
+        } }},
+    });
+}
+
+test "storage cleanup: generated assembly removal keeps source, commands and diagnostics" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try assemblyFixture(f, &e, .none);
+    const request = try generated.request(&e, assembly_path, "Completed generated test output");
+    try e.write(run ++ "/generated-release.json", request);
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try e.qualify(0);
+    try t.expectEqual(.ready, e.actions.items[0].status);
+    try mutation.apply(&e, 0);
+    try t.expect(!u.exists(t.io, try e.absolute(assembly_path)));
+    for ([_][]const u8{ assembly_dir ++ "/linked.zig", assembly_owner ++ "/report.json", assembly_owner ++ "/commands.json", assembly_dir ++ "/compile.stderr", assembly_dir ++ "/assemble.stderr" }) |path|
+        try t.expect(u.exists(t.io, try e.absolute(path)));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: generated assembly rejects failed, unrelated and incomplete commands" {
+    inline for (.{
+        .{ GeneratedFault.failed_assemble, error.GeneratedCommandNotSuccessful },
+        .{ GeneratedFault.wrong_output, error.UnboundAssemblyProducer },
+        .{ GeneratedFault.bad_index, error.InvalidGeneratedCommandIndexes },
+        .{ GeneratedFault.incomplete, error.IncompleteGeneratedComparison },
+        .{ GeneratedFault.wrong_source, error.UnboundHarnessSource },
+    }) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        try assemblyFixture(f, &e, case[0]);
+        try t.expectError(case[1], generated.request(&e, assembly_path, "Review generated output"));
+        try t.expect(u.exists(t.io, try e.absolute(assembly_path)));
+    }
+}
+
+test "storage cleanup: changed generated commands stop mutation and preserve payload" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try assemblyFixture(f, &initial, .none);
+    try initial.write(run ++ "/generated-release.json", try generated.request(&initial, assembly_path, "Completed generated test output"));
+    var e = f.engine();
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try e.qualify(0);
+    try f.write(assembly_owner ++ "/commands.json", "[]\n");
+    if (mutation.apply(&e, 0)) |_| return error.ChangedCommandsAccepted else |_| {}
+    try t.expect(u.exists(t.io, try e.absolute(assembly_path)));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: checksum pins still protect generated assembly" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try assemblyFixture(f, &e, .none);
+    try e.write(run ++ "/generated-release.json", try generated.request(&e, assembly_path, "Completed generated test output"));
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try e.qualify(0);
+    try f.write(run ++ "/accepted.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(assembly_path), assembly_path }));
+    try e.pins();
+    try t.expectEqual(.skipped, e.actions.items[0].status);
+}
+
+fn captureFixture(f: *Fixture, e: *core.Engine, wrong_hash: bool) !void {
+    try f.write(run ++ "/capture-zllvm", "\x7fELFsynthetic-validation-runner");
+    try f.write(run ++ "/commands.json", "[]\n");
+    try e.write(report, .{ .schema = "real-program-v1", .status = "passed", .tool_provenance = .{ .binary_sha256 = if (wrong_hash) "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" else try e.digest(run ++ "/capture-zllvm") }, .rows = .{.{ .mode = "ReleaseFast", .status = "matched" }} });
+}
+
+test "storage cleanup: capture helper requires the runner provenance hash" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try captureFixture(f, &e, true);
+    try t.expectError(error.CaptureRunnerHashMismatch, generated.request(&e, run ++ "/capture-zllvm", "Completed capture helper"));
+    try captureFixture(f, &e, false);
+    e = f.engine();
+    try e.write(run ++ "/generated-release.json", try generated.request(&e, run ++ "/capture-zllvm", "Completed capture helper"));
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try e.qualify(0);
+    try mutation.apply(&e, 0);
+    try t.expect(!u.exists(t.io, try e.absolute(run ++ "/capture-zllvm")));
+    try t.expect(u.exists(t.io, try e.absolute(report)));
+}
+
+test "storage cleanup: aliased capture helpers cannot be removed" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try captureFixture(f, &e, false);
+    const file = try f.tmp.dir.openFile(t.io, run ++ "/capture-zllvm", .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, run ++ "/still-needed-runner", .{});
+    try e.write(run ++ "/generated-release.json", try generated.request(&e, run ++ "/capture-zllvm", "Completed capture helper"));
+    try e.discoverRelease(run ++ "/generated-release.json", true);
+    try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
+}
+
+test "storage cleanup: generated assembly adapter does not accept arbitrary source files" {
+    try t.expect(!p.artifactName(.{ .path = assembly_dir ++ "/original.s", .sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", .kind = .generated_assembly }));
+}
+
+test "storage cleanup: parent integrated job protects finished subtest outputs" {
+    const parent = "local-state/validations/example/batch/integrated-v2";
+    const scope = generated.consumerRoot(parent ++ "/execution-breadth-controls");
+    try t.expectEqualStrings(parent, scope);
+    try t.expect(core.commandUsesRun("123 runner --output-root " ++ parent, scope, 456));
+    try t.expectEqualStrings(run, generated.consumerRoot(run));
+}
+
+fn generatedBatchFixture(f: *Fixture, e: *core.Engine) !void {
+    for ([_][]const u8{ "first", "second" }, 0..) |name, index| {
+        const owner = try f.c.fmt("{s}/integrated-batch/{s}", .{ run, name });
+        const path = try f.c.fmt("{s}/capture-zllvm", .{owner});
+        try f.tmp.dir.createDirPath(t.io, owner);
+        try f.write(path, "\x7fELFtemporary copied runner");
+        try f.write(try f.c.fmt("{s}/commands.json", .{owner}), "[]\n");
+        try f.write(try f.c.fmt("{s}/input.ll", .{owner}), "original input remains\n");
+        try e.write(try f.c.fmt("{s}/report.json", .{owner}), .{ .schema = "real-program-v1", .status = "passed", .tool_provenance = .{ .binary_sha256 = try e.digest(path) }, .rows = .{.{ .mode = "ReleaseFast", .status = "matched" }} });
+        const request_path = try f.c.fmt("{s}/batch-release-{d}.json", .{ run, index });
+        try e.write(request_path, try generated.request(e, path, "Completed copied helpers"));
+        try e.discoverRelease(request_path, true);
+        try e.qualify(index);
+    }
+}
+
+test "storage cleanup: generated batch removes only named files and records each result" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try generatedBatchFixture(f, &e);
+    var parent = try f.tmp.dir.openDir(t.io, run ++ "/integrated-batch/first", .{ .iterate = true });
+    try parent.setPermissions(t.io, .fromMode(0o500));
+    parent.close(t.io);
+    defer {
+        var restore = f.tmp.dir.openDir(t.io, run ++ "/integrated-batch/first", .{ .iterate = true }) catch unreachable;
+        defer restore.close(t.io);
+        restore.setPermissions(t.io, .fromMode(0o700)) catch {};
+    }
+    try mutation.applyGeneratedBatch(&e, &.{ 0, 1 });
+    parent = try f.tmp.dir.openDir(t.io, run ++ "/integrated-batch/first", .{ .iterate = true });
+    defer parent.close(t.io);
+    try t.expectEqual(@as(u32, 0o500), (try parent.stat(t.io)).permissions.toMode() & 0o7777);
+    for (e.actions.items, 0..) |a, index| {
+        try t.expectEqual(.removed, a.status);
+        try t.expectEqual(a.allocated_bytes, a.reclaimed_file_bytes);
+        try t.expect(!u.exists(t.io, try e.absolute(a.path)));
+        try t.expect(u.exists(t.io, try e.absolute(try f.c.fmt("{s}/record-{d}.json", .{ output, index }))));
+        try t.expect(u.exists(t.io, try e.absolute(try f.c.fmt("{s}/input.ll", .{a.run_root}))));
+    }
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: generated batch rolls back every name when a pin appears at refresh" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try generatedBatchFixture(f, &e);
+    try f.write(run ++ "/new-pin.sha256", try f.c.fmt("{s}  {s}\n", .{ e.actions.items[1].sha256.?, e.actions.items[1].path }));
+    try t.expectError(error.GeneratedBatchBecameHeld, mutation.applyGeneratedBatch(&e, &.{ 0, 1 }));
+    for (e.actions.items) |a| {
+        try t.expect(u.exists(t.io, try e.absolute(a.path)));
+        try t.expectEqual(@as(u64, 0), a.reclaimed_file_bytes);
+        try t.expectEqualStrings(a.sha256.?, try f.c.digest(try e.absolute(a.path)));
+    }
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: generated batch rejects changed files before any quarantine" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try generatedBatchFixture(f, &e);
+    try f.write(e.actions.items[1].path, "changed output");
+    try t.expectError(error.CandidateChanged, mutation.applyGeneratedBatch(&e, &.{ 0, 1 }));
+    for (e.actions.items) |a| try t.expect(u.exists(t.io, try e.absolute(a.path)));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: generated batch rejects duplicate members and unrelated generations" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try generatedBatchFixture(f, &e);
+    try t.expectError(error.InvalidGeneratedBatch, mutation.applyGeneratedBatch(&e, &.{ 0, 0 }));
+    e.actions.items[1].run_root = "local-state/validations/unrelated/batch/integrated-other";
+    try t.expectError(error.InvalidGeneratedBatch, mutation.applyGeneratedBatch(&e, &.{ 0, 1 }));
+    for (e.actions.items) |a| try t.expect(u.exists(t.io, try e.absolute(a.path)));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
 }

@@ -188,4 +188,5 @@ test -f "$cleanup_fixture/$cleanup_retirement"
 "${ZIGREP:-zigrep}" --no-config -q -F 'removed: 1;' "$cleanup_fixture/trace-apply.log"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply --requests "$cleanup_trace_requests" --policy policy.json > "$cleanup_fixture/trace-repeat.log"
 "${ZIGREP:-zigrep}" --no-config -q -F 'removed: 0;' "$cleanup_fixture/trace-repeat.log"
-printf 'Eighteen isolated CLI checks passed, including verified retired compiler identities for audited traces, preserved failure diagnostics, private test caches, exact pin retirement, maintenance leases and repeated collection.\n'
+bash "$(dirname -- "${BASH_SOURCE[0]}")/generated_cli_tests.sh" "$cleanup_binary"
+printf 'Twenty isolated CLI checks passed, including generated-output batches, retired compiler identities, preserved failure diagnostics, private caches, pin retirement, maintenance leases and repeated collection.\n'

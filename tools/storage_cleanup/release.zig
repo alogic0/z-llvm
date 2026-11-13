@@ -173,6 +173,7 @@ pub fn publish(e: *core.Engine, release: p.Release) ![]const u8 {
         try e.actions.append(e.c.a, .{ .path = try e.c.a.dupe(u8, artifact.path), .run_root = try e.c.a.dupe(u8, release.run_root), .producer = draft, .kind = switch (artifact.kind) {
             .raw_trace => .raw_trace,
             .build_output => .build_output,
+            .generated_assembly => .generated_assembly,
             .log => .log,
             .private_cache => .cache,
         }, .sha256 = if (artifact.kind == .private_cache) null else try e.c.a.dupe(u8, artifact.sha256), .released_cache = artifact.kind == .private_cache });

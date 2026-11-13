@@ -212,6 +212,39 @@ whole-cache removal checks used for compiler caches apply. Source/configuration
 reconstruction is not required. Logs, receipts, current pins, queued holds,
 active consumers and retained dependencies remain protected.
 
+### Generated integrated-test outputs
+
+`prepare-generated --paths FILE --reason TEXT` reads a newline-separated list
+of explicit project-relative paths and writes requests plus
+`generated-review.json`. Review the resulting `requests.json`, then use
+`--apply --requests` for qualified files. Preparation never removes payloads.
+
+Two reviewed families are supported:
+
+- `linked-harness.s` under an `execution-breadth-controls` run. A passed
+  `execution-breadth-controls-v2` row must bind the source, object and two
+  consecutive command indexes. The successful compiler command must name that
+  exact assembly output, and the successful assembler command must consume it.
+- `capture-zllvm` beside a passed `real-program-v1` report. Every selected mode
+  must have matched, and the executable hash must equal the report's validation
+  runner provenance hash. `program.zig` creates this helper by copying its own
+  executable.
+
+Both use disposable output retention. Reports, commands and existing recorded
+diagnostics remain. Source or build-configuration archives are not required.
+Arbitrary assembly sources and extensionless executables are not admitted.
+Current pins, holds, metadata/hashes, hardlinks and active consumers still
+protect files; an active parent integrated job protects its finished subtests.
+Files with multiple hardlinks remain held by the single-file collector.
+
+Within a completed integrated run, eligible named outputs are collected as one
+guarded batch. The collector journals every original path, hash and metadata,
+quarantines only those files, then refreshes holds, pins and consumers before
+unlinking. A failure before unlinking restores every original name; an
+interruption or partial removal leaves a pending journal that blocks another
+cleanup. Each removed file still receives its own completed retirement record.
+Mixed run directories, reports, inputs and source files are not removed.
+
 ### Traces whose original compiler was retired
 
 `prepare-traces --traces PLAN.json --reason TEXT` prepares requests for an
