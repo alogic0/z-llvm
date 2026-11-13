@@ -108,6 +108,17 @@ not infer that every surviving byte is essential.
   in Debug and ReleaseFast. All 14 isolated CLI checks pass, including actual
   deletion, repeated collection, disposable publication without sources,
   maintenance leases, failed-job protection and publication failures.
+- Committed the implementation as `7c6d0062`. The first apply completed 11
+  removals, reclaiming 2,508,615,680 allocated file bytes, including both traces.
+  It was then stopped at a verified read-only consumer-check boundary with no
+  pending mutation; completed action records remain intact. A fresh apply
+  rediscovers the remaining disposable binaries. Local restart evidence is in
+  `local-state/storage-cleanup/completed-run-qualification/collector-restart.md`.
+- Fixed mixed batches coupling disposable removals to another action's replay
+  environment. Only actions whose contract requires replay recheck Git revisions
+  and toolchain libraries. Hashes, controls, pins, holds and guarded removal
+  still apply to every action. All 66 native checks pass in Debug and ReleaseFast,
+  and all 14 isolated CLI checks pass after this correction.
 
 ## Remaining investigations and operating budget
 
@@ -124,6 +135,12 @@ the one mismatched compiler identity, and raw traces whose original compilers
 have already been retired. Current manifests and explicit queued holds continue
 to protect their targets. Raw trace auditing has a separate evidence requirement
 from binary disposal.
+
+A read-only follow-up also identified 37 present compiler outputs from passed
+behavior builds v800–v967. Their candidate list is
+`local-state/storage-cleanup/completed-run-qualification/later-present-builds.txt`.
+They still need explicit requests and fresh pin/consumer review; the list itself
+does not authorize removal and version order alone does not establish disuse.
 
 Do not impose an arbitrary total-size cap while 131.2 GiB in the initial full
 inventory remains unresolved. The measured 20.9 GiB under current contracts is

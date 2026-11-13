@@ -418,6 +418,25 @@ test "storage cleanup: disposable compiler still obeys current pins" {
     try t.expectEqual(.skipped, e.actions.items[0].status);
 }
 
+test "storage cleanup: disposable output does not depend on another action's replay environment" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try f.canonical(&initial);
+    try initial.write(run ++ "/storage-release.json", try releases.disposableBuild(&initial, report, "Temporary build"));
+    var e = f.engine();
+    try e.discover();
+    try e.qualify(0);
+    try t.expect(!e.actions.items[0].replay_required);
+    // Another, already completed trace action may have registered this replay
+    // environment. It must not become a prerequisite for ordinary disposal.
+    try e.libraries.append(f.c.a, .{ .path = "missing-other-toolchain", .sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", .files = 1 });
+    try e.revisions.append(f.c.a, .{ .commit = "missing-other-commit", .tree = "missing-other-tree", .reference = "refs/retirements/missing-other" });
+    try e.verifyEvidence(e.actions.items[0]);
+    try mutation.apply(&e, 0);
+    try t.expectError(error.FileNotFound, e.metadata(run ++ "/bin/z_llvm"));
+}
+
 test "storage cleanup: completed private caches may be disposable without old source or compiler" {
     const f = try Fixture.init();
     defer f.deinit();

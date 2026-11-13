@@ -47,6 +47,7 @@ pub const Action = struct {
     reclaimed_file_bytes: u64 = 0,
     measured: bool = false,
     idle_seconds: ?i64 = null,
+    replay_required: bool = true,
     retired_pins: []const p.PinTransition = &.{},
 };
 pub const Engine = struct {
@@ -804,6 +805,7 @@ pub const Engine = struct {
             }
             try e.releaseTransitions(a, list, r);
             try e.keep(list, a.producer, null);
+            a.replay_required = false;
             return;
         }
         try e.sourceRevisions(producer.value);
@@ -914,6 +916,7 @@ pub const Engine = struct {
         if (!e.oldEnough(m) or !e.oldEnough(producer_metadata)) return error.TooRecent;
         var kept: std.ArrayList(Evidence) = .empty;
         if (a.kind == .cache) {
+            a.replay_required = e.config.cache_evidence == .replay;
             if (e.config.cache_evidence == .closed_producer) try e.closedCache(a.*, &kept) else try e.buildEvidence(a.producer, &kept, null, &.{});
         } else try e.releaseEvidence(a, &kept);
         const absolute_candidate = try e.absolute(a.path);
@@ -1027,8 +1030,10 @@ pub const Engine = struct {
         e.hash_cache.clearRetainingCapacity();
         for (e.controls.items) |row| try e.check(row);
         for (a.retained) |row| try e.check(row);
-        try e.verifyRevisions();
-        try historical.verifyLibraries(e);
+        if (a.replay_required) {
+            try e.verifyRevisions();
+            try historical.verifyLibraries(e);
+        }
     }
     pub fn sourceRevisions(e: *Engine, v: u.Value) !void {
         for ([_][]const u8{ "project_revision", "source_head" }) |key| {
