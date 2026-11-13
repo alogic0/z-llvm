@@ -1652,6 +1652,7 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
             .direct_call => |call| try writer.print("\tcallq {s}\n", .{call.symbol}),
             .direct_jump => |symbol| try writer.print("\tjmp {s}\n", .{symbol}),
             .indirect_call_rax => try writer.writeAll("\tcallq *%rax\n"),
+            .tail_jump_rax => try writer.writeAll("\tjmp *%rax\n"),
             .noreturn_direct_call => |symbol| try writer.print("\tcallq {s}\n", .{symbol}),
             .cmp_arg8_imm8 => |cmp| try writer.print("\tcmpb ${}, {s}\n", .{ cmp.imm, cmp.reg.name8() }),
             .test_arg8 => |reg| try writer.print("\ttestb {s}, {s}\n", .{ reg.name8(), reg.name8() }),

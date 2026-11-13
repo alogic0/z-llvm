@@ -592,7 +592,7 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    and a verified 58,431-file seal. The complete 3,651-file source and its
    retained copy remain bound to every proof. See the
    [ten-family checkpoint](../evidence/compiler_behavior_remaining_checkpoint_20261113.json).
-   Subsequent private research proves bounded self recursion on a 64 KiB
+   The following three-family batch proves bounded self recursion on a 64 KiB
    worker stack, signed 8/16-bit argument carriers, and direct/indirect terminal
    tail transfers with ordinary stack-argument calls before the transfer.
    Both proper compiler builds and both complete 2,312-test unit runs pass.
@@ -606,8 +606,13 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    A preceding full unit run caught call-transaction code moved outside its
    required owner function; retain that failure. The corrected source keeps
    the protected code in its original function and passes the unchanged guards.
-   Keep these sources separate until adoption, fresh cumulative qualification
-   and preservation against all 193 accepted populations are complete.
+   **Adopted for fresh cumulative validation.** Freeze the committed source,
+   repeat both official 2,312-unit builds, all eight readiness procedures,
+   all 17 gates, both complete 196-population native suites and all 5,158
+   required fault controls. Compare against every accepted 193-population
+   outcome and artifact; repeat original compiler/runtime production and all
+   affected audits. Then close the fourteen remaining original Debug failures
+   before the final generations and full behavior matrices in step 12.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the

@@ -77,7 +77,7 @@ pub fn verify(function: machine.MachineFunction) !void {
                 continue;
             },
             .ud2 => continue,
-            .direct_jump => {
+            .direct_jump, .tail_jump_rax => {
                 if (depth != 0) return error.X87StackNotEmptyAtCall;
                 continue;
             },

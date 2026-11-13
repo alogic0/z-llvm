@@ -152,20 +152,24 @@ pub fn tryLowerComposedCfgObserved(
     if (try bindStackParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedPhiDestinations(&composed)) |diagnostic| return unsupported(diagnostic);
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
-    if (composed.stack_frame_bytes != 0) {
+    if (composed.stack_frame_bytes != 0 and (!@import("narrow_abi.zig").hasTail(function) or @import("narrow_abi.zig").hasOrdinaryReturn(function))) {
         composed.return_epilogue_label = try selector_cfg.ownedReturnEpilogueLabel(&composed);
     }
 
     for (function.blocks.items, 0..) |block, block_index| {
+        const terminal_tail = @import("narrow_abi.zig").terminalTail(function, block);
         if (block_index != 0) try machine.instructions.append(allocator, .{ .label = block.name });
         if (try enterBlock(&composed, block)) |diagnostic| {
             machine.instructions.items.len = start_len;
             return unsupported(diagnostic);
         }
-        for (block.instructions.items) |instruction| {
-            if (try lowerInstruction(&composed, instruction)) |diagnostic| {
+        for (block.instructions.items, 0..) |instruction, instruction_index| {
+            composed.terminal_tail_call = terminal_tail != null and instruction_index == terminal_tail.?;
+            const diagnostic = try lowerInstruction(&composed, instruction);
+            composed.terminal_tail_call = false;
+            if (diagnostic) |problem| {
                 machine.instructions.items.len = start_len;
-                return unsupported(diagnostic);
+                return unsupported(problem);
             }
         }
         const terminator = block.terminator orelse {
@@ -173,6 +177,10 @@ pub fn tryLowerComposedCfgObserved(
             return unsupported(.{ .unsupported_control_flow = "stage2-missing-terminator" });
         };
         try selector_state.expireExpiredBindings(&composed);
+        if (terminal_tail != null) {
+            composed.current_position += 1;
+            continue;
+        }
         if (try selector_cfg.lowerCfgTerminator(&composed, function, block_index, terminator)) |diagnostic| {
             machine.instructions.items.len = start_len;
             return unsupported(diagnostic);
@@ -681,19 +689,23 @@ pub fn tryLowerComposedBlockObserved(
     if (try stabilizeFramedParams(&composed, function)) |diagnostic| return unsupported(diagnostic);
 
     const block = function.blocks.items[0];
-    for (block.instructions.items) |instruction| {
-        if (try lowerInstruction(&composed, instruction)) |diagnostic| return unsupported(diagnostic);
+    const terminal_tail = @import("narrow_abi.zig").terminalTail(function, block);
+    for (block.instructions.items, 0..) |instruction, instruction_index| {
+        composed.terminal_tail_call = terminal_tail != null and instruction_index == terminal_tail.?;
+        const diagnostic = try lowerInstruction(&composed, instruction);
+        composed.terminal_tail_call = false;
+        if (diagnostic) |problem| return unsupported(problem);
     }
 
     const terminator = block.terminator orelse return unsupported(.{ .unsupported_control_flow = "composed-block-missing-terminator" });
     try selector_state.expireExpiredBindings(&composed);
-    switch (terminator) {
+    if (terminal_tail == null) switch (terminator) {
         .ret => |ret| {
             if (try selector_cfg.lowerReturn(&composed, ret)) |diagnostic| return unsupported(diagnostic);
         },
         .@"unreachable" => try selector_state.emitEflagsInstruction(&composed, .ud2, .preserve),
         .br, .condbr, .@"switch", .indirectbr => return unsupported(.{ .no_emitter = "composed-block-terminator-not-owned" }),
-    }
+    };
     try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
     try @import("frame_compaction.zig").compact(&composed, function);
     return .selected;

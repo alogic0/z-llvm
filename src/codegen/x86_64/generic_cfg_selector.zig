@@ -100,7 +100,9 @@ pub fn tryLowerObserved(
                     }
                 }
                 try budget.consume();
-                if (rewrite.retain_labels)
+                if (rewrite.retain_all_labels)
+                    try pending_labels.append(arena.allocator(), rewrite.function.blocks.items)
+                else if (rewrite.retain_labels)
                     try pending_labels.append(arena.allocator(), rewrite.function.blocks.items[function.blocks.items.len..]);
                 function = rewrite.function;
                 continue;

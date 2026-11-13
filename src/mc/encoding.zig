@@ -1834,6 +1834,7 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 try appendI32(&bytes, allocator, 0);
             },
             .indirect_call_rax => try bytes.appendSlice(allocator, &.{ 0xff, 0xd0 }),
+            .tail_jump_rax => try bytes.appendSlice(allocator, &.{ 0xff, 0xe0 }),
             .indirect_jump => |jump| {
                 if (jump.reg == .r8 or jump.reg == .r9) try bytes.append(allocator, 0x41);
                 const code: u8 = switch (jump.reg) {
@@ -2356,7 +2357,7 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .and_rsp_neg16 => 4,
         .direct_call, .noreturn_direct_call => 5,
         .direct_jump => 5,
-        .indirect_call_rax => 2,
+        .indirect_call_rax, .tail_jump_rax => 2,
         .indirect_jump => |jump| if (jump.reg == .r8 or jump.reg == .r9) 3 else 2,
         .cmp_arg8_imm8 => |cmp| if (cmp.reg.needsRex8()) 4 else 3,
         .test_arg8 => |reg| if (reg.needsRex8()) 3 else 2,

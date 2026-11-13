@@ -58,12 +58,16 @@ pub const Stage = enum {
     @"floating_payload_intrinsics.zig.legalize",
     @"extended_sret_payloads.zig.legalize",
     @"prefetch_hints.zig.legalize",
+    @"narrow_abi.zig.legalizeSelfTail",
+    @"narrow_abi.zig.legalizeSigned",
+    @"narrow_abi.zig.legalizeTail",
 };
 
 pub const Rewrite = struct {
     function: ir.Function,
     retry_original: bool,
     retain_labels: bool = false,
+    retain_all_labels: bool = false,
     profile_stage: usize,
     profile_allocation_bytes: u64,
 };
@@ -79,7 +83,11 @@ pub const Budget = struct {
 pub fn next(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, profile: ?*profiling.Profile) !?Rewrite {
     const scope = profiling.enter(profile, .legalize);
     defer scope.end();
+    if (try apply(.@"narrow_abi.zig.legalizeSelfTail", allocator, function, context, profile)) |rewrite| return rewrite;
+    if (try apply(.@"narrow_abi.zig.legalizeTail", allocator, function, context, profile)) |rewrite| return rewrite;
+    if (try apply(.@"narrow_abi.zig.legalizeSigned", allocator, function, context, profile)) |rewrite| return rewrite;
     inline for (std.enums.values(Stage)) |stage| {
+        if (stage == .@"narrow_abi.zig.legalizeSelfTail" or stage == .@"narrow_abi.zig.legalizeSigned" or stage == .@"narrow_abi.zig.legalizeTail") continue;
         if (try apply(stage, allocator, function, context, profile)) |rewrite| return rewrite;
     }
     return null;
@@ -142,6 +150,9 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
         .@"floating_payload_intrinsics.zig.legalize" => @import("floating_payload_intrinsics.zig").legalize(measured, function),
         .@"extended_sret_payloads.zig.legalize" => @import("extended_sret_payloads.zig").legalize(measured, function, context),
         .@"prefetch_hints.zig.legalize" => @import("prefetch_hints.zig").legalize(measured, function),
+        .@"narrow_abi.zig.legalizeSelfTail" => @import("narrow_abi.zig").legalizeSelfTail(measured, function),
+        .@"narrow_abi.zig.legalizeSigned" => @import("narrow_abi.zig").legalizeSigned(measured, function),
+        .@"narrow_abi.zig.legalizeTail" => @import("narrow_abi.zig").legalizeTail(measured, function),
     };
     attempt.outcome = if (candidate != null) .rewritten else .unchanged;
     return if (candidate) |rewritten| .{
@@ -172,6 +183,7 @@ fn apply(comptime stage: Stage, allocator: std.mem.Allocator, function: ir.Funct
             => true,
             else => false,
         },
+        .retain_all_labels = stage == .@"narrow_abi.zig.legalizeSelfTail",
         .retain_labels = switch (stage) {
             .@"variadic_values.zig.legalize" => true,
             .@"floating_atomics.zig.legalize" => true,

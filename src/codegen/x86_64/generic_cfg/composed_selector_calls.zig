@@ -85,77 +85,79 @@ fn isColdAssumeBundle(bundle: []const u8) bool {
 }
 
 pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst) !?Diagnostic {
-    if (call.va_arg) return .{ .no_emitter = "va-arg-requires-lowering" };
-    if (call.native_query != null) return lowerNativeQuery(selector, result, call);
-    if (call.abi_x87_return and ir.identifiers.eql(call.callee, "llvm.sqrt.f80")) {
-        if (!call.ret_ty.eql(.{ .int = 128 }) or call.args.items.len != 1 or
-            !call.args.items[0].ty.eql(.{ .int = 128 }) or !call.args.items[0].abi_x87_memory)
-            return .{ .no_emitter = "extended80-sqrt-carrier" };
-        return @import("extended80_arithmetic.zig").lower(selector, result, call.args.items[0].value, null, .sqrt);
+    if (!selector.terminal_tail_call) {
+        if (call.va_arg) return .{ .no_emitter = "va-arg-requires-lowering" };
+        if (call.native_query != null) return lowerNativeQuery(selector, result, call);
+        if (call.abi_x87_return and ir.identifiers.eql(call.callee, "llvm.sqrt.f80")) {
+            if (!call.ret_ty.eql(.{ .int = 128 }) or call.args.items.len != 1 or
+                !call.args.items[0].ty.eql(.{ .int = 128 }) or !call.args.items[0].abi_x87_memory)
+                return .{ .no_emitter = "extended80-sqrt-carrier" };
+            return @import("extended80_arithmetic.zig").lower(selector, result, call.args.items[0].value, null, .sqrt);
+        }
+        if (call.isDebugVariableLocation()) return null;
+        if (sysv_abi.isVariadicCall(call)) try sysv_abi.rejectUnsupportedCallSignature(call);
+        if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
+            return if (result == null and intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .no_emitter = "composed-block-noalias-scope-decl" };
+        if (call.inline_asm != null) {
+            if (@import("../inline_asm.zig").classify(call)) |operation|
+                return lowerSystemAssembly(selector, result, call, operation);
+            return lowerFpBarrier(selector, result, call);
+        }
+        if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.returnaddress")) return lowerReturnAddress(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
+        if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
+        if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) return try lowerFpAbs(selector, result, call, 64);
+        if (std.mem.eql(u8, call.callee, "llvm.sqrt.f32")) return try selector_fp.lowerSqrt(selector, result, call, 32);
+        if (std.mem.eql(u8, call.callee, "llvm.sqrt.f64")) return try selector_fp.lowerSqrt(selector, result, call, 64);
+        if (std.mem.eql(u8, call.callee, "llvm.maxnum.f32")) return try selector_fp.lowerMaxNum(selector, result, call, 32);
+        if (std.mem.eql(u8, call.callee, "llvm.maxnum.f64")) return try selector_fp.lowerMaxNum(selector, result, call, 64);
+        if (std.mem.eql(u8, call.callee, "llvm.copysign.f32")) return try selector_fp.lowerCopySignF32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.copysign.f64")) return try selector_fp.lowerCopySignF64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f32")) return try selector_vector.lowerCopySignV2F32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f64")) return try selector_vector.lowerCopySignV2F64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) return try selector_vector.lowerFabsV2F32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.fabs.v4f32")) return try selector_vector.lowerFabsV4F32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f64")) return try selector_vector.lowerFabsV2F64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and call.args.items.len != 2) return try lowerIntByteSizeCall(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try lowerAbsI32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try lowerAbsI64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try lowerAbsI128(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) return try lowerCtlzI16(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try lowerCtlzI32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.ctlz.i52")) return try lowerCtlzI52(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64")) return try lowerCtpop(selector, result, call, 64);
+        if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
+        if (std.mem.startsWith(u8, call.callee, "llvm.usub.sat.")) return try lowerUsubSat(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.bswap.i16")) return try lowerBitPermutation(selector, result, call, 16, .byte_swap);
+        if (std.mem.eql(u8, call.callee, "llvm.bswap.i32")) return try lowerBitPermutation(selector, result, call, 32, .byte_swap);
+        if (std.mem.eql(u8, call.callee, "llvm.bswap.i64")) return try lowerBitPermutation(selector, result, call, 64, .byte_swap);
+        if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
+        if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i32")) return try lowerBitPermutation(selector, result, call, 32, .bit_reverse);
+        if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
+        if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) return try lowerBitPermutation(selector, result, call, 128, .bit_reverse);
+        if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
+        if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
+        if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64")) return try lowerMemset(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
+            std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.memmove.p0.p0.i64")) return try lowerInlineMemmove(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "strlen") and
+            !(call.args.items.len == 1 and ordinaryGlobalArgument(selector, call.args.items[0].value) != null))
+            return try lowerInlineStrlen(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "strnlen")) return try lowerInlineStrnlen(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
+        if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
+        if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64") or std.mem.eql(u8, call.callee, "llvm.umul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
+        if (std.mem.startsWith(u8, call.callee, "llvm.")) return .{ .no_emitter = "composed-block-llvm-intrinsic" };
     }
-    if (call.isDebugVariableLocation()) return null;
-    if (sysv_abi.isVariadicCall(call)) try sysv_abi.rejectUnsupportedCallSignature(call);
-    if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
-        return if (result == null and intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .no_emitter = "composed-block-noalias-scope-decl" };
-    if (call.inline_asm != null) {
-        if (@import("../inline_asm.zig").classify(call)) |operation|
-            return lowerSystemAssembly(selector, result, call, operation);
-        return lowerFpBarrier(selector, result, call);
-    }
-    if (std.mem.eql(u8, call.callee, "llvm.lifetime.start.p0") or std.mem.eql(u8, call.callee, "llvm.lifetime.end.p0")) return lowerLifetimeMarker(result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.assume")) return lowerAssume(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.trap")) return try lowerTrap(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.returnaddress")) return lowerReturnAddress(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.fabs.f16")) return try lowerFpAbs(selector, result, call, 16);
-    if (std.mem.eql(u8, call.callee, "llvm.fabs.f32")) return try lowerFpAbs(selector, result, call, 32);
-    if (std.mem.eql(u8, call.callee, "llvm.fabs.f64")) return try lowerFpAbs(selector, result, call, 64);
-    if (std.mem.eql(u8, call.callee, "llvm.sqrt.f32")) return try selector_fp.lowerSqrt(selector, result, call, 32);
-    if (std.mem.eql(u8, call.callee, "llvm.sqrt.f64")) return try selector_fp.lowerSqrt(selector, result, call, 64);
-    if (std.mem.eql(u8, call.callee, "llvm.maxnum.f32")) return try selector_fp.lowerMaxNum(selector, result, call, 32);
-    if (std.mem.eql(u8, call.callee, "llvm.maxnum.f64")) return try selector_fp.lowerMaxNum(selector, result, call, 64);
-    if (std.mem.eql(u8, call.callee, "llvm.copysign.f32")) return try selector_fp.lowerCopySignF32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.copysign.f64")) return try selector_fp.lowerCopySignF64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f32")) return try selector_vector.lowerCopySignV2F32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.copysign.v2f64")) return try selector_vector.lowerCopySignV2F64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f32")) return try selector_vector.lowerFabsV2F32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.fabs.v4f32")) return try selector_vector.lowerFabsV4F32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.fabs.v2f64")) return try selector_vector.lowerFabsV2F64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "zig.target.intByteSize") and call.args.items.len != 2) return try lowerIntByteSizeCall(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.abs.i32")) return try lowerAbsI32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.abs.i64")) return try lowerAbsI64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.abs.i128")) return try lowerAbsI128(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i16")) return try lowerCtlzI16(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i32")) return try lowerCtlzI32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i52")) return try lowerCtlzI52(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.ctlz.i64")) return try lowerCtlzI64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.cttz.i32")) return try lowerCttzI32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.cttz.i64")) return try lowerCttzI64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.ctpop.i64")) return try lowerCtpop(selector, result, call, 64);
-    if (std.mem.eql(u8, call.callee, "llvm.ctpop.i128")) return try lowerCtpop(selector, result, call, 128);
-    if (std.mem.startsWith(u8, call.callee, "llvm.usub.sat.")) return try lowerUsubSat(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.bswap.i16")) return try lowerBitPermutation(selector, result, call, 16, .byte_swap);
-    if (std.mem.eql(u8, call.callee, "llvm.bswap.i32")) return try lowerBitPermutation(selector, result, call, 32, .byte_swap);
-    if (std.mem.eql(u8, call.callee, "llvm.bswap.i64")) return try lowerBitPermutation(selector, result, call, 64, .byte_swap);
-    if (std.mem.eql(u8, call.callee, "llvm.bswap.i128")) return try lowerBitPermutation(selector, result, call, 128, .byte_swap);
-    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i32")) return try lowerBitPermutation(selector, result, call, 32, .bit_reverse);
-    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i64")) return try lowerBitPermutation(selector, result, call, 64, .bit_reverse);
-    if (std.mem.eql(u8, call.callee, "llvm.bitreverse.i128")) return try lowerBitPermutation(selector, result, call, 128, .bit_reverse);
-    if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
-    if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
-    if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64")) return try lowerMemset(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
-        std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.memmove.p0.p0.i64")) return try lowerInlineMemmove(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "strlen") and
-        !(call.args.items.len == 1 and ordinaryGlobalArgument(selector, call.args.items[0].value) != null))
-        return try lowerInlineStrlen(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "strnlen")) return try lowerInlineStrnlen(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.uadd.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .add);
-    if (std.mem.eql(u8, call.callee, "llvm.usub.with.overflow.i32")) return try lowerUnsignedOverflowI32(selector, result, call, .sub);
-    if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i64") or std.mem.eql(u8, call.callee, "llvm.umul.with.overflow.i64")) return try lowerSmulOverflowI64(selector, result, call);
-    if (std.mem.eql(u8, call.callee, "llvm.smul.with.overflow.i128")) return try lowerSmulOverflowI128(selector, result, call);
-    if (std.mem.startsWith(u8, call.callee, "llvm.")) return .{ .no_emitter = "composed-block-llvm-intrinsic" };
     if (call.callee_value) |callee| {
         if (callee != .named or callee.named.len == 0 or callee.named[0] == '@' or
             call.callee_function_ty != null or sysv_abi.callHasScalarSseType(call) or call.ret_ty.eql(.{ .int = 1 }))
@@ -165,7 +167,9 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         return .{ .no_emitter = "composed-block-call-form" };
     }
     if (sysv_abi.callHasScalarSseType(call)) return lowerScalarSseCall(selector, result, call);
-    try sysv_abi.rejectUnsupportedCallEnvelope(call);
+    var envelope = call;
+    if (selector.terminal_tail_call) envelope.tail_kind = null;
+    try sysv_abi.rejectUnsupportedCallEnvelope(envelope);
     try sysv_abi.rejectUnsupportedCallSignature(call);
     for (call.args.items) |arg| try sysv_abi.rejectUnsupportedCallArgAttrs(arg);
     if (call.ret_ty.eql(.{ .int = 1 })) return lowerBooleanCall(selector, result, call);
@@ -173,7 +177,7 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     if (ret_bits != 0 and ret_bits != 32 and ret_bits != 64 and ret_bits != 128) return .{ .no_emitter = "composed-block-call-ret-width" };
     var abi_index: usize = 0;
 
-    var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (result != null and (ret_bits == 32 or ret_bits == 64))
+    var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (!selector.terminal_tail_call and result != null and (ret_bits == 32 or ret_bits == 64))
         try selector_state.AccumulatorDefinitionTransaction.begin(selector)
     else
         null;
@@ -229,6 +233,14 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
     }
     if (transaction) |*active| try active.finishCallPreparationAfterArguments();
 
+    if (selector.terminal_tail_call) {
+        if (stack_count != 0 or ret_bits == 128) return .{ .no_emitter = "scalar-tail-stack-or-return" };
+        if (indirect_target) |frame| try selector.machine.instructions.append(selector.allocator, .{ .load_stack_disp32_rax = try frame.byteOffset() });
+        if (selector.stack_frame_bytes != 0) try selector_frame.appendAddRsp(selector, selector.stack_frame_bytes);
+        const transfer: x86_64_machine.Instruction = if (indirect_target != null) .tail_jump_rax else .{ .direct_jump = call.callee };
+        try selector_state.emitEflagsInstruction(selector, transfer, .preserve);
+        return null;
+    }
     const needs_alignment = selector.stack_frame_bytes == 0;
     if (needs_alignment) try selector_frame.appendSubRsp(selector, 8);
     if (stack_count != 0 and needs_alignment) return .{ .no_spill_envelope = "composed-block-call-stack-frame" };

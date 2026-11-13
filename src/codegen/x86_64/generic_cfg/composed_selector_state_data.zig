@@ -51,6 +51,7 @@ pub const ComposedBlockSelector = struct {
     frame_setup_begin: usize = 0,
     frame_setup_end: usize = 0,
     return_epilogue_label: ?[]const u8 = null,
+    terminal_tail_call: bool = false,
     current_position: usize = 1,
     expired_binding_this_position: bool = false,
     enable_expired_plan_register_reuse: bool = false,

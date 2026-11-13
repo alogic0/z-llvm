@@ -5,6 +5,8 @@ const sysv_abi = @import("sysv_abi.zig");
 const MachineFunction = machine_ir.MachineFunction;
 
 pub fn verifyFunction(function: MachineFunction) !void {
+    const tail_depths = try @import("verify_tail_calls.zig").prove(function);
+    defer if (tail_depths) |depths| std.heap.page_allocator.free(depths);
     try @import("verify_x87.zig").verify(function);
     for (function.instructions.items) |instruction| switch (instruction) {
         .indirect_jump => |jump| {
@@ -457,6 +459,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
         .direct_call,
         .tls_address_rax,
         .direct_jump,
+        .tail_jump_rax,
         .indirect_call_rax,
         .noreturn_direct_call,
         .cmp_arg8_imm8,
@@ -488,6 +491,9 @@ pub fn verifyFunction(function: MachineFunction) !void {
     const return_join = finalReturnJoin(function);
     var join_definitions: ReturnDefinitions = .{};
     for (function.instructions.items, 0..) |instruction, instruction_index| {
+        if (tail_depths) |depths| if (depths[instruction_index]) |depth| {
+            rsp_mod16 = @intCast((24 - depth % 16) % 16);
+        };
         if (return_join) |join| {
             const target: ?[]const u8 = switch (instruction) {
                 .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |name| name,
@@ -575,7 +581,15 @@ pub fn verifyFunction(function: MachineFunction) !void {
                 xmm0_defined = false;
                 @memset(&xmm_defined_bits, 0);
             },
-            .direct_jump => {},
+            .direct_jump => {
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                saw_terminator = true;
+            },
+            .tail_jump_rax => {
+                if (rsp_mod16 != 8) return error.UnbalancedStackFrame;
+                if (!eax_defined) return error.ReturnRegisterUndefined;
+                saw_terminator = true;
+            },
             .indirect_call_rax => |ret_ty| {
                 if (rsp_mod16 != 0) return error.MisalignedStackBeforeCall;
                 const call_returns_scalar_sse = sysv_abi.isScalarSseAbiType(ret_ty);
@@ -784,7 +798,7 @@ fn finalReturnJoin(function: MachineFunction) ?usize {
 
 fn fallsThrough(instruction: machine_ir.Instruction) bool {
     return switch (instruction) {
-        .jmp, .indirect_jump, .ret, .ud2, .direct_jump, .noreturn_direct_call => false,
+        .jmp, .indirect_jump, .ret, .ud2, .direct_jump, .tail_jump_rax, .noreturn_direct_call => false,
         else => true,
     };
 }
@@ -1318,6 +1332,7 @@ fn hasLabel(function: MachineFunction, name: []const u8) bool {
         .direct_call,
         .tls_address_rax,
         .direct_jump,
+        .tail_jump_rax,
         .indirect_call_rax,
         .noreturn_direct_call,
         .cmp_arg8_imm8,

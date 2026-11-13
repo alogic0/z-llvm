@@ -1,4 +1,4 @@
-//! Deterministically generate forty-one behavior-frontier native populations.
+//! Deterministically generate forty-four behavior-frontier native populations.
 //! --output-root NEW; optional --verify-root DIR checks fixtures and registry.
 const std = @import("std");
 const u = @import("validation/common.zig");
@@ -41,10 +41,13 @@ pub fn main(init: std.process.Init) !void {
     try u.add(&entries, try mask3Input(&c, target));
     try u.add(&entries, try packedFloatExtract(&c, target));
     try u.add(&entries, try oddPairBitreverse(&c, target));
-    try u.add(&entries,try integerUndef(&c,target));
-    try u.add(&entries,try nativeLiteralTruncation(&c,target));
-    try u.add(&entries,try memoryLimbs(&c,target));
-    if (entries.array.items.len != 41) return error.ExpectedFortyOnePopulations;
+    try u.add(&entries, try integerUndef(&c, target));
+    try u.add(&entries, try nativeLiteralTruncation(&c, target));
+    try u.add(&entries, try memoryLimbs(&c, target));
+    try u.add(&entries, try selfTail(&c, target));
+    try u.add(&entries, try signedAbi(&c, target));
+    try u.add(&entries, try tailTransfer(&c, target));
+    if (entries.array.items.len != 44) return error.ExpectedFortyFourPopulations;
     try c.writeJson(try c.join(&.{ target, "native_canaries.json" }), try u.toValue(c.a, .{ .schema = 1, .canaries = entries }));
     var files = std.StringHashMap(void).init(c.a);
     for (entries.array.items) |entry| {
@@ -52,7 +55,7 @@ pub fn main(init: std.process.Init) !void {
         if (entry.object.get("reference_fixture")) |reference| try files.put(try c.fmt("{s}.ll", .{reference.string}), {});
         if (entry.object.get("reference_source")) |source| try files.put(source.string, {});
     }
-    if (files.count() != 84) return error.ExpectedEightyFourFixtureFiles;
+    if (files.count() != 90) return error.ExpectedNinetyFixtureFiles;
     if (args.get("verify-root")) |root| {
         var names = files.keyIterator();
         while (names.next()) |name| if (!std.mem.eql(u8, try c.digest(try c.join(&.{ target, name.* })), try c.digest(try c.join(&.{ root, name.* })))) return c.fail("generated fixture differs: {s}", .{name.*});
@@ -66,7 +69,7 @@ pub fn main(init: std.process.Init) !void {
             if (matches != 1) return error.GeneratedPopulationMissingOrDuplicated;
         }
     }
-    try c.print("behavior-expansion fixtures: 41 populations, 84 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
+    try c.print("behavior-expansion fixtures: 44 populations, 90 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
 }
 fn wideSwitch(c: *u.Context, target: []const u8) !u.Value {
     var text: std.Io.Writer.Allocating = .init(c.a);
@@ -1377,103 +1380,420 @@ fn oddPairBitreverse(c: *u.Context, target: []const u8) !u.Value {
     return entry;
 }
 
-const integer_undef_client_template=" rolq  $$3,  %rdi ; rolq $$13, %rdi\\0A rolq  $$61, %rdi ; rolq $$51, %rdi\\0A xchgq %rbx, %rbx";
-const integer_undef_client_constraints="={rdx},{rax},{rdx},~{cc},~{memory},~{dirflag},~{fpsr},~{flags}";
-fn integerUndefCase(c:*u.Context,text:*std.Io.Writer,driver:*std.Io.Writer,table:*std.Io.Writer,functions:*u.Value,id:usize,kind:usize,bits:usize,to:usize,cc:[]const u8) !void{
- const body=try c.fmt("integer_undef_body_{d}",.{id});const probe=try c.fmt("integer_undef_probe_{d}",.{id});try u.add(functions,u.s(body));try u.add(functions,u.s(probe));const extent=((if(kind==2)bits else to)+7)/8;
- try text.print("define {s}i64 @{s}(",.{cc,body});for(0..6) |i|try text.print("{s}i64 %p{d}",.{if(i==0)"" else ",",i});try text.writeAll(",ptr %out) noinline {\nentry:\n %header = alloca [6 x i64],align 8\n");for(0..6) |i|try text.print(" %h{0d} = getelementptr i8,ptr %header,i64 {1d}\n store i64 %p{0d},ptr %h{0d},align 8\n",.{i,i*8});
- if(kind==2)try text.print(" store i{d} undef,ptr %out,align 1\n",.{bits}) else if(kind==3)try text.print(" %narrow = trunc i64 undef to i{0d}\n %value = zext i{0d} %narrow to i64\n store i64 %value,ptr %out,align 1\n",.{bits}) else try text.print(" %value = {s} i{d} undef to i{d}\n store i{d} %value,ptr %out,align 1\n",.{if(kind==0)"zext" else "sext",bits,to,to});
- try text.print(" %request = ptrtoint ptr %header to i64\n %client = call i64 asm sideeffect \"{s}\", \"{s}\"(i64 %request,i64 %p4)\n",.{integer_undef_client_template,integer_undef_client_constraints});if(kind==2)try text.print(" store i64 %p0,ptr %out,align 1\n %last = getelementptr i8,ptr %out,i64 {d}\n store i64 %p1,ptr %last,align 1\n",.{extent-8});try text.print(" %marker = getelementptr i8,ptr %out,i64 {d}\n store i64 %client,ptr %marker,align 1\n",.{extent});for(0..6) |i|try text.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n",.{i,if(i==0)"%client" else try c.fmt("%r{d}",.{i-1})});try text.writeAll(" ret i64 %r5\n}\n");
- try text.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n",.{probe});for(0..6) |i|try text.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n",.{i,i*8});try text.print(" %answer = call {s}i64 @{s}(",.{cc,body});for(0..6) |i|try text.print("{s}i64 %v{d}",.{if(i==0)"" else ",",i});try text.writeAll(",ptr %out)\n");for([_][]const u8{"%answer","%salt","%v0"},0..) |value,i|try text.print(" %o{0d} = getelementptr i8,ptr %out,i64 {1d}\n store i64 {2s},ptr %o{0d},align 1\n",.{i,extent+8+i*8,value});try text.writeAll(" %result = xor i64 %answer,%salt\n ret i64 %result\n}\n");try driver.print("extern uint64_t {s}(const void *,void *,uint64_t);\n",.{probe});try table.print("{{{s},{d},{d},{d}}},\n",.{probe,kind,bits,to});
+const integer_undef_client_template = " rolq  $$3,  %rdi ; rolq $$13, %rdi\\0A rolq  $$61, %rdi ; rolq $$51, %rdi\\0A xchgq %rbx, %rbx";
+const integer_undef_client_constraints = "={rdx},{rax},{rdx},~{cc},~{memory},~{dirflag},~{fpsr},~{flags}";
+fn integerUndefCase(c: *u.Context, text: *std.Io.Writer, driver: *std.Io.Writer, table: *std.Io.Writer, functions: *u.Value, id: usize, kind: usize, bits: usize, to: usize, cc: []const u8) !void {
+    const body = try c.fmt("integer_undef_body_{d}", .{id});
+    const probe = try c.fmt("integer_undef_probe_{d}", .{id});
+    try u.add(functions, u.s(body));
+    try u.add(functions, u.s(probe));
+    const extent = ((if (kind == 2) bits else to) + 7) / 8;
+    try text.print("define {s}i64 @{s}(", .{ cc, body });
+    for (0..6) |i| try text.print("{s}i64 %p{d}", .{ if (i == 0) "" else ",", i });
+    try text.writeAll(",ptr %out) noinline {\nentry:\n %header = alloca [6 x i64],align 8\n");
+    for (0..6) |i| try text.print(" %h{0d} = getelementptr i8,ptr %header,i64 {1d}\n store i64 %p{0d},ptr %h{0d},align 8\n", .{ i, i * 8 });
+    if (kind == 2) try text.print(" store i{d} undef,ptr %out,align 1\n", .{bits}) else if (kind == 3) try text.print(" %narrow = trunc i64 undef to i{0d}\n %value = zext i{0d} %narrow to i64\n store i64 %value,ptr %out,align 1\n", .{bits}) else try text.print(" %value = {s} i{d} undef to i{d}\n store i{d} %value,ptr %out,align 1\n", .{ if (kind == 0) "zext" else "sext", bits, to, to });
+    try text.print(" %request = ptrtoint ptr %header to i64\n %client = call i64 asm sideeffect \"{s}\", \"{s}\"(i64 %request,i64 %p4)\n", .{ integer_undef_client_template, integer_undef_client_constraints });
+    if (kind == 2) try text.print(" store i64 %p0,ptr %out,align 1\n %last = getelementptr i8,ptr %out,i64 {d}\n store i64 %p1,ptr %last,align 1\n", .{extent - 8});
+    try text.print(" %marker = getelementptr i8,ptr %out,i64 {d}\n store i64 %client,ptr %marker,align 1\n", .{extent});
+    for (0..6) |i| try text.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n", .{ i, if (i == 0) "%client" else try c.fmt("%r{d}", .{i - 1}) });
+    try text.writeAll(" ret i64 %r5\n}\n");
+    try text.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n", .{probe});
+    for (0..6) |i| try text.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n", .{ i, i * 8 });
+    try text.print(" %answer = call {s}i64 @{s}(", .{ cc, body });
+    for (0..6) |i| try text.print("{s}i64 %v{d}", .{ if (i == 0) "" else ",", i });
+    try text.writeAll(",ptr %out)\n");
+    for ([_][]const u8{ "%answer", "%salt", "%v0" }, 0..) |value, i| try text.print(" %o{0d} = getelementptr i8,ptr %out,i64 {1d}\n store i64 {2s},ptr %o{0d},align 1\n", .{ i, extent + 8 + i * 8, value });
+    try text.writeAll(" %result = xor i64 %answer,%salt\n ret i64 %result\n}\n");
+    try driver.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+    try table.print("{{{s},{d},{d},{d}}},\n", .{ probe, kind, bits, to });
 }
 
-fn integerUndef(c:*u.Context,destination:[]const u8) !u.Value {
- const fixtures=destination;
-var text:std.Io.Writer.Allocating=.init(c.a);var driver:std.Io.Writer.Allocating=.init(c.a);var table:std.Io.Writer.Allocating=.init(c.a);var functions=u.array(c.a);var id:usize=0;
- try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_integerUndef_core.c"})));try table.writer.writeAll("static const struct test_case cases[]={\n");
- for([_]usize{1,4,7,15,31}) |bits| for([_]usize{8,16,32,64}) |to|{if(bits>=to)continue;for(0..2) |kind| for([_][]const u8{"","fastcc "}) |cc|{try integerUndefCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,kind,bits,to,cc);id+=1;};};
- for([_]usize{8,63}) |bits| for([_][]const u8{"","fastcc "}) |cc|{try integerUndefCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,3,bits,64,cc);id+=1;};
- for([_]usize{129,512,800,1024,64000}) |bits| for([_][]const u8{"","fastcc "}) |cc|{try integerUndefCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,2,bits,0,cc);id+=1;};
- if(id!=82)return error.CaseInventoryChanged;try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");try driver.writer.writeAll(table.written());try c.write(try c.join(&.{fixtures,"integer_undef.ll"}),text.written());try c.write(try c.join(&.{fixtures,"integer_undef_driver.c"}),driver.written());const entry=try u.toValue(c.a,.{.population="integer_undef",.fixture="integer_undef",.prefix="integer-undef",.functions=functions,.observations=47872,.stdout="integer-undef observations=47872 refinement-domains=defined-endpoints=guard-pages=live-aliases=client-request-marker=preserved\n"});
- return entry;
+fn integerUndef(c: *u.Context, destination: []const u8) !u.Value {
+    const fixtures = destination;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var id: usize = 0;
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_integerUndef_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]usize{ 1, 4, 7, 15, 31 }) |bits| for ([_]usize{ 8, 16, 32, 64 }) |to| {
+        if (bits >= to) continue;
+        for (0..2) |kind| for ([_][]const u8{ "", "fastcc " }) |cc| {
+            try integerUndefCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, kind, bits, to, cc);
+            id += 1;
+        };
+    };
+    for ([_]usize{ 8, 63 }) |bits| for ([_][]const u8{ "", "fastcc " }) |cc| {
+        try integerUndefCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 3, bits, 64, cc);
+        id += 1;
+    };
+    for ([_]usize{ 129, 512, 800, 1024, 64000 }) |bits| for ([_][]const u8{ "", "fastcc " }) |cc| {
+        try integerUndefCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 2, bits, 0, cc);
+        id += 1;
+    };
+    if (id != 82) return error.CaseInventoryChanged;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "integer_undef.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "integer_undef_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "integer_undef", .fixture = "integer_undef", .prefix = "integer-undef", .functions = functions, .observations = 47872, .stdout = "integer-undef observations=47872 refinement-domains=defined-endpoints=guard-pages=live-aliases=client-request-marker=preserved\n" });
+    return entry;
 }
 
-fn nativeLiteralTruncation(c:*u.Context,destination:[]const u8) !u.Value {
- const fixtures=destination;
-var text:std.Io.Writer.Allocating=.init(c.a);var driver:std.Io.Writer.Allocating=.init(c.a);var table:std.Io.Writer.Allocating=.init(c.a);var functions=u.array(c.a);
- try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_nativeLiteralTruncation_core.c"})));try table.writer.writeAll("static const struct test_case cases[]={\n");var id:usize=0;
- for([_][2]usize{.{16,8},.{32,8},.{32,16},.{64,8},.{64,16},.{64,32}}) |widths| {
-  const source=widths[0];const target=widths[1];const limit=@as(u128,1)<<@as(u7,@intCast(source));const mask=limit-1;const sign=limit>>1;
-  for([_]u128{0,1,mask,sign,sign-1,mask-1},0..) |raw,sample| for([_][]const u8{"","fastcc "}) |cc| {
-   const body=try c.fmt("literal_truncation_body_{d}",.{id});const probe=try c.fmt("literal_truncation_probe_{d}",.{id});id+=1;try u.add(&functions,u.s(body));try u.add(&functions,u.s(probe));
-   try text.writer.print("define {s}i64 @{s}(",.{cc,body});for(0..6) |i|try text.writer.print("{s}i64 %p{d}",.{if(i==0)"" else ",",i});try text.writer.writeAll(",ptr %out) noinline {\nentry:\n");
-   const literal: i128=if(sample==2 or sample==3)@as(i128,@intCast(raw))-@as(i128,@intCast(limit)) else @intCast(raw);
-   try text.writer.print(" %value = trunc i{d} {d} to i{d}\n %wide = zext i{d} %value to i64\n",.{source,literal,target,target});
-   for(0..6) |i|try text.writer.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n",.{i,if(i==0)"%wide" else try c.fmt("%r{d}",.{i-1})});try text.writer.writeAll(" ret i64 %r5\n}\n");
-   try text.writer.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n",.{probe});for(0..6) |i|try text.writer.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n",.{i,i*8});
-   try text.writer.print(" %answer = call {s}i64 @{s}(",.{cc,body});for(0..6) |i|try text.writer.print("{s}i64 %v{d}",.{if(i==0)"" else ",",i});try text.writer.writeAll(",ptr %out)\n store i64 %answer,ptr %out,align 1\n %o1 = getelementptr i8,ptr %out,i64 8\n store i64 %salt,ptr %o1,align 1\n %o2 = getelementptr i8,ptr %out,i64 16\n store i64 %v0,ptr %o2,align 1\n %r = xor i64 %answer,%salt\n ret i64 %r\n}\n");
-   try driver.writer.print("extern uint64_t {s}(const void *,void *,uint64_t);\n",.{probe});try table.writer.print("{{{s},0,0,{d},{d},UINT64_C({d}),UINT64_C(0)}},\n",.{probe,source,target,raw});
-  };
- }
- if(id!=72)return error.CaseInventoryChanged;try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");try driver.writer.writeAll(table.written());
- try c.write(try c.join(&.{fixtures,"native_literal_truncation.ll"}),text.written());try c.write(try c.join(&.{fixtures,"native_literal_truncation_driver.c"}),driver.written());
- const observations=id*64*7; const expected_stdout=try c.fmt("native-literal-truncation observations={d} integer-mask-model=native-widths=literal-spellings=live-aliases=stack-calls=guard-pages=preserved\n",.{observations});
- const entry=try u.toValue(c.a,.{.population="native_literal_truncation",.fixture="native_literal_truncation",.prefix="native-literal-truncation",.functions=functions,.observations=observations,.stdout=expected_stdout});
- return entry;
-}
-
-fn memoryLimbLiteral(c:*u.Context,bits:usize,pattern:usize) ![]const u8 {
-    if(pattern==0)return "0";if(pattern==1)return "-1";
-    var words:[16]u64=@splat(0);const at=(bits-1)/64;const bit:@TypeOf(@as(u6,0))=@intCast((bits-1)%64);
-    if(pattern==2)words[at]=@as(u64,1)<<bit else {for(words[0..at]) |*word|word.*=std.math.maxInt(u64);words[at]=(@as(u64,1)<<bit)-1;}
-    var digits:std.ArrayList(u8)=.empty;
-    while(true){var carry:u128=0;var nonzero=false;var i:usize=words.len;while(i>0){i-=1;const value=(carry<<64)|words[i];words[i]=@intCast(value/10);carry=value%10;nonzero=nonzero or words[i]!=0;}try digits.append(c.a,'0'+@as(u8,@intCast(carry)));if(!nonzero)break;}
-    std.mem.reverse(u8,digits.items);return if(pattern==2)try c.fmt("-{s}",.{digits.items}) else digits.items;
-}
-fn memoryLimbCase(c:*u.Context,text:*std.Io.Writer,driver:*std.Io.Writer,table:*std.Io.Writer,functions:*u.Value,id:usize,kind:usize,from:usize,to:usize,predicate:usize,pattern:usize,cc:[]const u8) !void {
-    const body=try c.fmt("memory_limbs_body_{d}",.{id});const probe=try c.fmt("memory_limbs_probe_{d}",.{id});try u.add(functions,u.s(body));try u.add(functions,u.s(probe));
-    try text.print("define {s}i64 @{s}(",.{cc,body});for(0..6) |i|try text.print("{s}i64 %p{d}",.{if(i==0)"" else ",",i});try text.writeAll(",ptr %input,ptr %out,i64 %salt) noinline {\nentry:\n");
-    if(kind!=5)try text.print(" %x = load i{d},ptr %input,align 1\n",.{from});
-    var initial:[]const u8="%low";var payload=(to+7)/8;
-    if(kind==1){
-        const names=[_][]const u8{"eq","ne","ult","ule","ugt","uge","slt","sle","sgt","sge"};
-        try text.print(" %yp = getelementptr i{0d},ptr %input,i64 1\n %y = load i{0d},ptr %yp,align 1\n %condition = icmp {1s} i{0d} %x,%y\n %selected = select i1 %condition,i{0d} %x,i{0d} %y\n %slot = alloca i{0d},align 16\n store i{0d} %selected,ptr %slot,align 16\n %slot0 = getelementptr i{0d},ptr %slot,i64 0\n %roundtrip = load i{0d},ptr %slot0,align 16\n store i{0d} %roundtrip,ptr %out,align 1\n br i1 %condition,label %left,label %right\nleft:\n br label %join\nright:\n br label %join\njoin:\n %chosen = phi i{0d} [%y,%left],[%x,%right]\n %defined = freeze i{0d} %chosen\n %other = getelementptr i8,ptr %out,i64 {2d}\n store i{0d} %defined,ptr %other,align 1\n %first = trunc i{0d} %roundtrip to i64\n %second = trunc i{0d} %defined to i64\n %mix = xor i64 %first,%second\n %flag = zext i1 %condition to i64\n %initial = xor i64 %mix,%flag\n",.{from,names[predicate],payload});
-        initial="%initial";payload*=2;
-    } else {
-        if(kind==0)try text.print(" %value = freeze i{0d} %x\n",.{from}) else if(kind==5) {
-            try text.print(" store i{0d} {1s},ptr %out,align 1\n %value = load i{0d},ptr %out,align 1\n",.{to,try memoryLimbLiteral(c,to,pattern)});
-        } else try text.print(" %value = {s} i{d} %x to i{d}\n",.{switch(kind){2=>"trunc",3=>"zext",4=>"sext",else=>unreachable},from,to});
-        try text.print(" store i{d} %value,ptr %out,align 1\n",.{to});
-        if(to==64)initial="%value" else try text.print(" %low = {s} i{d} %value to i64\n",.{if(to>64)"trunc" else "zext",to});
+fn nativeLiteralTruncation(c: *u.Context, destination: []const u8) !u.Value {
+    const fixtures = destination;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_nativeLiteralTruncation_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    var id: usize = 0;
+    for ([_][2]usize{ .{ 16, 8 }, .{ 32, 8 }, .{ 32, 16 }, .{ 64, 8 }, .{ 64, 16 }, .{ 64, 32 } }) |widths| {
+        const source = widths[0];
+        const target = widths[1];
+        const limit = @as(u128, 1) << @as(u7, @intCast(source));
+        const mask = limit - 1;
+        const sign = limit >> 1;
+        for ([_]u128{ 0, 1, mask, sign, sign - 1, mask - 1 }, 0..) |raw, sample| for ([_][]const u8{ "", "fastcc " }) |cc| {
+            const body = try c.fmt("literal_truncation_body_{d}", .{id});
+            const probe = try c.fmt("literal_truncation_probe_{d}", .{id});
+            id += 1;
+            try u.add(&functions, u.s(body));
+            try u.add(&functions, u.s(probe));
+            try text.writer.print("define {s}i64 @{s}(", .{ cc, body });
+            for (0..6) |i| try text.writer.print("{s}i64 %p{d}", .{ if (i == 0) "" else ",", i });
+            try text.writer.writeAll(",ptr %out) noinline {\nentry:\n");
+            const literal: i128 = if (sample == 2 or sample == 3) @as(i128, @intCast(raw)) - @as(i128, @intCast(limit)) else @intCast(raw);
+            try text.writer.print(" %value = trunc i{d} {d} to i{d}\n %wide = zext i{d} %value to i64\n", .{ source, literal, target, target });
+            for (0..6) |i| try text.writer.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n", .{ i, if (i == 0) "%wide" else try c.fmt("%r{d}", .{i - 1}) });
+            try text.writer.writeAll(" ret i64 %r5\n}\n");
+            try text.writer.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n", .{probe});
+            for (0..6) |i| try text.writer.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n", .{ i, i * 8 });
+            try text.writer.print(" %answer = call {s}i64 @{s}(", .{ cc, body });
+            for (0..6) |i| try text.writer.print("{s}i64 %v{d}", .{ if (i == 0) "" else ",", i });
+            try text.writer.writeAll(",ptr %out)\n store i64 %answer,ptr %out,align 1\n %o1 = getelementptr i8,ptr %out,i64 8\n store i64 %salt,ptr %o1,align 1\n %o2 = getelementptr i8,ptr %out,i64 16\n store i64 %v0,ptr %o2,align 1\n %r = xor i64 %answer,%salt\n ret i64 %r\n}\n");
+            try driver.writer.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+            try table.writer.print("{{{s},0,0,{d},{d},UINT64_C({d}),UINT64_C(0)}},\n", .{ probe, source, target, raw });
+        };
     }
-    for(0..6) |i|try text.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n",.{i,if(i==0)initial else try c.fmt("%r{d}",.{i-1})});
-    for([_][]const u8{"%r5","%salt","%p0"},0..) |value,i|try text.print(" %record{0d} = getelementptr i8,ptr %out,i64 {1d}\n store i64 {2s},ptr %record{0d},align 1\n",.{i,payload+i*8,value});try text.writeAll(" %result = xor i64 %r5,%salt\n ret i64 %result\n}\n");
-    try text.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n",.{probe});for(0..6) |i|try text.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n",.{i,i*8});
-    const stride=((from+127)/128)*16;try text.print(" %xp = getelementptr i8,ptr %input,i64 {d}\n %answer = call {s}i64 @{s}(",.{if(kind==1)48 else 48+stride,cc,body});for(0..6) |i|try text.print("{s}i64 %v{d}",.{if(i==0)"" else ",",i});try text.writeAll(",ptr %xp,ptr %out,i64 %salt)\n ret i64 %answer\n}\n");
-    try driver.print("extern uint64_t {s}(const void *,void *,uint64_t);\n",.{probe});try table.print("{{{s},{d},{d},{d},{d},{d}}},\n",.{probe,kind,from,to,predicate,pattern});
+    if (id != 72) return error.CaseInventoryChanged;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "native_literal_truncation.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "native_literal_truncation_driver.c" }), driver.written());
+    const observations = id * 64 * 7;
+    const expected_stdout = try c.fmt("native-literal-truncation observations={d} integer-mask-model=native-widths=literal-spellings=live-aliases=stack-calls=guard-pages=preserved\n", .{observations});
+    const entry = try u.toValue(c.a, .{ .population = "native_literal_truncation", .fixture = "native_literal_truncation", .prefix = "native-literal-truncation", .functions = functions, .observations = observations, .stdout = expected_stdout });
+    return entry;
 }
 
-fn memoryLimbs(c:*u.Context,destination:[]const u8) !u.Value {
- const fixtures=destination;
-var text:std.Io.Writer.Allocating=.init(c.a);var driver:std.Io.Writer.Allocating=.init(c.a);var table:std.Io.Writer.Allocating=.init(c.a);var functions=u.array(c.a);var id:usize=0;
-    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_memoryLimbs_core.c"})));try table.writer.writeAll("static const struct test_case cases[]={\n");
-    for([_]usize{800,896,1024}) |bits| {
-        for([_][]const u8{"","fastcc "}) |cc| {
-            try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,0,bits,bits,0,0,cc);id+=1;
-            for(0..10) |predicate|{try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,1,bits,bits,predicate,0,cc);id+=1;}
-            for(0..4) |pattern|{try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,5,bits,bits,0,pattern,cc);id+=1;}
-            for([_]usize{8,16,32,64,128}) |small| {
-                try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,2,bits,small,0,0,cc);id+=1;
-                for([_]usize{3,4}) |kind|{try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,kind,small,bits,0,0,cc);id+=1;}
+fn memoryLimbLiteral(c: *u.Context, bits: usize, pattern: usize) ![]const u8 {
+    if (pattern == 0) return "0";
+    if (pattern == 1) return "-1";
+    var words: [16]u64 = @splat(0);
+    const at = (bits - 1) / 64;
+    const bit: @TypeOf(@as(u6, 0)) = @intCast((bits - 1) % 64);
+    if (pattern == 2) words[at] = @as(u64, 1) << bit else {
+        for (words[0..at]) |*word| word.* = std.math.maxInt(u64);
+        words[at] = (@as(u64, 1) << bit) - 1;
+    }
+    var digits: std.ArrayList(u8) = .empty;
+    while (true) {
+        var carry: u128 = 0;
+        var nonzero = false;
+        var i: usize = words.len;
+        while (i > 0) {
+            i -= 1;
+            const value = (carry << 64) | words[i];
+            words[i] = @intCast(value / 10);
+            carry = value % 10;
+            nonzero = nonzero or words[i] != 0;
+        }
+        try digits.append(c.a, '0' + @as(u8, @intCast(carry)));
+        if (!nonzero) break;
+    }
+    std.mem.reverse(u8, digits.items);
+    return if (pattern == 2) try c.fmt("-{s}", .{digits.items}) else digits.items;
+}
+fn memoryLimbCase(c: *u.Context, text: *std.Io.Writer, driver: *std.Io.Writer, table: *std.Io.Writer, functions: *u.Value, id: usize, kind: usize, from: usize, to: usize, predicate: usize, pattern: usize, cc: []const u8) !void {
+    const body = try c.fmt("memory_limbs_body_{d}", .{id});
+    const probe = try c.fmt("memory_limbs_probe_{d}", .{id});
+    try u.add(functions, u.s(body));
+    try u.add(functions, u.s(probe));
+    try text.print("define {s}i64 @{s}(", .{ cc, body });
+    for (0..6) |i| try text.print("{s}i64 %p{d}", .{ if (i == 0) "" else ",", i });
+    try text.writeAll(",ptr %input,ptr %out,i64 %salt) noinline {\nentry:\n");
+    if (kind != 5) try text.print(" %x = load i{d},ptr %input,align 1\n", .{from});
+    var initial: []const u8 = "%low";
+    var payload = (to + 7) / 8;
+    if (kind == 1) {
+        const names = [_][]const u8{ "eq", "ne", "ult", "ule", "ugt", "uge", "slt", "sle", "sgt", "sge" };
+        try text.print(" %yp = getelementptr i{0d},ptr %input,i64 1\n %y = load i{0d},ptr %yp,align 1\n %condition = icmp {1s} i{0d} %x,%y\n %selected = select i1 %condition,i{0d} %x,i{0d} %y\n %slot = alloca i{0d},align 16\n store i{0d} %selected,ptr %slot,align 16\n %slot0 = getelementptr i{0d},ptr %slot,i64 0\n %roundtrip = load i{0d},ptr %slot0,align 16\n store i{0d} %roundtrip,ptr %out,align 1\n br i1 %condition,label %left,label %right\nleft:\n br label %join\nright:\n br label %join\njoin:\n %chosen = phi i{0d} [%y,%left],[%x,%right]\n %defined = freeze i{0d} %chosen\n %other = getelementptr i8,ptr %out,i64 {2d}\n store i{0d} %defined,ptr %other,align 1\n %first = trunc i{0d} %roundtrip to i64\n %second = trunc i{0d} %defined to i64\n %mix = xor i64 %first,%second\n %flag = zext i1 %condition to i64\n %initial = xor i64 %mix,%flag\n", .{ from, names[predicate], payload });
+        initial = "%initial";
+        payload *= 2;
+    } else {
+        if (kind == 0) try text.print(" %value = freeze i{0d} %x\n", .{from}) else if (kind == 5) {
+            try text.print(" store i{0d} {1s},ptr %out,align 1\n %value = load i{0d},ptr %out,align 1\n", .{ to, try memoryLimbLiteral(c, to, pattern) });
+        } else try text.print(" %value = {s} i{d} %x to i{d}\n", .{ switch (kind) {
+            2 => "trunc",
+            3 => "zext",
+            4 => "sext",
+            else => unreachable,
+        }, from, to });
+        try text.print(" store i{d} %value,ptr %out,align 1\n", .{to});
+        if (to == 64) initial = "%value" else try text.print(" %low = {s} i{d} %value to i64\n", .{ if (to > 64) "trunc" else "zext", to });
+    }
+    for (0..6) |i| try text.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n", .{ i, if (i == 0) initial else try c.fmt("%r{d}", .{i - 1}) });
+    for ([_][]const u8{ "%r5", "%salt", "%p0" }, 0..) |value, i| try text.print(" %record{0d} = getelementptr i8,ptr %out,i64 {1d}\n store i64 {2s},ptr %record{0d},align 1\n", .{ i, payload + i * 8, value });
+    try text.writeAll(" %result = xor i64 %r5,%salt\n ret i64 %result\n}\n");
+    try text.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n", .{probe});
+    for (0..6) |i| try text.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n", .{ i, i * 8 });
+    const stride = ((from + 127) / 128) * 16;
+    try text.print(" %xp = getelementptr i8,ptr %input,i64 {d}\n %answer = call {s}i64 @{s}(", .{ if (kind == 1) 48 else 48 + stride, cc, body });
+    for (0..6) |i| try text.print("{s}i64 %v{d}", .{ if (i == 0) "" else ",", i });
+    try text.writeAll(",ptr %xp,ptr %out,i64 %salt)\n ret i64 %answer\n}\n");
+    try driver.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+    try table.print("{{{s},{d},{d},{d},{d},{d}}},\n", .{ probe, kind, from, to, predicate, pattern });
+}
+
+fn memoryLimbs(c: *u.Context, destination: []const u8) !u.Value {
+    const fixtures = destination;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var id: usize = 0;
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_memoryLimbs_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]usize{ 800, 896, 1024 }) |bits| {
+        for ([_][]const u8{ "", "fastcc " }) |cc| {
+            try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 0, bits, bits, 0, 0, cc);
+            id += 1;
+            for (0..10) |predicate| {
+                try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 1, bits, bits, predicate, 0, cc);
+                id += 1;
+            }
+            for (0..4) |pattern| {
+                try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 5, bits, bits, 0, pattern, cc);
+                id += 1;
+            }
+            for ([_]usize{ 8, 16, 32, 64, 128 }) |small| {
+                try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 2, bits, small, 0, 0, cc);
+                id += 1;
+                for ([_]usize{ 3, 4 }) |kind| {
+                    try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, kind, small, bits, 0, 0, cc);
+                    id += 1;
+                }
             }
         }
     }
-    for([_][2]usize{.{800,896},.{800,1024},.{896,1024}}) |pair|for([_][]const u8{"","fastcc "}) |cc| {
-        for([_]usize{3,4}) |kind|{try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,kind,pair[0],pair[1],0,0,cc);id+=1;}
-        try memoryLimbCase(c,&text.writer,&driver.writer,&table.writer,&functions,id,2,pair[1],pair[0],0,0,cc);id+=1;
+    for ([_][2]usize{ .{ 800, 896 }, .{ 800, 1024 }, .{ 896, 1024 } }) |pair| for ([_][]const u8{ "", "fastcc " }) |cc| {
+        for ([_]usize{ 3, 4 }) |kind| {
+            try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, kind, pair[0], pair[1], 0, 0, cc);
+            id += 1;
+        }
+        try memoryLimbCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, 2, pair[1], pair[0], 0, 0, cc);
+        id += 1;
     };
-    if(id!=198)return error.CaseInventoryChanged;try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");try driver.writer.writeAll(table.written());
-    try c.write(try c.join(&.{fixtures,"memory_limbs.ll"}),text.written());try c.write(try c.join(&.{fixtures,"memory_limbs_driver.c"}),driver.written());const observations=id*64*9;
-    const entry=try u.toValue(c.a,.{.population="memory_limbs",.fixture="memory_limbs",.prefix="memory-limbs",.functions=functions,.observations=observations,.stdout=try c.fmt("memory-limbs observations={d} byte-model=integer-predicates=cast-domains=exact-tails=guard-pages=live-aliases=stack-calls=preserved\n",.{observations})});
- return entry;
+    if (id != 198) return error.CaseInventoryChanged;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "memory_limbs.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "memory_limbs_driver.c" }), driver.written());
+    const observations = id * 64 * 9;
+    const entry = try u.toValue(c.a, .{ .population = "memory_limbs", .fixture = "memory_limbs", .prefix = "memory-limbs", .functions = functions, .observations = observations, .stdout = try c.fmt("memory-limbs observations={d} byte-model=integer-predicates=cast-domains=exact-tails=guard-pages=live-aliases=stack-calls=preserved\n", .{observations}) });
+    return entry;
+}
+
+fn selfTailArguments(c: *u.Context, text: *std.Io.Writer, bits: usize, slots: usize, prefix: []const u8, count: []const u8) !void {
+    try text.print("i64 {s}", .{count});
+    for (0..slots) |i| try text.print(",i{d} %{s}{d}", .{ bits, prefix, i });
+    try text.writeAll(",ptr %out");
+    _ = c;
+}
+
+fn selfTail(c: *u.Context, fixtures: []const u8) !u.Value {
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var id: usize = 0;
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_selfTail_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for (0..3) |return_kind| for ([_]usize{ 8, 16, 32, 64 }) |bits| for ([_]usize{ 2, 5, 8, 16, 62 }) |slots| for ([_][]const u8{ "", "fastcc " }) |cc| {
+        const body = try c.fmt("self_tail_body_{d}", .{id});
+        const probe = try c.fmt("self_tail_probe_{d}", .{id});
+        id += 1;
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        const result_type = if (return_kind == 1) "void" else if (return_kind == 2) "ptr" else try c.fmt("i{d}", .{bits});
+        const result_binding = if (return_kind == 1) "" else "%answer = ";
+        const mask = (@as(u128, 1) << @as(u7, @intCast(bits))) - 1;
+        try text.writer.print("define internal {s}{s} @{s}(i64 %n", .{ cc, result_type, body });
+        for (0..slots) |i| try text.writer.print(",i{d} %p{d}", .{ bits, i });
+        try text.writer.writeAll(",ptr %out) noinline {\nentry:\n %done = icmp eq i64 %n,0\n br i1 %done,label %exit,label %step\nstep:\n %next = sub i64 %n,1\n %odd = and i64 %n,1\n %choice = icmp ne i64 %odd,0\n br i1 %choice,label %left,label %right\nleft:\n");
+        for (0..slots) |i| try text.writer.print(" %left{d} = add i{d} %p{d},{d}\n", .{ i, bits, (i + 1) % slots, (@as(u128, i + 1) * 17) & mask });
+        try text.writer.print(" {s}musttail call {s}{s} @{s}(", .{ result_binding, cc, result_type, body });
+        try selfTailArguments(c, &text.writer, bits, slots, "left", "%next");
+        try text.writer.writeAll(")\n");
+        if (return_kind == 1) try text.writer.writeAll(" ret void\nright:\n") else try text.writer.print(" ret {s} %answer\nright:\n", .{result_type});
+        for (0..slots) |i| try text.writer.print(" %right{d} = xor i{d} %p{d},{d}\n", .{ i, bits, (i + slots - 1) % slots, (@as(u128, i + 1) * 31) & mask });
+        const right_binding = if (return_kind == 1) "" else "%right_answer = ";
+        try text.writer.print(" {s}musttail call {s}{s} @{s}(", .{ right_binding, cc, result_type, body });
+        try selfTailArguments(c, &text.writer, bits, slots, "right", "%next");
+        try text.writer.writeAll(")\n");
+        if (return_kind == 1) try text.writer.writeAll(" ret void\nexit:\n") else try text.writer.print(" ret {s} %right_answer\nexit:\n", .{result_type});
+        for (0..slots) |i| {
+            if (bits < 64) try text.writer.print(" %wide{0d} = zext i{1d} %p{0d} to i64\n", .{ i, bits });
+            try text.writer.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},{2s}\n", .{ i, if (i == 0) "0" else try c.fmt("%r{d}", .{i - 1}), try c.fmt("%{s}{d}", .{ if (bits < 64) "wide" else "p", i }) });
+        }
+        for ([_][]const u8{ try c.fmt("%r{d}", .{slots - 1}), try c.fmt("%{s}0", .{if (bits < 64) "wide" else "p"}), try c.fmt("%{s}{d}", .{ if (bits < 64) "wide" else "p", slots - 1 }) }, 0..) |value, i| try text.writer.print(" %o{0d} = getelementptr i8,ptr %out,i64 {1d}\n store i64 {2s},ptr %o{0d},align 1\n", .{ i, i * 8, value });
+        if (return_kind == 1) try text.writer.writeAll(" ret void\n}\n") else if (return_kind == 2) try text.writer.writeAll(" ret ptr %out\n}\n") else if (bits == 64) try text.writer.print(" ret i64 %r{d}\n}}\n", .{slots - 1}) else try text.writer.print(" %truncated = trunc i64 %r{d} to i{d}\n ret i{d} %truncated\n}}\n", .{ slots - 1, bits, bits });
+        try text.writer.print("define i64 @{s}(ptr %input,ptr %out,i64 %count) {{\nentry:\n", .{probe});
+        for (0..slots) |i| {
+            try text.writer.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %raw{0d} = load i64,ptr %a{0d},align 1\n", .{ i, i * 8 });
+            if (bits < 64) try text.writer.print(" %v{d} = trunc i64 %raw{d} to i{d}\n", .{ i, i, bits });
+        }
+        try text.writer.print(" {s}call {s}{s} @{s}(", .{ if (return_kind == 1) "" else "%returned = ", cc, result_type, body });
+        try selfTailArguments(c, &text.writer, bits, slots, if (bits < 64) "v" else "raw", "%count");
+        try text.writer.writeAll(")\n");
+        if (return_kind == 2) try text.writer.writeAll(" %result = ptrtoint ptr %returned to i64\n ret i64 %result\n}\n") else {
+            const value = if (return_kind == 1) "%loaded" else "%returned";
+            if (return_kind == 1) try text.writer.writeAll(" %loaded = load i64,ptr %out,align 1\n");
+            if (bits == 64) try text.writer.print(" ret i64 {s}\n}}\n", .{value}) else if (return_kind == 1) try text.writer.print(" %result = and i64 %loaded,{d}\n ret i64 %result\n}}\n", .{mask}) else try text.writer.print(" %result = zext i{d} %returned to i64\n ret i64 %result\n}}\n", .{bits});
+        }
+        const deep = return_kind == 0 and bits == 64 and slots == 62 and cc.len != 0;
+        try driver.writer.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+        try table.writer.print("{{{s},{d},{d},{d},{d}}},\n", .{ probe, bits, slots, @as(u8, if (deep) 1 else 0), return_kind });
+    };
+    if (id != 120) return error.CaseInventoryChanged;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "self_tail.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "self_tail_driver.c" }), driver.written());
+    const observations = id * 10 * 7;
+    const entry = try u.toValue(c.a, .{ .population = "self_tail", .fixture = "self_tail", .prefix = "self-tail", .functions = functions, .observations = observations, .stdout = try c.fmt("self-tail observations={d} iterative-oracle=argument-cycles=one-million-steps=worker-stack-65536=guard-pages=preserved\n", .{observations}) });
+
+    return entry;
+}
+
+fn signedAbiAttr(index: usize) []const u8 {
+    return ([_][]const u8{ "signext ", "zeroext ", "" })[index % 3];
+}
+
+fn signedAbi(c: *u.Context, fixtures: []const u8) !u.Value {
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var id: usize = 0;
+    try text.writer.writeAll("target triple = \"x86_64-unknown-linux-gnu\"\ntarget datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_signedAbi_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]usize{ 8, 16 }) |bits| for ([_]usize{ 1, 4, 9, 62 }) |slots| for ([_][]const u8{ "", "fastcc " }) |cc| for (0..2) |literals| {
+        const entry = try c.fmt("signed_abi_entry_{d}", .{id});
+        const probe = try c.fmt("signed_abi_probe_{d}", .{id});
+        const external = try c.fmt("signed_abi_external_{d}", .{id});
+        id += 1;
+        try u.add(&functions, u.s(entry));
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define {s}signext i{d} @{s}(", .{ cc, bits, entry });
+        for (0..slots) |i| try text.writer.print("{s}i{d} {s}%a{d}", .{ if (i == 0) "" else ",", bits, signedAbiAttr(i), i });
+        try text.writer.writeAll(",ptr %out,i64 %live) noinline {\nentry:\n %seed = trunc i64 %live to i32\n");
+        for (0..slots) |i| try text.writer.print(" %v{0d} = {1s} i{2d} %a{0d} to i32\n %x{0d} = xor i32 {3s},%v{0d}\n %m{0d} = mul i32 %x{0d},37\n %r{0d} = add i32 %m{0d},{4d}\n", .{ i, if (i % 3 == 0) "sext" else "zext", bits, if (i == 0) "%seed" else try c.fmt("%r{d}", .{i - 1}), i * 17 });
+        try text.writer.print(" %wide = zext i32 %r{d} to i64\n store i64 %wide,ptr %out,align 1\n %out1 = getelementptr i8,ptr %out,i64 8\n store i64 %live,ptr %out1,align 1\n %result = trunc i32 %r{d} to i{d}\n ret i{d} %result\n}}\n", .{ slots - 1, slots - 1, bits, bits });
+        // C provider deliberately receives physical i32 homes. Its low-bit
+        // semantics and required sign/zero extension are checked independently.
+        try text.writer.print("declare signext i{d} @{s}(", .{ bits, external });
+        for (0..slots) |i| try text.writer.print("{s}i{d} {s}", .{ if (i == 0) "" else ",", bits, signedAbiAttr(i) });
+        try text.writer.writeAll(",ptr,i64)\n");
+        try text.writer.print("define i64 @{s}(ptr %input,ptr %out,i64 %live) {{\nentry:\n", .{probe});
+        for (0..slots) |i| try text.writer.print(" %p{0d} = getelementptr i8,ptr %input,i64 {1d}\n %raw{0d} = load i64,ptr %p{0d},align 1\n %v{0d} = trunc i64 %raw{0d} to i{2d}\n", .{ i, i * 8, bits });
+        try text.writer.print(" %r = call signext i{d} @{s}(", .{ bits, external });
+        for (0..slots) |i| {
+            const value = if (literals != 0 and i % 4 == 0) if (i % 3 == 0) "-2" else try c.fmt("{d}", .{(@as(u32, 1) << @intCast(bits)) - 1}) else try c.fmt("%v{d}", .{i});
+            try text.writer.print("{s}i{d} {s}{s}", .{ if (i == 0) "" else ",", bits, signedAbiAttr(i), value });
+        }
+        try text.writer.print(",ptr %out,i64 %live)\n %w = sext i{d} %r to i64\n %answer = xor i64 %w,%live\n ret i64 %answer\n}}\n", .{bits});
+        try driver.writer.print("extern void {s}(void);\nextern uint64_t {s}(const void *,void *,uint64_t);\n__attribute__((noinline)) uint32_t {s}(", .{ entry, probe, external });
+        for (0..slots) |i| try driver.writer.print("{s}uint32_t a{d}", .{ if (i == 0) "" else ",", i });
+        try driver.writer.writeAll(",void *out,uint64_t live){const uint32_t words[]={");
+        for (0..slots) |i| try driver.writer.print("{s}a{d}", .{ if (i == 0) "" else ",", i });
+        try driver.writer.print("}};return provider(words,{d},{d},out,live);}}\n", .{ bits, slots });
+        try table.writer.print("{{(const void *){s},{s},{d},{d},{d}}},\n", .{ entry, probe, bits, slots, literals });
+    };
+    if (id != 32) return error.CaseInventoryChanged;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "signed_abi.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "signed_abi_driver.c" }), driver.written());
+    const observations = id * 512 * 8;
+    const entry = try u.toValue(c.a, .{ .population = "signed_abi", .fixture = "signed_abi", .prefix = "signed-abi", .functions = functions, .observations = observations, .stdout = try c.fmt("signed-abi observations={d} c-physical-carriers=defined-return-payloads=ccc-fastcc=signed-zero-extension=register-stack-64-arguments=exact-stores=guard-pages=preserved\n", .{observations}) });
+
+    return entry;
+}
+
+fn tailTransfer(c: *u.Context, fixtures: []const u8) !u.Value {
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var id: usize = 0;
+    try text.writer.writeAll("target triple = \"x86_64-unknown-linux-gnu\"\ntarget datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndeclare i64 @tail_transfer_clobber(ptr,i64,i64,i64,i64,i64,i64,i64,i64,i64)\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_tailTransfer_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_][2]usize{ .{ 8, 8 }, .{ 16, 16 }, .{ 32, 32 }, .{ 64, 64 }, .{ 8, 16 }, .{ 16, 8 } }) |widths| for (0..if (widths[0] < 32) @as(usize, 2) else 1) |extension| for (0..3) |kind| for ([_][]const u8{ "", "fastcc " }) |cc| for (0..2) |indirect| {
+        const ab = widths[0];
+        const bb = widths[1];
+        const aa = if (ab < 32) if (extension == 0) "signext " else "zeroext " else "";
+        const ba = if (bb < 32) if (extension == 0) "zeroext " else "signext " else "";
+        const ret = if (kind == 1) "void" else if (kind == 2) "ptr" else try c.fmt("i{d}", .{ab});
+        const ra = if (kind == 0) aa else "";
+        const names = [_][]const u8{ try c.fmt("tail_transfer_a_{d}", .{id}), try c.fmt("tail_transfer_b_{d}", .{id}) };
+        const probe = try c.fmt("tail_transfer_probe_{d}", .{id});
+        id += 1;
+        for (names, 0..) |name, side| {
+            try u.add(&functions, u.s(name));
+            try text.writer.print("define internal {s}{s}{s} @{s}(ptr %nextfn,ptr %otherfn,i64 %n,i{d} {s}%a,i{d} {s}%b,ptr %out) noinline {{\nentry:\n %local = alloca [16 x i64],align 16\n %done = icmp eq i64 %n,0\n br i1 %done,label %exit,label %step\nstep:\n", .{ cc, ra, ret, name, ab, aa, bb, ba });
+            if (ab < 64) try text.writer.print(" %aw = zext i{d} %a to i64\n", .{ab}) else try text.writer.writeAll(" %aw = add i64 %a,0\n");
+            if (bb < 64) try text.writer.print(" %bw = zext i{d} %b to i64\n", .{bb}) else try text.writer.writeAll(" %bw = add i64 %b,0\n");
+            try text.writer.print(" %saved = add i64 %n,{d}\n store i64 %saved,ptr %local,align 8\n %clobber = call i64 @tail_transfer_clobber(ptr %local,i64 %aw,i64 %bw,i64 %n,i64 {d},i64 1,i64 3,i64 5,i64 7,i64 9)\n", .{ (side + 1) * 17, side + 1 });
+            if (side == 0) try text.writer.writeAll(" %a0 = add i64 %aw,17\n %a1 = add i64 %a0,%clobber\n %b1 = xor i64 %bw,%aw\n") else try text.writer.writeAll(" %a1 = xor i64 %bw,%clobber\n %b1 = add i64 %aw,31\n");
+            if (ab < 64) try text.writer.print(" %na = trunc i64 %a1 to i{d}\n", .{ab});
+            if (bb < 64) try text.writer.print(" %nb = trunc i64 %b1 to i{d}\n", .{bb});
+            const target = if (indirect != 0) "%nextfn" else try c.fmt("@{s}", .{names[1 - side]});
+            try text.writer.print(" %count = sub i64 %n,1\n {s}musttail call {s}{s}{s} {s}(ptr %otherfn,ptr %nextfn,i64 %count,i{d} {s}{s},i{d} {s}{s},ptr %out)\n", .{ if (kind == 1) "" else "%r = ", cc, ra, ret, target, ab, aa, if (ab < 64) "%na" else "%a1", bb, ba, if (bb < 64) "%nb" else "%b1" });
+            if (kind == 1) try text.writer.writeAll(" ret void\nexit:\n") else try text.writer.print(" ret {s} %r\nexit:\n", .{ret});
+            if (ab < 64) try text.writer.print(" %ea = zext i{d} %a to i64\n", .{ab}) else try text.writer.writeAll(" %ea = add i64 %a,0\n");
+            if (bb < 64) try text.writer.print(" %eb = zext i{d} %b to i64\n", .{bb}) else try text.writer.writeAll(" %eb = add i64 %b,0\n");
+            try text.writer.writeAll(" %product = mul i64 %ea,1099511628211\n %hash = xor i64 %product,%eb\n store i64 %ea,ptr %out,align 1\n %o1 = getelementptr i8,ptr %out,i64 8\n store i64 %eb,ptr %o1,align 1\n %o2 = getelementptr i8,ptr %out,i64 16\n store i64 %hash,ptr %o2,align 1\n %o3 = getelementptr i8,ptr %out,i64 24\n");
+            try text.writer.print(" store i64 {d},ptr %o3,align 1\n", .{side + 1});
+            if (kind == 1) try text.writer.writeAll(" ret void\n}\n") else if (kind == 2) try text.writer.writeAll(" ret ptr %out\n}\n") else if (ab == 64) try text.writer.writeAll(" ret i64 %hash\n}\n") else try text.writer.print(" %ret = trunc i64 %hash to i{d}\n ret i{d} %ret\n}}\n", .{ ab, ab });
+        }
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define i64 @{s}(ptr %input,ptr %out,i64 %n) {{\nentry:\n %rawa = load i64,ptr %input,align 1\n %p1 = getelementptr i8,ptr %input,i64 8\n %rawb = load i64,ptr %p1,align 1\n", .{probe});
+        if (ab < 64) try text.writer.print(" %a = trunc i64 %rawa to i{d}\n", .{ab});
+        if (bb < 64) try text.writer.print(" %b = trunc i64 %rawb to i{d}\n", .{bb});
+        try text.writer.print(" {s}call {s}{s}{s} @{s}(ptr @{s},ptr @{s},i64 %n,i{d} {s}{s},i{d} {s}{s},ptr %out)\n", .{ if (kind == 1) "" else "%r = ", cc, ra, ret, names[0], names[1], names[0], ab, aa, if (ab < 64) "%a" else "%rawa", bb, ba, if (bb < 64) "%b" else "%rawb" });
+        if (kind == 1) try text.writer.writeAll(" %p2 = getelementptr i8,ptr %out,i64 16\n %answer = load i64,ptr %p2,align 1\n ret i64 %answer\n}\n") else if (kind == 2) try text.writer.writeAll(" %answer = ptrtoint ptr %r to i64\n ret i64 %answer\n}\n") else if (ab == 64) try text.writer.writeAll(" ret i64 %r\n}\n") else try text.writer.print(" %answer = {s} i{d} %r to i64\n ret i64 %answer\n}}\n", .{ if (ab < 32 and extension == 0) "sext" else "zext", ab });
+        const deep = ab == 64 and bb == 64 and kind == 0 and cc.len != 0 and indirect != 0;
+        try driver.writer.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+        try table.writer.print("{{{s},{d},{d},{d},{d},{d}}},\n", .{ probe, ab, bb, kind, @as(u8, if (ab < 32 and extension == 0) 1 else 0), @as(u8, if (deep) 1 else 0) });
+    };
+    if (id != 120) return error.CaseInventoryChanged;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "tail_transfer.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "tail_transfer_driver.c" }), driver.written());
+    const observations = id * 10 * 8;
+    const entry = try u.toValue(c.a, .{ .population = "tail_transfer", .fixture = "tail_transfer", .prefix = "tail-transfer", .functions = functions, .libraries = .{"pthread"}, .observations = observations, .stdout = try c.fmt("tail-transfer observations={d} direct-indirect=ccc-fastcc=extended-carriers=argument-cycles=ordinary-stack-calls=one-million-transfers=worker-stack-65536=readonly-guards=preserved\n", .{observations}) });
+
+    return entry;
 }

@@ -101,7 +101,7 @@ pub fn walk(r: anytype, code: []machine.Instruction, old_frame: u32) Error!void 
             continue;
         }
         switch (inst.*) {
-            .label, .jmp, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .direct_jump, .ret, .ud2 => if (depth != 0) return error.InvalidStackDepth,
+            .label, .jmp, .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .direct_jump, .tail_jump_rax, .ret, .ud2 => if (depth != 0) return error.InvalidStackDepth,
             .stack_probe_rax_rcx_rsp,
             .and_rsp_neg16,
             .mov_rsp_rdi,

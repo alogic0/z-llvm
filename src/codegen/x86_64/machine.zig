@@ -815,6 +815,7 @@ pub const Instruction = union(enum) {
     syscall,
     ud2,
     ret,
+    tail_jump_rax,
 };
 
 pub const Limb64BitwiseOp = enum {
