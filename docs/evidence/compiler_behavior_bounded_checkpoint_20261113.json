@@ -1,0 +1,230 @@
+{
+  "schema": "upstream-behavior-bounded-checkpoint-v1",
+  "status": "repair-checkpoint-passed-follow-up-open",
+  "scope": "Six private FP/vector/boolean/assembly families. Complete original Debug behavior, final compiler generations and complete local-hook matrices remain open.",
+  "code_revision": "32b106895e80a30b2a26025a4bc236c572d9ab04",
+  "code_tree": "07cfcb93bb0da72b66d9e20f4e156988b3a25f87",
+  "preceding_checkpoint": "c3e5547dd722ee0df42f82a162a011c98196b2d2",
+  "units_per_build": 2294,
+  "structural_per_build": 64,
+  "profiling_per_build": 2,
+  "readiness_procedures": 8,
+  "integration_gates": 17,
+  "integration_actual_returncode": 0,
+  "integration_run_id": "f54dac09fbfd484ac91d4d691b6934ed",
+  "integration_bundle_sha256": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+  "integration_wall_ns": 3954736183980,
+  "native_populations_per_build": 183,
+  "added_native_populations": [
+    "fp_input_pieces",
+    "native_fp_masks",
+    "vector_fp_extrema",
+    "integer_vector_products",
+    "boolean_wide_arguments",
+    "bounded_inline_assembly"
+  ],
+  "generator": "tools/generate_behavior_expansion_canaries.zig",
+  "generator_populations": 31,
+  "generator_reproduced_files": 64,
+  "native_registry_sha256": "21fc2c1be1eaeebaade0ab9fc82c48a8a1ae593ec19ac661add500e8f2d44b16",
+  "prior_command_outcomes_per_build": 6476,
+  "prior_objects_unchanged_per_build": 1074,
+  "prior_objects_changed_per_build": 0,
+  "prior_owner_artifacts_unchanged_per_build": 1065,
+  "prior_optimizer_artifacts_unchanged_per_build": 540,
+  "strict_comparison_actual_returncode_per_build": 0,
+  "source_root_bridge": "Full 3620-file frozen source, HEAD and tree match after relocation. Strict comparison individually rehashes every relocated fixture input and records output/option path keys; original receipts, outcomes and artifact reads remain untouched. No comparator waiver.",
+  "native_fault_controls_per_build": 2214,
+  "fixed_runtime_fault_controls_per_build": 14,
+  "required_fault_controls": 4456,
+  "fixed_runtime_definitions": 455,
+  "fixed_runtime_object_bytes": 3085120,
+  "fixed_runtime_object_sha256": "47b8d77ec809654782c7fdee75bd7f8c4c486a1c0e15c96d28e62857f6e0917a",
+  "fixed_runtime_objects_byte_identical_to_previous_checkpoint": true,
+  "runtime_owners_unchanged": true,
+  "runtime_observations_per_route_per_build": 21792,
+  "fixed_compiler_definitions": 8928,
+  "fixed_compiler_object_bytes": 149611864,
+  "fixed_compiler_object_sha256": "2955471809d24338864675a51c29e1a50568f5147d2dd19790ceab1a84e8c5d9",
+  "compiler_whole_object_byte_identical_to_previous_checkpoint": true,
+  "compiler_function_symbols": 8929,
+  "compiler_function_symbols_unchanged": 8929,
+  "compiler_owners_unchanged": true,
+  "compiler_event_records": 5445910,
+  "original_events_balanced": true,
+  "original_elf_audits_passed": true,
+  "production_backend_sha256": {
+    "Debug": "b0d0f5fac352a9bd230238f37ec4df1611370b920b77d42ebc3a9d7b9dcf2cf6",
+    "ReleaseFast": "2034c860b6e6e35b4614aec3e641f7ecb1562e4bd02c2f6fafe9044fd8000cc1"
+  },
+  "source_preservation": {
+    "files": 3620,
+    "snapshot": "local-state/validations/compiler-behavior-completion-20261111/batch-01/source-frozen-behavior-bounded-v853.json",
+    "copies": "local-state/validations/compiler-behavior-completion-20261111/batch-01/retained-behavior-bounded-source-v853",
+    "isolated_snapshot": "local-state/isolated-validations-bounded-v928/source-frozen-behavior-bounded-isolated-v928.json",
+    "isolated_root": "/home/oleg/prog/z_llvm-validation-bounded-v928",
+    "final_verification_actual_returncode": 0
+  },
+  "original_debug_behavior": {
+    "definitions": 7874,
+    "selected_successfully": 7823,
+    "failed": 51,
+    "gained": 37,
+    "lost": 0,
+    "actual_returncode": 1,
+    "complete_object": false
+  },
+  "separate_release_small_runtime": {
+    "definitions": 503,
+    "failed": 0,
+    "actual_returncode": 0,
+    "object_complete": true,
+    "elf_audit_passed": true,
+    "balanced_events": true,
+    "replaces_fixed_runtime": false
+  },
+  "preserved": {
+    "frozen_contracts": 24,
+    "ratchet": 130,
+    "real_prefix": 100,
+    "execution_cohort": 12,
+    "core_records": 36,
+    "stack_object_limit_bytes": 65536,
+    "generated_frame_limit_bytes": 8388608,
+    "direct_argument_limit": 64,
+    "indirect_argument_limit": 16,
+    "stack_word_limit": 128,
+    "ordinary_ninth_sse_argument_remains_closed": true
+  },
+  "receipts": {
+    "build_debug": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/build-canonical-bounded-Debug-v853-run.json",
+      "sha256": "0f3debf1da148ed595affaa56ab4e938b60f3f9e9ad5bec1294929fba6bd7e53"
+    },
+    "build_fast": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/build-canonical-bounded-ReleaseFast-v853-run.json",
+      "sha256": "b2b9f2c39aecc223d07b3af795e90f8dfac4d0d946b2a588da4667e418976fac"
+    },
+    "generator": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/generate-canonical-bounded-v853-run.json",
+      "sha256": "a2881c479260382d6e9b8a9205ee1a4f3c48c5e8a2ddcc6728d399b72e1349e5"
+    },
+    "preserve_source": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/preserve-bounded-v853-run.json",
+      "sha256": "6f539f880dcebd7cbe14fff4af0ae39a7016b81385f2397bab94bcf8a56904ba"
+    },
+    "units_debug": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/units-canonical-bounded-Debug-v853-run.json",
+      "sha256": "9cbca26704deb67077e802445a688b56bb158a7dfa7282dc83a97511139ad046"
+    },
+    "units_safe": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/units-canonical-bounded-ReleaseSafe-v853-run.json",
+      "sha256": "bbed6e5edbee29022c3e9437e0c4ff7a2c44f0d60fb4386e8bf3ddc1959cb229"
+    },
+    "readiness": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/readiness-behavior-bounded-v854-run.json",
+      "sha256": "85948984b88a95011e36d275283c32c59e3c2eb3062aa82ed0486ddb67488e8f"
+    },
+    "protected_manifests": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/retained-pins-bounded-v956-run.json",
+      "sha256": "95b88d91e4b43cc3e340620d04634b350eca48c9be64558925c73675ba0cd920"
+    },
+    "runtime_debug": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-Debug-behavior-bounded-v854-run.json",
+      "sha256": "b0300dfe9cc1bfb55a58009fb558335a246000a522b3102794e31842b4fbcb38"
+    },
+    "runtime_fast": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-ReleaseFast-behavior-bounded-v854-run.json",
+      "sha256": "20fbfbccf4a15132d6c0bce1e0b8c0efe316c796d8366554b9fee80f27335022"
+    },
+    "runtime_events": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-events-bounded-v866-run.json",
+      "sha256": "a6c6f505018e9fca35de5e848e8580fc4f4fb483387b962b5f909d56592490e5"
+    },
+    "runtime_elf_debug": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-elf-Debug-bounded-v866-run.json",
+      "sha256": "6f61b930043269ccfc6734d093eb9e38c96b5bc8f3d3efeb4c4c041797903936"
+    },
+    "runtime_elf_fast": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-elf-ReleaseFast-bounded-v866-run.json",
+      "sha256": "3955fcfebf53283b30f36abebf777f96da781e897eaf7e04515e58ef7b5baa83"
+    },
+    "small_runtime": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-small-behavior-bounded-v854-run.json",
+      "sha256": "4d89d6860c89b09290af6e65584421ca2e86b788bd966cf5dab686861f1d9dc6"
+    },
+    "small_runtime_census": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/census-small-runtime-bounded-v866-run.json",
+      "sha256": "d21d836797566c1332de7ee850cc939bf49a7242aeb17bbe5c066145b6c0ef9f"
+    },
+    "small_runtime_elf": {
+      "path": "local-state/validations/compiler-behavior-completion-20261111/batch-01/runtime-small-elf-bounded-v872-run.json",
+      "sha256": "909a170ebfa2afb49a8d50a6f1b51271293b6c91030d0a75da87f7b83fd5d85b"
+    },
+    "source_root_bridge": {
+      "path": "local-state/isolated-validations-bounded-v928/source-root-bridge-bounded-v928-run.json",
+      "sha256": "63299998e5d1be6475939d440c4b674da5946d8bae96987f0fad14a6eb97d459"
+    },
+    "integration": {
+      "path": "local-state/isolated-validations-bounded-v928/full-behavior-bounded-v936-run.json",
+      "sha256": "5b439ead53a3b9045653c2ac6d8c6acbdc97c372630ef1f0395ce27840bc86da"
+    },
+    "native_debug": {
+      "path": "local-state/isolated-validations-bounded-v928/native-debug-behavior-bounded-v928-run.json",
+      "sha256": "b18d73d667173f0bd233c931562fe6bfa0324e86b2eb3c4708db4ee4208d1114"
+    },
+    "compiler": {
+      "path": "local-state/isolated-validations-bounded-v928/compiler-original-behavior-bounded-v928-run.json",
+      "sha256": "aa0d822d03195f1705dc32777fbf617267a6d20a82e1c85ada30f30ff760ce39"
+    },
+    "strict_fast": {
+      "path": "local-state/isolated-validations-bounded-v928/compare-native-ReleaseFast-bounded-v954-run.json",
+      "sha256": "9663dd98251c109f3b3e0af5ad2fa1f5f7dea6eb956bd766099029dcdcaeafb3"
+    },
+    "strict_debug": {
+      "path": "local-state/isolated-validations-bounded-v928/compare-native-Debug-bounded-v955-run.json",
+      "sha256": "6b56a11bee528d2851498034a9402bd6d7ced4668fdec2ca6f4b4fe8d1d05766"
+    },
+    "faults_fast": {
+      "path": "local-state/isolated-validations-bounded-v928/native-faults-bounded-ReleaseFast-v954-run.json",
+      "sha256": "0353469a17f08dd8ce4a5e08d08fb5fd787bda10a56440655baf9ab7766a6972"
+    },
+    "faults_debug": {
+      "path": "local-state/isolated-validations-bounded-v928/native-faults-bounded-Debug-v955-run.json",
+      "sha256": "c826cc046df64772e9b180f413320a56f779a2a327b98c4c41786f1a6e2dc27c"
+    },
+    "compiler_elf": {
+      "path": "local-state/isolated-validations-bounded-v928/audit-compiler-elf-bounded-v948-run.json",
+      "sha256": "f97dbbcc1e4e48e90b37b22efe37e60720af7225a18d1e7608ed0eaac4871354"
+    },
+    "compiler_functions": {
+      "path": "local-state/isolated-validations-bounded-v928/compare-compiler-functions-bounded-v948-run.json",
+      "sha256": "67e79c443ccbe9eed8adf2d75887f04e31066daa47214088a29fd11926cc4848"
+    },
+    "compiler_events_owners": {
+      "path": "local-state/isolated-validations-bounded-v928/audit-compiler-events-owners-bounded-v949-run.json",
+      "sha256": "6499df0064e4577ea030b75f21aa7396db648338d9790a97c8ef35e8e5591bf8"
+    },
+    "final_source": {
+      "path": "local-state/isolated-validations-bounded-v928/verify-source-bounded-isolated-v952-run.json",
+      "sha256": "3529632d1bc8fe5da039bd54bd80b7b350cbccaf0e25f988879a4499677f6607"
+    }
+  },
+  "retained_nonpassing_receipts": [
+    "local-state/validations/compiler-behavior-completion-20261111/batch-01/behavior-canonical-bounded-fast-v854-run.json",
+    "local-state/validations/compiler-behavior-completion-20261111/batch-01/full-behavior-bounded-v854-run.json",
+    "local-state/validations/compiler-behavior-completion-20261111/batch-01/compiler-original-behavior-bounded-v854-run.json",
+    "local-state/validations/compiler-behavior-completion-20261111/batch-01/native-debug-behavior-bounded-v854-run.json",
+    "local-state/isolated-validations-bounded-v928/full-behavior-bounded-v928-run.json",
+    "local-state/isolated-validations-bounded-v928/full-behavior-bounded-v929-run.json",
+    "local-state/isolated-validations-bounded-v928/full-behavior-bounded-v930-run.json",
+    "local-state/isolated-validations-bounded-v928/compare-native-ReleaseFast-bounded-v952-run.json"
+  ],
+  "evidence_root": "local-state/validations/compiler-behavior-completion-20261111/batch-01",
+  "isolated_evidence_root": "local-state/isolated-validations-bounded-v928",
+  "checkpoint_artifact_manifest": "/home/oleg/prog/z_llvm/local-state/validations/compiler-behavior-completion-20261111/batch-01/bounded-checkpoint-v961/accepted-artifacts.sha256",
+  "checkpoint_artifact_manifest_sha256": "4acb3ba93ee10304139cae3fe43265d45f0de59688f77c89317982ba79b744a1",
+  "sealed_files": 49332,
+  "controlled_performance_claim": false,
+  "final_follow_up_accepted": false
+}

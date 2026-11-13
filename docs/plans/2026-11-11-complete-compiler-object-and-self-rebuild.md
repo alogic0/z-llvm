@@ -13,10 +13,15 @@ pass cumulative validation at `d9148ebc`; eight additional families pass at
 The four-family scalar/vector checkpoint passes at `c3e5547d`: both official
 2,286-unit builds, eight readiness procedures, all 17 gates, both complete
 177-population native suites and all 4,132 required faults pass. The accepted
-original Debug replay still rejects 88 definitions. The next isolated six-family
-batch passes both 2,294-unit builds and gains 37 selections without loss,
-leaving 51 rejections. All twelve combined native runs pass with 324 component
-faults detected. The six families are adopted for fresh cumulative validation.
+original Debug replay still rejects 88 definitions. The six-family bounded
+checkpoint passes at `32b10689`: both official 2,294-unit builds, eight readiness
+procedures, all 17 gates, both complete 183-population native suites and all
+4,456 required faults pass. Strict comparisons retain all 6,476 prior outcomes
+per build and every preceding object, owner and optimizer artifact byte-for-byte.
+The unchanged original compiler and runtime objects match the preceding
+checkpoint exactly. The original Debug replay gains 37 selections without loss,
+leaving 51 rejections. Nine subsequent isolated families select 7,843/7,874;
+their canonical adoption and fresh cumulative validation remain open.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -533,6 +538,22 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    ELF, events, changed-function and independent execution audits. Then continue
    closing the original Debug failures. Selection gains cannot close the
    behavior milestone or authorize automatic object reuse.
+   **Complete for the six-family adoption at `32b10689`.** All required suites,
+   all 4,456 faults, strict comparisons and original-input audits pass. Both
+   comparisons preserve all 6,476 prior outcomes, 1,074 objects, 1,065 owner
+   artifacts and 540 optimizer artifacts per build exactly. The original
+   compiler retains all 8,929 function encodings. The frozen 3,620-file source
+   and an identical isolated checkout are retained; explicit path bridges
+   verify moved fixture inputs by hash. Server-interrupted and setup-failed
+   attempts remain failed evidence. A new checkpoint manifest seals 49,332
+   files. See the [bounded checkpoint](../evidence/compiler_behavior_bounded_checkpoint_20261113.json).
+   Continue step 10 with the independently exercised narrow integer-to-half,
+   byte-aligned odd unsigned saturation, safe constant flags, pointer constants,
+   three-bit input masks, packed float extraction, odd pair bit reversal,
+   undefined integer refinements and native literal truncation. The isolated
+   candidate passes both 2,298-unit builds and selects 7,843/7,874 original
+   Debug definitions, with 31 failures still explicit. Require combined-source
+   native proofs and fresh cumulative validation before adopting those changes.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
