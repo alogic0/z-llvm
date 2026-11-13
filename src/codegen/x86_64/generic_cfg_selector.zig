@@ -262,6 +262,7 @@ const SelectionTransaction = struct {
         transaction.machine.name = transaction.snapshot.name;
         transaction.machine.symbol_linkage = transaction.snapshot.symbol_linkage;
         transaction.machine.symbol_visibility = transaction.snapshot.symbol_visibility;
+        transaction.machine.symbol_alignment = transaction.snapshot.symbol_alignment;
         transaction.machine.ret_ty = transaction.snapshot.ret_ty;
         transaction.machine.codegen_path = transaction.snapshot.codegen_path;
         transaction.machine.entry_xmm_defined_bits = transaction.snapshot.entry_xmm_defined_bits;
@@ -276,6 +277,7 @@ const SelectionTransaction = struct {
                 if (!std.mem.eql(u8, name, "name") and
                     !std.mem.eql(u8, name, "symbol_linkage") and
                     !std.mem.eql(u8, name, "symbol_visibility") and
+                    !std.mem.eql(u8, name, "symbol_alignment") and
                     !std.mem.eql(u8, name, "ret_ty") and
                     !std.mem.eql(u8, name, "instructions") and
                     !std.mem.eql(u8, name, "owned_labels") and
@@ -374,6 +376,7 @@ test "generic cfg selector selection transaction rollback restores address depen
     defer machine.deinit(std.testing.allocator);
     machine.symbol_linkage = .internal;
     machine.symbol_visibility = .hidden;
+    machine.symbol_alignment = 32;
 
     var initial: AddressDependencyDomain = .{};
     try initial.replaceAddress("original-owner", &.{
@@ -383,6 +386,7 @@ test "generic cfg selector selection transaction rollback restores address depen
     const snapshot = transaction.address_dependencies_snapshot;
     machine.symbol_linkage = .external;
     machine.symbol_visibility = .default;
+    machine.symbol_alignment = 128;
     try transaction.address_dependencies.replaceAddress("owner", &.{
         .{ .name = "index", .identity_type = .integer, .role = .index },
     });
@@ -392,4 +396,5 @@ test "generic cfg selector selection transaction rollback restores address depen
     try std.testing.expectEqual(@as(usize, 1), transaction.address_dependencies.count());
     try std.testing.expectEqual(ir.FunctionLinkage.internal, machine.symbol_linkage);
     try std.testing.expectEqual(ir.FunctionVisibility.hidden, machine.symbol_visibility);
+    try std.testing.expectEqual(@as(u32, 32), machine.symbol_alignment);
 }

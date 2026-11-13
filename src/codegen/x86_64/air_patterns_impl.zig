@@ -262,6 +262,7 @@ pub fn lowerFunctionWithOptions(
     };
 
     var machine = MachineFunction.init(symbolName(function.name), function.ret_ty);
+    machine.symbol_alignment = try @import("function_alignment.zig").fromAttributes(function.attrs);
     machine.entry_xmm_defined_bits = sysv_abi.entryXmmDefinedBits(function);
     errdefer machine.deinit(allocator);
 

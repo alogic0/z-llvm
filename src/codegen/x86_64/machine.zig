@@ -833,6 +833,7 @@ pub const MachineFunction = struct {
     name: []const u8,
     symbol_linkage: ir.FunctionLinkage = .default,
     symbol_visibility: ir.FunctionVisibility = .default,
+    symbol_alignment: u32 = 1,
     ret_ty: ir.Type,
     instructions: std.ArrayList(Instruction),
     owned_labels: std.ArrayList([]const u8),

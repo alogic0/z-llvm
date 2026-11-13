@@ -5,6 +5,7 @@ const sysv_abi = @import("sysv_abi.zig");
 const MachineFunction = machine_ir.MachineFunction;
 
 pub fn verifyFunction(function: MachineFunction) !void {
+    try @import("function_alignment.zig").validate(function.symbol_alignment);
     const tail_depths = try @import("verify_tail_calls.zig").prove(function);
     defer if (tail_depths) |depths| std.heap.page_allocator.free(depths);
     try @import("verify_x87.zig").verify(function);

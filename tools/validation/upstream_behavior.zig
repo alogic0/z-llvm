@@ -2,32 +2,50 @@ const std = @import("std");
 const u = @import("common.zig");
 const Runner = @import("runner.zig").Runner;
 
+fn outcomeStatus(text: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, text, "OK") or std.mem.eql(u8, text, "SKIP")) return text;
+    if (std.mem.startsWith(u8, text, "FAIL (") and std.mem.endsWith(u8, text, ")")) return "FAIL";
+    return null;
+}
+fn appendOutcome(a: std.mem.Allocator, rows: *u.Value, names: *std.StringHashMap(void), name: []const u8, status: []const u8) !void {
+    if ((try names.getOrPut(name)).found_existing) return error.DuplicateTestIdentity;
+    var row = u.object(a);
+    try u.put(a, &row, "name", u.s(name));
+    try u.put(a, &row, "outcome", u.s(status));
+    try u.add(rows, row);
+}
 pub fn outcomes(a: std.mem.Allocator, bytes: []const u8) !u.Value {
     var rows = u.array(a);
     var total: ?usize = null;
     var names = std.StringHashMap(void).init(a);
     defer names.deinit();
+    var pending: ?[]const u8 = null;
     var lines = std.mem.splitScalar(u8, bytes, '\n');
     while (lines.next()) |line| {
+        if (pending) |name| if (outcomeStatus(line)) |status| {
+            try appendOutcome(a, &rows, &names, name, status);
+            pending = null;
+            continue;
+        };
         const slash = std.mem.indexOfScalar(u8, line, '/') orelse continue;
         const space = std.mem.indexOfScalarPos(u8, line, slash, ' ') orelse continue;
         const index = std.fmt.parseInt(usize, line[0..slash], 10) catch continue;
         const count = std.fmt.parseInt(usize, line[slash + 1 .. space], 10) catch continue;
         const dots = std.mem.lastIndexOf(u8, line, "...") orelse return error.IncompleteTestOutcome;
+        if (pending != null) return error.IncompleteTestOutcome;
         if (dots <= space + 1 or index != rows.array.items.len + 1 or count == 0 or index > count) return error.InvalidTestSequence;
         if (total) |t| {
             if (count != t) return error.InvalidTestSequence;
         } else total = count;
         const name = line[space + 1 .. dots];
         const suffix = line[dots + 3 ..];
-        const status = if (std.mem.startsWith(u8, suffix, "FAIL (") and std.mem.endsWith(u8, suffix, ")")) "FAIL" else suffix;
-        if (!u.contains(&.{ "OK", "SKIP", "FAIL" }, status)) return error.IncompleteTestOutcome;
-        if ((try names.getOrPut(name)).found_existing) return error.DuplicateTestIdentity;
-        var row = u.object(a);
-        try u.put(a, &row, "name", u.s(name));
-        try u.put(a, &row, "outcome", u.s(status));
-        try u.add(&rows, row);
+        if (outcomeStatus(suffix)) |status| try appendOutcome(a, &rows, &names, name, status) else {
+            // Zig prints expectation diagnostics after the test prefix and
+            // puts its final FAIL record on a subsequent line.
+            pending = name;
+        }
     }
+    if (pending != null) return error.IncompleteTestOutcome;
     if (total == null or rows.array.items.len != total.?) return error.IncompleteTestRun;
     return rows;
 }
@@ -161,4 +179,16 @@ test "upstream outcomes reject truncation missing duplicates and reordered recor
     try std.testing.expectError(error.IncompleteTestOutcome, outcomes(a, "1/1 first..."));
     const failed = try outcomes(a, "1/1 first...FAIL (TestUnexpectedResult)\nstack trace\n");
     try std.testing.expectEqualStrings("FAIL", try u.str(failed.array.items[0], "outcome"));
+}
+
+test "upstream outcomes retain failures whose expectation diagnostics split the record" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const rows = try outcomes(a, "1/2 payload...expected 2141192192, found 2145386496\nFAIL (TestExpectedEqual)\nstack trace\n2/2 next...OK\n1 passed; 0 skipped; 1 failed.\n");
+    try std.testing.expectEqual(@as(usize, 2), rows.array.items.len);
+    try std.testing.expectEqualStrings("payload", try u.str(rows.array.items[0], "name"));
+    try std.testing.expectEqualStrings("FAIL", try u.str(rows.array.items[0], "outcome"));
+    try std.testing.expectError(error.IncompleteTestOutcome, outcomes(a, "1/1 crashed...thread panic\n(empty stack trace)\n"));
+    try std.testing.expectError(error.IncompleteTestOutcome, outcomes(a, "1/2 missing...diagnostic\n2/2 next...OK\n"));
 }

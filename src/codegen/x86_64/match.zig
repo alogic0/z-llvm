@@ -104,15 +104,24 @@ pub fn fp32TextBits(value: ir.Value) !u32 {
         .fp => |text| text,
         .named, .int, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenValue,
     };
-    // LLVM prints float constants as raw double bit patterns (0x...), not
-    // C99 hex-float literals, so raw-hex spellings must be bit-decoded.
-    if (rawHexFpBits(text)) |bits| {
-        const wide: f64 = @bitCast(bits);
-        const narrow: f32 = @floatCast(wide);
-        return @bitCast(narrow);
-    }
-    const parsed = std.fmt.parseFloat(f32, text) catch return error.UnsupportedCodegenValue;
-    return @bitCast(parsed);
+    // Share the exact data decoder. A floating conversion would quiet sNaNs
+    // before a bitcast, store, call argument or return can observe their bits.
+    return @intCast(@import("../../analysis/fp_semantics.zig").scalarLiteralBits(.float, text) catch return error.UnsupportedCodegenValue);
+}
+
+test "scalar float code literals preserve signaling quiet payload and sign bits" {
+    const cases = [_]struct { text: []const u8, bits: u32 }{
+        .{ .text = "0x7FF0000020000000", .bits = 0x7f800001 },
+        .{ .text = "0x7FF4000000000000", .bits = 0x7fa00000 },
+        .{ .text = "0xFFF4000000000000", .bits = 0xffa00000 },
+        .{ .text = "0x7FF8000000000000", .bits = 0x7fc00000 },
+        .{ .text = "0x7FFFFFFFE0000000", .bits = 0x7fffffff },
+        .{ .text = "0x8000000000000000", .bits = 0x80000000 },
+        .{ .text = "0x3FF0000000000000", .bits = 0x3f800000 },
+    };
+    for (cases) |case| try std.testing.expectEqual(case.bits, try fp32TextBits(.{ .fp = case.text }));
+    try std.testing.expectError(error.UnsupportedCodegenValue, fp32TextBits(.{ .fp = "0x7FF0000000000001" }));
+    try std.testing.expectError(error.UnsupportedCodegenValue, fp32TextBits(.{ .fp = "0x3FF0000000000001" }));
 }
 
 fn rawHexFpBits(text: []const u8) ?u64 {

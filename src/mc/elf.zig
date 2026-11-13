@@ -138,8 +138,12 @@ fn buildObjectWithOptionalModuleContext(
 
     const function_offsets = try allocator.alloc(u64, functions.len);
     defer allocator.free(function_offsets);
+    var text_alignment: u32 = 16;
 
     for (functions, 0..) |function, function_index| {
+        try @import("../codegen/x86_64/function_alignment.zig").validate(function.symbol_alignment);
+        try alignArrayList(&text, allocator, function.symbol_alignment);
+        text_alignment = @max(text_alignment, function.symbol_alignment);
         const start: u64 = text.items.len;
         function_offsets[function_index] = start;
         const bytes = try encoding.encodeFunction(allocator, function);
@@ -236,7 +240,7 @@ fn buildObjectWithOptionalModuleContext(
     const rela_rodata_name = if (rodata_relocations.items.len != 0) try appendString(&shstrtab, allocator, ".rela.rodata") else 0;
 
     const ehdr_size: u64 = 64;
-    var cursor = alignForward(ehdr_size, 16);
+    var cursor = alignForward(ehdr_size, text_alignment);
     const text_offset = cursor;
     cursor += text.items.len;
     cursor = alignForward(cursor, data_alignment);
@@ -297,7 +301,7 @@ fn buildObjectWithOptionalModuleContext(
 
     const sections = [_]Section{
         .{ .name_offset = 0, .kind = 0, .flags = 0, .offset = 0, .size = 0, .addralign = 0 },
-        .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = 16 },
+        .{ .name_offset = text_name, .kind = 1, .flags = 0x6, .offset = text_offset, .size = text.items.len, .addralign = text_alignment },
         .{ .name_offset = data_name, .kind = 1, .flags = 0x3, .offset = data_offset, .size = data.items.len, .addralign = data_alignment },
         .{ .name_offset = tdata_name, .kind = 1, .flags = 0x403, .offset = tdata_offset, .size = tdata.items.len, .addralign = tdata_alignment },
         .{ .name_offset = rela_text_name, .kind = 4, .flags = 0, .offset = rela_text_offset, .size = rela_text_size, .link = 5, .info = 1, .addralign = 8, .entsize = 24 },

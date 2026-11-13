@@ -93,6 +93,9 @@ comptime {
     _ = @import("codegen/x86_64/symbol_address.zig");
     _ = @import("mc/global_data.zig");
     _ = @import("mc/elf.zig");
+    _ = @import("codegen/x86_64/function_alignment.zig");
+    _ = @import("codegen/x86_64/function_alignment_tests.zig");
+    _ = @import("codegen/x86_64/match.zig");
     _ = @import("codegen/x86_64/generic_cfg/runtime_pair_pressure_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/floating_vectors_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/incoming_byval80.zig");

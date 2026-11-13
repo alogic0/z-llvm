@@ -4,7 +4,9 @@ const x86_64 = @import("../codegen/x86_64.zig");
 const selector_bytes = @import("../codegen/x86_64/selector_bytes.zig");
 
 pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
+    try @import("../codegen/x86_64/function_alignment.zig").validate(function.symbol_alignment);
     try writer.writeAll("\t.text\n");
+    if (function.symbol_alignment > 1) try writer.print("\t.balign {d}\n", .{function.symbol_alignment});
     try writer.print("\t.globl {s}\n", .{function.name});
     try writer.print("{s}:\n", .{function.name});
     for (function.instructions.items) |instruction| {
