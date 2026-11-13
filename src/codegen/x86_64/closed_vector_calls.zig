@@ -14,9 +14,8 @@ fn needs(ty: ir.Type) bool {
     return bits > 0 and bits <= 128 and total > 128 and
         (total > 1024 or ((bits == 4 or bits == 5) and total > 128));
 }
-fn simple(attrs: ?[]const u8) bool {
-    const text = std.mem.trim(u8, attrs orelse return true, " \t\r\n");
-    return std.mem.eql(u8, text, "noundef");
+fn simple(ty: ir.Type, attrs: ?[]const u8) bool {
+    return @import("vector_facts.zig").advisory(ty, attrs);
 }
 fn eligible(function: ir.Function) bool {
     if ((function.linkage != .internal and function.linkage != .private) or function.is_varargs or function.blocks.items.len == 0 or function.params.items.len > 64 or function.ret_ty == .vector) return false;
@@ -24,7 +23,7 @@ fn eligible(function: ir.Function) bool {
     var found = false;
     for (function.params.items) |param| {
         if (needs(param.ty)) {
-            if (!simple(param.attrs) or param.abi_split_integer or param.abi_x87_memory or param.abi_incoming_address != null) return false;
+            if (!simple(param.ty, param.attrs) or param.abi_split_integer or param.abi_x87_memory or param.abi_incoming_address != null) return false;
             found = true;
         }
     }
@@ -34,7 +33,7 @@ fn supportedCalls(module: ir.Module, target: ir.Function) bool {
     for (module.functions.items) |function| for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.kind != .call or !ir.identifiers.eql(inst.kind.call.callee, target.name)) continue;
         if (inst.kind.call.args.items.len != target.params.items.len) return false;
-        for (inst.kind.call.args.items, target.params.items) |arg, param| if (needs(param.ty) and !simple(arg.attrs)) return false;
+        for (inst.kind.call.args.items, target.params.items) |arg, param| if (needs(param.ty) and !simple(arg.ty, arg.attrs)) return false;
     };
     return true;
 }
@@ -85,7 +84,7 @@ pub fn prepare(a: std.mem.Allocator, module: ir.Module) !?View {
                     var copy = inst;
                     copy.kind.call.args = try call.args.clone(a);
                     for (copy.kind.call.args.items, target.params.items) |*arg, param| if (needs(param.ty)) {
-                        if (!simple(arg.attrs)) return error.UnsupportedClosedVectorArgumentAttributes;
+                        if (!simple(arg.ty, arg.attrs)) return error.UnsupportedClosedVectorArgumentAttributes;
                         const buffer = try forms.temporary(a, function, &serial);
                         try prefixes.insert(a, 0, .{ .result = buffer, .kind = .{ .alloca = .{ .allocated_ty = .{ .aggregate = try std.fmt.allocPrint(a, "[{d} x i8]", .{byteCount(param.ty)}) }, .attrs = "align 16" } } });
                         try block.instructions.append(a, .{ .result = null, .kind = .{ .store = .{ .ty = arg.ty, .value = arg.value, .ptr = .{ .named = buffer }, .attrs = .{ .@"align" = 1 } } } });

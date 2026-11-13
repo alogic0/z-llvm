@@ -636,11 +636,11 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
    Close the fourteen remaining original Debug failures and complete its object
    before the final generations and full behavior matrices in step 12.
-   The completion candidate adds eight populations: one-bit checked vectors,
+   The completion candidate adds ten populations: one-bit checked vectors,
    odd-width vector shifts, closed internal vector calls, memory bitcasts,
-   bounded large-integer memory views, integer global data, function alignment
-   and exact floating literal payloads. Independent C
-   models cover each admitted form; generators and driver templates belong in
+   bounded large-integer memory views, integer global data, function alignment,
+   exact floating literal payloads, vector range facts and annotated assembly
+   operands. Independent C models cover each admitted form; generators and driver templates belong in
    `tools/` and must reproduce the qualified fixtures exactly. Keep ordinary
    ABI, stack-object, frame and Source/value-use limits unchanged. Explicit
    `.rodata` annotations require read-only section placement and relocation
@@ -651,18 +651,28 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    literal decoder for scalar float codegen so signaling NaNs keep their bits.
    Require the complete 7,874-definition census and object, ELF/event/owner
    audits, both unit builds, eight readiness procedures, all 17 gates, both
-   complete 204-population native suites and all 5,590 required faults. Compare
+   complete 206-population native suites and all 5,698 required faults. Compare
    every preceding outcome and artifact explicitly before accepting this
    successor checkpoint. Private complete objects and targeted execution runs
-   are available; cumulative acceptance remains open. Both private 2,329-test
-   builds and the two execution-repair populations pass all 108 fault controls.
+   are available; cumulative acceptance remains open. Both private 2,333-test
+   builds pass. The two execution-repair populations and the two optimized-fact
+   populations each pass all 108 of their required fault controls across both
+   compiler builds. The optimized-fact generator reproduces all four fixture
+   files byte-for-byte in Debug and ReleaseFast. Vector range facts validate
+   typed lane bounds and leave physical ABI carriers unconstrained. Annotated
+   empty assembly reuses checked pointer facts without widening its constraints.
    The complete Debug local-hook run with the pinned reference frontend now
    matches all 2,097 named reference outcomes under normal resources. This does
    not establish the final compiler-generation matrices. The three optimized
-   modes currently stop at verification of vector `range(...)` attributes;
-   annotated inline-assembly pointer operands also need shared validation and
-   lowering coverage. Keep these failed captures explicit and close their
-   contracts before final optimized-mode acceptance.
+   modes now verify every retained definition: 904 in ReleaseSafe, 743 in
+   ReleaseFast and 1,014 in ReleaseSmall. Their complete replays still fail
+   selection with 35, 34 and 64 failed definitions respectively. Retained
+   operation diagnostics identify intrinsic pointer facts, additional vector
+   forms, inline assembly and pointer constant expressions among the remaining
+   contracts. Close each with independent execution coverage, keep all failed
+   captures explicit, and rerun the complete optimized modes before final
+   acceptance. The latest Debug replay still matches all 2,097 reference
+   outcomes after the fact repairs.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the

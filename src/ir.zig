@@ -59,3 +59,4 @@ pub const identifiers = @import("ir/identifiers.zig");
 pub const printer = @import("ir/printer.zig");
 /// Shared validation for declaration, definition and call-argument attributes.
 pub const verifyParameterAttrs = @import("ir/verifier.zig").verifyParameterAttrs;
+pub const verifyInlineAsmParameterAttrs = @import("ir/verifier.zig").verifyInlineAsmParameterAttrs;

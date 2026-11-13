@@ -388,7 +388,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
     if (function.ret_ty == .vector and abiType(function.ret_ty) == null) return null;
     var has_fragment_parameters = false;
     for (function.params.items) |param| if (param.ty == .vector and abiType(param.ty) == null) {
-        if (inputParts(param.ty) == null or function.is_varargs or param.abi_x87_memory or param.abi_split_integer or param.abi_incoming_address != null or !fragmentAttrs(param.attrs)) return null;
+        if (inputParts(param.ty) == null or function.is_varargs or param.abi_x87_memory or param.abi_split_integer or param.abi_incoming_address != null or !fragmentAttrs(param.ty, param.attrs)) return null;
         has_fragment_parameters = true;
     };
     // The native boundary bitcasts mark an already expanded private graph.
@@ -399,7 +399,11 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                 (inst.kind.cast.from_ty.eql(xmm_carrier) and shape(inst.kind.cast.to_ty) != null))) return null;
     };
     var result = function;
-    if (result.ret_ty == .vector) result.ret_ty = abiType(result.ret_ty).?;
+    if (result.ret_ty == .vector) {
+        if (!fragmentAttrs(result.ret_ty, result.ret_attrs)) return error.UnsupportedIntegerVector;
+        result.ret_ty = abiType(result.ret_ty).?;
+        result.ret_attrs = null;
+    }
     var fragments = std.StringHashMap([]ir.Value).init(allocator);
     defer fragments.deinit();
     var serial: forms.TemporaryNames = .{};
@@ -421,13 +425,19 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
         } else if (has_fragment_parameters) {
             var physical = param;
             physical.ty = privateAbiType(param.ty) orelse param.ty;
+            if (param.ty == .vector) {
+                if (!fragmentAttrs(param.ty, param.attrs)) return error.UnsupportedIntegerVector;
+                physical.attrs = null;
+            }
             try result.params.append(allocator, physical);
         } else if (privateAbiType(param.ty)) |physical| {
+            if (!fragmentAttrs(param.ty, param.attrs)) return error.UnsupportedIntegerVector;
             if (!parameters_cloned) {
                 result.params = try function.params.clone(allocator);
                 parameters_cloned = true;
             }
             result.params.items[i].ty = physical;
+            result.params.items[i].attrs = null;
         }
     }
     result.blocks = .empty;
@@ -805,7 +815,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                         copy.kind.call.args = .empty;
                         for (call.args.items) |arg| {
                             if (inputParts(arg.ty)) |plan| {
-                                if (arg.abi_x87_memory or arg.abi_split_integer or !fragmentAttrs(arg.attrs)) return error.UnsupportedIntegerVector;
+                                if (arg.abi_x87_memory or arg.abi_split_integer or !fragmentAttrs(arg.ty, arg.attrs)) return error.UnsupportedIntegerVector;
                                 const pieces = try b.toFragments(try b.lanes(arg.value, arg.ty));
                                 for (pieces) |piece| {
                                     var physical = arg;
@@ -817,8 +827,10 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                             } else {
                                 var physical = arg;
                                 if (shape(arg.ty) != null) {
+                                    if (!fragmentAttrs(arg.ty, arg.attrs)) return error.UnsupportedIntegerVector;
                                     physical.value = try b.toAbi(try b.lanes(arg.value, arg.ty));
                                     physical.ty = abiType(arg.ty) orelse return error.UnsupportedIntegerVector;
+                                    physical.attrs = null;
                                 }
                                 try copy.kind.call.args.append(allocator, physical);
                             }
@@ -826,11 +838,17 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                     } else {
                         copy.kind.call.args = try call.args.clone(allocator);
                         for (copy.kind.call.args.items) |*arg| if (shape(arg.ty) != null) {
+                            if (!fragmentAttrs(arg.ty, arg.attrs)) return error.UnsupportedIntegerVector;
                             arg.value = try b.toAbi(try b.lanes(arg.value, arg.ty));
                             arg.ty = abiType(arg.ty) orelse return error.UnsupportedIntegerVector;
+                            arg.attrs = null;
                         };
                     }
-                    if (shape(call.ret_ty) != null) copy.kind.call.ret_ty = abiType(call.ret_ty) orelse return error.UnsupportedIntegerVector;
+                    if (shape(call.ret_ty) != null) {
+                        if (!fragmentAttrs(call.ret_ty, call.ret_attrs)) return error.UnsupportedIntegerVector;
+                        copy.kind.call.ret_ty = abiType(call.ret_ty) orelse return error.UnsupportedIntegerVector;
+                        copy.kind.call.ret_attrs = null;
+                    }
                     try block.instructions.append(allocator, copy);
                     if (shape(call.ret_ty) != null) value = try b.fromAbi(.{ .named = inst.result orelse return error.UnsupportedIntegerVector }, call.ret_ty);
                 } else {
@@ -884,11 +902,8 @@ fn inputParts(ty: ir.Type) ?InputParts {
     if (total <= 128 or total > 1024) return null;
     return .{ .count = total / 128, .lanes_per_piece = 128 / s.bits, .physical = xmm_carrier, .scalar = false };
 }
-fn fragmentAttrs(attrs: ?[]const u8) bool {
-    const text = attrs orelse return true;
-    var words = std.mem.tokenizeAny(u8, text, " \t\r\n");
-    while (words.next()) |word| if (!std.mem.eql(u8, word, "noundef")) return false;
-    return true;
+fn fragmentAttrs(ty: ir.Type, attrs: ?[]const u8) bool {
+    return @import("../vector_facts.zig").advisory(ty, attrs);
 }
 
 const CheckedVector = struct { ty: ir.Type, op: ir.BinaryOp, signed: bool };

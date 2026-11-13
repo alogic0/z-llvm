@@ -6,14 +6,17 @@ pub const Plan = union(enum) { constant: i128, add32, barriers };
 const clobbers = "~{dirflag},~{fpsr},~{flags}";
 const barrier = "m,~{memory}," ++ clobbers;
 fn pointerAttrs(attrs: ?[]const u8) bool {
-    const text = attrs orelse return true;
-    return std.mem.startsWith(u8, text, "elementtype(") and std.mem.endsWith(u8, text, ")");
+    if (attrs == null) return true;
+    return (ir.verifyInlineAsmParameterAttrs(.ptr, attrs) catch return false) != null;
 }
 pub fn classify(inst: ir.Instruction) ?Plan {
     if (inst.kind != .call) return null;
     const call = inst.kind.call;
     const assembly = call.inline_asm orelse return null;
-    if (call.callee_value != null or call.callee_function_ty != null or call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or call.raw_args != null or call.operand_bundle != null or call.native_query != null or call.va_arg or call.attrs != null) return null;
+    if (call.callee_value != null or call.callee_function_ty != null or call.calling_conv != null or call.ret_attrs != null or call.tail_kind != null or call.raw_args != null or call.operand_bundle != null or call.native_query != null or call.va_arg) return null;
+    var envelope = call;
+    envelope.inline_asm = null;
+    @import("../sysv_abi.zig").rejectUnsupportedCallEnvelope(envelope) catch return null;
     for (call.args.items) |arg| if (arg.abi_x87_memory or arg.abi_split_integer) return null;
     if (inst.result != null and (call.ret_ty.eql(.{ .int = 32 }) or call.ret_ty.eql(.{ .int = 64 })) and call.args.items.len == 0 and !assembly.has_memory_clobber and !assembly.may_load and !assembly.may_store and std.mem.eql(u8, assembly.constraints, "=r," ++ clobbers) and std.mem.startsWith(u8, assembly.template, "mov $$") and std.mem.endsWith(u8, assembly.template, ", ${0}")) {
         const literal = std.mem.trim(u8, assembly.template["mov $$".len .. assembly.template.len - ", ${0}".len], " \t");
@@ -129,7 +132,7 @@ test "bounded empty assembly preserves memory and rejects other envelopes" {
             0 => copy.kind.call.inline_asm.?.template = "nop",
             1 => copy.kind.call.inline_asm.?.constraints = "=*r|m,~{unknown}",
             2 => copy.kind.call.tail_kind = "musttail",
-            3 => copy.kind.call.attrs = "#0",
+            3 => copy.kind.call.attrs = "unknown",
             4 => copy.kind.call.native_query = .cpuid,
             else => unreachable,
         }

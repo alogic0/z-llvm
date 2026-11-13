@@ -1021,17 +1021,8 @@ fn verifyCall(lookup: ModuleLookup, ctx: VerifyContext, call: core.CallInst, blo
     if (call.inline_asm) |inline_asm| {
         if (!inline_asm.sideeffect and (inline_asm.has_memory_clobber or inline_asm.may_load or inline_asm.may_store)) return error.UnsupportedInlineAsm;
         for (call.args.items) |arg| {
-            const attrs = std.mem.trim(u8, arg.attrs orelse "", " \t");
-            if (abiPayload(attrs, "elementtype")) |payload| {
-                if (arg.ty != .ptr) return error.UnsupportedCallAttribute;
-                // This admission owns only the observed standalone attribute.
-                // Other argument facts must continue through their validators.
-                if (!std.mem.startsWith(u8, attrs, "elementtype(") or
-                    attrs.len != "elementtype(".len + payload.len + 1 or attrs[attrs.len - 1] != ')') return error.UnsupportedCallAttribute;
-                const element_ty = try parseType(payload);
-                if (element_ty == .void or element_ty == .metadata) return error.UnsupportedCallAttribute;
-                try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
-            } else try verifyCallArg(ctx, arg, block_index, instruction_index);
+            _ = try verifyInlineAsmParameterAttrs(arg.ty, arg.attrs);
+            try ctx.verifyValue(arg.ty, arg.value, block_index, instruction_index);
         }
         return;
     }
@@ -1165,6 +1156,50 @@ fn verifyCallArg(ctx: VerifyContext, arg: core.CallArg, block_index: usize, inst
 
 fn verifyCallArgAttrs(ty: core.Type, attrs: ?[]const u8) !void {
     try verifyParameterAttrs(ty, attrs);
+}
+
+/// Inline assembly's element type is separate from ordinary pointer facts.
+/// Validate the combined vocabulary once; ABI payloads and unknown facts close.
+pub fn verifyInlineAsmParameterAttrs(ty: core.Type, attrs: ?[]const u8) !?core.Type {
+    const text = std.mem.trim(u8, attrs orelse return null, " \t");
+    var scan = text;
+    var has_element = false;
+    while (scan.len != 0) {
+        const token = firstAttrToken(scan);
+        if (token.len == 0) return error.UnsupportedCallAttribute;
+        scan = std.mem.trim(u8, scan[token.len..], " \t");
+        if (abiPayload(token, "elementtype") != null) has_element = true;
+    }
+    if (!has_element) {
+        try verifyParameterAttrs(ty, attrs);
+        return null;
+    }
+    if (ty != .ptr) return error.UnsupportedCallAttribute;
+    var element: ?core.Type = null;
+    var seen: u8 = 0;
+    var rest = text;
+    while (rest.len != 0) {
+        const token = firstAttrToken(rest);
+        if (token.len == 0) return error.UnsupportedCallAttribute;
+        rest = std.mem.trim(u8, rest[token.len..], " \t");
+        if (abiPayload(token, "elementtype")) |payload| {
+            if (element != null) return error.UnsupportedCallAttribute;
+            const parsed = try parseType(payload);
+            if (parsed == .void or parsed == .metadata) return error.UnsupportedCallAttribute;
+            element = parsed;
+            continue;
+        }
+        const flag: u8 = if (std.mem.eql(u8, token, "nonnull")) 1 else if (std.mem.eql(u8, token, "noundef")) 2 else if (std.mem.eql(u8, token, "align")) 4 else if (abiPayload(token, "dereferenceable") != null) 8 else if (abiPayload(token, "dereferenceable_or_null") != null) 16 else return error.UnsupportedCallAttribute;
+        if (seen & flag != 0) return error.UnsupportedCallAttribute;
+        seen |= flag;
+        if (flag == 4) {
+            const amount = firstAttrToken(rest);
+            if (amount.len == 0) return error.InvalidAlignment;
+            rest = std.mem.trim(u8, rest[amount.len..], " \t");
+            try verifyAlignment(try std.fmt.parseUnsigned(u64, amount, 10));
+        } else try verifyParameterAttrs(.ptr, token);
+    }
+    return element;
 }
 
 pub fn verifyParameterAttrs(ty: core.Type, attrs: ?[]const u8) !void {
@@ -1365,20 +1400,21 @@ fn rangePayload(token: []const u8) ?[]const u8 {
 }
 
 fn verifyRangeAttrPayload(ty: core.Type, payload: []const u8) !void {
-    switch (ty) {
-        .int => {},
-        else => return error.UnsupportedCallAttribute,
-    }
+    const scalar: core.Type = if (ty == .vector) blk: {
+        if (ty.vector.len == 0 or ty.vector.elem_ty != .int) return error.UnsupportedCallAttribute;
+        break :blk ty.vector.elem_ty.toType();
+    } else ty;
+    if (scalar != .int) return error.UnsupportedCallAttribute;
     var bounds = std.mem.splitScalar(u8, payload, ',');
     var lower_tokens = std.mem.tokenizeAny(u8, bounds.next() orelse return error.UnsupportedCallAttribute, " \t");
     const range_ty = parseType(lower_tokens.next() orelse return error.UnsupportedCallAttribute) catch return error.UnsupportedCallAttribute;
-    if (!range_ty.eql(ty)) return error.UnsupportedCallAttribute;
+    if (!range_ty.eql(scalar)) return error.UnsupportedCallAttribute;
     const lower = try std.fmt.parseInt(i128, lower_tokens.next() orelse return error.UnsupportedCallAttribute, 10);
     if (lower_tokens.next() != null) return error.UnsupportedCallAttribute;
     const upper = try std.fmt.parseInt(i128, std.mem.trim(u8, bounds.next() orelse return error.UnsupportedCallAttribute, " \t"), 10);
-    if (bounds.next() != null or ty.int == 0) return error.UnsupportedCallAttribute;
-    if (ty.int < 128) {
-        const bits: u7 = @intCast(ty.int);
+    if (bounds.next() != null or scalar.int == 0) return error.UnsupportedCallAttribute;
+    if (scalar.int < 128) {
+        const bits: u7 = @intCast(scalar.int);
         const minimum = -(@as(i128, 1) << (bits - 1));
         const maximum = (@as(u128, 1) << bits) - 1;
         for ([_]i128{ lower, upper }) |value| {

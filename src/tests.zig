@@ -1,5 +1,9 @@
 const std = @import("std");
 comptime {
+    _ = @import("codegen/x86_64/vector_facts.zig");
+    _ = @import("ir/inline_asm_attrs_tests.zig");
+}
+comptime {
     _ = @import("analysis/direct_symbol_closure_tests.zig");
     _ = @import("codegen/x86_64/generic_cfg/memory_bytes_tests.zig");
 }
