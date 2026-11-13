@@ -435,3 +435,186 @@ test "runtime floating vectors reject explicit vector layout overrides" {
     const context: @import("../machine.zig").ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = "e-v64:128" };
     try std.testing.expect((try vectors.legalize(arena.allocator(), module.functions.items[0], &context)) == null);
 }
+
+test "four lane floating inputs retain physical pieces exact payloads and six live GP prefixes" {
+    const a = std.testing.allocator;
+    inline for (.{ .{ "double", 64 }, .{ "fp128", 128 }, .{ "x86_fp80", 80 } }) |format| {
+        const ty = format[0];
+        const bits = format[1];
+        const bytes = bits / 8;
+        var text: std.Io.Writer.Allocating = .init(a);
+        defer text.deinit();
+        try text.writer.print("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndefine i64 @fp_pieces(i64 %p0,i64 %p1,i64 %p2,i64 %p3,i64 %p4,i64 %p5,<4 x {0s}> %a,<4 x {0s}> %b,i64 %tail,ptr %out) {{\nentry:\n store <4 x {0s}> %a,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 {1d}\n store <4 x {0s}> %b,ptr %next,align 1\n", .{ ty, 4 * bytes });
+        for (0..6) |i| {
+            const previous = if (i == 0) "%tail" else try std.fmt.allocPrint(a, "%r{d}", .{i - 1});
+            defer if (i != 0) a.free(previous);
+            try text.writer.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n", .{ i, previous });
+        }
+        try text.writer.writeAll(" ret i64 %r5\n}\n");
+        var module = try ir.Module.parse(a, text.written());
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const view = (try vectors.legalize(arena.allocator(), original, null)).?;
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        try std.testing.expect((try vectors.legalize(arena.allocator(), view, null)) == null);
+        const context: @import("../machine.zig").ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items, .declarations = module.declarations.items };
+        var selected = try compilation.select(a, "x86_64-unknown-linux-gnu", original, .{ .generic_cfg_selector = true, .module_context = &context });
+        defer selected.deinit(a);
+        try verify.verifyFunction(selected);
+        const code = try encoding.encodeFunction(a, selected);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        for (0..16) |seed| {
+            const prefixes = [_]u64{ 0x9182736455aaccdd ^ seed, 0xfedcba9876543211 +% seed, seed *% 0x123456789abcdef1, ~@as(u64, seed), seed, 0x8000000000000000 | seed };
+            const tail = @as(u64, seed) *% 0x3456789abcdef011;
+            var expected = tail;
+            for (prefixes) |p| expected = (expected *% 1099511628211) ^ p;
+            var output: [160]u8 = @splat(0xa5);
+            var payload: [128]u8 = @splat(0);
+            const result = if (bits == 64) blk: {
+                const V = @Vector(2, u64);
+                var pieces: [4]V = undefined;
+                for (&pieces, 0..) |*piece, i| {
+                    const words = [2]u64{ (@as(u64, seed) *% 0x9182736455aaccdd) ^ i, (@as(u64, i) *% 0x123456789abcdef1) ^ seed };
+                    piece.* = words;
+                    @memcpy(payload[i * 16 ..][0..16], std.mem.asBytes(&words));
+                }
+                const run: *const fn (u64, u64, u64, u64, u64, u64, V, V, V, V, u64, *u8) callconv(.c) u64 = @ptrCast(memory.ptr);
+                break :blk run(prefixes[0], prefixes[1], prefixes[2], prefixes[3], prefixes[4], prefixes[5], pieces[0], pieces[1], pieces[2], pieces[3], tail, &output[8]);
+            } else blk: {
+                const F = if (bits == 128) f128 else f80;
+                const U = if (bits == 128) u128 else u80;
+                var pieces: [8]F = undefined;
+                for (&pieces, 0..) |*piece, i| {
+                    const raw: U = if (bits == 128) ((@as(u128, seed) *% 0x9182736455aaccdd) << 64) | (@as(u128, i) *% 0x123456789abcdef1) else (@as(u80, 0x3fff) << 64) | (@as(u80, 1) << 63) | (@as(u80, i * 17 + seed) << 40);
+                    piece.* = @bitCast(raw);
+                    for (0..bytes) |byte| payload[i * bytes + byte] = @truncate(raw >> @as(std.math.Log2Int(U), @intCast(byte * 8)));
+                }
+                const run: *const fn (u64, u64, u64, u64, u64, u64, F, F, F, F, F, F, F, F, u64, *u8) callconv(.c) u64 = @ptrCast(memory.ptr);
+                break :blk run(prefixes[0], prefixes[1], prefixes[2], prefixes[3], prefixes[4], prefixes[5], pieces[0], pieces[1], pieces[2], pieces[3], pieces[4], pieces[5], pieces[6], pieces[7], tail, &output[8]);
+            };
+            try std.testing.expectEqual(expected, result);
+            try std.testing.expectEqualSlices(u8, payload[0 .. 8 * bytes], output[8..][0 .. 8 * bytes]);
+            for (output[0..8]) |byte| try std.testing.expectEqual(@as(u8, 0xa5), byte);
+            for (output[8 + 8 * bytes ..]) |byte| try std.testing.expectEqual(@as(u8, 0xa5), byte);
+        }
+        try module.verify();
+        try std.testing.expectEqual(@as(usize, 10), original.params.items.len);
+        try std.testing.expect(original.params.items[6].ty == .vector);
+    }
+}
+test "floating input pieces keep wide returns layouts ABI facts and ninth SSE argument closed" {
+    const a = std.testing.allocator;
+    for (0..6) |variant| {
+        const input = if (variant == 0) "define <4 x double> @closed(<4 x double> %a) {\nentry:\n ret <4 x double> %a\n}\n" else if (variant == 5) "define void @closed(ptr %out,<4 x fp128> %a,<4 x fp128> %b,float %ninth) {\nentry:\n store <4 x fp128> %a,ptr %out,align 1\n ret void\n}\n" else "define void @closed(ptr %out,<4 x double> %a) {\nentry:\n store <4 x double> %a,ptr %out,align 1\n ret void\n}\n";
+        var module = try ir.Module.parse(a, input);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        var context: @import("../machine.zig").ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = "e-m:e-p:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", .functions = module.functions.items, .declarations = module.declarations.items };
+        const f = &module.functions.items[0];
+        if (variant >= 1 and variant <= 4) try std.testing.expect((try vectors.legalize(arena.allocator(), f.*, &context)) != null);
+        switch (variant) {
+            0 => {},
+            1 => f.params.items[1].attrs = "inreg",
+            2 => f.is_varargs = true,
+            3 => f.params.items[1].abi_x87_memory = true,
+            4 => context.target_datalayout = "e-m:e-p:64:64-v256:128-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+            5 => {},
+            else => unreachable,
+        }
+        if (variant == 5) {
+            const machine = @import("../machine.zig");
+            const selector = @import("../generic_cfg_selector.zig");
+            var output = machine.MachineFunction.init(f.name, f.ret_ty);
+            defer output.deinit(a);
+            const selected = try selector.tryLower(a, &output, f.*);
+            try std.testing.expect(selected == .unsupported);
+        } else try std.testing.expect((try vectors.legalize(arena.allocator(), f.*, &context)) == null);
+    }
+}
+
+test "floating native masks preserve physical XMM payloads and ordered comparison" {
+    const a = std.testing.allocator;
+    inline for (.{ .{ "float", 32, 4 }, .{ "double", 64, 2 } }) |format| {
+        const bits = format[1];
+        const count = format[2];
+        const U = if (bits == 32) u32 else u64;
+        const F = if (bits == 32) f32 else f64;
+        const V = @Vector(count, U);
+        const text = try std.fmt.allocPrint(a, "define <{0d} x {1s}> @mask_select(<{0d} x {1s}> %a,<{0d} x {1s}> %b) {{\nentry:\n %test = fcmp olt <{0d} x {1s}> %a,%b\n %value = select <{0d} x i1> %test,<{0d} x {1s}> %a,<{0d} x {1s}> %b\n ret <{0d} x {1s}> %value\n}}\n", .{ count, format[0] });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const private = (try vectors.legalize(arena.allocator(), original, null)).?;
+        var private_module = module;
+        private_module.functions = try module.functions.clone(arena.allocator());
+        private_module.functions.items[0] = private;
+        try private_module.verify();
+        try std.testing.expect((try vectors.legalize(arena.allocator(), private, null)) == null);
+        var failure_tag: ?[]const u8 = null;
+        var failure_detail: ?[]const u8 = null;
+        var selected = compilation.select(a, "x86_64-unknown-linux-gnu", original, .{ .generic_cfg_selector = true, .generic_cfg_selector_diagnostic_tag = &failure_tag, .generic_cfg_selector_diagnostic_detail = &failure_detail }) catch |err| {
+            std.debug.print("native-mask selector {s}: {s}\n", .{ failure_tag orelse "none", failure_detail orelse "none" });
+            return err;
+        };
+        defer selected.deinit(a);
+        try verify.verifyFunction(selected);
+        const code = try encoding.encodeFunction(a, selected);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (V, V) callconv(.c) V = @ptrCast(memory.ptr);
+        const sign: U = @as(U, 1) << (bits - 1);
+        const infinity: U = if (bits == 32) 0x7f800000 else 0x7ff0000000000000;
+        const quiet: U = infinity | (@as(U, 1) << (if (bits == 32) 22 else 51)) | 0x123;
+        const one: U = @bitCast(@as(F, 1));
+        const values = [_]U{ 0, sign, 1, one, sign | one, infinity, sign | infinity, quiet, sign | quiet };
+        for (values, 0..) |x, i| for (values, 0..) |y, j| {
+            var left: [count]U = undefined;
+            var right: [count]U = undefined;
+            var expected: [count]U = undefined;
+            for (0..count) |lane| {
+                left[lane] = if (lane == 0) x else values[(i + lane) % values.len];
+                right[lane] = if (lane == 0) y else values[(j + lane) % values.len];
+                const l: F = @bitCast(left[lane]);
+                const r: F = @bitCast(right[lane]);
+                expected[lane] = if (l < r) left[lane] else right[lane];
+            }
+            const actual: [count]U = run(left, right);
+            try std.testing.expectEqualSlices(U, &expected, &actual);
+        };
+        try module.verify();
+        try std.testing.expect(original.blocks.items[0].instructions.items[0].kind.fcmp.operand_ty == .vector);
+    }
+}
+
+test "floating native storage activation leaves two double quad carriers closed" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "float", "double" }, [_]usize{ 4, 2 }) |ty, count| {
+        const text = try std.fmt.allocPrint(a, "define void @store_native(<{0d} x {1s}> %a,ptr %out) {{\nentry:\n %home = alloca <{0d} x {1s}>,align 16\n store <{0d} x {1s}> %a,ptr %home,align 16\n %copy = load <{0d} x {1s}>,ptr %home,align 16\n store <{0d} x {1s}> %copy,ptr %out,align 1\n ret void\n}}\n", .{ count, ty });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const private = try vectors.legalize(arena.allocator(), module.functions.items[0], null);
+        if (count == 2) try std.testing.expect(private == null) else try std.testing.expect(private != null);
+        try module.verify();
+    }
+}

@@ -701,12 +701,24 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
                     if (!call.ret_ty.eql(s.scalar())) return error.UnsupportedIntegerVector;
                     var accumulator = try defined(lanes.values[0], s.scalar());
                     var matched = false;
-                    for ([_][]const u8{ "add", "and", "or", "xor", "umin", "umax", "smin", "smax" }, 0..) |op, op_index| {
+                    for ([_][]const u8{ "add", "and", "or", "xor", "umin", "umax", "smin", "smax", "mul" }, 0..) |op, op_index| {
                         const name = try std.fmt.allocPrint(allocator, "llvm.vector.reduce.{s}.v{d}i{d}", .{ op, s.len, s.bits });
                         if (!std.mem.eql(u8, name, call.callee)) continue;
+                        const product = std.mem.eql(u8, op, "mul");
+                        if (product) {
+                            if (s.bits != 8 and s.bits != 16 and s.bits != 24 and s.bits != 32 and s.bits != 48 and s.bits != 64 and s.bits != 128) return error.UnsupportedIntegerVector;
+                            if (call.tail_kind != null or call.callee_function_ty != null or call.args.items[0].abi_x87_memory or call.args.items[0].abi_split_integer) return error.UnsupportedIntegerVector;
+                            abi.rejectUnsupportedCallEnvelope(call) catch return error.UnsupportedIntegerVector;
+                        }
                         matched = true;
                         for (lanes.values[1..s.len]) |lane| {
-                            if (op_index < 4) {
+                            if (product) {
+                                const carrier: ir.Type = if (s.bits < 64) .{ .int = 64 } else s.scalar();
+                                const left = if (s.bits < 64) try b.cast(.zext, s.scalar(), accumulator, carrier) else accumulator;
+                                const right = if (s.bits < 64) try b.cast(.zext, s.scalar(), lane, carrier) else lane;
+                                const multiplied = try b.binary(.mul, carrier, left, right);
+                                accumulator = if (s.bits < 64) try b.cast(.trunc, carrier, multiplied, s.scalar()) else multiplied;
+                            } else if (op_index < 4) {
                                 const operations = [_]ir.BinaryOp{ .add, .@"and", .@"or", .xor };
                                 accumulator = try b.binary(operations[op_index], s.scalar(), accumulator, lane);
                             } else {

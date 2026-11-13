@@ -837,3 +837,86 @@ test "checked vector expansion rejects escaping aggregates and unproved envelope
         try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0], null)) == null);
     }
 }
+
+test "integer vector products retain modular lanes exact stores and source" {
+    const a = std.testing.allocator;
+    inline for ([_]u16{ 8, 16, 24, 32, 48, 64, 128 }) |bits| for ([_]usize{ 4, 64 }) |count| {
+        const text = try std.fmt.allocPrint(a, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ndeclare i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}>)\ndefine i64 @product(ptr %out,ptr %input,i64 %salt) {{\nentry:\n %v = load <{1d} x i{0d}>,ptr %input,align 1\n %r = call i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}> %v)\n store i{0d} %r,ptr %out,align 1\n %answer = xor i64 %salt,90\n ret i64 %answer\n}}\n", .{ bits, count });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const view = (try forms.legalize(arena.allocator(), original, null)).?;
+        var private = module;
+        private.functions = try module.functions.clone(arena.allocator());
+        private.functions.items[0] = view;
+        try private.verify();
+        const machine = @import("../machine.zig");
+        const selector = @import("../generic_cfg_selector.zig");
+        const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .aliases = module.aliases.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout, .functions = module.functions.items, .declarations = module.declarations.items };
+        var selected = machine.MachineFunction.init(original.name, original.ret_ty);
+        defer selected.deinit(a);
+        const selection = try selector.tryLowerWithContext(a, &selected, original, &context);
+        if (selection == .unsupported) std.debug.print("product i{d}x{d}: {s}\n", .{ bits, count, selection.unsupported.detail() });
+        try std.testing.expect(selection == .selected);
+        try @import("../verify.zig").verifyFunction(selected);
+        const code = try @import("../../../mc/encoding.zig").encodeFunction(a, selected);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (*u8, *const u8, u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+        const mask = std.math.maxInt(u128) >> @as(u7, @intCast(128 - bits));
+        for (0..32) |seed| {
+            var input: [1024]u8 = @splat(0);
+            var expected: u128 = 1;
+            for (0..count) |lane| {
+                var value = if (seed == 0) 0 else if (seed == 1) mask else (((@as(u128, seed) *% 0x9182736455aaccdd) << 64) ^ (@as(u128, lane) *% 0x123456789abcdef1) ^ seed) & mask;
+                if (seed == 2) value = 3;
+                expected = (expected *% value) & mask;
+                for (0..bits / 8) |byte| input[lane * (bits / 8) + byte] = @truncate(value >> @as(u7, @intCast(byte * 8)));
+            }
+            const saved = input;
+            var output: [32]u8 = @splat(0xa5);
+            const salt: u64 = seed *% 0x9182736455aaccdd;
+            try std.testing.expectEqual(salt ^ 90, run(&output[8], &input[0], salt));
+            for (0..bits / 8) |byte| try std.testing.expectEqual(@as(u8, @truncate(expected >> @as(u7, @intCast(byte * 8)))), output[8 + byte]);
+            for (output[0..8]) |byte| try std.testing.expectEqual(@as(u8, 0xa5), byte);
+            for (output[8 + bits / 8 ..]) |byte| try std.testing.expectEqual(@as(u8, 0xa5), byte);
+            try std.testing.expectEqualSlices(u8, &saved, &input);
+        }
+        try module.verify();
+        try std.testing.expect(original.blocks.items[0].instructions.items[1].kind == .call);
+    };
+}
+
+test "integer vector products keep call envelopes and unsupported scalar widths closed" {
+    const a = std.testing.allocator;
+    for (0..7) |variant| {
+        const bits: usize = if (variant == 6) 51 else 16;
+        const text = try std.fmt.allocPrint(a, "declare i{0d} @llvm.vector.reduce.mul.v4i{0d}(<4 x i{0d}>)\ndefine i{0d} @product(<4 x i{0d}> %a) {{\nentry:\n %r = call i{0d} @llvm.vector.reduce.mul.v4i{0d}(<4 x i{0d}> %a)\n ret i{0d} %r\n}}\n", .{bits});
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const f = &module.functions.items[0];
+        if (variant != 6) try std.testing.expect((try forms.legalize(arena.allocator(), f.*, null)) != null);
+        const call = &f.blocks.items[0].instructions.items[0].kind.call;
+        switch (variant) {
+            0 => call.tail_kind = "musttail",
+            1 => call.callee_function_ty = "i16 (<4 x i16>)",
+            2 => call.args.items[0].attrs = "noundef",
+            3 => call.args.items[0].abi_x87_memory = true,
+            4 => call.args.items[0].abi_split_integer = true,
+            5 => call.raw_args = "<4 x i16> %a",
+            6 => {},
+            else => unreachable,
+        }
+        try std.testing.expect((try forms.legalize(arena.allocator(), f.*, null)) == null);
+    }
+}

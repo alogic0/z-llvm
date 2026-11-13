@@ -97,6 +97,13 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
         var block = original;
         block.instructions = .empty;
         for (original.instructions.items, 0..) |inst, instruction_index| {
+            if (!inst.removed and inst.result == null) {
+                if (@import("bounded_inline_asm.zig").classify(inst)) |plan| {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    try @import("bounded_inline_asm.zig").lower(allocator, function, &block, &serial, inst, plan);
+                    continue;
+                }
+            }
             if (!inst.removed and inst.result != null) switch (inst.kind) {
                 .freeze => |freeze| if (freeze.ty == .int and freeze.ty.int > 32 and freeze.ty.int < 64 and
                     freeze.value == .named and !std.mem.startsWith(u8, freeze.value.named, "@"))
@@ -124,7 +131,11 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     } } });
                     continue;
                 },
-                .call => |call| if (unsignedMin(call)) {
+                .call => |call| if (@import("bounded_inline_asm.zig").classify(inst)) |plan| {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    try @import("bounded_inline_asm.zig").lower(allocator, function, &block, &serial, inst, plan);
+                    continue;
+                } else if (unsignedMin(call)) {
                     try candidate.begin(&block, block_index, instruction_index);
                     const condition = try temporary(allocator, function, &serial);
                     const swapped = call.args.items[0].value == .int;

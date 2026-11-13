@@ -15,7 +15,8 @@ The four-family scalar/vector checkpoint passes at `c3e5547d`: both official
 177-population native suites and all 4,132 required faults pass. The accepted
 original Debug replay still rejects 88 definitions. The next isolated six-family
 batch passes both 2,294-unit builds and gains 37 selections without loss,
-leaving 51 rejections. Canonical adoption and cumulative validation remain next.
+leaving 51 rejections. All twelve combined native runs pass with 324 component
+faults detected. The six families are adopted for fresh cumulative validation.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -511,15 +512,16 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    Preserve frozen Source/value-use contracts, 64 KiB stack objects, the 8 MiB
    frame guard and all argument limits. Add independent execution and negative
    controls for each bounded repair and repeat the required cumulative checks.
-   Adopt the independently exercised six-family batch once its combined
-   component runs pass: four-lane double/quad/x87 input fragments; native FP
+   **Adopted for fresh cumulative validation.** Integrate the independently
+   exercised six-family batch: four-lane double/quad/x87 input fragments; native FP
    masks and storage; lane-wise FP min/max; modular integer vector products;
    boolean results with wide integer arguments; and bounded assembly forms.
    Preserve whole-quad scalar selects, exact input/output extents, defined AL
    bits and all existing ABI limits. The assembly scope is constant moves,
    one tied i32 add and empty memory operands; other templates remain closed.
    The maintained Zig generator reproduces all 64 files and 31 population
-   entries exactly. Both isolated unit builds pass 2,294 tests. The unchanged
+   entries exactly. Both isolated unit builds pass 2,294 tests; all twelve
+   combined native runs pass and detect all 324 component faults. The unchanged
    original Debug input selects 7,823/7,874, gaining 37 without loss, but its
    actual nonzero result and 51 failures remain explicit. Mixed-zero FP ties
    use an explicit independent oracle; signaling-NaN payload compliance and

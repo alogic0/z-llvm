@@ -51,12 +51,12 @@ fn laneOperation(call: ir.CallInst) ?LaneOperation {
         call.raw_args != null or call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
     sysv.rejectUnsupportedCallEnvelope(call) catch return null;
     const scalar = call.ret_ty.vector.elem_ty.toType();
-    const operations = [_][]const u8{ "fabs", "copysign" } ++ @import("extended_math_intrinsics.zig").operations;
+    const operations = [_][]const u8{ "fabs", "copysign", "minnum", "maxnum" } ++ @import("extended_math_intrinsics.zig").operations;
     for (operations) |op| {
         var buffer: [96]u8 = undefined;
         const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.v{d}f{d}", .{ op, call.ret_ty.vector.len, width(scalar) }) catch return null;
         if (!std.mem.eql(u8, call.callee, spelling)) continue;
-        const arity: usize = if (std.mem.eql(u8, op, "fma")) 3 else if (std.mem.eql(u8, op, "copysign")) 2 else 1;
+        const arity: usize = if (std.mem.eql(u8, op, "fma")) 3 else if (std.mem.eql(u8, op, "copysign") or std.mem.eql(u8, op, "minnum") or std.mem.eql(u8, op, "maxnum")) 2 else 1;
         if (call.args.items.len != arity) return null;
         for (call.args.items) |arg| if (!arg.ty.eql(call.ret_ty) or arg.attrs != null) return null;
         return .{ .name = op, .arity = arity };
@@ -81,7 +81,7 @@ fn reduction(call: ir.CallInst) ?Reduction {
 }
 fn needed(function: ir.Function) bool {
     if (smallAbi(function.ret_ty) != null) return true;
-    for (function.params.items) |p| if (smallAbi(p.ty) != null) return true;
+    for (function.params.items) |p| if (smallAbi(p.ty) != null or inputPieces(p.ty) != null) return true;
     var crossing = false;
     var integer_binary = false;
     var shuffle = false;
@@ -92,7 +92,12 @@ fn needed(function: ir.Function) bool {
     // parameter. Restrict this additional storage trigger to scalar boundaries;
     // existing vector ABI rewrites retain their original activation rules.
     var scalar_boundary = !fp(function.ret_ty);
-    for (function.params.items) |p| scalar_boundary = scalar_boundary and !fp(p.ty);
+    const native_float: ir.Type = .{ .vector = .{ .len = 4, .elem_ty = .float } };
+    var native_float_boundary = function.ret_ty.eql(native_float);
+    for (function.params.items) |p| {
+        scalar_boundary = scalar_boundary and !fp(p.ty);
+        native_float_boundary = native_float_boundary or p.ty.eql(native_float);
+    }
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed) continue;
         if (inst.resultType()) |ty| if (fp(ty)) {
@@ -101,6 +106,14 @@ fn needed(function: ir.Function) bool {
         switch (inst.kind) {
             .alloca => |x| {
                 owned_storage = owned_storage or fp(x.allocated_ty);
+            },
+            .fcmp => |x| {
+                if (fp(x.operand_ty)) return true;
+            },
+            .select => |x| {
+                // Scalar conditions also select opaque quad XMM carriers.
+                // Only a vector mask establishes floating lane semantics.
+                if (fp(x.ty) and x.cond_ty == .vector) return true;
             },
             .cast => |c| {
                 if ((c.op == .fptrunc or c.op == .fpext) and fp(c.from_ty) and fp(c.to_ty)) native_fp_cast = true;
@@ -123,7 +136,7 @@ fn needed(function: ir.Function) bool {
                 if (reduction(c) != null) return true;
                 if (laneOperation(c)) |op| if (!std.mem.eql(u8, op.name, "fabs") and !std.mem.eql(u8, op.name, "copysign")) return true;
                 if (smallAbi(c.ret_ty) != null) return true;
-                for (c.args.items) |arg| if (smallAbi(arg.ty) != null) return true;
+                for (c.args.items) |arg| if (smallAbi(arg.ty) != null or inputPieces(arg.ty) != null) return true;
             },
             .binary => |b| if (b.ty == .vector and b.ty.vector.elem_ty == .int) {
                 integer_binary = true;
@@ -131,7 +144,7 @@ fn needed(function: ir.Function) bool {
             else => {},
         }
     };
-    return (crossing and integer_binary) or unsupported_shuffle or (shuffle and !native_fp_cast) or (owned_storage and scalar_boundary);
+    return (crossing and integer_binary) or unsupported_shuffle or (shuffle and !native_fp_cast) or (owned_storage and (scalar_boundary or native_float_boundary));
 }
 fn stable(value: ir.Value, ty: ir.Type) !ir.Value {
     if (value == .undef or value == .poison or value == .zero_initializer)
@@ -208,6 +221,17 @@ const Builder = struct {
         const bits = if (width(ty) == 80) try b.cast(.trunc, .{ .int = 128 }, payload, raw) else payload;
         return b.cast(.bitcast, raw, bits, ty);
     }
+    fn maximumValue(b: Builder, ty: ir.Type, x: ir.Value, y: ir.Value) !ir.Value {
+        const left = try stable(x, ty);
+        const right = try stable(y, ty);
+        const tie = try b.zeroTie(ty, left, right, false);
+        var call: ir.CallInst = .{ .callee = try std.fmt.allocPrint(b.a, "llvm.maxnum.f{d}", .{width(ty)}), .ret_ty = ty, .args = .empty };
+        try call.args.append(b.a, .{ .ty = ty, .value = left });
+        try call.args.append(b.a, .{ .ty = ty, .value = right });
+        const ordinary = try b.emit(.{ .call = call });
+        const signed_zero = try b.zeroFromPayload(ty, tie.payload);
+        return b.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = tie.condition, .ty = ty, .true_value = signed_zero, .false_value = ordinary } });
+    }
     fn minimumValue(b: Builder, ty: ir.Type, x: ir.Value, y: ir.Value) !ir.Value {
         const left = try stable(x, ty);
         const right = try stable(y, ty);
@@ -237,6 +261,35 @@ const Builder = struct {
             if (i + 1 == values.len) try b.block.instructions.append(b.a, .{ .result = name, .kind = kind }) else previous = try b.emit(kind);
         }
     }
+    fn fromInputPieces(b: Builder, pieces: []const ir.Value, ty: ir.Type) !Lanes {
+        const plan = inputPieces(ty) orelse return error.UnsupportedFloatingVector;
+        if (pieces.len != plan.count) return error.UnsupportedFloatingVector;
+        var output_lanes: Lanes = .{ .ty = ty };
+        if (plan.lanes_per_piece == 1) {
+            @memcpy(output_lanes.values[0..plan.count], pieces);
+        } else {
+            for (pieces, 0..) |piece, i| {
+                const part = try b.fromAbi(piece, plan.ty);
+                @memcpy(output_lanes.values[i * 2 ..][0..2], part.values[0..2]);
+            }
+        }
+        return output_lanes;
+    }
+    fn toInputPieces(b: Builder, value: ir.Value, ty: ir.Type) ![]ir.Value {
+        const plan = inputPieces(ty) orelse return error.UnsupportedFloatingVector;
+        const input_lanes = try b.lanes(value, ty);
+        const pieces = try b.a.alloc(ir.Value, plan.count);
+        for (pieces, 0..) |*piece, i| {
+            if (plan.lanes_per_piece == 1) {
+                piece.* = try stable(input_lanes.values[i], plan.ty);
+            } else {
+                const name = try forms.temporary(b.a, b.f, b.names);
+                try b.vector(name, plan.ty, input_lanes.values[i * 2 ..][0..2]);
+                piece.* = .{ .named = name };
+            }
+        }
+        return pieces;
+    }
     fn fromAbi(b: Builder, value: ir.Value, ty: ir.Type) !Lanes {
         var result: Lanes = .{ .ty = ty };
         const physical = try abiType(ty);
@@ -251,7 +304,7 @@ const Builder = struct {
                 const shifted = if (i == 0) bits else try b.emit(.{ .binary = .{ .op = .lshr, .ty = word, .lhs = bits, .rhs = .{ .int = @intCast(i * width(scalar)) } } });
                 result.values[i] = try b.cast(.bitcast, raw, try b.cast(.trunc, word, shifted, raw), scalar);
             }
-        } else if ((ty.vector.elem_ty == .half and ty.vector.len == 8) or (ty.vector.elem_ty == .float and ty.vector.len == 3)) {
+        } else if ((ty.vector.elem_ty == .half and ty.vector.len == 8) or (ty.vector.elem_ty == .float and (ty.vector.len == 3 or ty.vector.len == 4))) {
             const carrier: ir.Type = .{ .vector = .{ .len = 2, .elem_ty = .double } };
             const source = if (physical.eql(carrier)) value else try b.cast(.bitcast, physical, value, carrier);
             const scalar = ty.vector.elem_ty.toType();
@@ -276,7 +329,7 @@ const Builder = struct {
         const physical = try abiType(ty);
         const scalar = ty.vector.elem_ty.toType();
         if (ty.vector.len == 1 and physical != .vector) return stable(lanes_value.values[0], scalar);
-        if (physical == .double or (ty.vector.elem_ty == .half and ty.vector.len == 8) or (ty.vector.elem_ty == .float and ty.vector.len == 3)) {
+        if (physical == .double or (ty.vector.elem_ty == .half and ty.vector.len == 8) or (ty.vector.elem_ty == .float and (ty.vector.len == 3 or ty.vector.len == 4))) {
             const word: ir.Type = .{ .int = 64 };
             const raw: ir.Type = .{ .int = width(scalar) };
             const words: usize = if (physical == .double) 1 else 2;
@@ -349,14 +402,44 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
     };
     var result = function;
     result.ret_ty = try abiType(function.ret_ty);
-    result.params = try function.params.clone(a);
-    for (result.params.items) |*p| p.ty = try abiType(p.ty);
+    var pieces = std.StringHashMap([]ir.Value).init(a);
+    defer pieces.deinit();
+    var has_parameter_pieces = false;
+    for (function.params.items) |p| if (inputPieces(p.ty) != null) {
+        if (function.is_varargs or p.abi_x87_memory or p.abi_split_integer or p.abi_incoming_address != null or !inputPieceAttrs(p.attrs)) return error.UnsupportedFloatingVector;
+        has_parameter_pieces = true;
+    };
+    if (has_parameter_pieces) {
+        result.params = .empty;
+        for (function.params.items) |p| {
+            if (inputPieces(p.ty)) |plan| {
+                const values = try a.alloc(ir.Value, plan.count);
+                for (values) |*value| {
+                    var physical = p;
+                    physical.ty = plan.ty;
+                    physical.name = try forms.temporary(a, function, &names);
+                    physical.attrs = null;
+                    value.* = .{ .named = physical.name };
+                    try result.params.append(a, physical);
+                }
+                try pieces.put(p.name, values);
+            } else {
+                var physical = p;
+                physical.ty = try abiType(p.ty);
+                try result.params.append(a, physical);
+            }
+        }
+    } else {
+        result.params = try function.params.clone(a);
+        for (result.params.items) |*p| p.ty = try abiType(p.ty);
+    }
+
     result.blocks = .empty;
     for (function.blocks.items, 0..) |original, bi| {
         var block = original;
         block.instructions = .empty;
         const b: Builder = .{ .a = a, .f = function, .block = &block, .names = &names, .vectors = &vectors };
-        if (bi == 0) for (function.params.items) |p| if (fp(p.ty)) try b.define(p.name, try b.fromAbi(.{ .named = p.name }, p.ty));
+        if (bi == 0) for (function.params.items) |p| if (fp(p.ty)) try b.define(p.name, if (pieces.get(p.name)) |values| try b.fromInputPieces(values, p.ty) else try b.fromAbi(.{ .named = p.name }, p.ty));
         for (original.instructions.items) |inst| {
             if (inst.removed) {
                 try block.instructions.append(a, inst);
@@ -543,6 +626,14 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                         }
                         var lanes: Lanes = .{ .ty = x.ret_ty };
                         for (0..x.ret_ty.vector.len) |i| {
+                            if (std.mem.eql(u8, operation.name, "minnum")) {
+                                lanes.values[i] = try b.minimumValue(scalar, inputs[0].values[i], inputs[1].values[i]);
+                                continue;
+                            }
+                            if (std.mem.eql(u8, operation.name, "maxnum")) {
+                                lanes.values[i] = try b.maximumValue(scalar, inputs[0].values[i], inputs[1].values[i]);
+                                continue;
+                            }
                             var call: ir.CallInst = .{ .callee = try std.fmt.allocPrint(a, "llvm.{s}.f{d}", .{ operation.name, width(scalar) }), .ret_ty = scalar, .args = .empty };
                             for (0..operation.arity) |j| try call.args.append(a, .{ .ty = scalar, .value = inputs[j].values[i] });
                             lanes.values[i] = try b.emit(.{ .call = call });
@@ -552,13 +643,45 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
                     }
                     var copy = inst;
                     var changed = fp(x.ret_ty);
-                    copy.kind.call.args = try x.args.clone(a);
+                    var has_argument_pieces = false;
+                    for (x.args.items) |arg| has_argument_pieces = has_argument_pieces or inputPieces(arg.ty) != null;
                     if (fp(x.ret_ty)) copy.kind.call.ret_ty = try abiType(x.ret_ty);
-                    for (copy.kind.call.args.items) |*arg| if (fp(arg.ty)) {
-                        changed = true;
-                        arg.value = try b.toAbi(arg.value, arg.ty);
-                        arg.ty = try abiType(arg.ty);
-                    };
+                    if (has_argument_pieces) {
+                        if (x.callee_value != null or x.callee_function_ty != null or x.inline_asm != null or x.raw_args != null or x.operand_bundle != null or x.tail_kind != null or x.va_arg or x.native_query != null) return error.UnsupportedFloatingVector;
+                        if (x.calling_conv) |cc| if (!std.mem.eql(u8, cc, "fastcc")) return error.UnsupportedFloatingVector;
+                        sysv.rejectUnsupportedCallEnvelope(x) catch return error.UnsupportedFloatingVector;
+                        copy.kind.call.args = .empty;
+                        for (x.args.items) |arg| {
+                            if (inputPieces(arg.ty)) |plan| {
+                                if (arg.abi_x87_memory or arg.abi_split_integer or !inputPieceAttrs(arg.attrs)) return error.UnsupportedFloatingVector;
+                                const values = try b.toInputPieces(arg.value, arg.ty);
+                                for (values) |value| {
+                                    var physical = arg;
+                                    physical.ty = plan.ty;
+                                    physical.value = value;
+                                    physical.attrs = null;
+                                    try copy.kind.call.args.append(a, physical);
+                                }
+                                changed = true;
+                            } else {
+                                var physical = arg;
+                                if (fp(arg.ty)) {
+                                    physical.value = try b.toAbi(arg.value, arg.ty);
+                                    physical.ty = try abiType(arg.ty);
+                                    changed = true;
+                                }
+                                try copy.kind.call.args.append(a, physical);
+                            }
+                        }
+                    } else {
+                        copy.kind.call.args = try x.args.clone(a);
+                        for (copy.kind.call.args.items) |*arg| if (fp(arg.ty)) {
+                            changed = true;
+                            arg.value = try b.toAbi(arg.value, arg.ty);
+                            arg.ty = try abiType(arg.ty);
+                        };
+                    }
+
                     if (changed) {
                         if (x.inline_asm != null or std.mem.startsWith(u8, x.callee, "llvm.")) return error.UnsupportedFloatingVector;
                         if (fp(x.ret_ty)) {
@@ -584,4 +707,19 @@ fn expand(a: std.mem.Allocator, function: ir.Function, layout: @import("../../..
         try result.blocks.append(a, block);
     }
     return result;
+}
+
+const FpInputPieces = struct { count: usize, lanes_per_piece: usize, ty: ir.Type };
+fn inputPieces(ty: ir.Type) ?FpInputPieces {
+    if (!fp(ty) or ty.vector.len != 4) return null;
+    return switch (ty.vector.elem_ty) {
+        .double => .{ .count = 2, .lanes_per_piece = 2, .ty = .{ .vector = .{ .len = 2, .elem_ty = .double } } },
+        .x86_fp80, .fp128 => .{ .count = 4, .lanes_per_piece = 1, .ty = ty.vector.elem_ty.toType() },
+        else => null,
+    };
+}
+fn inputPieceAttrs(attrs: ?[]const u8) bool {
+    var words = std.mem.tokenizeAny(u8, attrs orelse return true, " \t\r\n");
+    while (words.next()) |word| if (!std.mem.eql(u8, word, "noundef")) return false;
+    return true;
 }

@@ -54,11 +54,12 @@ eight readiness procedures, all 17 gates, both 177-population suites and all
 object copies, changed compiler function and runtime helper are fully reviewed.
 The original Debug input gains 19 without loss but still rejects 88 definitions.
 
-Next, adopt the isolated six-family FP-input, FP-mask, FP-extrema, integer-product,
-boolean-call and bounded-assembly batch after its combined component checks.
-Both 2,294-unit builds pass; 37 original selections are gained without loss,
+The six-family FP-input, FP-mask, FP-extrema, integer-product, boolean-call and
+bounded-assembly batch is adopted for fresh cumulative validation. Both
+2,294-unit builds and all twelve combined native runs pass, with all 324
+component faults detected; 37 original selections are gained without loss,
 leaving 51 failures. The maintained Zig generator reproduces all 64 files
-exactly. Freeze and validate the 183-population corpus, including all 4,456
+exactly. Next, freeze and validate the 183-population corpus, including all 4,456
 required faults and fresh original objects, then continue closing Debug failures.
 Build the final generations and complete both four-mode local-hook
 matrices and the normal-resource rebuild after the repairs are accepted.

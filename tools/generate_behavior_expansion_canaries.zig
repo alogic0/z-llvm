@@ -1,4 +1,4 @@
-//! Deterministically generate twenty-five behavior-frontier native populations.
+//! Deterministically generate thirty-one behavior-frontier native populations.
 //! --output-root NEW; optional --verify-root DIR checks fixtures and registry.
 const std = @import("std");
 const u = @import("validation/common.zig");
@@ -28,7 +28,13 @@ pub fn main(init: std.process.Init) !void {
     try u.add(&entries, try mixedStackArguments(&c, target));
     for (0..3) |kind| try u.add(&entries, try scalarFollowupPopulation(&c, target, kind));
     try u.add(&entries, try checkedVectorArithmetic(&c, target));
-    if (entries.array.items.len != 25) return error.ExpectedTwentyFivePopulations;
+    try u.add(&entries, try floatingInputPieces(&c, target));
+    try u.add(&entries, try nativeMasks(&c, target));
+    try u.add(&entries, try vectorExtrema(&c, target));
+    try u.add(&entries, try integerVectorProducts(&c, target));
+    try u.add(&entries, try booleanWideArguments(&c, target));
+    try u.add(&entries, try boundedInlineAssembly(&c, target));
+    if (entries.array.items.len != 31) return error.ExpectedThirtyOnePopulations;
     try c.writeJson(try c.join(&.{ target, "native_canaries.json" }), try u.toValue(c.a, .{ .schema = 1, .canaries = entries }));
     var files = std.StringHashMap(void).init(c.a);
     for (entries.array.items) |entry| {
@@ -36,7 +42,7 @@ pub fn main(init: std.process.Init) !void {
         if (entry.object.get("reference_fixture")) |reference| try files.put(try c.fmt("{s}.ll", .{reference.string}), {});
         if (entry.object.get("reference_source")) |source| try files.put(source.string, {});
     }
-    if (files.count() != 51) return error.ExpectedFiftyOneFixtureFiles;
+    if (files.count() != 64) return error.ExpectedSixtyFourFixtureFiles;
     if (args.get("verify-root")) |root| {
         var names = files.keyIterator();
         while (names.next()) |name| if (!std.mem.eql(u8, try c.digest(try c.join(&.{ target, name.* })), try c.digest(try c.join(&.{ root, name.* })))) return c.fail("generated fixture differs: {s}", .{name.*});
@@ -50,7 +56,7 @@ pub fn main(init: std.process.Init) !void {
             if (matches != 1) return error.GeneratedPopulationMissingOrDuplicated;
         }
     }
-    try c.print("behavior-expansion fixtures: 25 populations, 51 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
+    try c.print("behavior-expansion fixtures: 31 populations, 64 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
 }
 fn wideSwitch(c: *u.Context, target: []const u8) !u.Value {
     var text: std.Io.Writer.Allocating = .init(c.a);
@@ -739,5 +745,257 @@ fn checkedVectorArithmetic(c: *u.Context, target: []const u8) !u.Value {
     try c.write(try c.join(&.{ fixtures, "checked_vector_arithmetic.ll" }), text.written());
     try c.write(try c.join(&.{ fixtures, "checked_vector_arithmetic_driver.c" }), driver.written());
     const entry = try u.toValue(c.a, .{ .population = "checked_vector_arithmetic", .fixture = "checked_vector_arithmetic", .prefix = "checked-vector-arithmetic", .functions = functions, .observations = count * 64 * 7, .stdout = try c.fmt("checked-vector-arithmetic observations={d} wrapped-lanes=packed-overflow-flags=live-values=exact-stores=guard-pages=preserved\n", .{count * 64 * 7}) });
+    return entry;
+}
+
+fn fpPieceCSignature(w: *std.Io.Writer, name: []const u8, ty: []const u8, parts: usize) !void {
+    try w.print("uint64_t {s}(", .{name});
+    for (0..6) |i| try w.print("{s}uint64_t p{d}", .{ if (i == 0) "" else ",", i });
+    for (0..parts) |i| try w.print(",{s} v{d}", .{ ty, i });
+    try w.writeAll(",uint64_t last,void *out)");
+}
+fn fpPieceIrArgs(w: *std.Io.Writer, ty: []const u8) !void {
+    for (0..6) |i| try w.print("{s}i64 {s}{d}", .{ if (i == 0) "" else ",", "%p", i });
+    try w.print(",<4 x {0s}> %a,<4 x {0s}> %b,i64 %tail,ptr %out", .{ty});
+}
+
+fn floatingInputPieces(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_floatingInputPieces_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_][]const u8{ "double", "fp128", "x86_fp80" }, [_][]const u8{ "fp_pair", "__float128", "long double" }, [_]u16{ 8, 16, 10 }, 0..) |ty, c_ty, bytes, format| for ([_][]const u8{ "", "fastcc " }, 0..) |cc, mode| {
+        const id = format * 2 + mode;
+        const parts: usize = if (bytes == 8) 4 else 8;
+        const part_bytes: usize = if (bytes == 10) 10 else 16;
+        const body = try c.fmt("fp_piece_body_{d}", .{id});
+        const probe = try c.fmt("fp_piece_probe_{d}", .{id});
+        const provider = try c.fmt("fp_piece_provider_{d}", .{id});
+        const direct = try c.fmt("fp_piece_direct_{d}", .{id});
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        try text.writer.print("define {s}i64 @{s}(", .{ cc, body });
+        try fpPieceIrArgs(&text.writer, ty);
+        try text.writer.print(") noinline {{\nentry:\n store <4 x {0s}> %a,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 {1d}\n store <4 x {0s}> %b,ptr %next,align 1\n", .{ ty, 4 * bytes });
+        for (0..6) |i| try text.writer.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n", .{ i, if (i == 0) "%tail" else try c.fmt("%r{d}", .{i - 1}) });
+        try text.writer.print(" %checksum = getelementptr i8,ptr %out,i64 {d}\n store i64 %r5,ptr %checksum,align 1\n ret i64 %r5\n}}\ndeclare i64 @{s}(i64,i64,i64,i64,i64,i64,<4 x {s}>,<4 x {s}>,i64,ptr)\n", .{ 8 * bytes, provider, ty, ty });
+        try text.writer.print("define i64 @{s}(ptr %out,ptr %a_ptr,ptr %b_ptr,i64 %salt) {{\nentry:\n %a = load <4 x {s}>,ptr %a_ptr,align 1\n %b = load <4 x {s}>,ptr %b_ptr,align 1\n", .{ probe, ty, ty });
+        for (0..6) |i| try text.writer.print(" %p{d} = xor i64 %salt,{d}\n", .{ i, @as(u64, i + 1) *% 0x123456789abcdef1 });
+        try text.writer.print(" %tail = xor i64 %salt,{d}\n %local = call {s}i64 @{s}(", .{ @as(u64, 0x8123456789abcdef), cc, body });
+        try fpPieceIrArgs(&text.writer, ty);
+        try text.writer.print(")\n %other = getelementptr i8,ptr %out,i64 {d}\n %external = call i64 @{s}(", .{ 8 * bytes + 8, provider });
+        for (0..6) |i| try text.writer.print("{s}i64 %p{d}", .{ if (i == 0) "" else ",", i });
+        try text.writer.print(",<4 x {0s}> %a,<4 x {0s}> %b,i64 %tail,ptr %other)\n %mixed = xor i64 %local,%external\n %r = xor i64 %mixed,%salt\n ret i64 %r\n}}\n", .{ty});
+        try driver.writer.writeAll("extern ");
+        try fpPieceCSignature(&driver.writer, body, c_ty, parts);
+        try driver.writer.writeAll(";\n");
+        try driver.writer.print("extern uint64_t {s}(void *,const void *,const void *,uint64_t);\n", .{probe});
+        try fpPieceCSignature(&driver.writer, provider, c_ty, parts);
+        try driver.writer.writeAll("{uint64_t args[]={p0,p1,p2,p3,p4,p5};unsigned char *bytes=out;");
+        for (0..parts) |i| try driver.writer.print("memcpy(bytes+{d},&v{d},{d});", .{ i * part_bytes, i, part_bytes });
+        try driver.writer.print("uint64_t value=checksum(args,last);memcpy(bytes+{d},&value,8);return value;}}\n", .{8 * bytes});
+        try driver.writer.print("static uint64_t {s}(void *out,const void *a,const void *b,uint64_t salt){{{s} values[{d}];memset(values,0,sizeof values);", .{ direct, c_ty, parts });
+        for (0..parts) |i| try driver.writer.print("memcpy(&values[{d}],(const unsigned char *){s}+{d},{d});", .{ i, if (i < parts / 2) "a" else "b", (i % (parts / 2)) * part_bytes, part_bytes });
+        try driver.writer.print("return {s}(", .{body});
+        for (0..6) |i| try driver.writer.print("{s}prefix({d},salt)", .{ if (i == 0) "" else ",", i });
+        for (0..parts) |i| try driver.writer.print(",values[{d}]", .{i});
+        try driver.writer.writeAll(",tail(salt),out);}\n");
+        try table.writer.print("{{{s},{s},{d}}},\n", .{ probe, direct, bytes });
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "fp_input_pieces.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "fp_input_pieces_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "fp_input_pieces", .fixture = "fp_input_pieces", .prefix = "fp-input-pieces", .functions = functions, .observations = 5376, .stdout = "fp-input-pieces observations=5376 physical-c-llvm-local-interop=double-quad-x87=live-gp-prefixes=stack-slots=exact-payloads=guard-pages=preserved\n" });
+    return entry;
+}
+
+const fpMasksExtremaLayout = "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n";
+fn nativeMasks(c: *u.Context, fixtures: []const u8) !u.Value {
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    try text.writer.writeAll(fpMasksExtremaLayout);
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_nativeMasks_core.c"})));
+    try driver.writer.writeAll("typedef float mask_f32x4 __attribute__((vector_size(16)));\ntypedef double mask_f64x2 __attribute__((vector_size(16)));\n");
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    var functions = u.array(c.a);
+    const predicates = [_][]const u8{ "false", "oeq", "ogt", "oge", "olt", "ole", "one", "ord", "ueq", "ugt", "uge", "ult", "ule", "une", "uno", "true" };
+    for ([_][]const u8{ "float", "double" }, [_]usize{ 32, 64 }, [_]usize{ 4, 2 }, [_][]const u8{ "mask_f32x4", "mask_f64x2" }) |ty, bits, count, c_ty| for (predicates, 0..) |predicate, p| for ([_][]const u8{ "", "fastcc " }, 0..) |cc, mode| {
+        const name = try c.fmt("native_fp_mask_{d}_{d}_{d}", .{ bits, p, mode });
+        const wrapper = try c.fmt("{s}_call", .{name});
+        try u.add(&functions, u.s(name));
+        try text.writer.print("define {0s}<{1d} x {2s}> @{3s}(<{1d} x {2s}> %a,<{1d} x {2s}> %b) noinline {{\nentry:\n %home = alloca <{1d} x {2s}>,align 16\n store <{1d} x {2s}> %a,ptr %home,align 16\n %copy = load <{1d} x {2s}>,ptr %home,align 16\n %condition = fcmp {4s} <{1d} x {2s}> %copy,%b\n %result = select <{1d} x i1> %condition,<{1d} x {2s}> %copy,<{1d} x {2s}> %b\n ret <{1d} x {2s}> %result\n}}\n", .{ cc, count, ty, name, predicate });
+        try driver.writer.print("extern {0s} {1s}({0s},{0s});\nstatic uint64_t {2s}(void *out,const void *a,const void *b,uint64_t salt){{{0s} left,right,result;memcpy(&left,a,16);memcpy(&right,b,16);result={1s}(left,right);memcpy(out,&result,16);return salt^90;}}\n", .{ c_ty, name, wrapper });
+        try table.writer.print("{{{s},{d},{d}}},\n", .{ wrapper, bits, p });
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "native_fp_masks.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "native_fp_masks_driver.c" }), driver.written());
+    return u.toValue(c.a, .{ .population = "native_fp_masks", .fixture = "native_fp_masks", .prefix = "native-fp-masks", .functions = functions, .observations = 32768, .stdout = "native-fp-masks observations=32768 all-sixteen-predicates=physical-xmm-returns=raw-payloads=stack-storage=guard-pages=preserved\n" });
+}
+fn vectorExtrema(c: *u.Context, fixtures: []const u8) !u.Value {
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var reference: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    try text.writer.writeAll(fpMasksExtremaLayout);
+    try reference.writer.writeAll(fpMasksExtremaLayout);
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_vectorExtrema_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    var functions = u.array(c.a);
+    for ([_][]const u8{ "half", "float", "double", "x86_fp80", "fp128" }, [_]usize{ 16, 32, 64, 80, 128 }) |ty, bits| for ([_]usize{ 2, 3, 4 }) |count| for ([_][]const u8{ "minnum", "maxnum" }, 0..) |operation, maximum| {
+        const decl = try c.fmt("declare <{0d} x {1s}> @llvm.{2s}.v{0d}f{3d}(<{0d} x {1s}>,<{0d} x {1s}>)\n", .{ count, ty, operation, bits });
+        try text.writer.writeAll(decl);
+        try reference.writer.writeAll(decl);
+        for ([_][]const u8{ "", "fastcc " }, 0..) |cc, mode| {
+            const body = try c.fmt("vector_fp_extrema_{d}_{d}_{d}_{d}", .{ bits, count, maximum, mode });
+            try u.add(&functions, u.s(body));
+            const head = try c.fmt("define {0s}i64 @{1s}(ptr %out,ptr %a_ptr,ptr %b_ptr,i64 %salt) noinline {{\nentry:\n %a = load <{2d} x {3s}>,ptr %a_ptr,align 1\n %b = load <{2d} x {3s}>,ptr %b_ptr,align 1\n %result = call <{2d} x {3s}> @llvm.{4s}.v{2d}f{5d}(<{2d} x {3s}> %a,<{2d} x {3s}> %b)\n", .{ cc, body, count, ty, operation, bits });
+            try text.writer.writeAll(head);
+            try reference.writer.writeAll(head);
+            try text.writer.print(" store <{d} x {s}> %result,ptr %out,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ count, ty });
+            try reference.writer.print(" %az = fcmp oeq <{0d} x {1s}> %a,zeroinitializer\n %bz = fcmp oeq <{0d} x {1s}> %b,zeroinitializer\n %tie = and <{0d} x i1> %az,%bz\n %ia = bitcast <{0d} x {1s}> %a to <{0d} x i{2d}>\n %ib = bitcast <{0d} x {1s}> %b to <{0d} x i{2d}>\n %joined = {3s} <{0d} x i{2d}> %ia,%ib\n %safe = select <{0d} x i1> %tie,<{0d} x i{2d}> %joined,<{0d} x i{2d}> zeroinitializer\n %zero = bitcast <{0d} x i{2d}> %safe to <{0d} x {1s}>\n %canonical = select <{0d} x i1> %tie,<{0d} x {1s}> %zero,<{0d} x {1s}> %result\n store <{0d} x {1s}> %canonical,ptr %out,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ count, ty, bits, if (maximum == 0) "or" else "and" });
+            try driver.writer.print("extern uint64_t {s}(void *,const void *,const void *,uint64_t);\n", .{body});
+            try table.writer.print("{{{s},{d},{d},{d}}},\n", .{ body, bits, count, maximum });
+        }
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "vector_fp_extrema.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "vector_fp_extrema_zero_reference.ll" }), reference.written());
+    try c.write(try c.join(&.{ fixtures, "vector_fp_extrema_driver.c" }), driver.written());
+    return u.toValue(c.a, .{ .population = "vector_fp_extrema", .fixture = "vector_fp_extrema", .prefix = "vector-fp-extrema", .reference_fixture = "vector_fp_extrema_zero_reference", .reference_source = "vector_fp_extrema_driver.c", .functions = functions, .libraries = .{"m"}, .observations = 30720, .stdout = "vector-fp-extrema observations=30720 five-formats=independent-c-model=canonical-zero-ties=quiet-nan-classification=exact-stores=guard-pages=preserved\n" });
+}
+
+fn integerVectorProducts(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_vectorProducts_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]usize{ 8, 16, 24, 32, 48, 64, 128 }) |bits| for ([_]usize{ 1, 2, 3, 4, 8, 16, 64 }) |count| {
+        try text.writer.print("declare i{0d} @llvm.vector.reduce.mul.v{1d}i{0d}(<{1d} x i{0d}>)\n", .{ bits, count });
+        for ([_][]const u8{ "", "fastcc " }, 0..) |cc, mode| {
+            const name = try c.fmt("integer_vector_product_{d}_{d}_{d}", .{ bits, count, mode });
+            try u.add(&functions, u.s(name));
+            try text.writer.print("define {0s}i64 @{1s}(ptr %out,ptr %input,i64 %salt) noinline {{\nentry:\n %v = load <{2d} x i{3d}>,ptr %input,align 1\n %r = call i{3d} @llvm.vector.reduce.mul.v{2d}i{3d}(<{2d} x i{3d}> %v)\n store i{3d} %r,ptr %out,align 1\n %live = xor i64 %salt,90\n ret i64 %live\n}}\n", .{ cc, name, count, bits });
+            try driver.writer.print("extern uint64_t {s}(void *,const void *,uint64_t);\n", .{name});
+            try table.writer.print("{{{s},{d},{d}}},\n", .{ name, bits, count });
+        }
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "integer_vector_products.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "integer_vector_products_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "integer_vector_products", .fixture = "integer_vector_products", .prefix = "integer-vector-products", .functions = functions, .observations = 31360, .stdout = "integer-vector-products observations=31360 seven-widths=modular-c-model=one-to-sixty-four-lanes=exact-stores=guard-pages=preserved\n" });
+    return entry;
+}
+
+fn booleanWideArguments(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_booleanWideArguments_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_]usize{ 65, 96, 127, 128 }) |bits| for ([_]usize{ 0, 1 }) |dirty| {
+        if (dirty == 1 and bits != 128) continue;
+        for ([_][]const u8{ "", "fastcc " }, 0..) |cc, mode| {
+            const name = try c.fmt("boolean_wide_{d}_{d}_{d}", .{ bits, dirty, mode });
+            const provider = try c.fmt("{s}_provider", .{name});
+            try u.add(&functions, u.s(name));
+            try text.writer.print("declare {0s}i1 @{1s}(i{2d},i64)\ndefine {0s}i64 @{3s}(ptr %out,ptr %input,i64 %salt) noinline {{\nentry:\n %v = load i{2d},ptr %input,align 1\n %r = call {0s}i1 @{1s}(i{2d} %v,i64 %salt)\n store i1 %r,ptr %out,align 1\n %saved = getelementptr i8,ptr %out,i64 8\n store i64 %salt,ptr %saved,align 1\n %z = zext i1 %r to i64\n %answer = xor i64 %z,%salt\n ret i64 %answer\n}}\n", .{ cc, provider, bits, name });
+            try driver.writer.print("extern uint64_t {s}(void *,const void *,uint64_t);\n", .{name});
+            if (dirty == 0) try driver.writer.print("_Bool {s}(uint64_t lo,uint64_t hi,uint64_t salt){{return model(lo,hi,salt,{d},0);}}\n", .{ provider, bits }) else try driver.writer.print("__asm__(\".text\\n.globl {0s}\\n.type {0s},@function\\n{0s}:\\nmovabs $0xa5a5a5a5a5a5a500,%rax\\nmovb %dil,%al\\nxorb %sil,%al\\nxorb %dl,%al\\nandb $1,%al\\nret\\n.size {0s},.-{0s}\\n\");\n", .{provider});
+            try table.writer.print("{{{s},{d},{d}}},\n", .{ name, bits, dirty });
+        }
+    };
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "boolean_wide_arguments.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "boolean_wide_arguments_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "boolean_wide_arguments", .fixture = "boolean_wide_arguments", .prefix = "boolean-wide-arguments", .functions = functions, .observations = 10240, .stdout = "boolean-wide-arguments observations=10240 multiword-c-abi=defined-al-only=live-pointers=live-salt=exact-stores=guard-pages=preserved\n" });
+    return entry;
+}
+
+fn boundedAsmCase(c: *u.Context, text: *std.Io.Writer, driver: *std.Io.Writer, table: *std.Io.Writer, functions: *u.Value, id: usize, cc: []const u8, kind: usize, position: usize, literal_operand: bool, bits: usize, literal: i128, form: usize) !void {
+    const body = try c.fmt("bounded_asm_body_{d}", .{id});
+    const probe = try c.fmt("bounded_asm_probe_{d}", .{id});
+    try u.add(functions, u.s(body));
+    try u.add(functions, u.s(probe));
+    try text.print("define {s}i64 @{s}(", .{ cc, body });
+    for (0..6) |i| try text.print("{s}i64 %p{d}", .{ if (i == 0) "" else ",", i });
+    try text.writeAll(",ptr %out) noinline {\nentry:\n");
+    if (kind == 0) {
+        try text.print(" %value = call i{d} asm sideeffect \"mov $${d}, ${{0}}\", \"=r,~{{dirflag}},~{{fpsr}},~{{flags}}\"()\n", .{ bits, literal });
+        if (bits == 32) try text.writeAll(" %result = zext i32 %value to i64\n") else try text.writeAll(" %result = add i64 %value,0\n");
+    } else if (kind == 1) {
+        try text.print(" %x = trunc i64 %p{d} to i32\n", .{position});
+        if (!literal_operand) try text.print(" %y = trunc i64 %p{d} to i32\n", .{(position + 1) % 6});
+        try text.print(" %value = call i32 asm \"addl ${{1}}, ${{0}}\", \"=r,r,0,~{{flags}},~{{dirflag}},~{{fpsr}},~{{flags}}\"(i32 {s},i32 %x)\n %result = zext i32 %value to i64\n", .{if (literal_operand) "13" else "%y"});
+    } else if (kind == 3) {
+        try text.writeAll(" call void asm sideeffect \"\", \"m,~{dirflag},~{fpsr},~{flags}\"(ptr @bounded_asm_global)\n %result = load i64,ptr @bounded_asm_global,align 1\n");
+    } else {
+        try text.print(" store i64 %p{d},ptr %out,align 1\n", .{position});
+        const constraints = [_][]const u8{ "m", "=*m|r", "=*r|m", "=*r|m,r|m" };
+        if (form == 3) try text.writeAll(" %extra = trunc i64 %p1 to i32\n");
+        try text.print(" call void asm sideeffect \"\", \"{s},~{{dirflag}},~{{fpsr}},~{{flags}}\"(ptr {s}%out{s})\n", .{ constraints[form], if (form == 0) "" else "elementtype(i64) ", if (form == 3) ",i32 %extra" else "" });
+        // Indirect register outputs are unconstrained. Observe a subsequent defined
+        // store, retaining their pointer escape and ordering without choosing bits.
+        try text.print(" store i64 %p{d},ptr %out,align 1\n %result = load i64,ptr %out,align 1\n", .{position});
+    }
+    for (0..6) |i| try text.print(" %m{0d} = mul i64 {1s},1099511628211\n %r{0d} = xor i64 %m{0d},%p{0d}\n", .{ i, if (i == 0) "%result" else try c.fmt("%r{d}", .{i - 1}) });
+    try text.writeAll(" ret i64 %r5\n}\n");
+    try text.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n", .{probe});
+    for (0..6) |i| try text.print(" %a{0d} = getelementptr i8,ptr %input,i64 {1d}\n %v{0d} = load i64,ptr %a{0d},align 1\n", .{ i, i * 8 });
+    try text.print(" %answer = call {s}i64 @{s}(", .{ cc, body });
+    for (0..6) |i| try text.print("{s}i64 %v{d}", .{ if (i == 0) "" else ",", i });
+    try text.writeAll(",ptr %out)\n store i64 %answer,ptr %out,align 1\n %o1 = getelementptr i8,ptr %out,i64 8\n store i64 %salt,ptr %o1,align 1\n %o2 = getelementptr i8,ptr %out,i64 16\n store i64 %v0,ptr %o2,align 1\n %r = xor i64 %answer,%salt\n ret i64 %r\n}\n");
+    try driver.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+    const raw: u64 = if (bits == 32) @as(u32, @truncate(@as(u128, @bitCast(literal)))) else @truncate(@as(u128, @bitCast(literal)));
+    try table.print("{{{s},{d},{d},{d},{d},UINT64_C({d})}},\n", .{ probe, kind, position, @intFromBool(literal_operand), bits, raw });
+}
+
+fn boundedInlineAssembly(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var id: usize = 0;
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n@bounded_asm_global = internal global i64 1311768467463790321,align 8\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_boundedInlineAssembly_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    for ([_][]const u8{ "", "fastcc " }) |cc| {
+        for ([_]usize{ 32, 64 }) |bits| for ([_]i128{ 0, 1, -1, 123, -(@as(i128, 1) << @as(u7, @intCast(bits - 1))), (@as(i128, 1) << @as(u7, @intCast(bits))) - 1 }) |value| {
+            try boundedAsmCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, cc, 0, 0, false, bits, value, 0);
+            id += 1;
+        };
+        for (0..6) |position| for ([_]bool{ false, true }) |literal_operand| {
+            try boundedAsmCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, cc, 1, position, literal_operand, 32, 0, 0);
+            id += 1;
+        };
+        for (0..5) |form| {
+            try boundedAsmCase(c, &text.writer, &driver.writer, &table.writer, &functions, id, cc, if (form == 4) 3 else 2, 0, false, 64, if (form == 4) 0x123456789abcdef1 else 0, form);
+            id += 1;
+        }
+    }
+    if (id != 58) return error.ExpectedCases;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "bounded_inline_assembly.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "bounded_inline_assembly_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "bounded_inline_assembly", .fixture = "bounded_inline_assembly", .prefix = "bounded-inline-assembly", .functions = functions, .observations = 25984, .stdout = "bounded-inline-assembly observations=25984 exact-asm-effects=live-aliases=opaque-memory-ordering=stack-calls=guard-pages=preserved\n" });
     return entry;
 }
