@@ -366,6 +366,7 @@ fn expand(allocator: std.mem.Allocator, function: ir.Function, context: ?*const 
         var parts = std.mem.splitScalar(u8, layout, '-');
         while (parts.next()) |part| if (part.len != 0 and part[0] == 'v') return null;
     };
+    if (try expandCheckedVectors(allocator, function)) |checked| return checked;
     if (function.ret_ty == .vector and abiType(function.ret_ty) == null) return null;
     var has_fragment_parameters = false;
     for (function.params.items) |param| if (param.ty == .vector and abiType(param.ty) == null) {
@@ -830,4 +831,95 @@ fn fragmentAttrs(attrs: ?[]const u8) bool {
     var words = std.mem.tokenizeAny(u8, text, " \t\r\n");
     while (words.next()) |word| if (!std.mem.eql(u8, word, "noundef")) return false;
     return true;
+}
+
+const CheckedVector = struct { ty: ir.Type, op: ir.BinaryOp, signed: bool };
+const CheckedNames = struct { aggregate: ir.Type, operation: CheckedVector, wrapped: []const u8, overflow: []const u8 };
+fn checkedVector(call: ir.CallInst) ?CheckedVector {
+    if (call.ret_ty != .aggregate or call.args.items.len != 2 or call.callee_value != null or call.callee_function_ty != null or
+        call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.calling_conv != null or call.ret_attrs != null) return null;
+    const ty = call.args.items[0].ty;
+    const s = shape(ty) orelse return null;
+    if (s.pointer or (s.bits != 8 and s.bits != 16 and s.bits != 32)) return null;
+    for (call.args.items) |arg| if (!arg.ty.eql(ty) or arg.attrs != null) return null;
+    abi.rejectUnsupportedCallEnvelope(call) catch return null;
+    var buffer: [96]u8 = undefined;
+    const pair = std.fmt.bufPrint(&buffer, "{{<{d}xi{d}>,<{d}xi1>}}", .{ s.len, s.bits, s.len }) catch return null;
+    if (!@import("word_pair_memory.zig").spelling(call.ret_ty.aggregate, pair)) return null;
+    for ([_][]const u8{ "uadd", "usub", "umul", "sadd", "ssub", "smul" }, [_]ir.BinaryOp{ .add, .sub, .mul, .add, .sub, .mul }) |name, op| {
+        const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.with.overflow.v{d}i{d}", .{ name, s.len, s.bits }) catch return null;
+        if (std.mem.eql(u8, call.callee, spelling)) return .{ .ty = ty, .op = op, .signed = name[0] == 's' };
+    }
+    return null;
+}
+fn expandCheckedVectors(a: std.mem.Allocator, function: ir.Function) !?ir.Function {
+    var entries = std.StringHashMap(CheckedNames).init(a);
+    defer entries.deinit();
+    var names: forms.TemporaryNames = .{};
+    defer names.deinit(a);
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.result == null or inst.kind != .call) continue;
+        const op = checkedVector(inst.kind.call) orelse continue;
+        try entries.put(inst.result.?, .{ .aggregate = inst.kind.call.ret_ty, .operation = op, .wrapped = try forms.temporary(a, function, &names), .overflow = try forms.temporary(a, function, &names) });
+    };
+    if (entries.count() == 0) return null;
+    const uses = @import("stage2_planning.zig");
+    var iterator = entries.iterator();
+    while (iterator.next()) |entry| for (function.blocks.items) |block| {
+        for (block.instructions.items) |inst| {
+            if (inst.removed or !try uses.instructionUsesName(a, inst, entry.key_ptr.*)) continue;
+            if (inst.kind != .extractvalue or inst.result == null) return null;
+            const x = inst.kind.extractvalue;
+            if (x.aggregate != .named or !ir.identifiers.eql(x.aggregate.named, entry.key_ptr.*) or !x.aggregate_ty.eql(entry.value_ptr.aggregate)) return null;
+            const field_ty: ir.Type = if (std.mem.eql(u8, x.indices, "0")) entry.value_ptr.operation.ty else if (std.mem.eql(u8, x.indices, "1")) .{ .vector = .{ .len = entry.value_ptr.operation.ty.vector.len, .elem_ty = .{ .int = 1 } } } else return null;
+            if (!x.result_ty.eql(field_ty)) return null;
+        }
+        if (block.terminator) |term| if (try uses.terminatorUsesName(a, term, entry.key_ptr.*)) return null;
+    };
+    var result = function;
+    result.blocks = .empty;
+    var unused_vectors = std.StringHashMap(Lanes).init(a);
+    defer unused_vectors.deinit();
+    for (function.blocks.items) |original| {
+        var block = original;
+        block.instructions = .empty;
+        const b: Builder = .{ .allocator = a, .function = function, .block = &block, .serial = &names, .vectors = &unused_vectors };
+        for (original.instructions.items) |inst| {
+            if (!inst.removed and inst.kind == .call and inst.result != null) if (entries.get(inst.result.?)) |entry| {
+                const op = entry.operation;
+                const left = inst.kind.call.args.items[0].value;
+                const right = inst.kind.call.args.items[1].value;
+                if (op.op == .mul) {
+                    // Exact doubled-width products fit the existing <=64-bit
+                    // scalar lane owner. A round trip detects every overflow.
+                    const wide: ir.Type = .{ .vector = .{ .len = op.ty.vector.len, .elem_ty = .{ .int = op.ty.vector.elem_ty.int * 2 } } };
+                    const l = try b.emit(.{ .cast = .{ .op = if (op.signed) .sext else .zext, .from_ty = op.ty, .value = left, .to_ty = wide } });
+                    const r = try b.emit(.{ .cast = .{ .op = if (op.signed) .sext else .zext, .from_ty = op.ty, .value = right, .to_ty = wide } });
+                    const full = try b.emit(.{ .binary = .{ .op = .mul, .ty = wide, .lhs = l, .rhs = r } });
+                    try block.instructions.append(a, .{ .result = entry.wrapped, .metadata = inst.metadata, .kind = .{ .cast = .{ .op = .trunc, .from_ty = wide, .value = full, .to_ty = op.ty } } });
+                    const round_trip = try b.emit(.{ .cast = .{ .op = if (op.signed) .sext else .zext, .from_ty = op.ty, .value = .{ .named = entry.wrapped }, .to_ty = wide } });
+                    try block.instructions.append(a, .{ .result = entry.overflow, .kind = .{ .icmp = .{ .predicate = .ne, .operand_ty = wide, .lhs = full, .rhs = round_trip } } });
+                } else {
+                    try block.instructions.append(a, .{ .result = entry.wrapped, .metadata = inst.metadata, .kind = .{ .binary = .{ .op = op.op, .ty = op.ty, .lhs = left, .rhs = right } } });
+                    var comparison: ir.IcmpInst = .{ .predicate = .ult, .operand_ty = op.ty, .lhs = if (op.op == .add) .{ .named = entry.wrapped } else left, .rhs = if (op.op == .add) left else right };
+                    if (op.signed) {
+                        const x = try b.emit(.{ .binary = .{ .op = .xor, .ty = op.ty, .lhs = left, .rhs = if (op.op == .add) .{ .named = entry.wrapped } else right } });
+                        const y = try b.emit(.{ .binary = .{ .op = .xor, .ty = op.ty, .lhs = if (op.op == .add) right else left, .rhs = .{ .named = entry.wrapped } } });
+                        const signs = try b.emit(.{ .binary = .{ .op = .@"and", .ty = op.ty, .lhs = x, .rhs = y } });
+                        comparison = .{ .predicate = .slt, .operand_ty = op.ty, .lhs = signs, .rhs = .zero_initializer };
+                    }
+                    try block.instructions.append(a, .{ .result = entry.overflow, .kind = .{ .icmp = comparison } });
+                }
+                continue;
+            };
+            if (!inst.removed and inst.kind == .extractvalue and inst.kind.extractvalue.aggregate == .named) if (entries.get(inst.kind.extractvalue.aggregate.named)) |entry| {
+                const x = inst.kind.extractvalue;
+                try block.instructions.append(a, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .binary = .{ .op = .@"or", .ty = x.result_ty, .lhs = .{ .named = if (std.mem.eql(u8, x.indices, "0")) entry.wrapped else entry.overflow }, .rhs = .zero_initializer } } });
+                continue;
+            };
+            try block.instructions.append(a, inst);
+        }
+        try result.blocks.append(a, block);
+    }
+    return result;
 }

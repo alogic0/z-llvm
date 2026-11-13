@@ -10,9 +10,10 @@ pass cumulative validation at `d9148ebc`; eight additional families pass at
 `c1c0ecee`. The six-population argument and arithmetic checkpoint passes at
 `c3b77e61`: both 2,281-unit builds, all 17 integration gates, both complete
 173-population native suites and all 3,916 required fault controls pass.
-The original Debug input still rejects 107 definitions. The next isolated
-four-family repair passes both 2,286-unit builds and gains 19 selections without
-loss, leaving 88 rejections; canonical adoption and cumulative validation follow.
+The accepted original Debug replay still rejects 107 definitions. The next
+four-family repair is adopted for fresh cumulative validation: both isolated
+2,286-unit builds pass and 19 selections are gained without loss, leaving 88
+rejections in the isolated replay.
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -477,7 +478,8 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    runtime pair; strict failures remain explicit. See the
    [argument checkpoint](../evidence/compiler_behavior_arguments_checkpoint_20261112.json).
    Neither isolated component proofs nor formatting authorize object reuse.
-8. Adopt the independently exercised four-family repair: normalize native i32
+8. **Adopted for fresh cumulative validation.** Integrate the independently
+   exercised four-family repair: normalize native i32
    bit reversal through the existing i64 terminal owner; materialize literal
    branch conditions without changing CFG edges or PHI predecessors; preserve
    integer-to-floating literal bitcasts exactly; and lower bounded checked

@@ -724,3 +724,116 @@ test "fragment vector inputs retain unproved returns layouts and ABI facts close
     };
     try std.testing.expect(outcome == .unsupported);
 }
+fn checkedVectorExecutable(module: ir.Module) ![]align(std.heap.page_size_min) u8 {
+    const a = std.testing.allocator;
+    const machine = @import("../machine.zig");
+    const selector = @import("../generic_cfg_selector.zig");
+    const encoding = @import("../../../mc/encoding.zig");
+    const f = module.functions.items[0];
+    var output = machine.MachineFunction.init(f.name, f.ret_ty);
+    defer output.deinit(a);
+    const result = try selector.tryLower(a, &output, f);
+    if (result == .unsupported) std.debug.print("checked vector: {s}\n", .{result.unsupported.detail()});
+    try std.testing.expect(result == .selected);
+    try @import("../verify.zig").verifyFunction(output);
+    const code = try encoding.encodeFunction(a, output);
+    defer a.free(code);
+    const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    @memcpy(memory[0..code.len], code);
+    return memory;
+}
+test "checked vector arithmetic preserves wrapped lanes packed flags and live values" {
+    const shapes = [_][2]u16{ .{ 2, 32 }, .{ 3, 32 }, .{ 4, 8 }, .{ 2, 8 }, .{ 4, 16 }, .{ 8, 8 }, .{ 4, 32 }, .{ 8, 32 }, .{ 1, 8 }, .{ 64, 32 } };
+    for (shapes) |s| for ([_][]const u8{ "uadd", "usub", "umul", "sadd", "ssub", "smul" }, 0..) |op, kind| for ([_]bool{ false, true }) |zero| {
+        const n = s[0];
+        const bits = s[1];
+        const bytes = bits / 8;
+        const a = std.testing.allocator;
+        const text = try std.fmt.allocPrint(a, "declare {{<{0d} x i{1d}>,<{0d} x i1>}} @llvm.{2s}.with.overflow.v{0d}i{1d}(<{0d} x i{1d}>,<{0d} x i{1d}>)\ndeclare i1 @llvm.vector.reduce.or.v{0d}i1(<{0d} x i1>)\ndefine i64 @checked(ptr %a,ptr %b,ptr %out,i64 %live) {{\nentry:\n %x = load <{0d} x i{1d}>,ptr %a,align 1\n %y = load <{0d} x i{1d}>,ptr %b,align 1\n %pair = call {{<{0d} x i{1d}>,<{0d} x i1>}} @llvm.{2s}.with.overflow.v{0d}i{1d}(<{0d} x i{1d}> {3s},<{0d} x i{1d}> %y)\n %v = extractvalue {{<{0d} x i{1d}>,<{0d} x i1>}} %pair,0\n %flags = extractvalue {{<{0d} x i{1d}>,<{0d} x i1>}} %pair,1\n store <{0d} x i{1d}> %v,ptr %out,align 1\n %fptr = getelementptr i8,ptr %out,i64 {4d}\n store <{0d} x i1> %flags,ptr %fptr,align 1\n %any = call i1 @llvm.vector.reduce.or.v{0d}i1(<{0d} x i1> %flags)\n %wide = zext i1 %any to i64\n %r = xor i64 %wide,%live\n ret i64 %r\n}}\n", .{ n, bits, op, if (zero) "zeroinitializer" else "%x", n * bytes });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const private = (try forms.legalize(arena.allocator(), original, null)).?;
+        var view = module;
+        view.functions = try module.functions.clone(arena.allocator());
+        view.functions.items[0] = private;
+        try view.verify();
+        const code = try checkedVectorExecutable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (*const u8, *const u8, *u8, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        const mask = (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+        const sign = @as(u64, 1) << @as(u6, @intCast(bits - 1));
+        const signed = kind >= 3;
+        const minimum: i128 = if (signed) -@as(i128, sign) else 0;
+        const maximum: i128 = if (signed) sign - 1 else mask;
+        for (0..32) |seed| {
+            var left: [256]u8 = @splat(0);
+            var right: [256]u8 = @splat(0);
+            var output: [288]u8 = @splat(0xa5);
+            var expected: [272]u8 = @splat(0);
+            var any = false;
+            for (0..n) |i| {
+                const edges = [_]u64{ 0, 1, sign - 1, sign, mask - 1, mask, mask / 3, mask / 5 };
+                const x = if (seed < 8) edges[(seed + i) % 8] else ((@as(u64, seed) *% 0x9182736455aaccdd) ^ (@as(u64, i) *% 0x123456789abcdef1)) & mask;
+                const y = if (seed < 8) edges[(seed + 3 + i * 3) % 8] else ~x & mask;
+                for (0..bytes) |byte| {
+                    left[i * bytes + byte] = @truncate(x >> @as(u6, @intCast(byte * 8)));
+                    right[i * bytes + byte] = @truncate(y >> @as(u6, @intCast(byte * 8)));
+                }
+                const l: i128 = if (zero) 0 else if (signed and x & sign != 0) @as(i128, x) - (@as(i128, 1) << @as(u7, @intCast(bits))) else x;
+                const r: i128 = if (signed and y & sign != 0) @as(i128, y) - (@as(i128, 1) << @as(u7, @intCast(bits))) else y;
+                const full = switch (kind % 3) {
+                    0 => l + r,
+                    1 => l - r,
+                    2 => l * r,
+                    else => unreachable,
+                };
+                const raw: u64 = @truncate(@as(u128, @bitCast(full)) & mask);
+                const overflow = full < minimum or full > maximum;
+                any = any or overflow;
+                for (0..bytes) |byte| expected[i * bytes + byte] = @truncate(raw >> @as(u6, @intCast(byte * 8)));
+                if (overflow) expected[n * bytes + i / 8] |= @as(u8, 1) << @as(u3, @intCast(i % 8));
+            }
+            const live = @as(u64, seed) *% 0xfedcba9876543211;
+            try std.testing.expectEqual(live ^ @intFromBool(any), run(&left[0], &right[0], &output[7], live));
+            const extent = n * bytes + (n + 7) / 8;
+            for (output, 0..) |byte, index| {
+                if (index >= 7 and index < 7 + extent) {
+                    const byte_mask: u8 = if (index == 7 + extent - 1 and n % 8 != 0) (@as(u8, 1) << @as(u3, @intCast(n % 8))) - 1 else 255;
+                    try std.testing.expectEqual(expected[index - 7] & byte_mask, byte & byte_mask);
+                } else try std.testing.expectEqual(@as(u8, 0xa5), byte);
+            }
+        }
+        try module.verify();
+        try std.testing.expect(original.blocks.items[0].instructions.items[2].kind.call.ret_ty == .aggregate);
+    };
+}
+test "checked vector expansion rejects escaping aggregates and unproved envelopes" {
+    const a = std.testing.allocator;
+    for (0..6) |variant| {
+        const input = if (variant == 0)
+            "declare {<4 x i8>,<4 x i1>} @llvm.uadd.with.overflow.v4i8(<4 x i8>,<4 x i8>)\ndefine {<4 x i8>,<4 x i1>} @closed(ptr %p) {\nentry:\n %x = load <4 x i8>,ptr %p,align 1\n %pair = call {<4 x i8>,<4 x i1>} @llvm.uadd.with.overflow.v4i8(<4 x i8> %x,<4 x i8> %x)\n ret {<4 x i8>,<4 x i1>} %pair\n}\n"
+        else
+            "declare {<4 x i8>,<4 x i1>} @llvm.uadd.with.overflow.v4i8(<4 x i8>,<4 x i8>)\ndefine void @closed(ptr %p) {\nentry:\n %x = load <4 x i8>,ptr %p,align 1\n %pair = call {<4 x i8>,<4 x i1>} @llvm.uadd.with.overflow.v4i8(<4 x i8> %x,<4 x i8> %x)\n %v = extractvalue {<4 x i8>,<4 x i1>} %pair,0\n store <4 x i8> %v,ptr %p,align 1\n ret void\n}\n";
+        var module = try ir.Module.parse(a, input);
+        defer module.deinit();
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        if (variant != 0) try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0], null)) != null);
+        const call = &module.functions.items[0].blocks.items[0].instructions.items[1].kind.call;
+        switch (variant) {
+            0 => {},
+            1 => call.tail_kind = "musttail",
+            2 => call.calling_conv = "fastcc",
+            3 => call.args.items[0].attrs = "inreg",
+            4 => call.ret_attrs = "noundef",
+            5 => call.args.items[1].ty = .{ .vector = .{ .len = 4, .elem_ty = .{ .int = 16 } } },
+            else => unreachable,
+        }
+        try std.testing.expect((try forms.legalize(arena.allocator(), module.functions.items[0], null)) == null);
+    }
+}

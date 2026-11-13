@@ -162,7 +162,17 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     try finish(allocator, &block, inst, wide, value.ty, answer);
                     continue;
                 },
-                .cast => |cast| if (cast.op == .zext and integer(cast.from_ty) and integer(cast.to_ty) and
+                .cast => |cast| if (cast.op == .bitcast and !cast.flags.any() and cast.value == .int and
+                    ((cast.from_ty.eql(.{ .int = 16 }) and cast.to_ty == .half) or
+                        (cast.from_ty.eql(.{ .int = 32 }) and cast.to_ty == .float) or
+                        (cast.from_ty.eql(.{ .int = 64 }) and cast.to_ty == .double)) and operand(cast.value, cast.from_ty.int))
+                {
+                    try candidate.begin(&block, block_index, instruction_index);
+                    var copy = inst;
+                    copy.kind.cast.value = try binary(allocator, function, &block, &serial, cast.from_ty, .add, cast.value, .{ .int = 0 });
+                    try block.instructions.append(allocator, copy);
+                    continue;
+                } else if (cast.op == .zext and integer(cast.from_ty) and integer(cast.to_ty) and
                     cast.from_ty.int < cast.to_ty.int and cast.value == .int and operand(cast.value, cast.from_ty.int) and
                     cast.from_ty.int != 1 and cast.from_ty.int != 8 and cast.from_ty.int != 16 and cast.from_ty.int != 32 and
                     (cast.to_ty.int == 8 or cast.to_ty.int == 16 or cast.to_ty.int == 32 or cast.to_ty.int == 64))

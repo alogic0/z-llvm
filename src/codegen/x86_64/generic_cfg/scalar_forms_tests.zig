@@ -667,12 +667,10 @@ test "safe comparison forms execute two constant operands with live inputs" {
             const x = pair[0];
             const y = pair[1];
             for (std.enums.values(ir.IcmpPredicate)) |predicate| {
-                const text = try std.fmt.allocPrint(std.testing.allocator,
-                    "define i64 @constant_pair(i64 %live) {{\nentry:\n" ++
-                        "  %c = icmp {s} i{d} {d}, {d}\n" ++
-                        "  %w = zext i1 %c to i64\n" ++
-                        "  %r = xor i64 %w, %live\n  ret i64 %r\n}}\n",
-                    .{ @tagName(predicate), bits, x, y });
+                const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @constant_pair(i64 %live) {{\nentry:\n" ++
+                    "  %c = icmp {s} i{d} {d}, {d}\n" ++
+                    "  %w = zext i1 %c to i64\n" ++
+                    "  %r = xor i64 %w, %live\n  ret i64 %r\n}}\n", .{ @tagName(predicate), bits, x, y });
                 defer std.testing.allocator.free(text);
                 var module = try ir.Module.parse(std.testing.allocator, text);
                 defer module.deinit();
@@ -1194,4 +1192,112 @@ test "integer intrinsics extrema preserve final-use and live register aliases" {
             try std.testing.expectEqual(a ^ b ^ 0x765432109abcdef0, out[1]);
         };
     };
+}
+
+test "native i32 reversal retains exact scalar width and six live full argument aliases" {
+    for (0..6) |position| for ([_]bool{ false, true }) |declared| {
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        var text: std.Io.Writer.Allocating = .init(a);
+        try text.writer.writeAll("declare i32 @llvm.bitreverse.i32(i32)\ndefine i64 @reverse_live(");
+        for (0..6) |i| try text.writer.print("{s}i{d} %a{d}", .{ if (i == 0) "" else ",", if (declared and i == position) @as(u16, 32) else 64, i });
+        try text.writer.writeAll(") {\nentry:\n");
+        if (!declared) try text.writer.print(" %input = trunc i64 %a{d} to i32\n", .{position});
+        const operand = if (declared) try std.fmt.allocPrint(a, "%a{d}", .{position}) else "%input";
+        try text.writer.print(" %v = call i32 @llvm.bitreverse.i32(i32 {s})\n %wide = zext i32 %v to i64\n", .{operand});
+        if (declared) try text.writer.print(" %logical = zext i32 %a{d} to i64\n", .{position});
+        for (0..6) |i| {
+            const value = if (declared and i == position) "%logical" else try std.fmt.allocPrint(a, "%a{d}", .{i});
+            try text.writer.print(" %m{d} = mul i64 {s},1099511628211\n %r{d} = xor i64 %m{d},{s}\n", .{ i, if (i == 0) "%wide" else try std.fmt.allocPrint(a, "%r{d}", .{i - 1}), i, i, value });
+        }
+        try text.writer.writeAll(" ret i64 %r5\n}\n");
+        var module = try ir.Module.parse(std.testing.allocator, text.written());
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, u64, u64, u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for (0..64) |seed| {
+            var inputs: [6]u64 = undefined;
+            for (&inputs, 0..) |*value, i| value.* = (@as(u64, seed) *% 0x9182736455aaccdd) ^ (@as(u64, i) *% 0x123456789abcdef1);
+            var expected: u64 = @bitReverse(@as(u32, @truncate(inputs[position])));
+            for (inputs, 0..) |value, i| expected = (expected *% 1099511628211) ^ (if (declared and i == position) @as(u64, @as(u32, @truncate(value))) else value);
+            try std.testing.expectEqual(expected, run(inputs[0], inputs[1], inputs[2], inputs[3], inputs[4], inputs[5]));
+        }
+    };
+}
+
+test "literal branches preserve CFG PHI edges exact stores and live inputs" {
+    for ([_][]const u8{ "false", "true", "-1" }, 0..) |literal, index| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @literal_branch(i64 %a,i64 %b,ptr %out,i64 %live) {{\nentry:\n br i1 {s},label %yes,label %no\nyes:\n %x = xor i64 %a,%live\n store i64 %x,ptr %out,align 1\n br label %join\nno:\n %y = add i64 %b,%live\n store i64 %y,ptr %out,align 1\n br label %join\njoin:\n %v = phi i64 [%x,%yes],[%y,%no]\n %r = xor i64 %v,%a\n %r2 = xor i64 %r,%b\n %r3 = xor i64 %r2,%live\n ret i64 %r3\n}}\n", .{literal});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const private = (try forms.legalize(arena.allocator(), original)).?;
+        var view = module;
+        view.functions = try module.functions.clone(arena.allocator());
+        view.functions.items[0] = private;
+        try view.verify();
+        try std.testing.expect((try forms.legalize(arena.allocator(), private)) == null);
+        try std.testing.expectEqual(@as(usize, 0), original.blocks.items[0].instructions.items.len);
+        try std.testing.expect(original.blocks.items[0].terminator.?.condbr.cond == .int);
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (u64, u64, *u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for (0..64) |seed| {
+            const a = @as(u64, seed) *% 0x9182736455aaccdd;
+            const b = ~a;
+            const live = a ^ 0x123456789abcdef0;
+            var output: [3]u64 = @splat(0xa5a5a5a5a5a5a5a5);
+            const expected = if (index == 0) b +% live else a ^ live;
+            try std.testing.expectEqual(expected ^ a ^ b ^ live, run(a, b, &output[1], live));
+            try std.testing.expectEqual(expected, output[1]);
+            try std.testing.expectEqual(@as(u64, 0xa5a5a5a5a5a5a5a5), output[0]);
+            try std.testing.expectEqual(@as(u64, 0xa5a5a5a5a5a5a5a5), output[2]);
+        }
+    }
+}
+
+test "native literal integer floating bitcasts retain exact payloads stores and live values" {
+    for ([_]u16{ 16, 32, 64 }, [_][]const u8{ "half", "float", "double" }) |bits, ty| {
+        const samples = [_]u64{ 0, 1, 0x8000000000008000, 0x7c007f807f800000, 0xffffffffffffffff, 0x7fc123457ff81234, 0x7ff0000000000001, 0x7ff8000000001234, 0x8000000000000000 };
+        for (samples) |sample| for ([_]bool{ false, true }) |signed_literal| {
+            const mask: u64 = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+            const raw = sample & mask;
+            const literal: i128 = if (signed_literal) @import("../../../analysis/integer_semantics.zig").Integer.init(.{ .int = bits }).?.normalize(raw) else raw;
+            const widen = if (bits == 64) " %wide = add i64 %back,0\n" else try std.fmt.allocPrint(std.testing.allocator, " %wide = zext i{d} %back to i64\n", .{bits});
+            defer if (bits != 64) std.testing.allocator.free(widen);
+            const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @literal_payload(ptr %out,i64 %live) {{\nentry:\n %v = bitcast i{0d} {1d} to {2s}\n store {2s} %v,ptr %out,align 1\n %back = bitcast {2s} %v to i{0d}\n{3s} %r = xor i64 %wide,%live\n ret i64 %r\n}}\n", .{ bits, literal, ty, widen });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+            defer arena.deinit();
+            const private = (try @import("integer_forms.zig").legalize(arena.allocator(), module.functions.items[0])).?;
+            var view = module;
+            view.functions = try module.functions.clone(arena.allocator());
+            view.functions.items[0] = private;
+            try view.verify();
+            try std.testing.expect((try @import("integer_forms.zig").legalize(arena.allocator(), private)) == null or bits == 16);
+            const code = try executable(module);
+            defer std.posix.munmap(code);
+            const run: *const fn (*u8, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+            for ([_]u64{ 0, 0x123456789abcdef0, std.math.maxInt(u64) }) |live| {
+                var output: [32]u8 = @splat(0xa5);
+                try std.testing.expectEqual(raw ^ live, run(&output[11], live));
+                for (output, 0..) |byte, index| {
+                    const expected: u8 = if (index >= 11 and index < 11 + bits / 8) @truncate(raw >> @as(u6, @intCast((index - 11) * 8))) else 0xa5;
+                    try std.testing.expectEqual(expected, byte);
+                }
+            }
+            try module.verify();
+            try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[0].kind.cast.value == .int);
+        };
+    }
 }

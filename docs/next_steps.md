@@ -47,10 +47,10 @@ required faults pass. The complete original compiler object is unchanged;
 changed runtime conversions have exact encoding and independent LLVM/C proofs.
 The original Debug replay gains 34 without loss but retains 107 failures.
 
-Next, adopt the isolated bit-reversal, literal-branch, literal-bitcast and
-checked-vector repairs. Both 2,286-unit builds and all component native checks
+The bit-reversal, literal-branch, literal-bitcast and checked-vector repairs
+are adopted for fresh cumulative validation. Both isolated 2,286-unit builds and all component native checks
 pass; 19 original selections are gained without loss, leaving 88 failures.
-The Zig generator reproduces all 51 fixture files exactly. Freeze and validate
+The Zig generator reproduces all 51 fixture files exactly. Next, freeze and validate
 the 177-population corpus, including all 4,132 required faults and fresh original
 objects, then continue closing the original Debug failures. Bounded double,
 quad and x87 input fragments remain isolated pending independent interop proof.

@@ -1,4 +1,4 @@
-//! Deterministically generate twenty-one behavior-frontier native populations.
+//! Deterministically generate twenty-five behavior-frontier native populations.
 //! --output-root NEW; optional --verify-root DIR checks fixtures and registry.
 const std = @import("std");
 const u = @import("validation/common.zig");
@@ -26,7 +26,9 @@ pub fn main(init: std.process.Init) !void {
     try u.add(&entries, try pairExtendedSaturation(&c, target));
     try u.add(&entries, try vectorInputFragments(&c, target));
     try u.add(&entries, try mixedStackArguments(&c, target));
-    if (entries.array.items.len != 21) return error.ExpectedTwentyOnePopulations;
+    for (0..3) |kind| try u.add(&entries, try scalarFollowupPopulation(&c, target, kind));
+    try u.add(&entries, try checkedVectorArithmetic(&c, target));
+    if (entries.array.items.len != 25) return error.ExpectedTwentyFivePopulations;
     try c.writeJson(try c.join(&.{ target, "native_canaries.json" }), try u.toValue(c.a, .{ .schema = 1, .canaries = entries }));
     var files = std.StringHashMap(void).init(c.a);
     for (entries.array.items) |entry| {
@@ -34,7 +36,7 @@ pub fn main(init: std.process.Init) !void {
         if (entry.object.get("reference_fixture")) |reference| try files.put(try c.fmt("{s}.ll", .{reference.string}), {});
         if (entry.object.get("reference_source")) |source| try files.put(source.string, {});
     }
-    if (files.count() != 43) return error.ExpectedFortyThreeFixtureFiles;
+    if (files.count() != 51) return error.ExpectedFiftyOneFixtureFiles;
     if (args.get("verify-root")) |root| {
         var names = files.keyIterator();
         while (names.next()) |name| if (!std.mem.eql(u8, try c.digest(try c.join(&.{ target, name.* })), try c.digest(try c.join(&.{ root, name.* })))) return c.fail("generated fixture differs: {s}", .{name.*});
@@ -48,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
             if (matches != 1) return error.GeneratedPopulationMissingOrDuplicated;
         }
     }
-    try c.print("behavior-expansion fixtures: 21 populations, 43 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
+    try c.print("behavior-expansion fixtures: 25 populations, 51 files{s}\n", .{if (args.get("verify-root") != null) ", byte-exact verification passed" else ""});
 }
 fn wideSwitch(c: *u.Context, target: []const u8) !u.Value {
     var text: std.Io.Writer.Allocating = .init(c.a);
@@ -617,5 +619,125 @@ fn mixedStackArguments(c: *u.Context, target: []const u8) !u.Value {
     try c.write(try c.join(&.{ fixtures, "mixed_stack_arguments.ll" }), text.written());
     try c.write(try c.join(&.{ fixtures, "mixed_stack_arguments_driver.c" }), driver.written());
     const entry = try u.toValue(c.a, .{ .population = "mixed_stack_arguments", .fixture = "mixed_stack_arguments", .prefix = "mixed-stack-arguments", .functions = functions, .observations = 6144, .stdout = "mixed-stack-arguments observations=6144 ccc-fastcc=scalar-fp-vector128=stack-gp128=alignment-holes=live-suffixes=llvm-c-interop=guard-pages=preserved\n" });
+    return entry;
+}
+
+const scalarFollowupNames = [_][]const u8{ "bitreverse_native_width", "literal_branches", "literal_fp_bitcasts" };
+const scalarFollowupPrefixes = [_][]const u8{ "bitreverse-native-width", "literal-branches", "literal-fp-bitcasts" };
+fn scalarFollowupPopulation(c: *u.Context, target: []const u8, kind: usize) !u.Value {
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    if (kind == 0) try text.writer.writeAll("declare i32 @llvm.bitreverse.i32(i32)\n");
+    try driver.writer.writeAll(try std.mem.replaceOwned(u8, c.a, try c.read(try c.join(&.{"tools/templates/behavior_scalarFollowup_core.c"})), "@PREFIX@", scalarFollowupPrefixes[kind]));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    const cases: usize = if (kind == 0) 24 else if (kind == 1) 12 else 60;
+    for (0..cases) |id| {
+        const cc = if (id % 2 == 0) "" else "fastcc ";
+        const body = try c.fmt("{s}_body_{d}", .{ scalarFollowupNames[kind], id });
+        const probe = try c.fmt("{s}_probe_{d}", .{ scalarFollowupNames[kind], id });
+        try u.add(&functions, u.s(body));
+        try u.add(&functions, u.s(probe));
+        const position = (id / 2) % 6;
+        const declared = kind == 0 and id / 12 == 1;
+        const truth = kind == 1 and (id / 2) % 3 != 0;
+        const loop = kind == 1 and id / 6 == 1;
+        const bits: u16 = if (kind != 2 or id / 20 == 0) 16 else if (id / 20 == 1) 32 else 64;
+        const ty = if (bits == 16) "half" else if (bits == 32) "float" else "double";
+        const patterns = [_]u64{ 0, 1, 0xffffffffffffffff, 0x8000000000008000, 0x7c007f807f800000, 0x7fc123457ff81234, 0x7ff0000000000001, 0x7ff8000000001234, 0x8000000000000000, 0x123456789abcdef0 };
+        const mask: u64 = if (bits == 64) std.math.maxInt(u64) else (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
+        const raw = patterns[(id / 2) % 10] & mask;
+        if (kind == 1) {
+            const literal = ([_][]const u8{ "false", "true", "-1" })[(id / 2) % 3];
+            try text.writer.print("define {s}i64 @{s}(i64 %a,i64 %b,i64 %live) noinline {{\nentry:\n", .{ cc, body });
+            if (loop) {
+                try text.writer.writeAll(" br label %loop\nloop:\n %i = phi i32 [0,%entry],[%next,%join]\n %sum = phi i64 [0,%entry],[%added,%join]\n");
+                try text.writer.print(" br i1 {s},label %yes,label %no\nyes:\n br label %join\nno:\n br label %join\njoin:\n %increment = phi i64 [%a,%yes],[%b,%no]\n %added = add i64 %sum,%increment\n %next = add i32 %i,1\n %more = icmp ult i32 %next,32\n br i1 %more,label %loop,label %end\nend:\n %r = xor i64 %added,%live\n ret i64 %r\n}}\n", .{literal});
+            } else try text.writer.print(" br i1 {s},label %yes,label %no\nyes:\n %x = xor i64 %a,%live\n br label %join\nno:\n %y = add i64 %b,%live\n br label %join\njoin:\n %r = phi i64 [%x,%yes],[%y,%no]\n ret i64 %r\n}}\n", .{literal});
+        } else {
+            try text.writer.print("define {s}{s} @{s}(", .{ cc, if (kind == 2) ty else "i64", body });
+            for (0..6) |i| try text.writer.print("{s}i{d} %a{d}", .{ if (i == 0) "" else ",", if (declared and i == position) @as(u16, 32) else 64, i });
+            if (kind == 2) try text.writer.writeAll(",ptr %out");
+            try text.writer.writeAll(") noinline {\nentry:\n");
+            if (kind == 0) {
+                if (!declared) try text.writer.print(" %input = trunc i64 %a{d} to i32\n", .{position});
+                try text.writer.print(" %v = call i32 @llvm.bitreverse.i32(i32 {s})\n %wide = zext i32 %v to i64\n", .{if (declared) try c.fmt("%a{d}", .{position}) else "%input"});
+                if (declared) try text.writer.print(" %logical = zext i32 %a{d} to i64\n", .{position});
+            } else {
+                try text.writer.print(" %v = bitcast i{d} {d} to {s}\n store {s} %v,ptr %out,align 1\n", .{ bits, raw, ty, ty });
+            }
+            for (0..6) |i| {
+                const value = if (declared and i == position) "%logical" else try c.fmt("%a{d}", .{i});
+                const previous = if (i == 0) (if (kind == 2) "0" else "%wide") else try c.fmt("%r{d}", .{i - 1});
+                try text.writer.print(" %m{d} = mul i64 {s},1099511628211\n %r{d} = xor i64 %m{d},{s}\n", .{ i, previous, i, i, value });
+            }
+            if (kind == 2) try text.writer.print(" %next = getelementptr i8,ptr %out,i64 8\n store i64 %r5,ptr %next,align 1\n ret {s} %v\n}}\n", .{ty}) else try text.writer.writeAll(" ret i64 %r5\n}\n");
+        }
+        try text.writer.print("define i64 @{s}(ptr %input,ptr %out,i64 %salt) {{\nentry:\n", .{probe});
+        for (0..6) |i| try text.writer.print(" %p{d} = getelementptr i8,ptr %input,i64 {d}\n %a{d} = load i64,ptr %p{d},align 1\n", .{ i, i * 8, i, i });
+        if (declared) try text.writer.print(" %logical = trunc i64 %a{d} to i32\n", .{position});
+        try text.writer.print(" %v = call {s}{s} @{s}(", .{ cc, if (kind == 2) ty else "i64", body });
+        if (kind == 1) try text.writer.writeAll("i64 %a0,i64 %a1,i64 %a2") else for (0..6) |i| try text.writer.print("{s}i{d} {s}", .{ if (i == 0) "" else ",", if (declared and i == position) @as(u16, 32) else 64, if (declared and i == position) "%logical" else try c.fmt("%a{d}", .{i}) });
+        if (kind == 2) try text.writer.writeAll(",ptr %out");
+        try text.writer.writeAll(")\n");
+        if (kind == 2) {
+            try text.writer.print(" %raw = bitcast {s} %v to i{d}\n", .{ ty, bits });
+            if (bits == 64) try text.writer.writeAll(" %wide = add i64 %raw,0\n") else try text.writer.print(" %wide = zext i{d} %raw to i64\n", .{bits});
+            try text.writer.writeAll(" %liveptr = getelementptr i8,ptr %out,i64 8\n %live = load i64,ptr %liveptr,align 1\n %tail = getelementptr i8,ptr %out,i64 16\n store i64 %wide,ptr %tail,align 1\n %mix = xor i64 %live,%wide\n %r = xor i64 %mix,%salt\n ret i64 %r\n}\n");
+        } else try text.writer.writeAll(" store i64 %v,ptr %out,align 1\n %next = getelementptr i8,ptr %out,i64 8\n store i64 %salt,ptr %next,align 1\n %tail = getelementptr i8,ptr %out,i64 16\n store i64 %a0,ptr %tail,align 1\n %r = xor i64 %v,%salt\n ret i64 %r\n}\n");
+        try driver.writer.print("extern uint64_t {s}(const void *,void *,uint64_t);\n", .{probe});
+        try table.writer.print("{{{s},{d},{d},{d},{d},UINT64_C({d})}},\n", .{ probe, if (kind == 0) @as(usize, 0) else if (kind == 1) (if (loop) @as(usize, 2) else 1) else 3, position, @intFromBool(if (kind == 1) truth else declared), bits, raw });
+    }
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ target, try c.fmt("{s}.ll", .{scalarFollowupNames[kind]}) }), text.written());
+    try c.write(try c.join(&.{ target, try c.fmt("{s}_driver.c", .{scalarFollowupNames[kind]}) }), driver.written());
+    return u.toValue(c.a, .{ .population = scalarFollowupNames[kind], .fixture = scalarFollowupNames[kind], .prefix = scalarFollowupPrefixes[kind], .functions = functions, .observations = cases * 64 * 7, .stdout = try c.fmt("{s} observations={d} exact-payloads=live-aliases=cfg-phis=stack-calls=guard-pages=preserved\n", .{ scalarFollowupPrefixes[kind], cases * 64 * 7 }) });
+}
+
+fn checkedVectorArithmetic(c: *u.Context, target: []const u8) !u.Value {
+    const fixtures = target;
+    var text: std.Io.Writer.Allocating = .init(c.a);
+    var driver: std.Io.Writer.Allocating = .init(c.a);
+    var table: std.Io.Writer.Allocating = .init(c.a);
+    var functions = u.array(c.a);
+    var count: usize = 0;
+    try text.writer.writeAll("target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
+    try driver.writer.writeAll(try c.read(try c.join(&.{"tools/templates/behavior_checkedVectorArithmetic_core.c"})));
+    try table.writer.writeAll("static const struct test_case cases[]={\n");
+    const shapes = [_][2]u16{ .{ 2, 32 }, .{ 3, 32 }, .{ 4, 8 }, .{ 2, 8 }, .{ 4, 16 }, .{ 8, 8 }, .{ 4, 32 }, .{ 8, 32 }, .{ 1, 8 }, .{ 64, 32 } };
+    var seen_lengths = std.AutoHashMap(u16, void).init(c.a);
+    for (shapes, 0..) |s, shape_index| {
+        const n = s[0];
+        const bits = s[1];
+        if (!seen_lengths.contains(n)) {
+            try text.writer.print("declare i1 @llvm.vector.reduce.or.v{d}i1(<{d} x i1>)\n", .{ n, n });
+            try seen_lengths.put(n, {});
+        }
+        for ([_][]const u8{ "uadd", "usub", "umul", "sadd", "ssub", "smul" }, 0..) |op, kind| {
+            try text.writer.print("declare {{<{0d} x i{1d}>,<{0d} x i1>}} @llvm.{2s}.with.overflow.v{0d}i{1d}(<{0d} x i{1d}>,<{0d} x i{1d}>)\n", .{ n, bits, op });
+            for ([_]bool{ false, true }) |zero| {
+                if (zero and shape_index != 0 and shape_index != 2) continue;
+                for ([_][]const u8{ "", "fastcc " }) |cc| {
+                    const body = try c.fmt("checked_vector_body_{d}", .{count});
+                    const probe = try c.fmt("checked_vector_probe_{d}", .{count});
+                    count += 1;
+                    try u.add(&functions, u.s(body));
+                    try u.add(&functions, u.s(probe));
+                    try text.writer.print("define {0s}i64 @{1s}(ptr %out,ptr %a,ptr %b,i64 %live) noinline {{\nentry:\n %x = load <{2d} x i{3d}>,ptr %a,align 1\n %y = load <{2d} x i{3d}>,ptr %b,align 1\n %pair = call {{<{2d} x i{3d}>,<{2d} x i1>}} @llvm.{4s}.with.overflow.v{2d}i{3d}(<{2d} x i{3d}> {5s},<{2d} x i{3d}> %y)\n %v = extractvalue {{<{2d} x i{3d}>,<{2d} x i1>}} %pair,0\n %flags = extractvalue {{<{2d} x i{3d}>,<{2d} x i1>}} %pair,1\n store <{2d} x i{3d}> %v,ptr %out,align 1\n %fptr = getelementptr i8,ptr %out,i64 {6d}\n store <{2d} x i1> %flags,ptr %fptr,align 1\n %any = call i1 @llvm.vector.reduce.or.v{2d}i1(<{2d} x i1> %flags)\n %wide = zext i1 %any to i64\n %r = xor i64 %wide,%live\n ret i64 %r\n}}\ndefine i64 @{7s}(ptr %out,ptr %a,ptr %b,i64 %live) {{\nentry:\n %r = call {0s}i64 @{1s}(ptr %out,ptr %a,ptr %b,i64 %live)\n ret i64 %r\n}}\n", .{ cc, body, n, bits, op, if (zero) "zeroinitializer" else "%x", n * (bits / 8), probe });
+                    try driver.writer.print("extern uint64_t {s}(void *,const void *,const void *,uint64_t);\n", .{probe});
+                    try table.writer.print("{{{s},{d},{d},{d},{d}}},\n", .{ probe, n, bits, kind, @intFromBool(zero) });
+                }
+            }
+        }
+    }
+    if (count != 144) return error.CaseInventoryDiffers;
+    try table.writer.writeAll("};\nint main(int argc,char **argv){return run_all(cases,sizeof cases/sizeof cases[0],argc,argv);}\n");
+    try driver.writer.writeAll(table.written());
+    try c.write(try c.join(&.{ fixtures, "checked_vector_arithmetic.ll" }), text.written());
+    try c.write(try c.join(&.{ fixtures, "checked_vector_arithmetic_driver.c" }), driver.written());
+    const entry = try u.toValue(c.a, .{ .population = "checked_vector_arithmetic", .fixture = "checked_vector_arithmetic", .prefix = "checked-vector-arithmetic", .functions = functions, .observations = count * 64 * 7, .stdout = try c.fmt("checked-vector-arithmetic observations={d} wrapped-lanes=packed-overflow-flags=live-values=exact-stores=guard-pages=preserved\n", .{count * 64 * 7}) });
     return entry;
 }

@@ -195,7 +195,7 @@ fn operation(call: ir.CallInst) ?Operation {
         if (!std.mem.eql(u8, call.callee, spelling)) continue;
         if (bits > 64 and op != .sadd_sat and op != .ssub_sat and !(bits == 128 and (op == .umin or op == .umax))) return null;
         if (op == .reverse) {
-            if (bits == 32 or bits == 64 or call.args.items.len != 1) return null;
+            if (bits == 64 or call.args.items.len != 1) return null;
         } else if (op == .ushl_one) {
             if (bits != 64 or call.args.items.len != 2 or call.args.items[1].value != .int or call.args.items[1].value.int != 1) return null;
         } else if (op == .ssub_sat or op == .sadd_sat) {
@@ -327,7 +327,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     const nonnegative = try emit(allocator, function, &block, &serial, .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = greater, .ty = call.ret_ty, .true_value = .{ .int = 1 }, .false_value = .{ .int = 0 } } });
                     try block.instructions.append(allocator, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = less, .ty = call.ret_ty, .true_value = .{ .int = -1 }, .false_value = nonnegative } } });
                 } else if (op == .reverse) {
-                    const wide: ir.Type = .{ .int = if (bits < 32) 32 else 64 };
+                    // The native i64 owner is terminal: all smaller widths
+                    // normalize once without reintroducing an i32 intrinsic.
+                    const wide: ir.Type = .{ .int = 64 };
                     const input = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);
                     const reversed = try forms.temporary(allocator, function, &serial);
                     var extended = call;

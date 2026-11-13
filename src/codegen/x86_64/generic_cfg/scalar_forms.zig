@@ -218,6 +218,31 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
             };
             try candidate.keep(&block, inst);
         }
+        if (original.terminator) |terminator| {
+            if (terminator == .condbr and terminator.condbr.cond_ty.eql(.{ .int = 1 }) and terminator.condbr.cond == .int) {
+                const literal = terminator.condbr.cond.int;
+                if (literal >= -1 and literal <= 1) {
+                    try candidate.begin(&block, block_index, original.instructions.items.len);
+                    const input = try temporary(allocator, function, &serial);
+                    const condition = try temporary(allocator, function, &serial);
+                    // Keep the exact CFG and PHI predecessor sets. The existing
+                    // scalar compare/branch owner receives a named i1 condition.
+                    try block.instructions.append(allocator, .{ .result = input, .kind = .{ .binary = .{
+                        .op = .add,
+                        .ty = .{ .int = 32 },
+                        .lhs = .{ .int = literal & 1 },
+                        .rhs = .{ .int = 0 },
+                    } } });
+                    try block.instructions.append(allocator, .{ .result = condition, .kind = .{ .icmp = .{
+                        .predicate = .ne,
+                        .operand_ty = .{ .int = 32 },
+                        .lhs = .{ .named = input },
+                        .rhs = .{ .int = 0 },
+                    } } });
+                    block.terminator.?.condbr.cond = .{ .named = condition };
+                }
+            }
+        }
         try candidate.finishBlock(block);
     }
     return candidate.finish();
