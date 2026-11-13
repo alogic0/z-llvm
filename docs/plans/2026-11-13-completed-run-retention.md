@@ -1,6 +1,7 @@
 # Retire completed validation runs
 
-Status: in progress. Requested by the user on 2026-11-13.
+Status: first execution complete. Further investigations are listed below.
+Requested by the user on 2026-11-13.
 
 ## Objective and starting measurements
 
@@ -54,17 +55,18 @@ No duplicate archive of deleted run trees is created.
   regression coverage for changed evidence and current-manifest protection.
 - [x] Qualify the changes in Debug and ReleaseFast and exercise the actual
   release/review/apply workflow on temporary fixtures.
-- [ ] Publish verified release records and retire eligible completed artifacts
+- [x] Publish verified release records and retire eligible completed artifacts
   in bounded batches. Recheck current integrity manifests and retained evidence
   afterward; record physical file allocation reclaimed without double-counting
-  hardlink aliases. Then review the selection suite and remaining raw traces.
+  hardlink aliases. Review the selection suite and identify the remaining trace
+  evidence gaps for subsequent batches.
 - [x] Give producers a supported way to publish completed-run evidence and
   releases; integrate cleanup into the appropriate producer lifecycle without
   changing compilation outcomes or discarding unique failure diagnostics.
-- [ ] Report the remaining storage as required now, eligible, or unresolved,
+- [x] Report the remaining storage as required now, eligible, or unresolved,
   with byte counts and specific reasons. Set a working budget from measured
   requirements and preserve the existing disk-headroom admission rule.
-- [ ] Update this plan with implementation, validation, actual cleanup results,
+- [x] Update this plan with implementation, validation, actual cleanup results,
   and any remaining concrete evidence gaps. Commit the tracked changes.
 
 ## Verification and completion
@@ -119,6 +121,80 @@ not infer that every surviving byte is essential.
   and toolchain libraries. Hashes, controls, pins, holds and guarded removal
   still apply to every action. All 66 native checks pass in Debug and ReleaseFast,
   and all 14 isolated CLI checks pass after this correction.
+- Retired the cleaner's own completed qualification cache after its tests ended
+  and a scoped consumer check found no users: 449,220,608 allocated bytes,
+  including directory allocation. Qualification logs remain; no source or build
+  configuration archive was made for those temporary test binaries.
+- The next apply completed 51 more removals (5,173,702,656 allocated file bytes)
+  before the other agent changed `holds.json`. The collector stopped with
+  `FileChanged` and no pending mutation. Its completed records remain valid;
+  a new invocation starts with the new holds. The updated helper is committed
+  as `5e69a93d`.
+- A subsequent pass completed 19 removals (1,919,676,416 allocated file bytes),
+  including two newly closed caches outside the original batch, before another
+  hold update stopped it without a pending mutation. The remaining 18 historical
+  binaries are handled by a new invocation with the latest holds. These stops
+  are retained in the reports rather than relabeled as complete passes.
+- The final pass completed all 18 remaining removals, reclaiming 1,770,500,096
+  allocated file bytes, and reverified all five current integrity manifests.
+  A fresh repeated apply found zero eligible candidates and removed nothing;
+  all five manifests passed again and no pending mutation remained.
+- Retired eight superseded cleanup helpers, reclaiming another 64,032,768
+  allocated bytes. The sole remaining helper is the qualified ReleaseFast
+  `local-state/storage-cleanup/clean-storage`.
+
+## Verified results of the first execution
+
+| Removed category | Count | Allocated bytes reclaimed |
+| --- | ---: | ---: |
+| Old compiler binaries | 89 | 9,143,136,256 |
+| Complete private compiler caches | 8 | 340,434,944 |
+| Audited raw traces | 2 | 1,888,923,648 |
+| Collector qualification cache and superseded helpers | 9 roots/files | 513,253,376 |
+| **Total** | | **11,885,748,224 (about 11.07 GiB)** |
+
+The original reviewed batch had six private caches. The other two completed
+during execution and account for 85,143,552 bytes of the cache total. Collector
+records count regular-file allocation; the separately measured qualification
+cache includes directory allocation. No hardlink allocation is counted twice.
+Concurrent writers mean whole-folder and filesystem free-space changes need not
+equal this measured reclaim.
+
+All 85 selected behavior compilers and four selection compilers were removed.
+Seven selection compilers remain pinned and one has an output hash mismatch;
+the repeat pass also retains 16 private cache roots covered by queued holds.
+These are the 24 held candidates, totaling 1,313,607,680 allocated file bytes.
+
+The apply and repeat reports are under
+`local-state/retirements/automatic-storage-cleanup/`:
+
+- `1794564726615204666-3385000/report.json`: 11 completed removals; stopped at a verified read-only boundary.
+- `1794565125136332044-3433930/report.json`: 51 completed removals; stopped after a hold change.
+- `1794566308521906905-3459795/report.json`: 19 completed removals; stopped after a hold change.
+- `1794566819220651797-3471013/report.json`: 18 completed removals; complete.
+- `1794567380590377679-3490531/report.json`: repeated apply; complete, zero removals.
+
+Completed action records reconcile to the totals above even where the enclosing
+pass was interrupted. Qualification logs, the restart observation and the
+`jqz` aggregation are under `local-state/storage-cleanup/completed-run-qualification/`.
+
+The final inventory at
+`local-state/retirements/automatic-storage-cleanup/1794567509443891881-3494523/inventory.json`
+observed 1,686,873 paths and 1,676,723 unique inodes, with no vanished entries or
+foreign-device entries and all current manifests verified:
+
+| Disposition | Allocated bytes |
+| --- | ---: |
+| Required by current contracts | 24,976,994,304 |
+| Eligible under the current supported releases | 0 |
+| Unresolved | 133,233,025,024 |
+| **Remaining total** | **158,210,019,328 (about 147.3 GiB)** |
+
+Zero eligible files does **not** mean minimal storage. About 124.1 GiB remains
+unresolved, including unsupported report families and history still needing
+purpose review. The largest filename/mode families are executables
+(55,211,532,288 bytes), raw traces (30,662,504,448 bytes), and compiler inputs
+(24,126,558,208 bytes); these classifications do not prove necessity.
 
 ## Remaining investigations and operating budget
 
@@ -142,10 +218,16 @@ behavior builds v800–v967. Their candidate list is
 They still need explicit requests and fresh pin/consumer review; the list itself
 does not authorize removal and version order alone does not establish disuse.
 
-Do not impose an arbitrary total-size cap while 131.2 GiB in the initial full
-inventory remains unresolved. The measured 20.9 GiB under current contracts is
+The first large batch exposes a latency limitation: refreshing the full
+historical pin graph and consumer checks before every artifact makes historical
+collection slow. Profile that path before expanding large batches. Preserve
+fresh discovery, alias checks and newly introduced pins when optimizing it;
+small producer-completion batches remain the preferred steady-state workflow.
+
+Do not impose an arbitrary total-size cap while 124.1 GiB in the final full
+inventory remains unresolved. The measured 23.3 GiB under current contracts is
 a review starting point, not a proven minimum. The operating limits remain
 20,000,000,000 bytes of free space for admitting serial validation, its existing
 8 GiB working allowance, and at most 32 GiB reclaimed per collector invocation.
-Refresh whole-tree accounting after the batch and retain explicit unresolved
+Refresh whole-tree accounting after each batch and retain explicit unresolved
 categories until their consumers or retirement rules are established.
