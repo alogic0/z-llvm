@@ -57,10 +57,17 @@ pub fn classify(call: ir.CallInst) ?Operation {
         call.raw_args != null or call.operand_bundle != null) return null;
     if (std.mem.eql(u8, asm_value.template, snapshot_template) and
         std.mem.eql(u8, asm_value.constraints, snapshot_constraints) and
-        call.ret_attrs == null and call.tail_kind == null and
-        call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr and
-        call.args.items[0].attrs == null)
+        call.ret_attrs == null and
+        call.ret_ty == .void and call.args.items.len == 1 and call.args.items[0].ty == .ptr)
+    {
+        if (call.native_query != null or call.va_arg or call.args.items[0].abi_x87_memory or call.args.items[0].abi_split_integer) return null;
+        if (call.args.items[0].attrs) |facts| if (!sysv.pointerCallAttrsAreAdvisory(facts)) return null;
+        var envelope = call;
+        envelope.inline_asm = null;
+        sysv.rejectUnsupportedCallEnvelope(envelope) catch return null;
+        sysv.rejectUnsupportedCallArgAttrs(call.args.items[0]) catch return null;
         return .register_snapshot;
+    }
     if (!std.mem.eql(u8, asm_value.template, "syscall") or !call.ret_ty.eql(.{ .int = 64 }) or
         call.args.items.len == 0 or call.args.items.len > syscall_inputs.len) return null;
     // This exact instruction contract supplies the assembly effects. Reuse the

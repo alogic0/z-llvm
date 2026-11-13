@@ -120,6 +120,16 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 .icmp => |cmp| if (cmp.operand_ty == .ptr) {
                     copy.kind.icmp.lhs = try materialize(allocator, function, &block, &serial, cmp.lhs);
                     copy.kind.icmp.rhs = try materialize(allocator, function, &block, &serial, cmp.rhs);
+                    if (cmp.predicate != .eq and cmp.predicate != .ne) {
+                        for ([_]*ir.Value{ &copy.kind.icmp.lhs, &copy.kind.icmp.rhs }) |value| {
+                            const name = try forms.temporary(allocator, function, &serial);
+                            try block.instructions.append(allocator, .{ .result = name, .kind = .{ .cast = .{
+                                .op = .ptrtoint, .from_ty = .ptr, .value = value.*, .to_ty = word,
+                            } } });
+                            value.* = .{ .named = name };
+                        }
+                        copy.kind.icmp.operand_ty = word;
+                    }
                 },
                 .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, context, gep)) {
                     copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);

@@ -55,6 +55,26 @@ pub fn tryLowerObserved(
     profile: ?*@import("../../compilation_profile.zig").Profile,
     observer: ?*Observer,
 ) !SelectionResult {
+    return tryLowerObservedInner(allocator, machine, source, module_context, profile, observer) catch |err| {
+        if (err != error.ValueUseIdentityTooLong) return err;
+        // Composed lowering has already rolled back its failed transaction.
+        // Preserve every successful original stream and retry only this exact
+        // bounded-identity error with a private alpha-renamed SSA view.
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        const view = (try shortLocalNames(arena.allocator(), source)) orelse return err;
+        return tryLowerObservedInner(allocator, machine, view, module_context, profile, observer);
+    };
+}
+
+fn tryLowerObservedInner(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    source: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    profile: ?*@import("../../compilation_profile.zig").Profile,
+    observer: ?*Observer,
+) !SelectionResult {
     const profiling = @import("../../compilation_profile.zig");
     const optional = @import("generic_cfg/optional_legalization.zig");
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -128,6 +148,112 @@ pub fn tryLowerObserved(
         }
         return result;
     }
+}
+
+const LocalAliases = std.HashMap([]const u8, []const u8, ir.identifiers.Context, std.hash_map.default_max_load_percentage);
+const LocalRename = struct {
+    pub const Error = error{ UnsupportedOpaqueNameSyntax, UnsafePrivateLocalIdentity };
+    aliases: *const LocalAliases,
+
+    fn text(rename: LocalRename, raw: ?[]const u8) Error!void {
+        var tokens: @import("../../ir/opaque_names.zig").Iterator = .{ .raw = raw orelse return };
+        while (try tokens.next()) |token| switch (token) {
+            .local => |name| if (rename.aliases.contains(name)) return error.UnsafePrivateLocalIdentity,
+            // Function and block identities are never changed by this view.
+            .block_address => {},
+        };
+    }
+    pub fn visit(rename: LocalRename, value: *ir.Value, _: ir.Type) Error!void {
+        switch (value.*) {
+            .named => |name| if (rename.aliases.get(name)) |replacement| {
+                value.* = .{ .named = replacement };
+            },
+            .vector => |raw| try rename.text(raw),
+            .constant_expr => |raw| try rename.text(raw),
+            else => {},
+        }
+    }
+};
+
+fn shortLocalNames(a: std.mem.Allocator, source: ir.Function) !?ir.Function {
+    return shortLocalNamesImpl(a, source) catch |err| switch (err) {
+        error.UnsupportedOpaqueNameSyntax, error.UnsafePrivateLocalIdentity => null,
+        else => return err,
+    };
+}
+fn shortLocalNamesImpl(a: std.mem.Allocator, source: ir.Function) !?ir.Function {
+    const limit = @import("generic_cfg/value_use/model.zig").max_identity_bytes;
+    const forms = @import("generic_cfg/scalar_forms.zig");
+    var names: forms.TemporaryNames = .{ .prefix = "__zllvm_short_local_" };
+    defer names.deinit(a);
+    var aliases = LocalAliases.init(a);
+    defer aliases.deinit();
+    // ABI parameters, CFG labels and external symbol names retain their full
+    // Source identities. Only instruction-result locals are eligible.
+    for (source.params.items) |param| if (param.name.len > limit) return null;
+    for (source.blocks.items) |block| {
+        if (block.name.len > limit) return null;
+        for (block.instructions.items) |inst| if (inst.result) |name| {
+            if (name.len <= limit) continue;
+            if (!ir.identifiers.isValid(name)) return null;
+            const entry = try aliases.getOrPut(name);
+            if (entry.found_existing) return null;
+            entry.value_ptr.* = try forms.temporary(a, source, &names);
+        };
+    }
+    if (aliases.count() == 0) return null;
+    const rename: LocalRename = .{ .aliases = &aliases };
+    try rename.text(source.attrs);
+    try rename.text(source.ret_attrs);
+    for (source.params.items) |param| try rename.text(param.attrs);
+    var result = source;
+    result.blocks = .empty;
+    for (source.blocks.items) |original| {
+        var block = original;
+        block.instructions = .empty;
+        for (original.instructions.items) |inst| {
+            var copy = inst;
+            if (copy.result) |name| if (aliases.get(name)) |replacement| {
+                copy.result = replacement;
+            };
+            try rename.text(copy.metadata);
+            switch (copy.kind) {
+                .call => |call| {
+                    copy.kind.call.args = try call.args.clone(a);
+                    try rename.text(call.callee_function_ty);
+                    try rename.text(call.raw_args);
+                    try rename.text(call.operand_bundle);
+                    try rename.text(call.attrs);
+                    try rename.text(call.ret_attrs);
+                    for (call.args.items) |arg| try rename.text(arg.attrs);
+                    // Inline assembly templates bind typed arguments and do
+                    // not refer to the surrounding LLVM SSA namespace.
+                },
+                .phi => |phi| copy.kind.phi.incoming = try phi.incoming.clone(a),
+                .gep => |gep| copy.kind.gep.indices = try gep.indices.clone(a),
+                .alloca => |alloca| try rename.text(alloca.attrs),
+                else => {},
+            }
+            _ = try ir.operands.instruction(&copy, rename);
+            if (copy.replacement) |*value| try rename.visit(value, inst.resultType() orelse .void);
+            try block.instructions.append(a, copy);
+        }
+        if (block.terminator) |*term| {
+            switch (term.*) {
+                .@"switch" => |x| {
+                    term.@"switch".cases = try x.cases.clone(a);
+                    try rename.text(x.metadata);
+                },
+                .br => |x| try rename.text(x.metadata),
+                .condbr => |x| try rename.text(x.metadata),
+                .indirectbr => |x| try rename.text(x.metadata),
+                else => {},
+            }
+            _ = try ir.operands.terminator(term, rename);
+        }
+        try result.blocks.append(a, block);
+    }
+    return result;
 }
 
 fn selectReady(

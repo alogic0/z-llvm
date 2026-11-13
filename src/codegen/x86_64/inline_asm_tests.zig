@@ -37,6 +37,56 @@ const asm_forms = @import("inline_asm.zig");
 const codegen = @import("../../codegen.zig");
 const encoding = @import("../../mc/encoding.zig");
 
+test "optimized facts register snapshot retains annotated pointer inputs and exact machine effects" {
+    const a = std.testing.allocator;
+    const text = try std.fmt.allocPrint(a, "define void @snapshot(ptr %p) {{\nentry:\n call void asm sideeffect \"{s}\",\"{s}\"(ptr %p)\n ret void\n}}\n", .{ asm_forms.snapshot_template, asm_forms.snapshot_constraints });
+    defer a.free(text);
+    var module = try ir.Module.parse(a, text);
+    defer module.deinit();
+    try module.verify();
+    const original = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call;
+    var baseline = try codegen.x86_64.lowerFunctionWithOptions(a, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+    defer baseline.deinit(a);
+    const bytes = try encoding.encodeFunction(a, baseline);
+    defer a.free(bytes);
+    for ([_]?[]const u8{ null, "tail", "notail" }) |hint| for ([_]?[]const u8{ null, "nonnull", "noundef nonnull", "nonnull align 8 dereferenceable(136)" }) |facts| {
+        var call = original;
+        call.tail_kind = hint;
+        call.args.items[0].attrs = facts;
+        call.attrs = "#0";
+        try std.testing.expect((asm_forms.classify(call) orelse return error.ExpectedAnnotatedSnapshot) == .register_snapshot);
+        module.functions.items[0].blocks.items[0].instructions.items[0].kind.call = call;
+        var selected = try codegen.x86_64.lowerFunctionWithOptions(a, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+        defer selected.deinit(a);
+        const actual = try encoding.encodeFunction(a, selected);
+        defer a.free(actual);
+        try std.testing.expectEqualSlices(u8, bytes, actual);
+        try std.testing.expectEqual(facts, call.args.items[0].attrs);
+    };
+    original.args.items[0].attrs = null;
+    for (0..12) |variant| {
+        var call = original;
+        call.args = try original.args.clone(a);
+        defer call.args.deinit(a);
+        switch (variant) {
+            0 => call.tail_kind = "musttail",
+            1 => call.inline_asm.?.template = "nop",
+            2 => call.inline_asm.?.constraints = "{rdi},~{memory}",
+            3 => call.ret_attrs = "noundef",
+            4 => call.args.items[0].attrs = "sret(i64)",
+            5 => call.args.items[0].attrs = "signext",
+            6 => call.args.items[0].attrs = "inreg",
+            7 => call.args.items[0].abi_x87_memory = true,
+            8 => call.args.items[0].abi_split_integer = true,
+            9 => call.native_query = .cpuid,
+            10 => call.va_arg = true,
+            11 => call.attrs = "#0 byval(i64)",
+            else => unreachable,
+        }
+        try std.testing.expect(asm_forms.classify(call) == null);
+    }
+}
+
 test "system assembly validates constraints and preserves simultaneous inputs" {
     for (0..7) |count| {
         var source: std.Io.Writer.Allocating = .init(std.testing.allocator);

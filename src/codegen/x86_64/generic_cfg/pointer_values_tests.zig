@@ -24,6 +24,118 @@ const pointer_values = @import("pointer_values.zig");
 const pair_values = @import("word_pair_values.zig");
 const Pair = extern struct { first: u64, second: u64 };
 
+test "optimized facts pointer order retains native unsigned addresses and exact masks" {
+    const a = std.testing.allocator;
+    var module = try ir.Module.parse(a,
+        \\define i32 @order(ptr %left,ptr %right) {
+        \\entry:
+        \\ %a = icmp ult ptr %left,%right
+        \\ %b = icmp ule ptr %left,%right
+        \\ %c = icmp ugt ptr %left,%right
+        \\ %d = icmp uge ptr %left,%right
+        \\ %a32 = zext i1 %a to i32
+        \\ %b32 = zext i1 %b to i32
+        \\ %c32 = zext i1 %c to i32
+        \\ %d32 = zext i1 %d to i32
+        \\ %b2 = shl i32 %b32,1
+        \\ %c4 = shl i32 %c32,2
+        \\ %d8 = shl i32 %d32,3
+        \\ %ab = or i32 %a32,%b2
+        \\ %cd = or i32 %c4,%d8
+        \\ %r = or i32 %ab,%cd
+        \\ ret i32 %r
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    const source = module.functions.items[0];
+    const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = "e-p:64:64" };
+    var arena = std.heap.ArenaAllocator.init(a);
+    defer arena.deinit();
+    const view = (try pointer_values.legalize(arena.allocator(), source, &context)) orelse return error.ExpectedPointerOrderView;
+    var comparisons: usize = 0;
+    for (view.blocks.items[0].instructions.items) |inst| if (inst.kind == .icmp) {
+        comparisons += 1;
+        try std.testing.expect(inst.kind.icmp.operand_ty.eql(.{ .int = 64 }));
+    };
+    try std.testing.expectEqual(@as(usize, 4), comparisons);
+    var selected = try @import("../../../compilation.zig").select(a, "x86_64-unknown-linux-gnu", source, .{ .generic_cfg_selector = true, .module_context = &context });
+    defer selected.deinit(a);
+    try verify.verifyFunction(selected);
+    const code = try encoding.encodeFunction(a, selected);
+    defer a.free(code);
+    const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..code.len], code);
+    const run: *const fn (?*const anyopaque, ?*const anyopaque) callconv(.c) u32 = @ptrCast(memory.ptr);
+    const words = [_]u64{ 0, 1, 4095, 0x7fffffffffffffff, 0x8000000000000000, 0xfffffffffffffffe, 0xffffffffffffffff };
+    for (words) |left| for (words) |right| {
+        const expected: u32 = @as(u32, @intFromBool(left < right)) | (@as(u32, @intFromBool(left <= right)) << 1) | (@as(u32, @intFromBool(left > right)) << 2) | (@as(u32, @intFromBool(left >= right)) << 3);
+        try std.testing.expectEqual(expected, run(@ptrFromInt(left), @ptrFromInt(right)));
+    };
+    try std.testing.expect(source.blocks.items[0].instructions.items[0].kind.icmp.operand_ty == .ptr);
+    try module.verify();
+}
+
+test "native signed pointer comparisons retain integer address signs" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{ "slt", "sle", "sgt", "sge" }, 0..) |predicate, kind| {
+        const text = try std.fmt.allocPrint(a, "define i32 @signed_order(ptr %left,ptr %right) {{\nentry:\n %c = icmp {s} ptr %left,%right\n %r = zext i1 %c to i32\n ret i32 %r\n}}\n", .{predicate});
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const source = module.functions.items[0];
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = "e-p:64:64" };
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        const view = (try pointer_values.legalize(arena.allocator(), source, &context)) orelse return error.ExpectedSignedPointerView;
+        try std.testing.expect(view.blocks.items[0].instructions.items[2].kind.icmp.operand_ty.eql(.{ .int = 64 }));
+        var selected = try @import("../../../compilation.zig").select(a, "x86_64-unknown-linux-gnu", source, .{ .generic_cfg_selector = true, .module_context = &context });
+        defer selected.deinit(a);
+        try verify.verifyFunction(selected);
+        const code = try encoding.encodeFunction(a, selected);
+        defer a.free(code);
+        const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory[0..code.len], code);
+        const run: *const fn (?*const anyopaque, ?*const anyopaque) callconv(.c) u32 = @ptrCast(memory.ptr);
+        const words = [_]u64{ 0, 1, 4095, 0x7fffffffffffffff, 0x8000000000000000, 0xfffffffffffffffe, 0xffffffffffffffff };
+        for (words) |left| for (words) |right| {
+            const x: i64 = @bitCast(left);
+            const y: i64 = @bitCast(right);
+            const expected: u32 = @intFromBool(switch (kind) { 0 => x < y, 1 => x <= y, 2 => x > y, else => x >= y });
+            try std.testing.expectEqual(expected, run(@ptrFromInt(left), @ptrFromInt(right)));
+        };
+        try std.testing.expect(source.blocks.items[0].instructions.items[0].kind.icmp.operand_ty == .ptr);
+        try module.verify();
+    }
+}
+
+test "optimized facts pointer order retains nonnative and existing equality boundaries" {
+    const a = std.testing.allocator;
+    const cases = [_]struct { predicate: []const u8, layout: []const u8 }{
+        .{ .predicate = "ult", .layout = "e-p:32:32" },
+        .{ .predicate = "uge", .layout = "e-p:64:64-ni:0" },
+        .{ .predicate = "ugt", .layout = "e-p:64:64:64:32" },
+        .{ .predicate = "ule", .layout = "E-p:64:64" },
+        .{ .predicate = "eq", .layout = "e-p:64:64" },
+        .{ .predicate = "ne", .layout = "e-p:64:64" },
+    };
+    for (cases) |case| {
+        const text = try std.fmt.allocPrint(a, "define i1 @closed(ptr %a,ptr %b) {{\nentry:\n %r = icmp {s} ptr %a,%b\n ret i1 %r\n}}\n", .{case.predicate});
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = &.{}, .named_types = &.{}, .target_datalayout = case.layout };
+        var arena = std.heap.ArenaAllocator.init(a);
+        defer arena.deinit();
+        try std.testing.expect((try pointer_values.legalize(arena.allocator(), module.functions.items[0], &context)) == null);
+        try module.verify();
+    }
+}
+
 test "symbolic volatile scalar loads keep one exact memory event after pointer normalization" {
     const a = std.testing.allocator;
     for ([_][]const u8{ "i8", "i16", "i32", "i64", "ptr" }, [_]usize{ 8, 16, 32, 64, 64 }) |ty, bits| {
@@ -394,4 +506,83 @@ test "pointer flow constant boolean truncations preserve only their low bit" {
         const run: *const fn () callconv(.c) u64 = @ptrCast(memory.ptr);
         try std.testing.expectEqual(if (input & 1 != 0) @as(u64, 7) else 42, run());
     }
+}
+test "private long local identities retain quoted spellings and source memory behavior" {
+    const a = std.testing.allocator;
+    const prefix = "retained.";
+    const name = try a.alloc(u8,prefix.len+600);
+    defer a.free(name);
+    @memcpy(name[0..prefix.len],prefix);
+    @memset(name[prefix.len..],'x');
+    const alias = try std.fmt.allocPrint(a,"\"retained.\\78{s}\"",.{name[prefix.len+1..]});
+    defer a.free(alias);
+    const text = try std.fmt.allocPrint(a,
+        "define i64 @long_local(ptr %input,i64 %offset,i64 %salt) {{\nentry:\n %__zllvm_short_local_0 = or i64 %salt,0\n %{s} = getelementptr i8,ptr %input,i64 %offset\n %v = load i64,ptr %{s},align 1\n %c = icmp ult i64 %v,%salt\n br i1 %c,label %yes,label %no\nyes:\n %added = add i64 %v,%__zllvm_short_local_0\n br label %join\nno:\n %mixed = xor i64 %v,%__zllvm_short_local_0\n br label %join\njoin:\n %answer = phi i64 [%added,%yes],[%mixed,%no]\n ret i64 %answer\n}}\n", .{ alias, alias });
+    defer a.free(text);
+    var module = try ir.Module.parse(a, text);
+    defer module.deinit();
+    try module.verify();
+    const source = module.functions.items[0];
+    var selected = try @import("../../../compilation.zig").select(a, "x86_64-unknown-linux-gnu", source, .{ .generic_cfg_selector = true });
+    defer selected.deinit(a);
+    try verify.verifyFunction(selected);
+    const code = try encoding.encodeFunction(a, selected);
+    defer a.free(code);
+    const memory = try std.posix.mmap(null, code.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory[0..code.len], code);
+    const run: *const fn (*const u8,u64,u64) callconv(.c) u64 = @ptrCast(memory.ptr);
+    for (0..64) |seed| {
+        var input: [64]u8 = undefined;
+        for (&input,0..) |*byte,i| byte.* = @truncate((seed+1)*%0x9182736455aaccdd +% i*%71);
+        const before = input;
+        const offset = seed%8;
+        const value = std.mem.readInt(u64,input[offset..][0..8],.little);
+        const salt = seed*%0xfedcba9876543211;
+        try std.testing.expectEqual(if(value<salt) value+%salt else value^salt,run(&input[0],offset,salt));
+        try std.testing.expectEqualSlices(u8,&before,&input);
+    }
+    try std.testing.expectEqualStrings(alias,source.blocks.items[0].instructions.items[1].result.?);
+    try std.testing.expectEqualStrings(alias,source.blocks.items[0].instructions.items[2].kind.load.ptr.named);
+    try module.verify();
+}
+
+test "private long local identities reject opaque references and restore seeded machine state" {
+    const a = std.testing.allocator;
+    const name = try a.alloc(u8,600);
+    defer a.free(name);
+    @memset(name,'q');
+    for (0..3) |variant| {
+        const opaque_text = try std.fmt.allocPrint(a,"!capture !{{ptr %{s}}}",.{name});
+        defer a.free(opaque_text);
+        const bundle = if(variant==0) try std.fmt.allocPrint(a," [ \"deopt\"(ptr %{s}) ]",.{name}) else "";
+        defer if(variant==0) a.free(bundle);
+        const text = try std.fmt.allocPrint(a,
+            "declare void @identity_sink(ptr)\ndefine void @closed(ptr %input,i64 %offset) {{\nentry:\n %{s} = getelementptr i8,ptr %input,i64 %offset\n call void @identity_sink(ptr %{s})\n br label %end\nend:\n ret void\n}}\n",.{name,name});
+        defer a.free(text);
+        var module = try ir.Module.parse(a,text);
+        defer module.deinit();
+        if(variant==0) {
+            module.functions.items[0].blocks.items[0].instructions.items[1].kind.call.operand_bundle=bundle;
+            try std.testing.expectError(error.UnsupportedOperandBundle,module.verify());
+            continue;
+        }
+        if(variant==1) module.functions.items[0].blocks.items[0].instructions.items[0].metadata=opaque_text;
+        if(variant==2) module.functions.items[0].blocks.items[0].terminator.?.br.metadata=opaque_text;
+        try module.verify();
+        const source=module.functions.items[0];
+        var output=machine.MachineFunction.init(source.name,source.ret_ty);
+        defer output.deinit(a);
+        try output.instructions.append(a,.{.mov_imm_rax=123});
+        try std.testing.expectError(error.ValueUseIdentityTooLong,selector.tryLower(a,&output,source));
+        try std.testing.expectEqual(@as(usize,1),output.instructions.items.len);
+        try std.testing.expectEqual(@as(i64,123),output.instructions.items[0].mov_imm_rax);
+        try std.testing.expectEqual(machine.SelectionOwner.unassigned,output.selection_owner);
+        try std.testing.expectEqualStrings(name,source.blocks.items[0].instructions.items[0].result.?);
+        try std.testing.expectEqualStrings(name,source.blocks.items[0].instructions.items[1].kind.call.args.items[0].value.named);
+        try module.verify();
+    }
+    const maximum=@import("value_use/model.zig").max_identity_bytes;
+    try std.testing.expectEqual(@as(usize,512),maximum);
+    try std.testing.expectError(error.ValueUseIdentityTooLong,@import("value_use/model.zig").ActionIdentity.init(name));
 }
