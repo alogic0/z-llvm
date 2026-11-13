@@ -47,13 +47,19 @@ required faults pass. The complete original compiler object is unchanged;
 changed runtime conversions have exact encoding and independent LLVM/C proofs.
 The original Debug replay gains 34 without loss but retains 107 failures.
 
-The bit-reversal, literal-branch, literal-bitcast and checked-vector repairs
-are adopted for fresh cumulative validation. Both isolated 2,286-unit builds and all component native checks
-pass; 19 original selections are gained without loss, leaving 88 failures.
-The Zig generator reproduces all 51 fixture files exactly. Next, freeze and validate
-the 177-population corpus, including all 4,132 required faults and fresh original
-objects, then continue closing the original Debug failures. Bounded double,
-quad and x87 input fragments remain isolated pending independent interop proof.
+The [scalar/vector checkpoint](evidence/compiler_behavior_scalar_vector_checkpoint_20261112.json)
+accepts those four repairs at `c3e5547d`. Both official 2,286-unit builds,
+eight readiness procedures, all 17 gates, both 177-population suites and all
+4,132 faults pass. All 6,332 prior outcomes per build match. The 54 changed
+object copies, changed compiler function and runtime helper are fully reviewed.
+The original Debug input gains 19 without loss but still rejects 88 definitions.
+
+Next, adopt the isolated six-family FP-input, FP-mask, FP-extrema, integer-product,
+boolean-call and bounded-assembly batch after its combined component checks.
+Both 2,294-unit builds pass; 37 original selections are gained without loss,
+leaving 51 failures. The maintained Zig generator reproduces all 64 files
+exactly. Freeze and validate the 183-population corpus, including all 4,456
+required faults and fresh original objects, then continue closing Debug failures.
 Build the final generations and complete both four-mode local-hook
 matrices and the normal-resource rebuild after the repairs are accepted.
 The existing resource and scalar checkpoints retain their separate scopes.

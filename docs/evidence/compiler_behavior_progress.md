@@ -339,7 +339,25 @@ fails with 107 rejections. The next isolated four-family repair passes both
 2,286-unit builds and all eight component native runs, detecting 216 faults.
 It gains 19 original selections without loss, leaving 88 failures. Its maintained
 Zig generator reproduces all 51 files and 25 population entries exactly.
-Adopt it and repeat cumulative validation at 177 native populations. Wider
-floating input fragments remain isolated pending full LLVM/C interoperability
-proof. Final compiler generations, both complete local-hook matrices and
+The [scalar/vector checkpoint](compiler_behavior_scalar_vector_checkpoint_20261112.json)
+accepts that adoption at `c3e5547d`. Both official 2,286-unit builds, all eight
+readiness procedures, all 17 gates, both 177-population native suites and all
+4,132 faults pass. Each strict comparison retains all 6,332 prior command
+outcomes. All 54 changed object copies bind to eight audited pairs with exact
+data, symbol and relocation contracts and full-module function encodings.
+One differing Debug input hash receives a fresh encoding proof. Fresh original
+production completes 8,928 compiler and both 455 runtime definitions, with
+unchanged owners and passing ELF and balanced-event audits. The one changed
+compiler function and two runtime symbols reproduce their before/after
+encodings exactly. The runtime's i32 bit-reversal helper also agrees with an
+independent C loop and 65,536 exact LLVM records per object. The separate Small
+runtime completes all 503 definitions. All 3,599 frozen source files remain
+unchanged through validation; uncontrolled concurrent timings imply no speedup.
+
+The accepted Debug replay remains failed at 7,786/7,874 with 88 rejections.
+The next isolated six-family batch passes both 2,294-unit builds and selects
+7,823/7,874, gaining 37 without loss and retaining 51 failures. Its maintained
+Zig generator reproduces all 64 files and 31 population entries exactly.
+Combined component checks precede adoption and fresh 183-population cumulative
+validation. Final compiler generations, both complete local-hook matrices and
 follow-up acceptance remain open.

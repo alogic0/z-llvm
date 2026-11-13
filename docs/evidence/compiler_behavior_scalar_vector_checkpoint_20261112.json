@@ -1,0 +1,195 @@
+{
+  "schema": "upstream-behavior-scalar-vector-checkpoint-v1",
+  "status": "repair-checkpoint-passed-follow-up-open",
+  "scope": "Four private scalar and checked-vector repairs; original Debug behavior, final compiler generations and complete local-hook matrices remain open",
+  "code_revision": "c3e5547dd722ee0df42f82a162a011c98196b2d2",
+  "code_tree": "96111a1c2f6fd53dbfafe47e4a2235fb96fc27ff",
+  "preceding_checkpoint": "c3b77e61ec43d7159a5175af73f6599ca03d16cf",
+  "units_per_build": 2286,
+  "unit_builds": [
+    "Debug",
+    "ReleaseSafe"
+  ],
+  "structural_per_build": 64,
+  "profiling_per_build": 2,
+  "readiness_procedures": 8,
+  "integration_gates": 17,
+  "integration_actual_returncode": 0,
+  "integration_run_id": "17fbeaefeff86420ddf1935d9a58833f",
+  "integration_bundle_sha256": "3b65f5608098bf2c5f7816bea4b38a0cf0333797b516d1c7ae21d1f7e89d5249",
+  "integration_wall_ns": 4732152054004,
+  "native_builds": [
+    "Debug",
+    "ReleaseFast"
+  ],
+  "native_populations_per_build": 177,
+  "added_native_populations": [
+    "bitreverse_native_width",
+    "literal_branches",
+    "literal_fp_bitcasts",
+    "checked_vector_arithmetic"
+  ],
+  "generator": "tools/generate_behavior_expansion_canaries.zig",
+  "generator_reproduced_files": 51,
+  "native_registry_sha256": "f1389925ceb5b38677b1b02ed0364f6c7fa46fe9c399665c2b3265f28bdbce5d",
+  "prior_command_outcomes_per_build": 6332,
+  "prior_objects_unchanged_per_build": 1023,
+  "prior_objects_changed_per_build": 27,
+  "prior_owner_artifacts_unchanged_per_build": 1041,
+  "prior_optimizer_artifacts_unchanged_per_build": 528,
+  "strict_comparison_actual_returncode_per_build": 1,
+  "changed_artifact_review": {
+    "strict_failure": "NativeArtifactsRequireReview",
+    "changed_object_copies": 54,
+    "unique_object_pairs": 8,
+    "reports": [
+      "review-native-followup-fast-v835/report.json",
+      "review-native-followup-debug-v846/report.json"
+    ],
+    "cause": "Normalizing smaller bit reversals through the existing terminal i64 owner changes instruction encodings in integer-intrinsics, intrinsic-facts, intrinsic-preservation, vector-intrinsics and the full runtime provider",
+    "checks": "Allocated non-text bytes, section sizes and flags, symbol properties and function-owned relocations match. Every changed function reproduces from the complete exact artifact module using both retained sources. Debug copies bind to the same whole-object pairs; one differing input hash receives an additional full-module encoding proof. All native LLVM/C executions are fresh.",
+    "baseline_or_comparator_waiver": false
+  },
+  "native_fault_controls_per_build": 2052,
+  "fixed_runtime_fault_controls_per_build": 14,
+  "required_fault_controls": 4132,
+  "fixed_runtime_definitions": 455,
+  "fixed_runtime_object_bytes": 3085120,
+  "fixed_runtime_object_sha256": "47b8d77ec809654782c7fdee75bd7f8c4c486a1c0e15c96d28e62857f6e0917a",
+  "fixed_runtime_objects_byte_identical_to_previous_checkpoint": false,
+  "runtime_observations_per_route_per_build": 21792,
+  "runtime_owners_unchanged": true,
+  "runtime_changed_function_symbols": 2,
+  "runtime_changed_functions": [
+    "__bitreversesi2"
+  ],
+  "runtime_changed_function_review": {
+    "encoding_report": "runtime-changed-functions-followup-v797/report.json",
+    "execution_report": "runtime-bitreverse-followup-v798/report.json",
+    "full_module_context_and_aliases": true,
+    "all_4_before_after_encodings_match_objects": true,
+    "exact_records_per_route": 65536,
+    "independent_bit_loop_checks_per_route": 65536,
+    "routes": [
+      "LLVM",
+      "previous accepted runtime",
+      "Debug",
+      "ReleaseFast"
+    ],
+    "record_sha256": "6359ef6d620d045b5f665c6ea514c2f605275d39082a00349819442f1cb80aa9",
+    "additional_detected_faults": 9,
+    "checks": "All single-bit positions, their complements and 65,472 deterministic i32 patterns agree with an independent C bit loop and exact LLVM records; complete original runtime objects are linked and executed"
+  },
+  "fixed_compiler_definitions": 8928,
+  "fixed_compiler_object_bytes": 149611864,
+  "fixed_compiler_object_sha256": "2955471809d24338864675a51c29e1a50568f5147d2dd19790ceab1a84e8c5d9",
+  "compiler_whole_object_byte_identical_to_previous_checkpoint": false,
+  "compiler_function_symbols": 8929,
+  "compiler_function_symbols_unchanged": 8928,
+  "compiler_function_symbols_changed": 1,
+  "compiler_owners_unchanged": true,
+  "compiler_event_records": 5445910,
+  "original_events_balanced": true,
+  "original_elf_audits_passed": true,
+  "production_backend_sha256": {
+    "Debug": "11c8393c6302a0d54a6dbf9fa802e29ebd9abbde614e0d77a79d77c3ac4de420",
+    "ReleaseFast": "21c1abb68955285c6dc11535bc67d12ce4872a2d09a1975713e5cfdc8eee3b93"
+  },
+  "source_preservation": {
+    "files": 3599,
+    "snapshot": "source-frozen-behavior-followup-v780.json",
+    "copies": "retained-behavior-followup-source-v780",
+    "final_verification_actual_returncode": 0
+  },
+  "original_debug_behavior": {
+    "input_sha256": "d8b983f4686a19acdf9f5bcc84c084b6fbc68e104e1671032509f7180c9aa02b",
+    "definitions": 7874,
+    "backend_build": "ReleaseFast",
+    "selected_successfully": 7786,
+    "failed": 88,
+    "gained": 19,
+    "lost": 0,
+    "actual_returncode": 1,
+    "complete_object": false,
+    "gains_report": "behavior-canonical-followup-gains-v794.json"
+  },
+  "separate_release_small_runtime": {
+    "input_sha256": "e480b71b5e90c088cabda455b52238f6fe72333db6e7e6a565fed322be083fc3",
+    "definitions": 503,
+    "failed": 0,
+    "actual_returncode": 0,
+    "object_complete": true,
+    "elf_audit_passed": true,
+    "balanced_events": true,
+    "replaces_fixed_runtime": false
+  },
+  "preserved": {
+    "frozen_contracts": 24,
+    "ratchet": 130,
+    "real_prefix": 100,
+    "execution_cohort": 12,
+    "core_records": 36,
+    "stack_object_limit_bytes": 65536,
+    "generated_frame_limit_bytes": 8388608,
+    "direct_argument_limit": 64,
+    "indirect_argument_limit": 16,
+    "stack_word_limit": 128,
+    "ordinary_ninth_sse_argument_remains_closed": true
+  },
+  "controlled_performance_claim": false,
+  "final_follow_up_accepted": false,
+  "evidence_root": "local-state/validations/compiler-behavior-completion-20261111/batch-01",
+  "receipts": {
+    "build_debug": "build-canonical-followup-Debug-v780-run",
+    "build_fast": "build-canonical-followup-ReleaseFast-v780-run",
+    "generator": "generate-canonical-followup-v780-run",
+    "units_debug": "units-canonical-followup-Debug-v780-run",
+    "units_safe": "units-canonical-followup-ReleaseSafe-v780-run",
+    "readiness": "readiness-behavior-followup-v781-run",
+    "retained_pins": "retained-pins-followup-v800-run",
+    "integration": "full-behavior-followup-v781-run",
+    "native_debug": "native-debug-behavior-followup-v781-run",
+    "native_fast_report": "integrated-behavior-followup-v781/unchanged-upstream-c/report.json",
+    "native_review_fast": "review-native-followup-fast-v835-run",
+    "native_review_debug": "review-native-followup-debug-v846-run",
+    "native_faults_debug": "native-Debug-faults-followup-v840-run",
+    "native_faults_fast": "native-ReleaseFast-faults-followup-v833-run",
+    "runtime_debug": "runtime-Debug-behavior-followup-v781-run",
+    "runtime_fast": "runtime-ReleaseFast-behavior-followup-v781-run",
+    "runtime_events": "runtime-events-followup-v794-run",
+    "runtime_elf_debug": "runtime-elf-Debug-followup-v794-run",
+    "runtime_elf_fast": "runtime-elf-ReleaseFast-followup-v794-run",
+    "runtime_function_bytes": "runtime-function-bytes-followup-v796-run",
+    "runtime_changed_functions": "runtime-changed-functions-followup-v797-run",
+    "runtime_bit_loop_execution": "runtime-bitreverse-followup-v798-run",
+    "small_runtime": "runtime-small-behavior-followup-v781-run",
+    "small_runtime_census": "census-small-runtime-followup-v794-run",
+    "small_runtime_elf": "runtime-small-elf-followup-v800-run",
+    "compiler": "compiler-original-behavior-followup-v781-run",
+    "compiler_elf": "compiler-elf-followup-v845-run",
+    "compiler_function_bytes": "compiler-function-bytes-followup-v845-run",
+    "compiler_changed_functions": "compiler-changed-functions-followup-v847-run",
+    "final_source": "source-final-followup-v848-run"
+  },
+  "event_audits": [
+    "compiler-events-followup-v845.json",
+    "runtime-events-followup-v794-Debug.json",
+    "runtime-events-followup-v794-ReleaseFast.json",
+    "runtime-small-events-followup-v794.json"
+  ],
+  "retained_nonpassing_receipts": {
+    "strict_debug_requires_review": "native-Debug-strict-followup-v840-run",
+    "strict_fast_requires_review": "native-ReleaseFast-strict-followup-v833-run",
+    "original_debug_behavior": "behavior-canonical-followup-fast-v781-run",
+    "first_debug_review_requires_actual_input_proof": "review-native-followup-debug-v843-run"
+  },
+  "compiler_changed_function_review": {
+    "report": "compiler-changed-functions-followup-v847/report.json",
+    "functions": [
+      "compress.flate.Decompress.streamInner"
+    ],
+    "full_original_module_context": true,
+    "all_2_before_after_encodings_match_objects": true,
+    "cause": "The private bit-reversal normalization changes the function encoding; independent native bit-reversal and preservation suites prove the bounded operation"
+  }
+}
