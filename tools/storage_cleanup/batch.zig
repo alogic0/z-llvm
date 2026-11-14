@@ -178,7 +178,9 @@ pub fn reviewedPins(e: *core.Engine, requests_path: []const u8, review_path: []c
     const requests = try load(e, requests_path);
     if (!p.relative(review_path)) return error.InvalidEvidencePath;
     try e.addControl(review_path);
-    var review = try e.load(e.c.gpa, review_path);
+    // A 16K-candidate review can exceed the ordinary 32 MiB evidence limit.
+    // This larger bound applies only to the explicitly selected collector report.
+    var review = try e.loadLimit(e.c.gpa, review_path, 128 * 1024 * 1024);
     defer review.deinit();
     if (!core.eq(review.value, "status", "complete") or !core.eq(review.value, "mode", "review")) return error.IncompleteRequestReview;
     var bound = false;
@@ -192,6 +194,19 @@ pub fn reviewedPins(e: *core.Engine, requests_path: []const u8, review_path: []c
     defer pin_json.deinit();
     var pins = try std.json.parseFromValue([]const core.PinReference, e.c.gpa, pin_json.value, .{});
     defer pins.deinit();
+    var qualified_actions = std.StringHashMap(void).init(e.c.a);
+    for ((try core.get(review.value, "actions")).array.items) |action| {
+        const retained = try core.get(action, "retained");
+        if (retained != .array or retained.array.items.len == 0) continue;
+        try qualified_actions.put(try e.c.fmt("{s}\n{s}", .{ try core.str(action, "producer"), try core.str(action, "path") }), {});
+    }
+    var candidate_pins = std.StringHashMap(std.ArrayList(core.PinReference)).init(e.c.a);
+    for (pins.value) |pin| {
+        const group = try candidate_pins.getOrPut(pin.candidate);
+        if (!group.found_existing) group.value_ptr.* = .empty;
+        try group.value_ptr.append(e.c.a, pin);
+    }
+    var terminal_manifests = std.StringHashMap(bool).init(e.c.a);
     var revised: std.ArrayList(p.Evidence) = .empty;
     var transitioned: usize = 0;
     for (requests) |request| {
@@ -202,14 +217,9 @@ pub fn reviewedPins(e: *core.Engine, requests_path: []const u8, review_path: []c
         var transitions: std.ArrayList(p.PinTransition) = .empty;
         try transitions.appendSlice(e.c.a, record.value.retired_pins);
         for (record.value.artifacts) |artifact| {
-            var qualified = false;
-            for ((try core.get(review.value, "actions")).array.items) |action| {
-                if (!core.eq(action, "producer", request.path) or !core.eq(action, "path", artifact.path)) continue;
-                const retained = try core.get(action, "retained");
-                if (retained == .array and retained.array.items.len > 0) qualified = true;
-            }
-            if (!qualified) continue;
-            for (pins.value) |pin| {
+            if (!qualified_actions.contains(try e.c.fmt("{s}\n{s}", .{ request.path, artifact.path }))) continue;
+            const matches = candidate_pins.get(artifact.path) orelse continue;
+            for (matches.items) |pin| {
                 var explicitly_reviewed = false;
                 for (reviewed) |manifest| if (std.mem.eql(u8, manifest.path, pin.manifest.path) and std.mem.eql(u8, manifest.sha256, pin.manifest.sha256)) {
                     explicitly_reviewed = true;
@@ -219,9 +229,16 @@ pub fn reviewedPins(e: *core.Engine, requests_path: []const u8, review_path: []c
                 for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, pin.manifest.path)) return error.CurrentManifestCannotBeRetired;
                 try e.check(pin.manifest);
                 if (!explicitly_reviewed and std.mem.endsWith(u8, pin.manifest.path, ".json")) {
-                    var old = try e.load(e.c.gpa, pin.manifest.path);
-                    defer old.deinit();
-                    if (!core.eq(old.value, "status", "complete")) continue;
+                    // The hash/path observation is checked above on every use.
+                    // Only parsing the immutable terminal status is shared.
+                    const complete = terminal_manifests.get(pin.manifest.path) orelse blk: {
+                        var old = try e.load(e.c.gpa, pin.manifest.path);
+                        defer old.deinit();
+                        const result = core.eq(old.value, "status", "complete");
+                        try terminal_manifests.put(pin.manifest.path, result);
+                        break :blk result;
+                    };
+                    if (!complete) continue;
                 }
                 try transitions.append(e.c.a, .{ .manifest = pin.manifest, .reference = pin.reference.?, .target = .{ .path = artifact.path, .sha256 = artifact.sha256 }, .reason = if (explicitly_reviewed) reviewed_reason else if (record.value.state == .disposable) "User-authorized disposal of completed temporary build output; this historical reference does not require preserving its binary" else "Completed historical retirement pin replaced by verified source/build/result evidence and the explicitly accepted successor" });
                 transitioned += 1;

@@ -36,7 +36,7 @@ const usage =
     \\Without --apply, writes a review with reasons and makes no artifact changes.
     \\--apply discovers again and collects eligible completed private caches and
     \\explicitly released artifacts. Unknown or pinned files are retained.
-    \\--minimal removes the optional idle delay and reviews up to 1024 candidates;
+    \\--minimal removes the optional idle delay and reviews up to 16384 candidates;
     \\all provenance, pins, consumers and the policy's byte limit still apply.
     \\maintain runs a command under the reader lease, then applies minimal cleanup.
     \\Policy defaults to docs/storage_cleanup_policy.json. JSON reports are saved

@@ -18,7 +18,7 @@ pub const Config = struct {
 pub fn minimal(c: Config) Config {
     var result = c;
     result.minimum_idle_hours = 0;
-    result.max_candidates = 1024;
+    result.max_candidates = 16_384;
     return result;
 }
 pub const Holds = struct { schema: u32 = 1, paths: []const []const u8 = &.{} };
@@ -114,7 +114,7 @@ pub fn commandOutputName(a: Artifact) bool {
         (artifactName(a) or std.mem.indexOfScalar(u8, std.fs.path.basename(a.path), '.') == null);
 }
 pub fn validate(c: Config) !void {
-    if (c.schema != 1 or c.max_candidates == 0 or c.max_candidates > 1024 or c.max_candidate_entries == 0 or c.max_candidate_entries > 1_000_000 or c.max_reclaim_bytes == 0 or !relative(c.holds_file)) return error.InvalidPolicy;
+    if (c.schema != 1 or c.max_candidates == 0 or c.max_candidates > 16_384 or c.max_candidate_entries == 0 or c.max_candidate_entries > 1_000_000 or c.max_reclaim_bytes == 0 or !relative(c.holds_file)) return error.InvalidPolicy;
     for (c.current_manifests) |m| {
         if (!relative(m)) return error.InvalidPolicy;
         for (c.retired_manifests) |r| if (std.mem.eql(u8, m, r.path)) return error.CurrentManifestCannotBeRetired;

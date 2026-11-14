@@ -59,6 +59,30 @@ test "storage cleanup: unsuccessful output command cannot release a passed owner
     try t.expectError(error.OutputCommandNotSuccessful, command_outputs.request(&e, report, "Rejected output"));
 }
 
+test "storage cleanup: multi-product requests retain only exact per-file pin exceptions" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, true);
+    var r = try command_outputs.request(&e, report, "Closed products with historical references");
+    const manifest = run ++ "/historical.sha256";
+    try f.write(manifest, try e.c.fmt("{s}  {s}\n{s}  {s}\n", .{ r.artifacts[0].sha256, r.artifacts[0].path, r.artifacts[1].sha256, r.artifacts[1].path }));
+    var transitions: [2]p.PinTransition = undefined;
+    for (r.artifacts, &transitions) |artifact, *transition| transition.* = .{ .manifest = .{ .path = manifest, .sha256 = try e.digest(manifest) }, .reference = artifact.path, .target = .{ .path = artifact.path, .sha256 = artifact.sha256 }, .reason = "Exact reviewed historical output" };
+    r.retired_pins = &transitions;
+    try e.write(run ++ "/products-release.json", r);
+    try e.discoverRelease(run ++ "/products-release.json", true);
+    for (0..2) |index| {
+        try e.qualify(index);
+        try t.expectEqual(@as(usize, 1), e.actions.items[index].retired_pins.len);
+        try t.expectEqualStrings(e.actions.items[index].path, e.actions.items[index].retired_pins[0].target.path);
+    }
+    try e.pins();
+    try mutation.applyFileBatch(&e, &.{ 0, 1 });
+    for (e.actions.items) |a| try t.expectEqual(.removed, a.status);
+    _ = try e.metadata(manifest);
+}
+
 test "storage cleanup: other extensionless executables require commands and compiled bytes" {
     const f = try Fixture.init();
     defer f.deinit();
@@ -123,6 +147,22 @@ test "storage cleanup: changed command evidence preserves every batched product"
     for (0..2) |i| try e.qualify(i);
     try f.write(run ++ "/commands.json", "[]");
     if (mutation.applyFileBatch(&e, &.{ 0, 1 })) |_| return error.ChangedEvidenceAccepted else |_| {}
+    for (e.actions.items) |a| _ = try e.metadata(a.path);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: cached owner request detects changes between product qualifications" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, true);
+    var r = try command_outputs.request(&e, report, "Closed products");
+    try e.write(run ++ "/products-release.json", r);
+    try e.discoverRelease(run ++ "/products-release.json", true);
+    try e.qualify(0);
+    r.reason = "Changed after first product qualified";
+    try e.write(run ++ "/products-release.json", r);
+    try t.expectError(error.FileChanged, e.qualify(1));
     for (e.actions.items) |a| _ = try e.metadata(a.path);
     try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
 }
@@ -217,6 +257,23 @@ test "storage cleanup: unknown third trace name prevents group admission" {
     try e.discoverRelease(released ++ "/storage-release.json", true);
     try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
     for (e.actions.items) |a| _ = try e.metadata(a.path);
+}
+
+test "storage cleanup: cached alias index rechecks names after a same-count relink" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try traceAliasFixture(f);
+    var e = f.engine();
+    try qualifyTraceAliases(f, &e);
+    const file = try f.tmp.dir.openFile(t.io, peer_trace, .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, released ++ "/unlisted-link", .{});
+    try f.tmp.dir.deleteFile(t.io, peer_trace);
+    try t.expectEqual(@as(u64, 2), (try e.metadata(released ++ "/profile.events.jsonl")).links);
+    e.actions.items[0].status = .discovered;
+    try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
+    _ = try e.metadata(released ++ "/profile.events.jsonl");
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
 }
 
 test "storage cleanup: new trace alias pin rolls back both quarantined names" {
@@ -1740,7 +1797,8 @@ test "storage cleanup: minimal mode preserves byte limits and protection declara
     const config: p.Config = .{ .max_reclaim_bytes = 4096, .protected_paths = &.{run}, .current_manifests = &.{"required.sha256"}, .holds_file = "queue.json" };
     const minimal = p.minimal(config);
     try t.expectEqual(@as(u32, 0), minimal.minimum_idle_hours);
-    try t.expectEqual(@as(usize, 1024), minimal.max_candidates);
+    try t.expectEqual(@as(usize, 16_384), minimal.max_candidates);
+    try p.validate(minimal);
     try t.expectEqual(config.max_reclaim_bytes, minimal.max_reclaim_bytes);
     try t.expectEqualStrings(run, minimal.protected_paths[0]);
     try t.expectEqualStrings("required.sha256", minimal.current_manifests[0]);

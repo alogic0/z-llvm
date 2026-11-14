@@ -43,7 +43,7 @@ names; interruption or partial removal leaves a durable journal.
 
 ## Qualification and initial review
 
-All 138 collector tests pass in Debug and ReleaseFast, including missing aliases,
+All 141 collector tests pass in Debug and ReleaseFast, including missing aliases,
 new pins, evidence changes, noncompiled payloads, output binding and allocation.
 Four targeted native-event auditor tests pass in both modes. The full storage
 suite passed ten build steps; the final collector also passed the eight targeted
@@ -63,3 +63,21 @@ pairs can be transitioned; the five current integrity contracts, other manifest
 entries, live holds and incomplete alias groups remain protected.
 
 Detailed evidence and checks are in `local-state/storage-cleanup/completed-outputs/`.
+
+The expanded set contains 16,004 products. Minimal mode now admits up to 16,384
+candidates in one review/apply pass so qualification is not repeated for each
+1024-file chunk. File mutations remain capped at 1024 names, with refreshed
+holds, pins, consumers and evidence per batch; the 32 GiB byte budget is unchanged.
+
+The real workload also exposed repeated work in hardlink and historical-pin
+checks. Alias discovery now builds one inode index and freshly checks every
+member of a proposed group. Typed release records and terminal ledger statuses
+are cached only while their pathname observations and hashes remain unchanged.
+Historical-pin preparation indexes qualified review rows and candidate references;
+each action retains only its own validated exceptions. The selected collector
+review has a separate 128 MiB read bound because the 16K-action report exceeds
+the ordinary 32 MiB evidence limit. Tests cover a same-count relink, a request
+changed after the first qualification, and exact per-file historical exceptions.
+The indexed preparer produced 7,909 exact historical pin transitions in 1.50
+seconds with 345,460 KiB maximum resident memory. The declarations remain subject
+to fresh qualification, current pins, holds and consumers during collection.

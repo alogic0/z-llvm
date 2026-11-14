@@ -282,8 +282,9 @@ pin, retained dependency, hold or active owner protects the physical file.
 Allocation is counted once, on the last unlink. `--complete-capture-aliases`
 remains the narrower option for capture helpers.
 
-Qualified files are collected in batches bounded by the policy's candidate
-budget (at most 1024 names), keeping each alias group indivisible. The durable
+Minimal mode admits up to 16,384 candidates per pass, within the unchanged byte
+budget. Qualified files are collected in batches bounded by that budget and a
+separate cap of 1024 names, keeping each alias group indivisible. The durable
 `file-batch` journal records every original/quarantine name, hash and metadata.
 The collector rechecks pins, holds, consumers and retained evidence after
 quarantining all members. Before the first unlink a failure restores every

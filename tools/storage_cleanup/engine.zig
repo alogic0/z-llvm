@@ -94,9 +94,12 @@ pub const Engine = struct {
     allow_capture_aliases: bool = false,
     allow_artifact_aliases: bool = false,
     command_output_records: std.StringHashMap([]const @import("command_outputs.zig").Record),
+    alias_index: ?std.AutoHashMap(fa.metadata.Identity, std.ArrayList(usize)) = null,
+    validated_transition_requests: std.StringHashMap(void),
+    release_records: std.StringHashMap(struct { record: p.Release, sha256: []const u8 }),
 
     pub fn init(c: *u.Context, config: p.Config, output: []const u8, zigrep: []const u8) Engine {
-        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a), .git_sources = .init(c.a), .command_output_records = .init(c.a) };
+        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a), .git_sources = .init(c.a), .command_output_records = .init(c.a), .validated_transition_requests = .init(c.a), .release_records = .init(c.a) };
     }
     pub fn absolute(e: *Engine, path: []const u8) ![]const u8 {
         return e.c.join(&.{path});
@@ -150,7 +153,10 @@ pub const Engine = struct {
         if (!p.hash(row.sha256) or !std.mem.eql(u8, try e.digest(row.path), row.sha256)) return error.EvidenceHashMismatch;
     }
     pub fn load(e: *Engine, allocator: std.mem.Allocator, path: []const u8) !std.json.Parsed(u.Value) {
-        const bytes = try e.read(allocator, path, 32 * 1024 * 1024);
+        return e.loadLimit(allocator, path, 32 * 1024 * 1024);
+    }
+    pub fn loadLimit(e: *Engine, allocator: std.mem.Allocator, path: []const u8, max_bytes: usize) !std.json.Parsed(u.Value) {
+        const bytes = try e.read(allocator, path, max_bytes);
         defer allocator.free(bytes);
         return std.json.parseFromSlice(u.Value, allocator, bytes, .{ .allocate = .alloc_always });
     }
@@ -815,11 +821,7 @@ pub const Engine = struct {
         if (!bound) return error.SourceCompilerCommandNotBound;
     }
     fn releaseEvidence(e: *Engine, a: *Action, list: *std.ArrayList(Evidence)) !void {
-        var parsed = try e.load(e.c.gpa, a.producer);
-        defer parsed.deinit();
-        var rp = try std.json.parseFromValue(p.Release, e.c.gpa, parsed.value, .{});
-        defer rp.deinit();
-        const r = rp.value;
+        const r = try e.releaseRecord(a.producer);
         if (r.state == .held) return error.ReleaseHeld;
         const named_test = std.mem.eql(u8, std.fs.path.basename(a.path), "local") or std.mem.eql(u8, std.fs.path.basename(a.path), "reference");
         if (named_test and r.command_outputs == null) return error.MissingCommandOutputBinding;
@@ -946,20 +948,50 @@ pub const Engine = struct {
             }
         }
     }
-    fn releaseTransitions(e: *Engine, a: *Action, list: *std.ArrayList(Evidence), r: p.Release) !void {
-        for (r.retired_pins) |transition| {
-            if (!p.relative(transition.manifest.path) or !p.hash(transition.manifest.sha256) or
-                transition.reference.len == 0 or transition.reason.len == 0) return error.InvalidPinTransition;
-            for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, transition.manifest.path)) return error.CurrentManifestCannotBeRetired;
-            var matches = false;
-            for (r.artifacts) |artifact| if (std.mem.eql(u8, artifact.path, transition.target.path) and std.mem.eql(u8, artifact.sha256, transition.target.sha256)) {
-                matches = true;
-                break;
-            };
-            if (!matches) return error.PinTransitionNotAnArtifact;
-            try e.keep(list, transition.manifest.path, transition.manifest.sha256);
+    fn releaseRecord(e: *Engine, path: []const u8) !p.Release {
+        if (e.release_records.get(path)) |cached| {
+            try e.check(.{ .path = path, .sha256 = cached.sha256 });
+            return cached.record;
         }
-        a.retired_pins = (try std.json.parseFromSlice([]const p.PinTransition, e.c.a, try std.json.Stringify.valueAlloc(e.c.a, r.retired_pins, .{}), .{ .allocate = .alloc_always })).value;
+        const bytes = try e.read(e.c.gpa, path, 32 * 1024 * 1024);
+        defer e.c.gpa.free(bytes);
+        // The engine arena owns the typed record for this invocation. Each use
+        // still checks the pathname observation and its bound content hash.
+        const parsed = try std.json.parseFromSlice(p.Release, e.c.a, bytes, .{ .allocate = .alloc_always });
+        try e.release_records.put(try e.c.a.dupe(u8, path), .{ .record = parsed.value, .sha256 = try e.digest(path) });
+        return parsed.value;
+    }
+    fn releaseTransitions(e: *Engine, a: *Action, list: *std.ArrayList(Evidence), r: p.Release) !void {
+        if (r.retired_pins.len == 0) return;
+        // Validate the complete immutable declaration once, then retain only
+        // this action's exact exceptions. Large owner requests may contain
+        // thousands of products; copying every exception onto each action is
+        // quadratic and gives unrelated products unnecessary dependencies.
+        if (!e.validated_transition_requests.contains(a.producer)) {
+            var artifacts = std.StringHashMap([]const u8).init(e.c.gpa);
+            defer artifacts.deinit();
+            for (r.artifacts) |artifact| {
+                const entry = try artifacts.getOrPut(artifact.path);
+                if (entry.found_existing) return error.DuplicateReleaseArtifact;
+                entry.value_ptr.* = artifact.sha256;
+            }
+            for (r.retired_pins) |transition| {
+                if (!p.relative(transition.manifest.path) or !p.hash(transition.manifest.sha256) or
+                    transition.reference.len == 0 or transition.reason.len == 0) return error.InvalidPinTransition;
+                for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, transition.manifest.path)) return error.CurrentManifestCannotBeRetired;
+                const sha = artifacts.get(transition.target.path) orelse return error.PinTransitionNotAnArtifact;
+                if (!std.mem.eql(u8, sha, transition.target.sha256)) return error.PinTransitionNotAnArtifact;
+                try e.check(transition.manifest);
+            }
+            try e.validated_transition_requests.put(try e.c.a.dupe(u8, a.producer), {});
+        }
+        var matched: std.ArrayList(p.PinTransition) = .empty;
+        for (r.retired_pins) |transition| {
+            if (!std.mem.eql(u8, transition.target.path, a.path)) continue;
+            try e.keep(list, transition.manifest.path, transition.manifest.sha256);
+            try matched.append(e.c.a, transition);
+        }
+        a.retired_pins = (try std.json.parseFromSlice([]const p.PinTransition, e.c.a, try std.json.Stringify.valueAlloc(e.c.a, matched.items, .{}), .{ .allocate = .alloc_always })).value;
     }
     pub fn qualify(e: *Engine, index: usize) !void {
         const a = &e.actions.items[index];
@@ -1023,18 +1055,35 @@ pub const Engine = struct {
     fn completeCaptureSet(e: *Engine, index: usize, expected: fa.Metadata) !bool {
         const action = e.actions.items[index];
         if (!e.aliasAllowed(action)) return false;
-        var count: usize = 0;
-        for (e.actions.items) |other| {
-            if (!e.aliasAllowed(other)) continue;
+        if (e.alias_index == null) {
+            var identities = std.AutoHashMap(fa.metadata.Identity, std.ArrayList(usize)).init(e.c.a);
+            for (e.actions.items, 0..) |*other, other_index| {
+                if (!e.aliasAllowed(other.*)) continue;
+                const m = e.metadata(other.path) catch |err| switch (err) {
+                    error.FileNotFound => continue,
+                    else => return err,
+                };
+                // Do not replace a previously qualified metadata observation.
+                if (other.metadata == null) other.metadata = m;
+                const group = try identities.getOrPut(fa.metadata.identity(m));
+                if (!group.found_existing) group.value_ptr.* = .empty;
+                try group.value_ptr.append(e.c.a, other_index);
+            }
+            e.alias_index = identities;
+        }
+        const group = e.alias_index.?.get(fa.metadata.identity(expected)) orelse return false;
+        if (group.items.len != expected.links) return false;
+        // The index narrows the lookup, never establishes current identity.
+        // Replaced, missing or newly added links fail closed on this pass.
+        for (group.items) |other_index| {
+            const other = e.actions.items[other_index];
             const m = e.metadata(other.path) catch |err| switch (err) {
-                error.FileNotFound => continue,
+                error.FileNotFound => return false,
                 else => return err,
             };
-            if (m.device != expected.device or m.inode != expected.inode) continue;
             if (!m.eql(expected) or other.sha256 == null or !std.mem.eql(u8, other.sha256.?, action.sha256.?)) return false;
-            count += 1;
         }
-        return count == expected.links;
+        return true;
     }
     pub fn aliasAllowed(e: *Engine, a: Action) bool {
         return (e.allow_artifact_aliases and (a.kind == .build_output or a.kind == .raw_trace)) or
