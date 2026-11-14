@@ -1,5 +1,7 @@
 # Review held build products and repeated compiler inputs
 
+Status: complete. Implementation commit: `08b18133`.
+
 1. Review the holders, current readers, queued/unfinished jobs, receipt ownership
    and integrity contracts for `behavior-tools-v1038`, `full-zig-local-v7`, and
    the 64 retained compiler binaries. Keep exact active dependencies and records;
@@ -58,5 +60,59 @@ inputs of at least 256 KiB; checked-in fixture copies, source worktrees, AIR and
 bitcode remain outside this migration. The narrowed plan has 1,300 filenames.
 The review preserves held inputs and incomplete alias groups.
 
-Implementation, collection and final accounting are in progress. Results and
-exact net savings will be recorded after guarded mutation and verification.
+## Completed results
+
+| Work | Result | Allocated file bytes reclaimed |
+| --- | --- | ---: |
+| Retire ordinary compilers | 64 files | 7,013,982,208 |
+| Retire reviewed shared caches | 2 roots | 24,322,768,896 |
+| Share generated inputs | 481 old physical files, 1,027 preserved paths | 3,608,739,840 net |
+| Existing payload total | 32.546 GiB | 34,945,490,944 |
+
+Input migration removed 4,480,806,912 old allocated bytes and created
+872,067,072 bytes of immutable objects. It preserved 159 paths in 92 held
+physical files, 98 paths in two incomplete alias groups, and 16 paths already
+sharing one stored object. The incomplete groups include original `compiler.ll`
+and `compiler_runtime_division_provider.ll` names outside this migration; their
+34/35 and 64/65 selected aliases therefore stayed untouched.
+
+All 1,300 planned input paths independently matched their original SHA-256
+after migration. Both mutation reports verified all five current integrity
+manifests. The accepted final compiler generations, source snapshots, commands,
+reports, diagnostics and other holds remain. Exactly 66 obsolete manual holds
+were removed, leaving 517. There is no pending mutation journal.
+
+The installed collector is ReleaseFast, SHA-256
+`8f03ed3acd66c36c6e6832e634a2674e327707c85ec82b7430b0f482714eade4`.
+All 162 cleanup tests pass in Debug and ReleaseFast, along with eight CLI checks.
+Task-owned build scratch was removed after checking ownership, links, hashes,
+metadata and readers under both locks: 774 files, 468,873,216 allocated bytes.
+That scratch was created during this task and is excluded from the existing
+payload savings above. The large inventory tables were compressed and verified
+against their uncompressed hashes; the task evidence directory is about 14 MiB.
+
+Final main-checkout inventory: **91,359,010,816 bytes (85.085 GiB)**, down from
+126,266,855,424 bytes (117.595 GiB). The measured storage reduction is
+34,907,844,608 bytes (**32.510 GiB**); the difference from payload accounting
+includes newly retained audit records and directory allocations. The inventory
+observed 1,696,495 paths, no vanished entries and no foreign-device entries.
+
+Of the remaining space, 18.115 GiB is covered by current contracts and
+66.970 GiB still needs investigation. No further files currently qualify for
+automatic collection. This is not a conclusion that all remaining files are
+necessary. The largest unresolved family is executables (22,818,287,616 bytes).
+Small repeated inputs have a theoretical 780,451,840 bytes of duplicate
+allocation across 83,282 names, including source fixtures; they were inventoried
+but are outside this generated-input migration.
+
+Evidence:
+
+- Held products:
+  `local-state/retirements/automatic-storage-cleanup/1794648371578868863-1352816/report.json`
+- Input migration:
+  `local-state/retirements/automatic-storage-cleanup/1794648857693195014-1360406/shared-input-review.json`
+- Final inventory:
+  `local-state/retirements/automatic-storage-cleanup/1794649658752532842-1379413/inventory.json`
+- Qualification, commands, original input hashes, compressed inventory hashes,
+  retained-alias review and totals:
+  `local-state/storage-cleanup/held-products-20261114/`
