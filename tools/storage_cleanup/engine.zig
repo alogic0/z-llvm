@@ -196,7 +196,7 @@ pub const Engine = struct {
     pub fn add(e: *Engine, path: []const u8, run: []const u8, producer: []const u8, kind: @FieldType(Action, "kind"), sha: ?[]const u8) !usize {
         if (kind == .temporary_workspace) {
             if (!@import("../validation/storage_paths.zig").validTemporary(path) or !p.candidate(run)) return error.InvalidCandidateScope;
-        } else if (!p.candidate(path)) return error.InvalidCandidateScope;
+        } else if (!p.candidate(path) and !(kind == .build_output and p.validationOutput(path))) return error.InvalidCandidateScope;
         for (e.actions.items, 0..) |*old, index| if (p.overlaps(path, old.path)) {
             if (std.mem.eql(u8, path, old.path) and std.mem.eql(u8, producer, old.producer) and kind == old.kind) return index;
             old.status = .skipped;
@@ -257,7 +257,7 @@ pub const Engine = struct {
         var r = try std.json.parseFromValue(p.Release, e.c.gpa, parsed.value, .{});
         defer r.deinit();
         if (!std.mem.eql(u8, r.value.schema, "zllvm-storage-release-v1")) return error.UnknownReleaseSchema;
-        if (!p.candidate(r.value.run_root) or (!staged and !std.mem.eql(u8, std.fs.path.dirname(name).?, r.value.run_root)) or r.value.reason.len == 0) return error.InvalidReleaseScope;
+        if (!p.releaseRoot(r.value) or (!staged and !std.mem.eql(u8, std.fs.path.dirname(name).?, r.value.run_root)) or r.value.reason.len == 0) return error.InvalidReleaseScope;
         if (r.value.state == .held) {
             try e.release_holds.append(e.c.a, try e.c.a.dupe(u8, r.value.run_root));
             return;
@@ -751,7 +751,7 @@ pub const Engine = struct {
             }
         }
     }
-    fn closedCache(e: *Engine, a: Action, list: *std.ArrayList(Evidence)) !void {
+    pub fn closedCache(e: *Engine, a: Action, list: *std.ArrayList(Evidence)) !void {
         var parsed = try e.load(e.c.gpa, a.producer);
         defer parsed.deinit();
         const v = parsed.value;
@@ -830,6 +830,7 @@ pub const Engine = struct {
         const named_test = std.mem.eql(u8, std.fs.path.basename(a.path), "local") or std.mem.eql(u8, std.fs.path.basename(a.path), "reference");
         if (named_test and r.command_outputs == null) return error.MissingCommandOutputBinding;
         if (r.command_outputs != null and (r.state != .disposable or a.kind != .build_output)) return error.InvalidCommandOutputRelease;
+        if (r.command_owner != null and r.command_outputs == null) return error.MissingCommandOutputBinding;
         const generated = a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm");
         if (generated and r.state != .disposable) return error.GeneratedOutputRequiresDisposable;
         var compiler_proof: ?retired_compiler.Proof = null;

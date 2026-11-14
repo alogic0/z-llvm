@@ -4,7 +4,7 @@ const core = @import("engine.zig");
 const release = @import("release.zig");
 const private_cache = @import("private_cache.zig");
 const p = core.p;
-const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests: []const p.Evidence };
+pub const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests: []const p.Evidence };
 pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
 
 pub fn generated(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {

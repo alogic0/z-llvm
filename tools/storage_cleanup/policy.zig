@@ -48,6 +48,7 @@ pub const Release = struct {
     cache_owner: ?CacheOwner = null,
     compiler_retirement: ?Evidence = null,
     command_outputs: ?Evidence = null,
+    command_owner: ?CacheOwner = null,
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');
@@ -68,6 +69,15 @@ pub fn candidate(p: []const u8) bool {
     var count: usize = 0;
     while (parts.next()) |_| count += 1;
     return count >= 5;
+}
+pub fn validationRun(p: []const u8) bool {
+    return relative(p) and std.mem.startsWith(u8, p, "local-state/validations/") and p.len > "local-state/validations/".len;
+}
+pub fn validationOutput(path: []const u8) bool {
+    return relative(path) and validationRun(std.fs.path.dirname(path) orelse "");
+}
+pub fn releaseRoot(r: Release) bool {
+    return candidate(r.run_root) or (r.command_outputs != null and validationRun(r.run_root));
 }
 pub fn hash(s: []const u8) bool {
     if (s.len != 64) return false;
@@ -110,7 +120,7 @@ pub fn artifactName(a: Artifact) bool {
 /// These names are admitted only with a verified command-output owner; the
 /// collector additionally requires ELF/archive bytes before any removal.
 pub fn commandOutputName(a: Artifact) bool {
-    return a.kind == .build_output and candidate(a.path) and hash(a.sha256) and
+    return a.kind == .build_output and validationOutput(a.path) and hash(a.sha256) and
         (artifactName(a) or std.mem.indexOfScalar(u8, std.fs.path.basename(a.path), '.') == null);
 }
 pub fn validate(c: Config) !void {

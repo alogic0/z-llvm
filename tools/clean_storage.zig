@@ -3,6 +3,7 @@ const std = @import("std");
 const u = @import("validation/common.zig");
 const core = @import("storage_cleanup/engine.zig");
 const mutation = @import("storage_cleanup/mutation.zig");
+const cache_batch = @import("storage_cleanup/cache_batch.zig");
 const coverage = @import("storage_cleanup/coverage.zig");
 const release = @import("storage_cleanup/release.zig");
 const inventory = @import("storage_cleanup/inventory.zig");
@@ -30,6 +31,9 @@ const usage =
     \\       tools/clean-storage prepare-traces --traces FILE --reason TEXT
     \\       tools/clean-storage prepare-generated --paths FILE --reason TEXT
     \\       tools/clean-storage prepare-outputs --reports FILE --reason TEXT
+    \\       tools/clean-storage prepare-receipts --receipts PLAN --reason TEXT
+    \\       tools/clean-storage prepare-aliases --requests FILE --reason TEXT
+    \\       tools/clean-storage narrow-cache-holds --roots FILE --reason TEXT [--apply]
     \\       tools/clean-storage prepare-pins --requests FILE --review FILE
     \\       tools/clean-storage [--apply] --requests FILE
     \\
@@ -68,12 +72,18 @@ pub fn main(init: std.process.Init) !void {
     const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
     const prepare_generated = args.len > 1 and std.mem.eql(u8, args[1], "prepare-generated");
     const prepare_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-outputs");
+    const prepare_receipts = args.len > 1 and std.mem.eql(u8, args[1], "prepare-receipts");
+    const prepare_aliases = args.len > 1 and std.mem.eql(u8, args[1], "prepare-aliases");
+    const prepare_legacy = prepare_receipts or prepare_aliases;
+    const narrow_cache_holds = args.len > 1 and std.mem.eql(u8, args[1], "narrow-cache-holds");
     const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
     var requests_path: ?[]const u8 = null;
     var builds_path: ?[]const u8 = null;
     var caches_path: ?[]const u8 = null;
     var traces_path: ?[]const u8 = null;
     var generated_paths: ?[]const u8 = null;
+    var receipt_plan: ?[]const u8 = null;
+    var hold_roots: ?[]const u8 = null;
     var compiler_retirement_path: ?[]const u8 = null;
     var review_path: ?[]const u8 = null;
     var reviewed_manifests: ?[]const u8 = null;
@@ -83,7 +93,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_legacy or narrow_cache_holds) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -139,6 +149,16 @@ pub fn main(init: std.process.Init) !void {
             caches_path = args[i];
             continue;
         }
+        if (prepare_receipts and std.mem.eql(u8, args[i], "--receipts") and i + 1 < args.len) {
+            i += 1;
+            receipt_plan = args[i];
+            continue;
+        }
+        if (narrow_cache_holds and std.mem.eql(u8, args[i], "--roots") and i + 1 < args.len) {
+            i += 1;
+            hold_roots = args[i];
+            continue;
+        }
         if (prepare_traces and std.mem.eql(u8, args[i], "--traces") and i + 1 < args.len) {
             i += 1;
             traces_path = args[i];
@@ -154,7 +174,7 @@ pub fn main(init: std.process.Init) !void {
             generated_paths = args[i];
             continue;
         }
-        if ((prepare_caches or prepare_traces or prepare_generated or prepare_outputs) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
+        if ((prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_legacy or narrow_cache_holds) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
             i += 1;
             reason = args[i];
             continue;
@@ -209,14 +229,16 @@ pub fn main(init: std.process.Init) !void {
     if (release_workspace and (apply or minimal or workspace_layout == null or reason == null)) return error.InvalidReleaseArguments;
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
     if (share_inputs and (inputs_plan == null or minimal or requests_path != null)) return error.InvalidSharedInputPlan;
-    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) and (apply or minimal)) return error.PreparationIsReadOnly;
+    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_legacy) and (apply or minimal)) return error.PreparationIsReadOnly;
     if ((prepare_generated or prepare_outputs) and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_caches and (caches_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_traces and (traces_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_pins and (requests_path == null or review_path == null)) return error.InvalidReleaseArguments;
+    if (prepare_legacy and (apply or reason == null or (prepare_receipts and receipt_plan == null) or (prepare_aliases and requests_path == null))) return error.InvalidReleaseArguments;
+    if (narrow_cache_holds and (hold_roots == null or reason == null or requests_path != null)) return error.InvalidReleaseArguments;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
-    if ((capture_aliases or artifact_aliases) and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_pins)) return error.InvalidCaptureAliasArguments;
+    if ((capture_aliases or artifact_aliases) and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_pins or prepare_legacy)) return error.InvalidCaptureAliasArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
     const policy_absolute = try c.join(&.{policy_path});
     var policy_dir = try core.fa.metadata.openRoot(c.io, std.fs.path.dirname(policy_absolute).?);
@@ -250,6 +272,16 @@ pub fn main(init: std.process.Init) !void {
     defer report(&e, status, apply, minimal) catch {};
     try e.check(.{ .path = policy_path, .sha256 = policy_sha256 });
     try e.addControl(policy_path);
+    if (narrow_cache_holds) {
+        try @import("storage_cleanup/cache_holds.zig").execute(&e, hold_roots.?, reason.?, apply);
+        status = if (apply) "holds-narrowed" else "holds-reviewed";
+        return;
+    }
+    if (prepare_legacy) {
+        if (prepare_receipts) try @import("storage_cleanup/legacy.zig").receipts(&e, receipt_plan.?, reason.?) else try @import("storage_cleanup/legacy.zig").aliases(&e, requests_path.?, reason.?);
+        status = "prepared";
+        return;
+    }
     if (share_inputs) {
         try @import("storage_cleanup/shared_inputs.zig").run(&e, inputs_plan.?, apply);
         status = "complete";
@@ -331,15 +363,16 @@ pub fn main(init: std.process.Init) !void {
             try e.consumers();
             try e.guardCaptureGroups();
             if (a.status != .ready) continue;
-            const group = if (mutation.fileAction(a.*)) try mutation.fileBatch(&e, index) else &.{};
+            const caches = a.kind == .cache and a.snapshot != null;
+            const group = if (mutation.fileAction(a.*)) try mutation.fileBatch(&e, index) else if (caches) try cache_batch.select(&e, index) else &.{};
             if (group.len > 0) {
-                try mutation.applyFileBatch(&e, group);
+                if (caches) try cache_batch.apply(&e, group) else try mutation.applyFileBatch(&e, group);
             } else try mutation.apply(&e, index);
             try report(&e, "applying", apply, minimal);
             if (group.len > 0) {
                 var reclaimed_group: u64 = 0;
                 for (group) |member| reclaimed_group += e.actions.items[member].reclaimed_file_bytes;
-                try c.print("Removed {d} verified files ({d} allocated file bytes)\n", .{ group.len, reclaimed_group });
+                if (caches) try c.print("Removed {d} verified caches ({d} allocated file bytes)\n", .{ group.len, reclaimed_group }) else try c.print("Removed {d} verified files ({d} allocated file bytes)\n", .{ group.len, reclaimed_group });
             } else try c.print("Removed: {s} ({d} allocated file bytes)\n", .{ a.path, a.reclaimed_file_bytes });
         }
         e.hash_cache.clearRetainingCapacity();
@@ -410,6 +443,9 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
         .{ .path = "tools/storage_cleanup/generated.zig", .bytes = @embedFile("storage_cleanup/generated.zig") },
         .{ .path = "tools/storage_cleanup/command_outputs.zig", .bytes = @embedFile("storage_cleanup/command_outputs.zig") },
+        .{ .path = "tools/storage_cleanup/legacy.zig", .bytes = @embedFile("storage_cleanup/legacy.zig") },
+        .{ .path = "tools/storage_cleanup/cache_holds.zig", .bytes = @embedFile("storage_cleanup/cache_holds.zig") },
+        .{ .path = "tools/storage_cleanup/cache_batch.zig", .bytes = @embedFile("storage_cleanup/cache_batch.zig") },
         .{ .path = "tools/storage_cleanup/retired_logs.zig", .bytes = @embedFile("storage_cleanup/retired_logs.zig") },
         .{ .path = "tools/storage_cleanup/jobs.zig", .bytes = @embedFile("storage_cleanup/jobs.zig") },
         .{ .path = "tools/storage_cleanup/shared_inputs.zig", .bytes = @embedFile("storage_cleanup/shared_inputs.zig") },

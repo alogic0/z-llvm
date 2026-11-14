@@ -83,7 +83,7 @@ already removed paths are absent from the next discovery.
 The project policy now uses minimal retention by default. Use `--minimal --apply`
 to request that mode explicitly even with a custom policy. It removes the optional
 waiting period and raises the candidate
-limit to 1,024, while retaining the policy's byte limit and the applicable
+limit to 16,384, while retaining the policy's byte limit and the applicable
 artifact-hash, pin, active-consumer and mutation checks. The project uses
 `cache_evidence:"closed_producer"`: a completed private cache needs its closed
 producer and exact command ownership, without reconstructing old sources or
@@ -275,6 +275,30 @@ files. The collector keeps the
 report, commands and diagnostics, and checks compiled-file magic. Shell commands,
 implicit build destinations and file names alone cannot authorize collection.
 
+`prepare-receipts --receipts PLAN --reason TEXT` supports standalone checked-run
+receipts with explicit compiler output arguments. The plan has schema
+`zllvm-command-output-plan-v1` and a `receipts` array of `{producer,
+working_directory, legacy_working_directory_review?}`. The working directory is
+`.` for this checkout or an owned validation subdirectory. Modern recorded `cwd`
+must agree; an older receipt without it requires an explicit review of the
+original runner convention. A successful terminal result, ordered timestamps,
+combined diagnostic log and exact output binding are mandatory. A plan cannot
+override a conflicting recorded directory or infer an implicit build product.
+
+Passed `whole-compiler-diagnostic-v1` reports can bind their named `candidate` or
+`rebuilt_candidate` to a successful `zig build --prefix` command and the report's
+exact binary hash. The recorded `/usr/bin/time -f ... -o ... --` wrapper is
+supported. Help invocations, arbitrary wrappers and unnamed install outputs do
+not establish ownership. Reports may also identify their compiler/emitter in
+the `toolchain` object.
+
+`prepare-aliases --requests FILE --reason TEXT` searches the validation tree for
+every name of the requested compiled-output inodes. It preserves the original
+requests and adds independently verified command owners or capture-helper
+owners for newly found names. Its review records rejected or unbound owners.
+It does not extend authority to aliases outside the validation tree; the full
+link-count check below still prevents collection of an incomplete group.
+
 Use `--complete-artifact-aliases --requests FILE` for an explicitly reviewed
 complete group of compiled outputs or audited raw traces. Every name needs its
 own qualified request and evidence. A missing name, unqualified audit, current
@@ -289,8 +313,24 @@ separate cap of 1024 names, keeping each alias group indivisible. The durable
 The collector rechecks pins, holds, consumers and retained evidence after
 quarantining all members. Before the first unlink a failure restores every
 name; an interrupted or partially unlinked batch leaves the journal for review.
-Evidence is verified again before clearing the journal. Directory workspaces
-and caches retain their separate snapshot-based mutation rules.
+Evidence is verified again before clearing the journal. Private caches use a
+separate `cache-batch` transaction of at most 16 roots, normally at most 1 GiB
+and the configured entry budget; a larger single cache retains the existing
+single-root allowance. Every snapshot and allocation is checked before any
+rename. All roots are quarantined before refreshing pins, holds, consumers and
+evidence; failure before the first unlink restores every name. Exact file and
+directory checks continue throughout removal. Directory workspaces retain their
+separate snapshot-based mutation rules.
+
+`narrow-cache-holds --roots FILE --reason TEXT` reviews explicitly selected
+run-level manual holds, one path per line. Each run must have a passed producer
+whose completed commands own its direct private caches. The proposed holds
+retain every existing non-cache child and every unselected hold. Active job
+holds, protected roots and a held release refuse the change. Add `--apply` to
+write a before/after receipt and atomically narrow those holds after rechecking
+the evidence, original holds, directory membership and consumers. This command
+does not delete payloads. A subsequent ordinary collection still checks all
+independent holds, current pins and live uses.
 
 For older whole-compiler runs without a separate checked-run receipt, the trace
 auditor also accepts the original passed `whole-compiler-diagnostic-v1` report

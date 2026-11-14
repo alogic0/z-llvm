@@ -43,7 +43,7 @@ const GeneratedMove = struct {
     sha256: []const u8,
     parent_mode: u32,
 };
-fn syncDirectory(dir: D) !void {
+pub fn syncDirectory(dir: D) !void {
     if (std.os.linux.errno(std.os.linux.fsync(dir.handle)) != .SUCCESS) return error.DirectorySyncFailed;
 }
 fn moveGenerated(e: *core.Engine, entry: GeneratedMove, restore: bool, did_move: ?*bool) !void {
@@ -203,12 +203,12 @@ fn unchangedGenerated(e: *core.Engine, parent: D, name: []const u8, expected: fa
     if (!std.mem.eql(u8, sha, &std.fmt.bytesToHex(try fa.metadata.hashFile(e.c.gpa, e.c.io, parent, name, m), .lower))) return error.CandidateHashChanged;
 }
 
-fn unchangedFile(e: *core.Engine, parent: D, name: []const u8, expected: fa.Metadata, sha: []const u8) !void {
+pub fn unchangedFile(e: *core.Engine, parent: D, name: []const u8, expected: fa.Metadata, sha: []const u8) !void {
     const m = try fa.metadata.child(e.c.gpa, parent, name);
     if (!m.eql(expected) or m.kind != .file or m.links != 1) return error.CandidateChanged;
     if (!std.mem.eql(u8, sha, &std.fmt.bytesToHex(try fa.metadata.hashFile(e.c.gpa, e.c.io, parent, name, m), .lower))) return error.CandidateHashChanged;
 }
-fn sameDirectory(a: fa.Metadata, b: fa.Metadata) bool {
+pub fn sameDirectory(a: fa.Metadata, b: fa.Metadata) bool {
     return a.kind == .directory and b.kind == .directory and a.device == b.device and a.inode == b.inode and a.mode == b.mode and a.uid == b.uid and a.gid == b.gid;
 }
 pub fn compareMoved(before: fa.Snapshot, after: fa.Snapshot) !void {

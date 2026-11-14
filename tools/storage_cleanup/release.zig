@@ -175,7 +175,7 @@ pub fn disposableBuild(e: *core.Engine, build_path: []const u8, reason: []const 
 
 pub fn publish(e: *core.Engine, release: p.Release) ![]const u8 {
     if (!std.mem.eql(u8, release.schema, "zllvm-storage-release-v1") or release.state == .held or
-        !p.candidate(release.run_root) or release.reason.len == 0 or release.artifacts.len == 0) return error.InvalidReleaseScope;
+        !p.releaseRoot(release) or release.reason.len == 0 or release.artifacts.len == 0) return error.InvalidReleaseScope;
     const destination = try e.c.fmt("{s}/storage-release.json", .{release.run_root});
     const draft = try e.c.fmt("{s}/release-draft.json", .{e.output});
     try e.write(draft, release);

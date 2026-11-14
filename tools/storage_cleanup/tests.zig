@@ -9,6 +9,9 @@ const private_cache = @import("private_cache.zig");
 const retired_compiler = @import("retired_compiler.zig");
 const generated = @import("generated.zig");
 const command_outputs = @import("command_outputs.zig");
+const legacy_outputs = @import("legacy.zig");
+const cache_holds = @import("cache_holds.zig");
+const cache_batch = @import("cache_batch.zig");
 const p = core.p;
 const workspaces = @import("workspaces.zig");
 const workspace = @import("../validation/storage_workspace.zig");
@@ -20,6 +23,241 @@ const released = "local-state/validations/test/batch/released";
 const assembly_owner = run ++ "/execution-breadth-controls";
 const assembly_dir = assembly_owner ++ "/ReleaseFast/example";
 const assembly_path = assembly_dir ++ "/linked-harness.s";
+
+const receipt_root = "local-state/validations/legacy";
+const receipt_path = receipt_root ++ "/build-run.json";
+fn receiptFixture(f: *Fixture, cwd: ?[]const u8, destination: []const u8, code: i32) !void {
+    try f.tmp.dir.createDirPath(t.io, receipt_root);
+    try f.write(receipt_root ++ "/compiler-old", "\x7fELFclosed compiler");
+    try f.write(receipt_root ++ "/build.log", "build diagnostics");
+    try f.write(receipt_root ++ "/main.zig", "source remains");
+    var e = f.engine();
+    try e.write(receipt_path, .{ .argv = [_][]const u8{ "zig", "build-exe", receipt_root ++ "/main.zig", try f.c.fmt("-femit-bin={s}", .{destination}) }, .cwd = cwd, .status = "finished", .outcome = "completed", .returncode = code, .actual_returncode = code, .started_ns = 1, .finished_ns = 2, .log = try e.absolute(receipt_root ++ "/build.log") });
+}
+
+test "storage cleanup: modern standalone receipt retires a shallow explicit product" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try receiptFixture(f, f.c.root, receipt_root ++ "/compiler-old", 0);
+    var e = f.engine();
+    const request = try command_outputs.receipt(&e, .{ .producer = receipt_path, .working_directory = "." }, "Closed build");
+    try e.write(output ++ "/receipt-release.json", request);
+    try e.discoverRelease(output ++ "/receipt-release.json", true);
+    try t.expectEqual(@as(usize, 1), e.actions.items.len);
+    try e.qualify(0);
+    try e.protectRetained();
+    try mutation.applyFileBatch(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    for ([_][]const u8{ receipt_path, receipt_root ++ "/build.log", receipt_root ++ "/main.zig" }) |path| _ = try e.metadata(path);
+}
+
+test "storage cleanup: legacy receipt cwd needs explicit review and cannot override recorded cwd" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try receiptFixture(f, null, receipt_root ++ "/compiler-old", 0);
+    var e = f.engine();
+    try t.expectError(error.MissingOutputWorkingDirectory, command_outputs.receipt(&e, .{ .producer = receipt_path, .working_directory = "." }, "Closed build"));
+    _ = try command_outputs.receipt(&e, .{ .producer = receipt_path, .working_directory = ".", .legacy_working_directory_review = "Reviewed original runner project-root convention" }, "Closed build");
+    try receiptFixture(f, "/different-checkout", receipt_root ++ "/compiler-old", 0);
+    var fresh = f.engine();
+    try t.expectError(error.OutputWorkingDirectoryMismatch, command_outputs.receipt(&fresh, .{ .producer = receipt_path, .working_directory = ".", .legacy_working_directory_review = "Cannot override a recorded cwd" }, "Closed build"));
+}
+
+test "storage cleanup: receipt rejects failure traversal and missing diagnostics" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const binding: command_outputs.ReceiptEntry = .{ .producer = receipt_path, .working_directory = "." };
+    try receiptFixture(f, f.c.root, receipt_root ++ "/compiler-old", 1);
+    var failed = f.engine();
+    try t.expectError(error.OutputCommandNotSuccessful, command_outputs.receipt(&failed, binding, "Closed build"));
+    try receiptFixture(f, f.c.root, "../compiler-old", 0);
+    var traversal = f.engine();
+    try t.expectError(error.AmbiguousOutputArgument, command_outputs.receipt(&traversal, binding, "Closed build"));
+    try receiptFixture(f, f.c.root, receipt_root ++ "/compiler-old", 0);
+    try f.tmp.dir.deleteFile(t.io, receipt_root ++ "/build.log");
+    var missing = f.engine();
+    if (command_outputs.receipt(&missing, binding, "Closed build")) |_| return error.MissingDiagnosticAccepted else |_| {}
+    _ = try missing.metadata(receipt_root ++ "/compiler-old");
+}
+
+test "storage cleanup: standalone command index is separated by reviewed cwd" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try receiptFixture(f, null, "compiler-old", 0);
+    var e = f.engine();
+    const review = "Reviewed command directory";
+    try t.expectError(error.NoBoundOutputs, command_outputs.receipt(&e, .{ .producer = receipt_path, .working_directory = ".", .legacy_working_directory_review = review }, "Closed build"));
+    const request = try command_outputs.receipt(&e, .{ .producer = receipt_path, .working_directory = receipt_root, .legacy_working_directory_review = review }, "Closed build");
+    try t.expectEqualStrings(receipt_root ++ "/compiler-old", request.artifacts[0].path);
+}
+
+fn wholeCompilerFixture(f: *Fixture, hash: ?[]const u8, help: bool) !void {
+    var e = f.engine();
+    try f.tmp.dir.createDirPath(t.io, run ++ "/install/bin");
+    try f.write(run ++ "/install/bin/zig", "\x7fELFwhole compiler");
+    try f.write(run ++ "/build.stdout", "build success");
+    try f.write(run ++ "/build.stderr", "");
+    try e.write(report, .{ .schema = "whole-compiler-diagnostic-v1", .status = "passed", .build_completed = true, .build_returncode = 0, .candidate = .{ .path = try e.absolute(run ++ "/install/bin/zig"), .sha256 = hash orelse try e.digest(run ++ "/install/bin/zig") } });
+    const args = [_][]const u8{ "/usr/bin/time", "-f", "%e", "-o", try e.absolute(run ++ "/time.txt"), "--", "/toolchain/zig", "build", "--prefix", try e.absolute(run ++ "/install"), if (help) "--help" else "-Doptimize=ReleaseFast" };
+    try e.write(run ++ "/commands.json", .{.{ .argv = args, .outcome = "completed", .actual_returncode = 0, .returncode = 0, .stdout = try e.absolute(run ++ "/build.stdout"), .stderr = try e.absolute(run ++ "/build.stderr") }});
+}
+
+test "storage cleanup: timed whole-compiler build requires exact installed candidate hash" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try wholeCompilerFixture(f, null, false);
+    var e = f.engine();
+    const request = try command_outputs.request(&e, report, "Closed compiler diagnostic");
+    try t.expectEqualStrings(run ++ "/install/bin/zig", request.artifacts[0].path);
+    try wholeCompilerFixture(f, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false);
+    var wrong = f.engine();
+    try t.expectError(error.CopiedCompilerHashMismatch, command_outputs.request(&wrong, report, "Closed compiler diagnostic"));
+    try wholeCompilerFixture(f, null, true);
+    var warmup = f.engine();
+    try t.expectError(error.NoBoundOutputs, command_outputs.request(&warmup, report, "Warmup is not a build"));
+}
+
+test "storage cleanup: report toolchain binds compiler stdout and selected output owners" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.write(run ++ "/subject.o", "\x7fELFobject");
+    try f.write(run ++ "/compiler.stderr", "diagnostic");
+    try f.write(run ++ "/failed", "\x7fELFfailed product stays");
+    try e.write(report, .{ .schema = "upstream-c-program-v1", .status = "passed", .toolchain = .{ .zllvm = "/known/compiler" } });
+    const Command = struct { argv: []const []const u8, outcome: []const u8 = "completed", actual_returncode: i32 = 0, returncode: i32 = 0, stdout: []const u8, stderr: []const u8 };
+    try e.write(run ++ "/commands.json", [_]Command{
+        .{ .argv = &.{ "/known/compiler", "--emit=obj", "input.ll" }, .stdout = try e.absolute(run ++ "/subject.o"), .stderr = try e.absolute(run ++ "/compiler.stderr") },
+        .{ .argv = &.{ "cc", "-o", try e.absolute(run ++ "/failed") }, .actual_returncode = 1, .returncode = 1, .stdout = try e.absolute(run ++ "/compiler.stderr"), .stderr = try e.absolute(run ++ "/compiler.stderr") },
+    });
+    try t.expectError(error.OutputCommandNotSuccessful, command_outputs.request(&e, report, "Review all outputs"));
+    const selected = try command_outputs.requestSelected(&e, report, "Independently owned successful output", &.{run ++ "/subject.o"});
+    try t.expectEqual(@as(usize, 1), selected.artifacts.len);
+    try t.expectEqualStrings(run ++ "/subject.o", selected.artifacts[0].path);
+}
+
+fn cachePairFixture(f: *Fixture, passed: bool) !void {
+    var e = f.engine();
+    try f.tmp.dir.createDirPath(t.io, run ++ "/zig-global-cache/o");
+    try f.write(cache ++ "/o/object", "local cache object");
+    try f.write(run ++ "/zig-global-cache/o/object", "global cache object");
+    try f.write(run ++ "/z_llvm", "\x7fELFcompiler must stay");
+    try f.write(run ++ "/build.log", "kept diagnostics");
+    try e.write(report, .{ .status = if (passed) "passed" else "failed", .commands = .{.{ .outcome = "completed", .actual_returncode = 0, .argv = [_][]const u8{ "zig", "build-exe", "--cache-dir", try e.absolute(cache), "--global-cache-dir", try e.absolute(run ++ "/zig-global-cache") } }} });
+}
+fn qualifyCachePair(e: *core.Engine) !void {
+    e.config.cache_evidence = .closed_producer;
+    for ([_][]const u8{ cache, run ++ "/zig-global-cache" }) |path| {
+        const i = try e.add(path, run, report, .cache, null);
+        try e.qualify(i);
+    }
+    try e.protectRetained();
+}
+fn cacheHoldsFixture(f: *Fixture, passed: bool) !void {
+    try cachePairFixture(f, passed);
+    var e = f.engine();
+    try e.write(e.config.holds_file, p.Holds{ .paths = &.{ run, released } });
+    try f.write(output ++ "/roots.txt", run ++ "\n");
+}
+
+test "storage cleanup: narrowed cache hold retains every non-cache child and independent hold" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try cacheHoldsFixture(f, true);
+    var e = f.engine();
+    const proposal = try cache_holds.prepare(&e, output ++ "/roots.txt");
+    try t.expectEqual(@as(usize, 2), proposal.actions.len);
+    try t.expectEqual(@as(usize, 4), proposal.after.paths.len);
+    for ([_][]const u8{ released, run ++ "/z_llvm", report, run ++ "/build.log" }) |expected| {
+        var found = false;
+        for (proposal.after.paths) |path| if (std.mem.eql(u8, path, expected)) {
+            found = true;
+        };
+        try t.expect(found);
+    }
+    try cache_holds.apply(&e, proposal);
+    var fresh = f.engine();
+    try fresh.loadHolds();
+    try qualifyCachePair(&fresh);
+    try cache_batch.apply(&fresh, try cache_batch.select(&fresh, 0));
+    for (fresh.actions.items) |a| try t.expectEqual(.removed, a.status);
+    for ([_][]const u8{ run ++ "/z_llvm", report, run ++ "/build.log", output ++ "/holds-before.json", output ++ "/holds-after.json" }) |path| _ = try fresh.metadata(path);
+}
+
+test "storage cleanup: hold narrowing refuses changed membership failed producers and changed holds" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try cacheHoldsFixture(f, case != 0);
+        var e = f.engine();
+        if (case == 0) {
+            try t.expectError(error.ProducerNotSuccessful, cache_holds.prepare(&e, output ++ "/roots.txt"));
+            continue;
+        }
+        const proposal = try cache_holds.prepare(&e, output ++ "/roots.txt");
+        if (case == 1) {
+            try f.write(run ++ "/new-evidence.json", "{}");
+            try t.expectError(error.HeldRootChanged, cache_holds.apply(&e, proposal));
+        } else {
+            try f.write(e.config.holds_file, "{\"schema\":1,\"paths\":[]}");
+            if (cache_holds.apply(&e, proposal)) |_| return error.ChangedHoldAccepted else |_| {}
+        }
+        _ = try e.metadata(cache ++ "/o/object");
+        try t.expect(!u.exists(t.io, try e.absolute(output ++ "/holds-after.json")));
+    }
+}
+
+test "storage cleanup: bounded cache batch deletes both caches and retains evidence" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try cachePairFixture(f, true);
+    var e = f.engine();
+    try qualifyCachePair(&e);
+    try cache_batch.apply(&e, &.{ 0, 1 });
+    for (e.actions.items) |a| {
+        try t.expectEqual(.removed, a.status);
+        try t.expectEqual(a.allocated_bytes, a.reclaimed_file_bytes);
+        try t.expect(!u.exists(t.io, try e.absolute(a.path)));
+    }
+    for ([_][]const u8{ report, run ++ "/z_llvm", run ++ "/build.log" }) |path| _ = try e.metadata(path);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: cache batch rolls back all roots on fresh pin or hold" {
+    for ([_]bool{ false, true }) |hold| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try cachePairFixture(f, true);
+        var e = f.engine();
+        try qualifyCachePair(&e);
+        if (hold) try e.write(e.config.holds_file, p.Holds{ .paths = &.{run ++ "/zig-global-cache"} }) else try f.write(run ++ "/new-pin.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(run ++ "/zig-global-cache/o/object"), run ++ "/zig-global-cache/o/object" }));
+        try t.expectError(error.CacheBatchBecameHeld, cache_batch.apply(&e, &.{ 0, 1 }));
+        for (e.actions.items) |a| {
+            _ = try e.metadata(a.path);
+            try t.expectEqual(@as(u64, 0), a.reclaimed_file_bytes);
+        }
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: cache batch rejects changed data accounting and duplicate members" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try cachePairFixture(f, true);
+        var e = f.engine();
+        try qualifyCachePair(&e);
+        if (case == 0) {
+            try f.write(run ++ "/zig-global-cache/o/object", "modified cache object");
+            if (cache_batch.apply(&e, &.{ 0, 1 })) |_| return error.ChangedCacheAccepted else |_| {}
+        } else if (case == 1) {
+            e.actions.items[1].allocated_bytes += 4096;
+            try t.expectError(error.AllocationMismatch, cache_batch.apply(&e, &.{ 0, 1 }));
+        } else try t.expectError(error.InvalidCacheBatch, cache_batch.apply(&e, &.{ 0, 0 }));
+        for (e.actions.items) |a| _ = try e.metadata(a.path);
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
 
 fn commandOutputFixture(f: *Fixture, e: *core.Engine, success: bool) !void {
     try f.write(run ++ "/local", "\x7fELFtest executable");
@@ -49,6 +287,46 @@ test "storage cleanup: explicit completed command outputs retire as a mixed file
     try mutation.applyFileBatch(&e, try mutation.fileBatch(&e, 0));
     for (e.actions.items) |a| try t.expectEqual(.removed, a.status);
     for ([_][]const u8{ report, run ++ "/commands.json", run ++ "/input.ll", run ++ "/compile.stdout", run ++ "/compile.stderr" }) |path| _ = try e.metadata(path);
+}
+
+test "storage cleanup: alias preparation binds peer commands and preserves an outside link" {
+    for ([_]bool{ false, true }) |outside| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try commandOutputFixture(f, &prepare, false);
+        const peer = "local-state/validations/test/batch/peer";
+        try f.tmp.dir.createDirPath(t.io, peer);
+        {
+            const file = try f.tmp.dir.openFile(t.io, run ++ "/reference.o", .{});
+            defer file.close(t.io);
+            try file.hardLink(t.io, f.tmp.dir, peer ++ "/reference.o", .{});
+            if (outside) try file.hardLink(t.io, f.tmp.dir, "toolchain/unreviewed-object", .{});
+        }
+        try f.write(peer ++ "/compile.log", "peer diagnostics");
+        try prepare.write(peer ++ "/report.json", .{ .status = "passed" });
+        try prepare.write(peer ++ "/commands.json", .{.{ .argv = [_][]const u8{ "cc", "-c", "input.c", "-o", try prepare.absolute(peer ++ "/reference.o") }, .outcome = "completed", .actual_returncode = 0, .returncode = 0, .stdout = try prepare.absolute(peer ++ "/compile.log"), .stderr = try prepare.absolute(peer ++ "/compile.log") }});
+        try prepare.write(output ++ "/original.json", try command_outputs.requestSelected(&prepare, report, "Original owner", &.{run ++ "/reference.o"}));
+        try prepare.write(output ++ "/original-list.json", batches.List{ .requests = &.{.{ .path = output ++ "/original.json", .sha256 = try prepare.digest(output ++ "/original.json") }} });
+        try legacy_outputs.aliases(&prepare, output ++ "/original-list.json", "Resolve independently owned peer");
+        var collect = f.engine();
+        collect.allow_artifact_aliases = true;
+        const requests = try batches.load(&collect, output ++ "/requests.json");
+        try t.expectEqual(@as(usize, 2), requests.len);
+        for (requests) |request| try collect.discoverRelease(request.path, true);
+        try t.expectEqual(@as(usize, 2), collect.actions.items.len);
+        if (outside) {
+            try t.expectError(error.AliasedOrNonRegularArtifact, collect.qualify(0));
+            _ = try collect.metadata("toolchain/unreviewed-object");
+        } else {
+            for (0..2) |i| try collect.qualify(i);
+            try collect.protectRetained();
+            try collect.guardCaptureGroups();
+            try mutation.applyFileBatch(&collect, &.{ 0, 1 });
+            for (collect.actions.items) |a| try t.expectEqual(.removed, a.status);
+        }
+        for ([_][]const u8{ run ++ "/local", report, peer ++ "/report.json", peer ++ "/commands.json", peer ++ "/compile.log" }) |path| _ = try collect.metadata(path);
+    }
 }
 
 test "storage cleanup: unsuccessful output command cannot release a passed owner's files" {
@@ -158,7 +436,7 @@ test "storage cleanup: command output adapter ignores shell and source outputs" 
     const f = try Fixture.init();
     defer f.deinit();
     var e = f.engine();
-    try t.expectError(error.UnboundOutputOwner, command_outputs.request(&e, "local-state/validations/legacy/run/report.json", "Reject shallow legacy scope"));
+    try t.expectError(error.UnboundOutputOwner, command_outputs.request(&e, "local-state/inputs/legacy/run/report.json", "Reject maintained input scope"));
     try commandOutputFixture(f, &e, true);
     // A source-looking -o is never promoted merely because a command names it.
     try e.write(run ++ "/commands.json", .{.{ .argv = [_][]const u8{ "cc", "-S", "-o", try e.absolute(run ++ "/input.ll") }, .outcome = "completed", .actual_returncode = 0, .returncode = 0 }});
