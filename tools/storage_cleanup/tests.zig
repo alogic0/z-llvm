@@ -2269,6 +2269,34 @@ fn captureFixture(f: *Fixture, e: *core.Engine, wrong_hash: bool) !void {
     try e.write(report, .{ .schema = "real-program-v1", .status = "passed", .tool_provenance = .{ .binary_sha256 = if (wrong_hash) "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" else try e.digest(run ++ "/capture-zllvm") }, .rows = .{.{ .mode = "ReleaseFast", .status = "matched" }} });
 }
 
+test "storage cleanup: shallow legacy capture helper retains exact provenance and scope" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const owner = "local-state/validations/test/legacy-capture";
+    const helper = owner ++ "/capture-zllvm";
+    try f.tmp.dir.createDirPath(t.io, owner);
+    try f.write(helper, "\x7fELFclosed capture runner");
+    try f.write(owner ++ "/commands.json", "[]");
+    try e.write(owner ++ "/report.json", .{ .schema = "real-program-v1", .status = "passed", .tool_provenance = .{ .binary_sha256 = try e.digest(helper) }, .rows = .{.{ .mode = "ReleaseFast", .status = "matched" }} });
+    const request = try generated.request(&e, helper, "Closed legacy capture");
+    try t.expect(p.releaseRoot(request));
+    var unrelated = request;
+    unrelated.artifacts = &.{.{ .path = owner ++ "/unbound.o", .kind = .build_output }};
+    try t.expect(!p.releaseRoot(unrelated));
+    unrelated = request;
+    unrelated.producer.path = run ++ "/report.json";
+    try t.expect(!p.releaseRoot(unrelated));
+    try e.write(output ++ "/capture-request.json", request);
+    try e.discoverRelease(output ++ "/capture-request.json", true);
+    try e.qualify(0);
+    try e.protectRetained();
+    try mutation.applyFileBatch(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    _ = try e.metadata(owner ++ "/report.json");
+    _ = try e.metadata(owner ++ "/commands.json");
+}
+
 test "storage cleanup: capture helper requires the runner provenance hash" {
     const f = try Fixture.init();
     defer f.deinit();

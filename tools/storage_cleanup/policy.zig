@@ -77,7 +77,19 @@ pub fn validationOutput(path: []const u8) bool {
     return relative(path) and validationRun(std.fs.path.dirname(path) orelse "");
 }
 pub fn releaseRoot(r: Release) bool {
-    return candidate(r.run_root) or (r.command_outputs != null and validationRun(r.run_root));
+    if (candidate(r.run_root)) return true;
+    if (!validationRun(r.run_root)) return false;
+    if (r.command_outputs != null) return true;
+    // Older real-program runs have no batch component. Admit only their exact
+    // capture helper here; generated.verify still requires a passed comparison
+    // and the runner's recorded binary hash before collection.
+    if (r.state != .disposable or r.artifacts.len != 1) return false;
+    const artifact = r.artifacts[0];
+    return artifact.kind == .build_output and
+        std.mem.eql(u8, std.fs.path.basename(artifact.path), "capture-zllvm") and
+        std.mem.eql(u8, std.fs.path.dirname(artifact.path) orelse "", r.run_root) and
+        std.mem.eql(u8, std.fs.path.basename(r.producer.path), "report.json") and
+        std.mem.eql(u8, std.fs.path.dirname(r.producer.path) orelse "", r.run_root);
 }
 pub fn hash(s: []const u8) bool {
     if (s.len != 64) return false;

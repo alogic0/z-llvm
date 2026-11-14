@@ -275,6 +275,11 @@ files. The collector keeps the
 report, commands and diagnostics, and checks compiled-file magic. Shell commands,
 implicit build destinations and file names alone cannot authorize collection.
 
+The generated-output adapter also accepts older capture-helper runs without a
+batch directory. Such a release must name only the owner's direct `capture-zllvm`
+file; a passed real-program comparison and matching runner-provenance hash are
+still required. This does not admit arbitrary outputs from a shallow directory.
+
 `prepare-receipts --receipts PLAN --reason TEXT` supports standalone checked-run
 receipts with explicit compiler output arguments. The plan has schema
 `zllvm-command-output-plan-v1` and a `receipts` array of `{producer,
@@ -315,7 +320,7 @@ quarantining all members. Before the first unlink a failure restores every
 name; an interrupted or partially unlinked batch leaves the journal for review.
 Evidence is verified again before clearing the journal. Private caches use a
 separate `cache-batch` transaction of at most 16 roots, normally at most 1 GiB
-and the configured entry budget; a larger single cache retains the existing
+and the configured file-count budget; a larger single cache retains the existing
 single-root allowance. Every snapshot and allocation is checked before any
 rename. All roots are quarantined before refreshing pins, holds, consumers and
 evidence; failure before the first unlink restores every name. Exact file and
