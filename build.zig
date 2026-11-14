@@ -393,7 +393,21 @@ pub fn build(b: *std.Build) void {
     const storage_behavior_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/behavior_cli_tests.sh" });
     storage_behavior_tests.addArtifactArg(storage_cleanup);
     storage_behavior_tests.addArtifactArg(storage_behavior_runner);
+    const captured_object_auditor = b.addExecutable(.{ .name = "audit-captured-object", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/audit_captured_object.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    storage_behavior_tests.addArtifactArg(captured_object_auditor);
+    storage_behavior_tests.addArtifactArg(exe);
+    const captured_object_tests = b.addTest(.{ .filters = &.{"object audit"}, .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/audit_captured_object.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    storage_behavior_tests.step.dependOn(&b.addRunArtifact(captured_object_tests).step);
     storage_cleanup_test_step.dependOn(&storage_behavior_tests.step);
+    b.step("test-behavior-storage", "Check behavior capture storage and independent object audits").dependOn(&storage_behavior_tests.step);
     const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
         .target = b.graph.host,

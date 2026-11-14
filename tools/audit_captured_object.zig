@@ -4,6 +4,7 @@ const std = @import("std");
 const u = @import("validation/common.zig");
 const reports = @import("validation/whole_compiler_report.zig");
 const elf = @import("validation/object_contract.zig");
+const storage = @import("validation/storage_workspace.zig");
 
 fn validateCaptureDirectory(report: u.Value, root: []const u8, directory: []const u8) !u.Value {
     if (!u.isWithin(root, directory) or std.mem.eql(u8, root, directory)) return error.CaptureOutsideRun;
@@ -49,6 +50,11 @@ fn objectName(a: std.mem.Allocator, spelling: []const u8) ![]const u8 {
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
+    const lease = try storage.reader(&c);
+    defer if (lease) |file| {
+        file.unlock(c.io);
+        file.close(c.io);
+    };
     const argv = try init.minimal.args.toSlice(c.a);
     const args = try u.Args.parse(c.a, argv[1..], &.{ "capture-root", "capture-directory", "census", "output-root" }, &.{});
     const root = try c.join(&.{try args.require("capture-root")});
@@ -92,7 +98,7 @@ pub fn main(init: std.process.Init) !void {
     const profile = try c.load(try c.join(&.{ directory, "profile.json" }));
     const analysis = try reports.analyze(c.a, try c.read(try c.join(&.{ directory, "backend.stderr" })));
     try reports.validateSuccess(c.a, analysis, profile, try c.read(try c.join(&.{ directory, "owners.tsv" })));
-    const object_path = try c.join(&.{ directory, "local.o" });
+    const object_path = try storage.artifact(&c, root, &.{ directory, "local.o" });
     const contract = try elf.parse(c.a, try c.read(object_path));
     try reports.validateObject(c.a, contract, profile);
     var symbols = std.StringHashMap(u.Value).init(c.a);

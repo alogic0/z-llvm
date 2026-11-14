@@ -321,6 +321,17 @@ An explicitly recorded capture may have a deleted transient frontend IR file;
 if that original still exists, its hash must match too. The default fixed-input
 route retains the strict original-input check.
 
+For managed captures, the auditor resolves `local.o` through the run's validated
+`validation.storage-layout.json` and holds a storage reader lease while checking
+it. Legacy runs without a layout keep the capture-directory path. A missing
+managed object is an error even if an evidence copy exists. Retain the producer's
+workspace through the audit with its `--retain-products` option, then release it
+after all consumers finish.
+
+The focused `test-behavior-storage` build step exercises managed and legacy
+captures with the real backend and independent auditor, including rejection of
+a missing managed object despite a valid evidence copy.
+
 The auditor writes a separate report and leaves the original runner receipt
 unchanged. It requires one successful actual backend command. A reused initial
 compiler object instead needs the separate source-object audit and exact binding
