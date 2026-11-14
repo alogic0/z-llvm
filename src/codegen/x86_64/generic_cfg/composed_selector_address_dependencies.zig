@@ -101,13 +101,12 @@ pub const AddressDependencyDomain = struct {
         if (dependencies.len > max_dependencies_per_owner)
             return error.AddressDependencyOwnerCapacityExceeded;
 
-        var next = domain.*;
         if (dependencies.len == 0) {
-            next.removeOwnerInPlace(owner_name);
-            domain.* = next;
+            domain.removeOwner(owner_name);
             return;
         }
 
+        var next = domain.*;
         const owner_index = next.ownerIndex(owner_name) orelse blk: {
             if (next.owner_count == max_owners) return error.AddressDependencyDomainCapacityExceeded;
             const index = next.owner_count;
@@ -132,9 +131,10 @@ pub const AddressDependencyDomain = struct {
     }
 
     pub fn removeOwner(domain: *AddressDependencyDomain, owner_name: []const u8) void {
-        var next = domain.*;
-        next.removeOwnerInPlace(owner_name);
-        domain.* = next;
+        // Removal cannot fail. Resolve the borrowed name before compacting the
+        // owned records; a speculative copy only adds full-domain traffic to
+        // every binding write, including the common absent-owner case.
+        domain.removeOwnerInPlace(owner_name);
     }
 
     pub fn count(domain: *const AddressDependencyDomain) usize {
@@ -157,7 +157,7 @@ pub const AddressDependencyDomain = struct {
             var seen_roles: [@typeInfo(Role).@"enum".field_names.len]bool = @splat(false);
             for (owner.dependencies[0..owner.dependency_count], 0..) |*dependency, dependency_index| {
                 if (owner.identity.eqlIdentity(&dependency.identity)) return error.AddressDependencyCycle;
-                const role_index = @intFromEnum(dependency.role);
+                const role_index = @backingInt(dependency.role);
                 if (seen_roles[role_index]) return error.AddressDependencyDuplicateRole;
                 seen_roles[role_index] = true;
                 switch (dependency.role) {

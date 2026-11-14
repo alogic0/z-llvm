@@ -196,6 +196,41 @@ test "generic cfg selector address dependency domain releases dead owners and se
     try std.testing.expectEqual(@as(usize, 0), domain.count());
 }
 
+test "generic cfg selector address owner removal accepts borrowed identities and preserves independent copies" {
+    for ([_]bool{ false, true }) |empty_replacement| {
+        var domain: AddressDependencyDomain = .{};
+        for ([_][]const u8{ "first", "middle", "last" }) |name| {
+            try domain.replaceAddress(name, &.{
+                .{ .name = "shared-index", .identity_type = .integer, .role = .index },
+            });
+        }
+        const before = domain;
+        const borrowed_name = domain.ownerAt(1).?.name;
+        if (empty_replacement) {
+            try domain.replaceAddress(borrowed_name, &.{});
+        } else {
+            domain.removeOwner(borrowed_name);
+        }
+        try domain.validate();
+        try std.testing.expectEqual(@as(usize, 2), domain.count());
+        try std.testing.expectEqualStrings("first", domain.ownerAt(0).?.name);
+        try std.testing.expectEqualStrings("last", domain.ownerAt(1).?.name);
+        try std.testing.expectEqualStrings("middle", before.ownerAt(1).?.name);
+        try std.testing.expectEqual(@as(usize, 3), before.count());
+
+        const after = domain;
+        domain.removeOwner("missing");
+        try std.testing.expect(domain.eql(&after));
+        try domain.replaceAddress("missing", &.{});
+        try std.testing.expect(domain.eql(&after));
+        domain.removeOwner(domain.ownerAt(0).?.name);
+        domain.removeOwner(domain.ownerAt(0).?.name);
+        domain.removeOwner("missing");
+        try std.testing.expectEqual(@as(usize, 0), domain.count());
+        try std.testing.expectEqual(@as(usize, 3), before.count());
+    }
+}
+
 test "generic cfg selector address dependency domain rebind and failed replacement are atomic" {
     var domain: AddressDependencyDomain = .{};
     try domain.replaceAddress("owner", &.{
