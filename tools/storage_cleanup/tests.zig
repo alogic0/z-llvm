@@ -9,6 +9,7 @@ const private_cache = @import("private_cache.zig");
 const retired_compiler = @import("retired_compiler.zig");
 const generated = @import("generated.zig");
 const command_outputs = @import("command_outputs.zig");
+const observed_compiler = @import("observed_compiler.zig");
 const legacy_outputs = @import("legacy.zig");
 const cache_holds = @import("cache_holds.zig");
 const held_products = @import("held_products.zig");
@@ -514,6 +515,84 @@ fn commandOutputFixture(f: *Fixture, e: *core.Engine, success: bool) !void {
         .{ .argv = &.{ "cc", try e.absolute(run ++ "/reference.o"), "-o", try e.absolute(run ++ "/local") }, .actual_returncode = code, .returncode = code, .stdout = run ++ "/compile.stdout", .stderr = run ++ "/compile.stderr" },
         .{ .argv = &.{ "clang-22", "-c", try e.absolute(run ++ "/input.ll"), "-o", try e.absolute(run ++ "/reference.o") }, .actual_returncode = 0, .returncode = 0, .stdout = run ++ "/compile.stdout", .stderr = run ++ "/compile.stderr" },
     });
+}
+
+const observed_binary = receipt_root ++ "/compiler-debug/bin/z_llvm";
+const observed_report = receipt_root ++ "/native/report.json";
+fn observedCompilerFixture(f: *Fixture, e: *core.Engine, case: usize) !void {
+    try f.tmp.dir.createDirPath(t.io, receipt_root ++ "/compiler-debug/bin");
+    try f.tmp.dir.createDirPath(t.io, receipt_root ++ "/native");
+    try f.write(observed_binary, "\x7fELFlegacy debug compiler");
+    try f.write(receipt_root ++ "/native/compile.stderr", "");
+    try f.write(receipt_root ++ "/native/local.o", "\x7fELFdisposable object");
+    try e.write(observed_report, .{ .schema = "native-canary-v1", .status = if (case == 1) "running" else "passed", .compiler_sha256 = if (case == 2) "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" else try e.digest(observed_binary) });
+    // Legacy successful invocations lack outcome and actual_returncode.
+    var command = try u.toValue(e.c.a, .{
+        .argv = [_][]const u8{ try e.absolute(observed_binary), if (case == 3) "--version" else "--emit=obj", "input.ll" },
+        .returncode = if (case == 4) @as(i32, 1) else @as(i32, 0),
+        .stdout = receipt_root ++ "/native/local.o",
+        .stderr = receipt_root ++ "/native/compile.stderr",
+    });
+    if (case == 5) try u.put(e.c.a, &command, "outcome", u.s("timed_out"));
+    if (case == 6) try u.put(e.c.a, &command, "actual_returncode", .{ .integer = 1 });
+    try e.write(receipt_root ++ "/native/commands.json", .{command});
+    if (case == 7) try f.write(observed_binary ++ ".build.json", "{\"status\":\"incomplete\"}");
+}
+
+test "storage cleanup: legacy compiler observation retires exact binary without retaining its object" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var prepare = f.engine();
+    try observedCompilerFixture(f, &prepare, 0);
+    var e = f.engine();
+    const r = try observed_compiler.request(&e, observed_report, "Closed legacy temporary compiler");
+    try t.expectEqualStrings(receipt_root, r.run_root);
+    try e.write(output ++ "/observed.json", r);
+    try e.discoverRelease(output ++ "/observed.json", true);
+    try e.qualify(0);
+    for (e.actions.items[0].retained) |ev| try t.expect(!std.mem.eql(u8, ev.path, receipt_root ++ "/native/local.o"));
+    try mutation.applyFileBatch(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    for ([_][]const u8{ observed_report, receipt_root ++ "/native/commands.json", receipt_root ++ "/native/compile.stderr", receipt_root ++ "/native/local.o" }) |path| _ = try e.metadata(path);
+}
+
+test "storage cleanup: compiler observation rejects missing identity completion and existing receipts" {
+    for (1..8) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try observedCompilerFixture(f, &prepare, case);
+        var e = f.engine();
+        try t.expectError(if (case == 1) error.UnboundCompilerObservation else error.NoObservedCompiler, observed_compiler.request(&e, observed_report, "Reject unbound compiler"));
+        _ = try e.metadata(observed_binary);
+    }
+}
+
+test "storage cleanup: observed compilers remain subject to holds current pins and changed evidence" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try observedCompilerFixture(f, &prepare, 0);
+        try prepare.write(output ++ "/observed.json", try observed_compiler.request(&prepare, observed_report, "Keep independent protections"));
+        if (case == 0) try prepare.write(prepare.config.holds_file, p.Holds{ .paths = &.{receipt_root} });
+        if (case == 1) try f.write(receipt_root ++ "/current.sha256", try prepare.c.fmt("{s}  {s}\n", .{ try prepare.digest(observed_binary), observed_binary }));
+        if (case == 2) try f.write(observed_binary ++ ".build.json", "{\"status\":\"passed\"}");
+        if (case == 3) try f.write(receipt_root ++ "/native/commands.json", "[]");
+        var e = f.engine();
+        if (case == 1) e.config.current_manifests = &.{receipt_root ++ "/current.sha256"};
+        try e.discoverRelease(output ++ "/observed.json", true);
+        try e.loadHolds();
+        if (case == 0) {
+            try t.expectEqual(.skipped, e.actions.items[0].status);
+        } else if (case == 1) {
+            try e.qualify(0);
+            try e.pins();
+            try e.currentManifests(true);
+            try t.expectEqual(.skipped, e.actions.items[0].status);
+        } else try t.expectError(if (case == 2) error.CanonicalBuildReceiptPresent else error.EvidenceHashMismatch, e.qualify(0));
+        _ = try e.metadata(observed_binary);
+    }
 }
 
 test "storage cleanup: explicit completed command outputs retire as a mixed file batch" {

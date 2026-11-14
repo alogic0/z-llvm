@@ -8,15 +8,18 @@ pub const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requ
 pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
 
 pub fn generated(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
-    return outputRequests(e, paths_file, reason, false, false);
+    return outputRequests(e, paths_file, reason, .generated);
 }
 pub fn outputs(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
-    return outputRequests(e, paths_file, reason, true, false);
+    return outputRequests(e, paths_file, reason, .outputs);
 }
 pub fn closedOutputs(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
-    return outputRequests(e, paths_file, reason, true, true);
+    return outputRequests(e, paths_file, reason, .closed_outputs);
 }
-fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, commands: bool, closed: bool) !void {
+pub fn observedCompilers(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
+    return outputRequests(e, paths_file, reason, .observed_compilers);
+}
+fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, mode: enum { generated, outputs, closed_outputs, observed_compilers }) !void {
     if (!p.relative(paths_file) or reason.len == 0) return error.InvalidEvidencePath;
     try e.addControl(paths_file);
     const bytes = try e.read(e.c.gpa, paths_file, 1024 * 1024);
@@ -30,7 +33,12 @@ fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, c
         if (seen.count() >= 1024 or seen.contains(path)) return error.InvalidRequestList;
         const owned = try e.c.a.dupe(u8, path);
         try seen.put(owned, {});
-        const candidate = (if (closed) @import("command_outputs.zig").requestClosed(e, owned, reason) else if (commands) @import("command_outputs.zig").request(e, owned, reason) else @import("generated.zig").request(e, owned, reason)) catch |err| {
+        const candidate = (switch (mode) {
+            .closed_outputs => @import("command_outputs.zig").requestClosed(e, owned, reason),
+            .outputs => @import("command_outputs.zig").request(e, owned, reason),
+            .generated => @import("generated.zig").request(e, owned, reason),
+            .observed_compilers => @import("observed_compiler.zig").request(e, owned, reason),
+        }) catch |err| {
             try rejected.append(e.c.a, .{ .path = owned, .reason = @errorName(err) });
             continue;
         };

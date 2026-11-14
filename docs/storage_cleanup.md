@@ -291,6 +291,18 @@ retained undefined-symbol diagnostic, zeroed ELF header and consistent ELF64
 program-header/table mapping. Empty files, scripts, unrelated data and other
 unfinished binary formats remain ineligible.
 
+`prepare-observed-compilers --reports FILE --reason TEXT` handles older
+`z_llvm` binaries that have no canonical `.build.json` receipt. It requires a
+passed `native-canary-v1` report with the exact current compiler SHA-256 and a
+saved, successful direct `z_llvm --emit=obj` invocation in sibling
+`commands.json`. Legacy commands may lack `outcome` and `actual_returncode`;
+their recorded return code must be zero, and any present completion fields must
+also show success. Compiler and report must belong to the same validation tree.
+The report, commands and diagnostics remain; object stdout is a separate
+temporary product. Existing build receipts, mismatched hashes, unfinished runs,
+holds, pins and incomplete alias groups still prevent this retirement. This
+mode does not recreate an old build or require new source/configuration archives.
+
 The generated-output adapter also accepts older capture-helper runs without a
 batch directory. Such a release must name only the owner's direct `capture-zllvm`
 file; a passed real-program comparison and matching runner-provenance hash are

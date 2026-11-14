@@ -50,6 +50,7 @@ pub const Release = struct {
     command_outputs: ?Evidence = null,
     command_owner: ?CacheOwner = null,
     closed_command_outputs: bool = false,
+    compiler_observation: ?Evidence = null,
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');
@@ -80,7 +81,7 @@ pub fn validationOutput(path: []const u8) bool {
 pub fn releaseRoot(r: Release) bool {
     if (candidate(r.run_root)) return true;
     if (!validationRun(r.run_root)) return false;
-    if (r.command_outputs != null) return true;
+    if (r.command_outputs != null or r.compiler_observation != null) return true;
     // Older real-program runs have no batch component. Admit only their exact
     // capture helper here; generated.verify still requires a passed comparison
     // and the runner's recorded binary hash before collection.

@@ -32,6 +32,7 @@ const usage =
     \\       tools/clean-storage prepare-generated --paths FILE --reason TEXT
     \\       tools/clean-storage prepare-outputs --reports FILE --reason TEXT
     \\       tools/clean-storage prepare-closed-outputs --reports FILE --reason TEXT
+    \\       tools/clean-storage prepare-observed-compilers --reports FILE --reason TEXT
     \\       tools/clean-storage prepare-receipts --receipts PLAN --reason TEXT
     \\       tools/clean-storage prepare-aliases --requests FILE --reason TEXT
     \\       tools/clean-storage narrow-cache-holds --roots FILE --reason TEXT [--apply]
@@ -75,7 +76,8 @@ pub fn main(init: std.process.Init) !void {
     const prepare_generated = args.len > 1 and std.mem.eql(u8, args[1], "prepare-generated");
     const prepare_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-outputs");
     const prepare_closed_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-closed-outputs");
-    const prepare_any_outputs = prepare_outputs or prepare_closed_outputs;
+    const prepare_observed_compilers = args.len > 1 and std.mem.eql(u8, args[1], "prepare-observed-compilers");
+    const prepare_any_outputs = prepare_outputs or prepare_closed_outputs or prepare_observed_compilers;
     const prepare_receipts = args.len > 1 and std.mem.eql(u8, args[1], "prepare-receipts");
     const prepare_aliases = args.len > 1 and std.mem.eql(u8, args[1], "prepare-aliases");
     const prepare_legacy = prepare_receipts or prepare_aliases;
@@ -294,7 +296,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_closed_outputs) try batch.closedOutputs(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_closed_outputs) try batch.closedOutputs(&e, generated_paths.?, reason.?) else if (prepare_observed_compilers) try batch.observedCompilers(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
         status = "prepared";
         return;
     }
@@ -450,6 +452,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
         .{ .path = "tools/storage_cleanup/generated.zig", .bytes = @embedFile("storage_cleanup/generated.zig") },
         .{ .path = "tools/storage_cleanup/command_outputs.zig", .bytes = @embedFile("storage_cleanup/command_outputs.zig") },
+        .{ .path = "tools/storage_cleanup/observed_compiler.zig", .bytes = @embedFile("storage_cleanup/observed_compiler.zig") },
         .{ .path = "tools/storage_cleanup/legacy.zig", .bytes = @embedFile("storage_cleanup/legacy.zig") },
         .{ .path = "tools/storage_cleanup/cache_holds.zig", .bytes = @embedFile("storage_cleanup/cache_holds.zig") },
         .{ .path = "tools/storage_cleanup/held_products.zig", .bytes = @embedFile("storage_cleanup/held_products.zig") },

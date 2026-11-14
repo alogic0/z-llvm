@@ -849,6 +849,7 @@ pub const Engine = struct {
         if (named_test and r.command_outputs == null) return error.MissingCommandOutputBinding;
         if (r.command_outputs != null and (r.state != .disposable or a.kind != .build_output)) return error.InvalidCommandOutputRelease;
         if (r.command_owner != null and r.command_outputs == null) return error.MissingCommandOutputBinding;
+        if (r.compiler_observation != null and (r.state != .disposable or a.kind != .build_output)) return error.UnboundCompilerObservation;
         const generated = a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm");
         if (generated and r.state != .disposable) return error.GeneratedOutputRequiresDisposable;
         var compiler_proof: ?retired_compiler.Proof = null;
@@ -883,6 +884,7 @@ pub const Engine = struct {
             }
             if (a.released_cache) try private_cache.verify(e, a.*, r, producer.value);
             if (r.command_outputs != null) try @import("command_outputs.zig").verify(e, a.*, r, producer.value, list);
+            if (r.compiler_observation != null) try @import("observed_compiler.zig").verify(e, a.*, r, producer.value, list);
             if (generated) try @import("generated.zig").verify(e, a.*, r, producer.value, list);
             try e.releaseTransitions(a, list, r);
             try e.keep(list, a.producer, null);
