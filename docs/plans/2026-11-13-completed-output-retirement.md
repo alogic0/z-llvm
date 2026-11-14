@@ -89,3 +89,52 @@ both formats. Regression coverage checks matching, mismatched, missing and
 non-string hashes, as well as preparation of an explicitly reviewed inventory
 exception. Current contracts still cannot be retired. This affects 1,075 otherwise
 qualified products in the two reviewed performance inventories.
+
+## Collection result
+
+All five planned steps are complete for the reviewed candidate set. Two guarded
+apply passes removed 15,299 file names; the confirmation pass found zero eligible
+files. Both mutating passes verified the five required integrity manifests after
+collection, and no pending mutation journal remains.
+
+| Removed data | Names / groups | Allocated bytes reclaimed |
+| --- | --- | ---: |
+| Completed binaries and objects | 15,295 names | 2,008,363,008 |
+| Fully audited raw traces | Four names, two complete hardlink groups | 2,894,225,408 |
+| This task's build/test scratch | One private directory, no external hardlinks or open users | 1,250,328,576 |
+
+The verified project payload total is 4,902,588,416 bytes (4.566 GiB). Including
+the task's temporary build data, removals account for 6,152,916,992 bytes
+(5.730 GiB). These are removal totals; concurrent production and new audit
+records mean the whole tree's net change is a different measurement. Ordinary
+compiled products were retired without creating new source/configuration
+archives. Their existing commands, results and diagnostics remain.
+
+The installed collector uses ReleaseFast, source revision
+`a9384f4b22ec17f8cf2cb9f83f7ae1c35605791e`, SHA-256
+`7cfb043f6c3ce46f4cbc4864e701ac0b3aa2dc4314e58cb22898058ceee09eda`.
+Final qualification includes 142 tests in each of Debug and ReleaseFast and
+eight generated/command-output CLI checks. Temporary compiler caches and build
+copies are gone; the reusable installed helpers and qualification records remain.
+
+The final inventory observed 138,875,637,760 bytes (129.338 GiB) in this checkout's
+`local-state`: 52.462 GiB covered by current contracts/holds, zero eligible bytes,
+and 76.876 GiB unresolved. No entries vanished during this inventory. The active
+sibling worktree's separate `local-state` measured 21.016 GiB; it was not part of
+these removals. Neither current protection nor unresolved status proves every
+remaining file is needed.
+
+The prepared set still has 705 names in incomplete hardlink groups and 128 cache
+candidates protected by current holds. A sampled binary has twelve names across
+the integrated v419, native-debug v419, and native-debug/native-fast v399 runs;
+all owners must qualify before its allocation can be reclaimed. The broader
+unresolved executable inventory remains a separate ownership-review task.
+
+Evidence:
+
+- `local-state/storage-cleanup/completed-outputs/summary.json` combines exact
+  removals, qualification, remaining candidates and the final inventory.
+- First apply: `local-state/retirements/automatic-storage-cleanup/1794622414199474427-918921/report.json`.
+- Object-inventory follow-up: `local-state/retirements/automatic-storage-cleanup/1794623886597209136-946399/report.json`.
+- Zero-removal confirmation: `local-state/retirements/automatic-storage-cleanup/1794624079900682835-949682/report.json`.
+- Final inventory: `local-state/retirements/automatic-storage-cleanup/1794624132061290988-950612/inventory.json`.
