@@ -8,6 +8,12 @@ const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests
 pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
 
 pub fn generated(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
+    return outputRequests(e, paths_file, reason, false);
+}
+pub fn outputs(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
+    return outputRequests(e, paths_file, reason, true);
+}
+fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, commands: bool) !void {
     if (!p.relative(paths_file) or reason.len == 0) return error.InvalidEvidencePath;
     try e.addControl(paths_file);
     const bytes = try e.read(e.c.gpa, paths_file, 1024 * 1024);
@@ -21,7 +27,7 @@ pub fn generated(e: *core.Engine, paths_file: []const u8, reason: []const u8) !v
         if (seen.count() >= 1024 or seen.contains(path)) return error.InvalidRequestList;
         const owned = try e.c.a.dupe(u8, path);
         try seen.put(owned, {});
-        const candidate = @import("generated.zig").request(e, owned, reason) catch |err| {
+        const candidate = (if (commands) @import("command_outputs.zig").request(e, owned, reason) else @import("generated.zig").request(e, owned, reason)) catch |err| {
             try rejected.append(e.c.a, .{ .path = owned, .reason = @errorName(err) });
             continue;
         };
@@ -43,13 +49,19 @@ pub fn traces(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void 
     var plan = try std.json.parseFromValue(Plan, e.c.gpa, parsed.value, .{});
     defer plan.deinit();
     if (!std.mem.eql(u8, plan.value.schema, "zllvm-trace-retirement-plan-v1") or plan.value.traces.len == 0 or plan.value.traces.len > 1024) return error.InvalidTracePlan;
+    var peers: std.ArrayList(p.Evidence) = .empty;
+    for (plan.value.traces) |entry| {
+        var audit = try e.load(e.c.gpa, entry.audit);
+        defer audit.deinit();
+        try peers.append(e.c.a, .{ .path = try e.relative(try core.str(audit.value, "path")), .sha256 = try e.c.a.dupe(u8, try core.str(audit.value, "sha256")) });
+    }
     var requests: std.ArrayList(p.Evidence) = .empty;
     for (plan.value.traces) |entry| {
         const retired: ?p.Evidence = if (entry.compiler_retirement) |path| blk: {
             if (!p.relative(path)) return error.InvalidEvidencePath;
             break :blk .{ .path = path, .sha256 = try e.digest(path) };
         } else null;
-        const candidate = try release.traceRequest(e, entry.audit, entry.build, reason, entry.source_reconstructions, retired);
+        const candidate = try release.traceRequestWithPeers(e, entry.audit, entry.build, reason, entry.source_reconstructions, retired, peers.items);
         const destination = try e.c.fmt("{s}/request-{d}.json", .{ e.output, requests.items.len });
         try e.write(destination, candidate);
         try requests.append(e.c.a, .{ .path = destination, .sha256 = try e.digest(destination) });

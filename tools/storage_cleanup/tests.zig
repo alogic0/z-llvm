@@ -8,6 +8,7 @@ const batches = @import("batch.zig");
 const private_cache = @import("private_cache.zig");
 const retired_compiler = @import("retired_compiler.zig");
 const generated = @import("generated.zig");
+const command_outputs = @import("command_outputs.zig");
 const p = core.p;
 const workspaces = @import("workspaces.zig");
 const workspace = @import("../validation/storage_workspace.zig");
@@ -19,6 +20,216 @@ const released = "local-state/validations/test/batch/released";
 const assembly_owner = run ++ "/execution-breadth-controls";
 const assembly_dir = assembly_owner ++ "/ReleaseFast/example";
 const assembly_path = assembly_dir ++ "/linked-harness.s";
+
+fn commandOutputFixture(f: *Fixture, e: *core.Engine, success: bool) !void {
+    try f.write(run ++ "/local", "\x7fELFtest executable");
+    try f.write(run ++ "/reference.o", "\x7fELFtest object");
+    try f.write(run ++ "/input.ll", "preserved test input");
+    try f.write(run ++ "/compile.stdout", "diagnostic");
+    try f.write(run ++ "/compile.stderr", "");
+    try e.write(report, .{ .schema = "input-program-v1", .status = "passed" });
+    const Command = struct { argv: []const []const u8, outcome: []const u8 = "completed", actual_returncode: i32, returncode: i32, stdout: []const u8, stderr: []const u8 };
+    const code: i32 = if (success) 0 else 1;
+    try e.write(run ++ "/commands.json", [_]Command{
+        .{ .argv = &.{ "cc", try e.absolute(run ++ "/reference.o"), "-o", try e.absolute(run ++ "/local") }, .actual_returncode = code, .returncode = code, .stdout = run ++ "/compile.stdout", .stderr = run ++ "/compile.stderr" },
+        .{ .argv = &.{ "clang-22", "-c", try e.absolute(run ++ "/input.ll"), "-o", try e.absolute(run ++ "/reference.o") }, .actual_returncode = 0, .returncode = 0, .stdout = run ++ "/compile.stdout", .stderr = run ++ "/compile.stderr" },
+    });
+}
+
+test "storage cleanup: explicit completed command outputs retire as a mixed file batch" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, true);
+    try e.write(run ++ "/products-release.json", try command_outputs.request(&e, report, "Closed test products"));
+    try e.discoverRelease(run ++ "/products-release.json", true);
+    try t.expectEqual(@as(usize, 2), e.actions.items.len);
+    for (0..2) |i| try e.qualify(i);
+    try e.protectRetained();
+    try mutation.applyFileBatch(&e, try mutation.fileBatch(&e, 0));
+    for (e.actions.items) |a| try t.expectEqual(.removed, a.status);
+    for ([_][]const u8{ report, run ++ "/commands.json", run ++ "/input.ll", run ++ "/compile.stdout", run ++ "/compile.stderr" }) |path| _ = try e.metadata(path);
+}
+
+test "storage cleanup: unsuccessful output command cannot release a passed owner's files" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, false);
+    try t.expectError(error.OutputCommandNotSuccessful, command_outputs.request(&e, report, "Rejected output"));
+}
+
+test "storage cleanup: other extensionless executables require commands and compiled bytes" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var prepare = f.engine();
+    try commandOutputFixture(f, &prepare, true);
+    const path = run ++ "/case-reference";
+    try f.write(path, "\x7fELFcompleted case executable");
+    try prepare.write(run ++ "/commands.json", .{.{ .argv = [_][]const u8{ "cc", try prepare.absolute(run ++ "/input.ll"), "-o", try prepare.absolute(path) }, .outcome = "completed", .actual_returncode = @as(i32, 0), .returncode = @as(i32, 0), .stdout = run ++ "/compile.stdout", .stderr = run ++ "/compile.stderr" }});
+    var e = f.engine();
+    var r = try command_outputs.request(&e, report, "Completed named test executable");
+    try t.expectEqual(@as(usize, 1), r.artifacts.len);
+    try e.write(run ++ "/products-release.json", r);
+    try e.discoverRelease(run ++ "/products-release.json", true);
+    try e.qualify(0);
+    r.command_outputs = null;
+    try e.write(run ++ "/unbound-release.json", r);
+    try t.expectError(error.InvalidReleaseArtifact, e.discoverRelease(run ++ "/unbound-release.json", true));
+    try mutation.applyFileBatch(&e, &.{0});
+    _ = try e.metadata(run ++ "/input.ll");
+    // A command cannot promote a script into a compiled product by its name.
+    try f.write(path, "#!/bin/sh\nexit 0\n");
+    var again = f.engine();
+    try again.write(run ++ "/script-release.json", try command_outputs.request(&again, report, "Reject script"));
+    try again.discoverRelease(run ++ "/script-release.json", true);
+    try t.expectError(error.NotCompiledOutput, again.qualify(0));
+}
+
+test "storage cleanup: extensionless product names require explicit output binding" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, true);
+    var r = try command_outputs.request(&e, report, "Missing binding");
+    r.command_outputs = null;
+    try e.write(run ++ "/products-release.json", r);
+    try e.discoverRelease(run ++ "/products-release.json", true);
+    try t.expectError(error.MissingCommandOutputBinding, e.qualify(0));
+}
+
+test "storage cleanup: command output adapter ignores shell and source outputs" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try t.expectError(error.UnboundOutputOwner, command_outputs.request(&e, "local-state/validations/legacy/run/report.json", "Reject shallow legacy scope"));
+    try commandOutputFixture(f, &e, true);
+    // A source-looking -o is never promoted merely because a command names it.
+    try e.write(run ++ "/commands.json", .{.{ .argv = [_][]const u8{ "cc", "-S", "-o", try e.absolute(run ++ "/input.ll") }, .outcome = "completed", .actual_returncode = 0, .returncode = 0 }});
+    var fresh = f.engine();
+    try t.expectError(error.NoBoundOutputs, command_outputs.request(&fresh, report, "No compiled outputs"));
+    try e.write(run ++ "/commands.json", .{.{ .argv = [_][]const u8{ "bash", "-c", "cc -o local source.c" }, .outcome = "completed", .actual_returncode = 0, .returncode = 0 }});
+    fresh = f.engine();
+    try t.expectError(error.NoBoundOutputs, command_outputs.request(&fresh, report, "No direct output command"));
+}
+
+test "storage cleanup: changed command evidence preserves every batched product" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, true);
+    try e.write(run ++ "/products-release.json", try command_outputs.request(&e, report, "Closed products"));
+    try e.discoverRelease(run ++ "/products-release.json", true);
+    for (0..2) |i| try e.qualify(i);
+    try f.write(run ++ "/commands.json", "[]");
+    if (mutation.applyFileBatch(&e, &.{ 0, 1 })) |_| return error.ChangedEvidenceAccepted else |_| {}
+    for (e.actions.items) |a| _ = try e.metadata(a.path);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: copied compiler output requires the recorded compiler hash" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try commandOutputFixture(f, &e, true);
+    try f.write(run ++ "/z_llvm", "\x7fELFcopied compiler");
+    const original = try e.absolute(run ++ "/original/z_llvm");
+    try e.write(report, .{ .status = "passed", .compiler = original, .compiler_sha256 = try e.digest(run ++ "/z_llvm") });
+    try e.write(run ++ "/commands.json", .{.{ .argv = [_][]const u8{ "cp", original, try e.absolute(run ++ "/z_llvm") }, .outcome = "completed", .actual_returncode = @as(i32, 0), .returncode = @as(i32, 0), .stdout = run ++ "/compile.stdout", .stderr = run ++ "/compile.stderr" }});
+    var fresh = f.engine();
+    const r = try command_outputs.request(&fresh, report, "Closed compiler copy");
+    try t.expectEqual(@as(usize, 1), r.artifacts.len);
+    try e.write(report, .{ .status = "passed", .compiler = original, .compiler_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+    fresh = f.engine();
+    try t.expectError(error.CopiedCompilerHashMismatch, command_outputs.request(&fresh, report, "Reject unbound copy"));
+    try e.write(run ++ "/commands.json", .{.{ .argv = [_][]const u8{ "cp", original, run ++ "/z_llvm" }, .outcome = "completed", .actual_returncode = @as(i32, 0), .returncode = @as(i32, 0) }});
+    fresh = f.engine();
+    try t.expectError(error.NoBoundOutputs, command_outputs.request(&fresh, report, "Relative copy destination has no cwd binding"));
+}
+
+const peer_trace = released ++ "/peer/profile.events.jsonl";
+fn traceAliasFixture(f: *Fixture) !void {
+    var prepare = f.engine();
+    _ = try f.release(&prepare, .raw_trace, true, true, false);
+    try f.tmp.dir.createDirPath(t.io, released ++ "/peer");
+    const file = try f.tmp.dir.openFile(t.io, released ++ "/profile.events.jsonl", .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, peer_trace, .{});
+    var audit = try prepare.load(f.c.a, released ++ "/audit.json");
+    try audit.value.object.put(f.c.a, "path", .{ .string = peer_trace });
+    try prepare.write(released ++ "/peer-audit.json", audit.value);
+    const parsed = try prepare.load(f.c.a, released ++ "/storage-release.json");
+    var r = (try std.json.parseFromValue(p.Release, f.c.a, parsed.value, .{})).value;
+    var artifacts: [2]p.Artifact = .{ r.artifacts[0], .{ .path = peer_trace, .sha256 = r.artifacts[0].sha256, .kind = .raw_trace, .audit = released ++ "/peer-audit.json" } };
+    var rows: std.ArrayList(p.Retained) = .empty;
+    try rows.appendSlice(f.c.a, r.retained);
+    try rows.append(f.c.a, .{ .path = released ++ "/peer-audit.json", .sha256 = try prepare.digest(released ++ "/peer-audit.json"), .role = .audit });
+    r.retained = rows.items;
+    r.artifacts = &artifacts;
+    r.state = .audited;
+    r.successor = null;
+    try prepare.write(released ++ "/storage-release.json", r);
+}
+fn qualifyTraceAliases(f: *Fixture, e: *core.Engine) !void {
+    _ = f;
+    e.allow_artifact_aliases = true;
+    try e.discoverRelease(released ++ "/storage-release.json", true);
+    for (0..2) |i| try e.qualify(i);
+    try e.guardCaptureGroups();
+}
+
+test "storage cleanup: audited trace alias batch frees exactly one physical allocation" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try traceAliasFixture(f);
+    var e = f.engine();
+    try qualifyTraceAliases(f, &e);
+    const allocation = e.actions.items[0].metadata.?.allocated_bytes;
+    try t.expectError(error.AllocationMismatch, mutation.applyFileBatch(&e, &.{ 1, 0 }));
+    for (e.actions.items) |a| _ = try e.metadata(a.path);
+    try mutation.applyFileBatch(&e, try mutation.fileBatch(&e, 0));
+    try t.expectEqual(allocation, e.actions.items[0].reclaimed_file_bytes + e.actions.items[1].reclaimed_file_bytes);
+    for (e.actions.items) |a| try t.expectEqual(.removed, a.status);
+    _ = try e.metadata(released ++ "/input.ll");
+}
+
+test "storage cleanup: missing trace alias audit prevents physical retirement" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try traceAliasFixture(f);
+    var e = f.engine();
+    try qualifyTraceAliases(f, &e);
+    try f.tmp.dir.deleteFile(t.io, released ++ "/peer-audit.json");
+    if (mutation.applyFileBatch(&e, &.{ 0, 1 })) |_| return error.MissingAuditAccepted else |_| {}
+    for (e.actions.items) |a| _ = try e.metadata(a.path);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: unknown third trace name prevents group admission" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try traceAliasFixture(f);
+    const file = try f.tmp.dir.openFile(t.io, peer_trace, .{});
+    defer file.close(t.io);
+    try file.hardLink(t.io, f.tmp.dir, released ++ "/unknown-alias", .{});
+    var e = f.engine();
+    e.allow_artifact_aliases = true;
+    try e.discoverRelease(released ++ "/storage-release.json", true);
+    try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
+    for (e.actions.items) |a| _ = try e.metadata(a.path);
+}
+
+test "storage cleanup: new trace alias pin rolls back both quarantined names" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try traceAliasFixture(f);
+    var e = f.engine();
+    try qualifyTraceAliases(f, &e);
+    try f.write(run ++ "/new-pin.sha256", try f.c.fmt("{s}  {s}\n", .{ e.actions.items[1].sha256.?, peer_trace }));
+    try t.expectError(error.GeneratedBatchBecameHeld, mutation.applyFileBatch(&e, &.{ 0, 1 }));
+    for (e.actions.items) |a| try t.expectEqual(@as(u64, 2), (try e.metadata(a.path)).links);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
 fn workspaceFixture(f: *Fixture, passed: bool) !workspace.Workspace {
     try f.c.mkdir(try f.c.join(&.{"docs"}));
     try f.c.mkdir(try f.c.join(&.{"tools"}));

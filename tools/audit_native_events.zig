@@ -38,10 +38,58 @@ fn binding(e: *storage.Engine, value: u.Value) !p.Evidence {
     return result;
 }
 
-fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !void {
+fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !i64 {
     if (!p.relative(entry.path) or !p.candidate(entry.path) or !std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.InvalidTracePath;
     const run = std.fs.path.dirname(entry.top_report.path) orelse return error.InvalidTraceScope;
     if (!p.candidate(run) or !p.within(run, entry.path) or !p.within(run, entry.backend_report.path)) return error.InvalidTraceScope;
+    // Older whole-build runs kept their terminal report and command records,
+    // but not a separate run_checked receipt. Bind that actual report to its
+    // successful build prefix and the exact embedded capture, never synthesize
+    // a replacement producer receipt.
+    if (std.mem.eql(u8, entry.producer.path, entry.top_report.path)) {
+        if (!storage.eq(producer, "schema", "whole-compiler-diagnostic-v1") or !storage.eq(producer, "status", "passed") or
+            !try storage.boolean(producer, "build_completed") or try storage.integer(producer, "build_returncode") != 0 or
+            !try storage.boolean(producer, "all_hook_objects_complete") or !try storage.boolean(producer, "source_and_backend_verified")) return error.ProducerNotTerminal;
+        const commands = try storage.get(producer, "commands");
+        if (commands != .array) return error.UnboundProducer;
+        var build_bound = false;
+        for (commands.array.items) |command| {
+            const args = try u.stringSlice(e.c.a, try storage.get(command, "argv"));
+            var build = false;
+            var prefix: ?[]const u8 = null;
+            for (args, 0..) |arg, i| {
+                if (std.mem.eql(u8, std.fs.path.basename(arg), "zig") and i + 1 < args.len and std.mem.eql(u8, args[i + 1], "build") and
+                    (i == 0 or (i > 0 and std.mem.eql(u8, args[i - 1], "--") and std.mem.eql(u8, std.fs.path.basename(args[0]), "time")))) build = true;
+                if (std.mem.eql(u8, arg, "--prefix")) {
+                    if (prefix != null or i + 1 == args.len) return error.UnboundProducer;
+                    prefix = try e.relative(args[i + 1]);
+                }
+            }
+            if (build and prefix != null and std.mem.eql(u8, prefix.?, try e.c.fmt("{s}/install", .{run}))) {
+                if (!storage.eq(command, "outcome", "completed") or try storage.integer(command, "actual_returncode") != 0 or try storage.integer(command, "returncode") != 0) return error.ProducerNotTerminal;
+                build_bound = true;
+            }
+        }
+        if (!build_bound) return error.UnboundProducer;
+        const invocations = try storage.get(producer, "invocations");
+        if (invocations != .array) return error.UnboundProducer;
+        var matches: usize = 0;
+        var backend = try e.load(e.c.gpa, entry.backend_report.path);
+        defer backend.deinit();
+        for (invocations.array.items) |invocation| {
+            if (!std.mem.eql(u8, try e.relative(try storage.str(invocation, "directory")), std.fs.path.dirname(entry.path).?)) continue;
+            if (!try storage.boolean(invocation, "process_completed") or !try storage.boolean(invocation, "object_complete") or try storage.integer(invocation, "returncode") != 0) return error.ProducerNotTerminal;
+            for ([_][]const u8{ "profile_events", "input" }) |key| {
+                const embedded = try storage.get(invocation, key);
+                const actual = try storage.get(backend.value, key);
+                if (!std.mem.eql(u8, try e.relative(try storage.str(embedded, "path")), try e.relative(try storage.str(actual, "path"))) or
+                    !std.mem.eql(u8, try storage.str(embedded, "sha256"), try storage.str(actual, "sha256"))) return error.UnboundProducer;
+            }
+            matches += 1;
+        }
+        if (matches != 1) return error.UnboundProducer;
+        return 0;
+    }
     if (!storage.eq(producer, "status", "finished") or !storage.eq(producer, "outcome", "completed")) return error.ProducerNotTerminal;
     _ = try storage.integer(producer, "actual_returncode");
     const argv = try storage.get(producer, "argv");
@@ -53,6 +101,7 @@ fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !void {
         }
     }
     if (!bound) return error.UnboundProducer;
+    return storage.integer(producer, "actual_returncode");
 }
 
 fn auditOne(e: *storage.Engine, entry: Entry, destination: []const u8, sources: Sources) !bool {
@@ -62,7 +111,7 @@ fn auditOne(e: *storage.Engine, entry: Entry, destination: []const u8, sources: 
     }
     var producer = try e.load(e.c.gpa, entry.producer.path);
     defer producer.deinit();
-    try validateEntry(e, entry, producer.value);
+    const producer_returncode = try validateEntry(e, entry, producer.value);
     var top = try e.load(e.c.gpa, entry.top_report.path);
     defer top.deinit();
     const compiler = try storage.get(top.value, "backend");
@@ -181,7 +230,7 @@ fn auditOne(e: *storage.Engine, entry: Entry, destination: []const u8, sources: 
         .top_report = entry.top_report,
         .backend_report = entry.backend_report,
         .input = input,
-        .producer_returncode = try storage.integer(producer.value, "actual_returncode"),
+        .producer_returncode = producer_returncode,
         .backend_returncode = try storage.integer(report, "returncode"),
         .failure_stage = try storage.get(report, "failure_stage"),
         .core_source = sources.core.path,
@@ -336,6 +385,42 @@ test "native event audit: real files preserve failed outcomes and reject truncat
             try t.expectEqual(@as(i64, 1), try storage.integer(result.value, "producer_returncode"));
         }
         _ = try e.metadata(entry.path);
+    }
+}
+
+test "native event audit: terminal whole-build reports bind the build and exact capture" {
+    const t = std.testing;
+    const run = "local-state/validations/audit/test/run";
+    for (0..5) |case| {
+        var tmp = t.tmpDir(.{ .iterate = true });
+        defer tmp.cleanup();
+        var arena = std.heap.ArenaAllocator.init(t.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        var c: u.Context = .{ .a = a, .gpa = t.allocator, .io = t.io, .root = try tmp.dir.realPathFileAlloc(t.io, ".", a), .env = try t.environ.createMap(a), .quiet = true };
+        try tmp.dir.createDirPath(t.io, run ++ "/captures/1");
+        var e = storage.Engine.init(&c, .{}, run, "zigrep");
+        const raw: p.Evidence = .{ .path = run ++ "/captures/1/profile.events.jsonl", .sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+        const input: p.Evidence = .{ .path = run ++ "/captures/1/input.ll", .sha256 = raw.sha256 };
+        try e.write(run ++ "/captures/1/report.json", .{ .profile_events = raw, .input = input });
+        try e.write(run ++ "/report.json", .{
+            .schema = "whole-compiler-diagnostic-v1",
+            .status = "passed",
+            .build_completed = case != 1,
+            .build_returncode = @as(i32, 0),
+            .all_hook_objects_complete = true,
+            .source_and_backend_verified = true,
+            .commands = .{.{ .argv = [_][]const u8{ "zig", "build", "--prefix", if (case == 2) run ++ "/unrelated" else run ++ "/install" }, .outcome = "completed", .actual_returncode = @as(i32, if (case == 4) 1 else 0), .returncode = @as(i32, 0) }},
+            .invocations = .{.{ .directory = if (case == 3) run ++ "/captures/2" else run ++ "/captures/1", .process_completed = true, .object_complete = true, .returncode = @as(i32, 0), .profile_events = raw, .input = input }},
+        });
+        const top: p.Evidence = .{ .path = run ++ "/report.json", .sha256 = try e.digest(run ++ "/report.json") };
+        const entry: Entry = .{ .path = raw.path, .producer = top, .top_report = top, .backend_report = .{ .path = run ++ "/captures/1/report.json", .sha256 = try e.digest(run ++ "/captures/1/report.json") } };
+        var parsed = try e.load(t.allocator, top.path);
+        defer parsed.deinit();
+        if (case == 0) try t.expectEqual(@as(i64, 0), try validateEntry(&e, entry, parsed.value)) else if (case == 1 or case == 4)
+            try t.expectError(error.ProducerNotTerminal, validateEntry(&e, entry, parsed.value))
+        else
+            try t.expectError(error.UnboundProducer, validateEntry(&e, entry, parsed.value));
     }
 }
 

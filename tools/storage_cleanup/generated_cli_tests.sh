@@ -34,7 +34,7 @@ test "${#cleanup_reviews[@]}" = 1
 cleanup_requests=${cleanup_reviews[0]%/*}/requests.json
 cleanup_requests=${cleanup_requests#"$cleanup_fixture/"}
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --requests "$cleanup_requests" > "$cleanup_fixture/apply.log"
-"$cleanup_zigrep" -q -F 'Removed 2 generated outputs' "$cleanup_fixture/apply.log"
+"$cleanup_zigrep" -q -F 'Removed 2 verified files' "$cleanup_fixture/apply.log"
 for cleanup_case in first second; do
     test ! -e "$cleanup_fixture/$cleanup_run/$cleanup_case/capture-zllvm"
     test -f "$cleanup_fixture/$cleanup_run/$cleanup_case/input.ll"
@@ -81,3 +81,37 @@ cleanup_report=$(tail -n 1 "$cleanup_fixture/alias-apply.log"); cleanup_report=$
 "$cleanup_jqz" -e --argjson bytes "$((cleanup_blocks * 512))" '.removed == 3 and .reclaimed_allocated_file_bytes == $bytes' "$cleanup_fixture/$cleanup_report" > /dev/null
 for cleanup_case in first second third; do test ! -e "$cleanup_fixture/$cleanup_run/$cleanup_case/capture-zllvm"; done
 printf 'Five generated-output CLI checks passed: single-link and complete-alias batches, incomplete groups, current pins and repeated collection.\n'
+
+cleanup_run=local-state/validations/test/batch/completed-products
+for cleanup_case in first second; do
+    cleanup_owner="$cleanup_run/$cleanup_case"
+    mkdir -p "$cleanup_fixture/$cleanup_owner"
+    if [[ $cleanup_case == first ]]; then
+        printf '\177ELFshared completed test executable\n' > "$cleanup_fixture/$cleanup_owner/local"
+    else
+        ln -- "$cleanup_fixture/$cleanup_run/first/local" "$cleanup_fixture/$cleanup_owner/local"
+    fi
+    printf 'retained test input\n' > "$cleanup_fixture/$cleanup_owner/input.ll"
+    printf 'retained compiler diagnostic\n' > "$cleanup_fixture/$cleanup_owner/compile.stderr"
+    : > "$cleanup_fixture/$cleanup_owner/compile.stdout"
+    printf '{"schema":"input-program-v1","status":"passed"}\n' > "$cleanup_fixture/$cleanup_owner/report.json"
+    "$cleanup_jqz" -n --arg input "$cleanup_fixture/$cleanup_owner/input.ll" --arg output "$cleanup_fixture/$cleanup_owner/local" \
+        --arg stdout "$cleanup_fixture/$cleanup_owner/compile.stdout" --arg stderr "$cleanup_fixture/$cleanup_owner/compile.stderr" \
+        '[{argv:["cc",$input,"-o",$output],outcome:"completed",actual_returncode:0,returncode:0,stdout:$stdout,stderr:$stderr}]' > "$cleanup_fixture/$cleanup_owner/commands.json"
+    printf '%s/report.json\n' "$cleanup_owner" >> "$cleanup_fixture/reports.txt"
+done
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" prepare-outputs --reports reports.txt --reason 'Completed test products' > "$cleanup_fixture/products-prepare.log"
+cleanup_review=$(tail -n 1 "$cleanup_fixture/products-prepare.log")
+cleanup_requests=${cleanup_review%/generated-review.json}/requests.json
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --requests "$cleanup_requests" > "$cleanup_fixture/products-single.log"
+test -f "$cleanup_fixture/$cleanup_run/first/local"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --complete-artifact-aliases --requests "$cleanup_requests" > "$cleanup_fixture/products-apply.log"
+for cleanup_case in first second; do
+    test ! -e "$cleanup_fixture/$cleanup_run/$cleanup_case/local"
+    for cleanup_evidence in input.ll report.json commands.json compile.stderr; do
+        test -f "$cleanup_fixture/$cleanup_run/$cleanup_case/$cleanup_evidence"
+    done
+done
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --apply --complete-artifact-aliases --requests "$cleanup_requests" > "$cleanup_fixture/products-repeat.log"
+"$cleanup_zigrep" -q -F 'removed: 0;' "$cleanup_fixture/products-repeat.log"
+printf 'Three command-output CLI checks passed: explicit alias opt-in, completed owner bindings and repeat collection.\n'

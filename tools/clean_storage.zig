@@ -16,6 +16,7 @@ const usage =
     \\       tools/clean-storage share-inputs --inputs PLAN [--apply]
     \\       tools/clean-storage prepare-pins --requests FILE --review REPORT [--manifests PLAN]
     \\       tools/clean-storage --requests FILE --complete-capture-aliases [--apply]
+    \\       tools/clean-storage --requests FILE --complete-artifact-aliases [--apply]
     \\       tools/clean-storage release-trace --audit FILE --build FILE --reason TEXT
     \\           [--reconstruction FILE ...]
     \\           [--compiler-retirement RECORD.json]
@@ -28,6 +29,7 @@ const usage =
     \\       tools/clean-storage prepare-caches --caches FILE --reason TEXT
     \\       tools/clean-storage prepare-traces --traces FILE --reason TEXT
     \\       tools/clean-storage prepare-generated --paths FILE --reason TEXT
+    \\       tools/clean-storage prepare-outputs --reports FILE --reason TEXT
     \\       tools/clean-storage prepare-pins --requests FILE --review FILE
     \\       tools/clean-storage [--apply] --requests FILE
     \\
@@ -50,6 +52,7 @@ pub fn main(init: std.process.Init) !void {
     var apply = false;
     var minimal = false;
     var capture_aliases = false;
+    var artifact_aliases = false;
     var policy_path: []const u8 = "docs/storage_cleanup_policy.json";
     const release_trace = args.len > 1 and std.mem.eql(u8, args[1], "release-trace");
     const release_request = args.len > 1 and std.mem.eql(u8, args[1], "release");
@@ -64,6 +67,7 @@ pub fn main(init: std.process.Init) !void {
     const prepare_caches = args.len > 1 and std.mem.eql(u8, args[1], "prepare-caches");
     const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
     const prepare_generated = args.len > 1 and std.mem.eql(u8, args[1], "prepare-generated");
+    const prepare_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-outputs");
     const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
     var requests_path: ?[]const u8 = null;
     var builds_path: ?[]const u8 = null;
@@ -79,7 +83,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -92,6 +96,10 @@ pub fn main(init: std.process.Init) !void {
         }
         if (std.mem.eql(u8, args[i], "--complete-capture-aliases")) {
             capture_aliases = true;
+            continue;
+        }
+        if (std.mem.eql(u8, args[i], "--complete-artifact-aliases")) {
+            artifact_aliases = true;
             continue;
         }
         if (share_inputs and std.mem.eql(u8, args[i], "--inputs") and i + 1 < args.len) {
@@ -141,12 +149,12 @@ pub fn main(init: std.process.Init) !void {
             compiler_retirement_path = args[i];
             continue;
         }
-        if (prepare_generated and std.mem.eql(u8, args[i], "--paths") and i + 1 < args.len) {
+        if (((prepare_generated and std.mem.eql(u8, args[i], "--paths")) or (prepare_outputs and std.mem.eql(u8, args[i], "--reports"))) and i + 1 < args.len) {
             i += 1;
             generated_paths = args[i];
             continue;
         }
-        if ((prepare_caches or prepare_traces or prepare_generated) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
+        if ((prepare_caches or prepare_traces or prepare_generated or prepare_outputs) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
             i += 1;
             reason = args[i];
             continue;
@@ -202,13 +210,13 @@ pub fn main(init: std.process.Init) !void {
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
     if (share_inputs and (inputs_plan == null or minimal or requests_path != null)) return error.InvalidSharedInputPlan;
     if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) and (apply or minimal)) return error.PreparationIsReadOnly;
-    if (prepare_generated and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
+    if ((prepare_generated or prepare_outputs) and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_caches and (caches_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_traces and (traces_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_pins and (requests_path == null or review_path == null)) return error.InvalidReleaseArguments;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
-    if (capture_aliases and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_pins)) return error.InvalidCaptureAliasArguments;
+    if ((capture_aliases or artifact_aliases) and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_pins)) return error.InvalidCaptureAliasArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
     const policy_absolute = try c.join(&.{policy_path});
     var policy_dir = try core.fa.metadata.openRoot(c.io, std.fs.path.dirname(policy_absolute).?);
@@ -235,6 +243,7 @@ pub fn main(init: std.process.Init) !void {
     const zigrep = c.env.get("ZIGREP") orelse "zigrep";
     var e = core.Engine.init(&c, config, output, zigrep);
     e.allow_capture_aliases = capture_aliases;
+    e.allow_artifact_aliases = artifact_aliases;
     e.collector_binary_sha256 = try c.digest("/proc/self/exe");
     e.collector_sources = try collectorSources(&c);
     var status: []const u8 = "failed";
@@ -246,8 +255,8 @@ pub fn main(init: std.process.Init) !void {
         status = "complete";
         return;
     }
-    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
+    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs) {
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
         status = "prepared";
         return;
     }
@@ -322,24 +331,15 @@ pub fn main(init: std.process.Init) !void {
             try e.consumers();
             try e.guardCaptureGroups();
             if (a.status != .ready) continue;
-            var group: std.ArrayList(usize) = .empty;
-            if (mutation.generatedAction(a.*)) {
-                const scope = @import("storage_cleanup/generated.zig").consumerRoot(a.run_root);
-                for (e.actions.items, 0..) |other, other_index| {
-                    if (other.status != .ready or !mutation.generatedAction(other)) continue;
-                    const shared = a.metadata.?.links > 1;
-                    if (if (shared) other.metadata.?.device == a.metadata.?.device and other.metadata.?.inode == a.metadata.?.inode else other.metadata.?.links == 1 and
-                        std.mem.eql(u8, scope, @import("storage_cleanup/generated.zig").consumerRoot(other.run_root))) try group.append(c.a, other_index);
-                }
-            }
-            if (group.items.len > 1) {
-                try mutation.applyGeneratedBatch(&e, group.items);
+            const group = if (mutation.fileAction(a.*)) try mutation.fileBatch(&e, index) else &.{};
+            if (group.len > 0) {
+                try mutation.applyFileBatch(&e, group);
             } else try mutation.apply(&e, index);
             try report(&e, "applying", apply, minimal);
-            if (group.items.len > 1) {
+            if (group.len > 0) {
                 var reclaimed_group: u64 = 0;
-                for (group.items) |member| reclaimed_group += e.actions.items[member].reclaimed_file_bytes;
-                try c.print("Removed {d} generated outputs in {s} ({d} allocated file bytes)\n", .{ group.items.len, @import("storage_cleanup/generated.zig").consumerRoot(a.run_root), reclaimed_group });
+                for (group) |member| reclaimed_group += e.actions.items[member].reclaimed_file_bytes;
+                try c.print("Removed {d} verified files ({d} allocated file bytes)\n", .{ group.len, reclaimed_group });
             } else try c.print("Removed: {s} ({d} allocated file bytes)\n", .{ a.path, a.reclaimed_file_bytes });
         }
         e.hash_cache.clearRetainingCapacity();
@@ -409,6 +409,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/private_cache.zig", .bytes = @embedFile("storage_cleanup/private_cache.zig") },
         .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
         .{ .path = "tools/storage_cleanup/generated.zig", .bytes = @embedFile("storage_cleanup/generated.zig") },
+        .{ .path = "tools/storage_cleanup/command_outputs.zig", .bytes = @embedFile("storage_cleanup/command_outputs.zig") },
         .{ .path = "tools/storage_cleanup/retired_logs.zig", .bytes = @embedFile("storage_cleanup/retired_logs.zig") },
         .{ .path = "tools/storage_cleanup/jobs.zig", .bytes = @embedFile("storage_cleanup/jobs.zig") },
         .{ .path = "tools/storage_cleanup/shared_inputs.zig", .bytes = @embedFile("storage_cleanup/shared_inputs.zig") },

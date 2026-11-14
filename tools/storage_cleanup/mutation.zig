@@ -8,6 +8,33 @@ pub const pending_path = "local-state/storage-cleanup/pending.json";
 pub fn generatedAction(a: core.Action) bool {
     return a.kind == .generated_assembly or (a.kind == .build_output and std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm"));
 }
+pub fn fileAction(a: core.Action) bool {
+    return a.snapshot == null and a.kind != .cache and a.kind != .temporary_workspace;
+}
+/// Keep complete inode groups together within the configured candidate budget.
+/// The existing hard cap is 1024; minimal collection can use one admitted set.
+pub fn fileBatch(e: *core.Engine, start: usize) ![]const usize {
+    var indexes: std.ArrayList(usize) = .empty;
+    const limit = @min(e.config.max_candidates, 1024);
+    for (e.actions.items[start..], start..) |a, index| {
+        if (a.status != .ready or !fileAction(a)) continue;
+        if (std.mem.indexOfScalar(usize, indexes.items, index) != null) continue;
+        const m = a.metadata orelse return error.CandidateChanged;
+        const count = m.links;
+        if (count > limit) return error.InvalidGeneratedBatch;
+        if (indexes.items.len + count > limit) continue;
+        if (count == 1) {
+            try indexes.append(e.c.a, index);
+        } else {
+            for (e.actions.items, 0..) |other, other_index| {
+                const om = other.metadata orelse continue;
+                if (om.device == m.device and om.inode == m.inode) try indexes.append(e.c.a, other_index);
+            }
+        }
+        if (indexes.items.len >= limit) break;
+    }
+    return indexes.items;
+}
 const GeneratedMove = struct {
     action_index: usize,
     path: []const u8,
@@ -46,26 +73,58 @@ fn moveGenerated(e: *core.Engine, entry: GeneratedMove, restore: bool, did_move:
 pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
     if (indexes.len < 2 or indexes.len > 1024) return error.InvalidGeneratedBatch;
     for (indexes) |index| if (index >= e.actions.items.len) return error.InvalidGeneratedBatch;
-    var entries: std.ArrayList(GeneratedMove) = .empty;
     const scope = @import("generated.zig").consumerRoot(e.actions.items[indexes[0]].run_root);
     const first = e.actions.items[indexes[0]].metadata orelse return error.InvalidGeneratedBatch;
     const aliases = first.links > 1;
-    if (aliases and (!e.allow_capture_aliases or first.links != indexes.len)) return error.InvalidGeneratedBatch;
+    for (indexes) |index| {
+        const a = e.actions.items[index];
+        if (!generatedAction(a) or (!aliases and !std.mem.eql(u8, scope, @import("generated.zig").consumerRoot(a.run_root)))) return error.InvalidGeneratedBatch;
+    }
+    return applyFileBatch(e, indexes);
+}
+
+/// A bounded set of fully qualified files, possibly from independent closed
+/// runs. Every hardlink must be present and qualified within this transaction.
+pub fn applyFileBatch(e: *core.Engine, indexes: []const usize) !void {
+    if (indexes.len == 0 or indexes.len > 1024) return error.InvalidGeneratedBatch;
+    for (indexes) |index| if (index >= e.actions.items.len) return error.InvalidGeneratedBatch;
+    var entries: std.ArrayList(GeneratedMove) = .empty;
+    try e.verifyBatchEvidence(indexes);
     for (indexes, 0..) |index, n| {
         for (indexes[0..n]) |old| if (old == index) return error.InvalidGeneratedBatch;
         const a = e.actions.items[index];
-        if (a.status != .ready or !generatedAction(a) or a.snapshot != null or
-            (!aliases and !std.mem.eql(u8, scope, @import("generated.zig").consumerRoot(a.run_root)))) return error.InvalidGeneratedBatch;
-        try e.verifyEvidence(a);
+        if (a.status != .ready or !fileAction(a)) return error.InvalidGeneratedBatch;
         const observed = try e.metadata(a.path);
-        if (!observed.eql(a.metadata.?) or observed.kind != .file or (if (aliases) !observed.eql(first) or !std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm") else observed.links != 1)) return error.CandidateChanged;
+        if (!observed.eql(a.metadata.?) or observed.kind != .file) return error.CandidateChanged;
+        if (observed.links > 1) {
+            if (!e.aliasAllowed(a)) return error.InvalidGeneratedBatch;
+            var count: usize = 0;
+            for (indexes) |other_index| {
+                const other = e.actions.items[other_index];
+                const om = other.metadata orelse return error.InvalidGeneratedBatch;
+                if (om.device != observed.device or om.inode != observed.inode) continue;
+                if (!om.eql(observed) or !e.aliasAllowed(other) or other.sha256 == null or !std.mem.eql(u8, other.sha256.?, a.sha256.?)) return error.InvalidGeneratedBatch;
+                count += 1;
+            }
+            if (count != observed.links) return error.InvalidGeneratedBatch;
+        }
         const absolute = try e.absolute(a.path);
         var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
         defer parent.close(e.c.io);
         try unchangedGenerated(e, parent, std.fs.path.basename(absolute), observed, a.sha256.?);
         try entries.append(e.c.a, .{ .action_index = index, .path = a.path, .quarantine = try e.c.fmt("{s}/.storage-cleanup-{d}-{d}-{s}", .{ std.fs.path.dirname(a.path).?, std.os.linux.getpid(), index, std.fs.path.basename(a.path) }), .metadata = observed, .sha256 = a.sha256.?, .parent_mode = (try parent.stat(e.c.io)).permissions.toMode() });
     }
-    try e.write(pending_path, .{ .schema = 1, .status = "pending", .kind = "generated-batch", .output = e.output, .entries = entries.items });
+    // Reject an invalid accounting/order plan before moving or unlinking any
+    // name, including callers that reorder a previously guarded alias group.
+    for (entries.items, 0..) |entry, position| {
+        var last = true;
+        for (entries.items[position + 1 ..]) |later| if (later.metadata.device == entry.metadata.device and later.metadata.inode == entry.metadata.inode) {
+            last = false;
+        };
+        const allocation: u64 = if (last) entry.metadata.allocated_bytes else 0;
+        if (e.actions.items[entry.action_index].allocated_bytes != allocation) return error.AllocationMismatch;
+    }
+    try e.write(pending_path, .{ .schema = 1, .status = "pending", .kind = "file-batch", .output = e.output, .entries = entries.items });
     var moved: usize = 0;
     var deleting = false;
     errdefer if (!deleting) {
@@ -92,10 +151,11 @@ pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
     try e.loadHolds();
     try e.pins();
     try e.consumers();
+    try e.guardCaptureGroups();
+    try e.verifyBatchEvidence(indexes);
     for (entries.items) |entry| {
         const a = e.actions.items[entry.action_index];
         if (a.status != .ready) return error.GeneratedBatchBecameHeld;
-        try e.verifyEvidence(a);
         const absolute = try e.absolute(entry.quarantine);
         var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
         defer parent.close(e.c.io);
@@ -105,7 +165,7 @@ pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
     }
     const journal = try u.files.createLog(e.c.io, .{ .path = try e.absolute(try e.c.fmt("{s}/actions.jsonl", .{e.output})), .truncate = false });
     defer journal.close(e.c.io);
-    for (entries.items, 0..) |entry, removed| {
+    for (entries.items, 0..) |entry, position| {
         const a = &e.actions.items[entry.action_index];
         const absolute = try e.absolute(entry.quarantine);
         var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
@@ -114,7 +174,9 @@ pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
         if (mode != entry.parent_mode) return error.ParentPermissionsChanged;
         const name = std.fs.path.basename(absolute);
         var expected = entry.metadata;
-        if (aliases) expected.links -= removed;
+        for (entries.items[0..position]) |old| if (old.metadata.device == expected.device and old.metadata.inode == expected.inode) {
+            expected.links -= 1;
+        };
         expected.ctime_ns = (try fa.metadata.child(e.c.gpa, parent, name)).ctime_ns;
         try unchangedGenerated(e, parent, name, expected, a.sha256.?);
         if (mode & 0o200 == 0) try parent.setPermissions(e.c.io, .fromMode(mode | 0o200));
@@ -124,14 +186,14 @@ pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
         if (mode & 0o200 == 0) try parent.setPermissions(e.c.io, .fromMode(mode));
         if ((try parent.stat(e.c.io)).permissions.toMode() != mode) return error.ParentPermissionsChanged;
         try syncDirectory(parent);
-        a.reclaimed_file_bytes = if (!aliases or removed + 1 == entries.items.len) entry.metadata.allocated_bytes else 0;
+        a.reclaimed_file_bytes = if (expected.links == 1) entry.metadata.allocated_bytes else 0;
         if (a.reclaimed_file_bytes != a.allocated_bytes) return error.AllocationMismatch;
-        try e.verifyEvidence(a.*);
         a.status = .removed;
         try journal.writeStreamingAll(e.c.io, try e.c.fmt("{{\"action\":{d},\"phase\":\"removed\",\"reclaimed_file_bytes\":{d}}}\n", .{ entry.action_index, a.reclaimed_file_bytes }));
         try journal.sync(e.c.io);
         try e.write(try e.c.fmt("{s}/record-{d}.json", .{ e.output, entry.action_index }), .{ .status = "complete", .action = a.*, .retained = a.retained });
     }
+    try e.verifyBatchEvidence(indexes);
     try D.cwd().deleteFile(e.c.io, try e.absolute(pending_path));
 }
 

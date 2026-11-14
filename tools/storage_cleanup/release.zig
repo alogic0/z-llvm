@@ -21,6 +21,9 @@ pub fn traceWithSources(e: *core.Engine, audit_path: []const u8, build_path: []c
     return publish(e, try traceRequest(e, audit_path, build_path, reason, reconstructions, null));
 }
 pub fn traceRequest(e: *core.Engine, audit_path: []const u8, build_path: []const u8, reason: []const u8, reconstructions: []const p.Evidence, compiler_retirement: ?p.Evidence) !p.Release {
+    return traceRequestWithPeers(e, audit_path, build_path, reason, reconstructions, compiler_retirement, &.{});
+}
+pub fn traceRequestWithPeers(e: *core.Engine, audit_path: []const u8, build_path: []const u8, reason: []const u8, reconstructions: []const p.Evidence, compiler_retirement: ?p.Evidence, peers: []const p.Evidence) !p.Release {
     if (!p.relative(audit_path) or !p.relative(build_path) or reason.len == 0) return error.InvalidReleaseArguments;
     var audit = try e.load(e.c.gpa, audit_path);
     defer audit.deinit();
@@ -73,10 +76,22 @@ pub fn traceRequest(e: *core.Engine, audit_path: []const u8, build_path: []const
     // Keep the rest of the original run, including detailed failure reports,
     // profiles, commands and logs. The full build map is checked by qualify.
     const relative_raw = raw[run.len + 1 ..];
+    var excluded: std.ArrayList([]const u8) = .empty;
+    try excluded.appendSlice(e.c.a, &.{ relative_raw, "storage-release.json" });
+    const identity = core.fa.metadata.identity(try e.metadata(raw));
+    for (peers) |peer| {
+        if (std.mem.eql(u8, peer.path, raw) or !p.within(run, peer.path)) continue;
+        if (!p.artifactName(.{ .path = peer.path, .sha256 = peer.sha256, .kind = .raw_trace, .audit = audit_path })) return error.InvalidTracePeer;
+        const m = try e.metadata(peer.path);
+        if (m.device != identity.device or m.inode != identity.inode) continue;
+        if (!std.mem.eql(u8, peer.sha256, raw_sha)) return error.InvalidTracePeer;
+        try e.check(peer);
+        try excluded.append(e.c.a, peer.path[run.len + 1 ..]);
+    }
     var snapshot = try core.fa.scan(e.c.gpa, e.c.io, try e.absolute(run), .{
         .hash_files = true,
         .max_entries = e.config.max_candidate_entries,
-        .exclude_paths = &.{ relative_raw, "storage-release.json" },
+        .exclude_paths = excluded.items,
     });
     defer snapshot.deinit();
     for (snapshot.value.entries) |entry| {
@@ -168,7 +183,7 @@ pub fn publish(e: *core.Engine, release: p.Release) ![]const u8 {
     // precedes it even when the policy has no idle delay.
     e.now_ns = std.Io.Clock.real.now(e.c.io).nanoseconds;
     for (release.artifacts) |artifact| {
-        if (!p.artifactName(artifact) or !p.within(release.run_root, artifact.path)) return error.InvalidReleaseArtifact;
+        if ((!p.artifactName(artifact) and !(release.command_outputs != null and p.commandOutputName(artifact))) or !p.within(release.run_root, artifact.path)) return error.InvalidReleaseArtifact;
         for (e.actions.items) |old| if (p.overlaps(old.path, artifact.path)) return error.DuplicateReleaseArtifact;
         try e.actions.append(e.c.a, .{ .path = try e.c.a.dupe(u8, artifact.path), .run_root = try e.c.a.dupe(u8, release.run_root), .producer = draft, .kind = switch (artifact.kind) {
             .raw_trace => .raw_trace,

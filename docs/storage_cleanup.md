@@ -264,6 +264,40 @@ obsolete. The
 
 ## Reviewing historical batches
 
+Completed test products can be prepared with
+`prepare-outputs --reports FILE --reason TEXT`, where FILE lists owner
+`report.json` paths, one per line. Each passed report must have a sibling
+`commands.json`. Direct compiler `-o` / `-femit-bin=` arguments or the recorded
+compiler's `--emit=obj` stdout establish the exact output; direct compiler copies
+also require the report's compiler hash. Supported products include `local`,
+`reference`, `z_llvm`, other extensionless products, objects, archives and `.exe`
+files. The collector keeps the
+report, commands and diagnostics, and checks compiled-file magic. Shell commands,
+implicit build destinations and file names alone cannot authorize collection.
+
+Use `--complete-artifact-aliases --requests FILE` for an explicitly reviewed
+complete group of compiled outputs or audited raw traces. Every name needs its
+own qualified request and evidence. A missing name, unqualified audit, current
+pin, retained dependency, hold or active owner protects the physical file.
+Allocation is counted once, on the last unlink. `--complete-capture-aliases`
+remains the narrower option for capture helpers.
+
+Qualified files are collected in batches bounded by the policy's candidate
+budget (at most 1024 names), keeping each alias group indivisible. The durable
+`file-batch` journal records every original/quarantine name, hash and metadata.
+The collector rechecks pins, holds, consumers and retained evidence after
+quarantining all members. Before the first unlink a failure restores every
+name; an interrupted or partially unlinked batch leaves the journal for review.
+Evidence is verified again before clearing the journal. Directory workspaces
+and caches retain their separate snapshot-based mutation rules.
+
+For older whole-compiler runs without a separate checked-run receipt, the trace
+auditor also accepts the original passed `whole-compiler-diagnostic-v1` report
+as its producer. It requires completed build/source verification, a successful
+recorded build bound to that run's install prefix, and exactly one embedded
+capture matching the backend report's input and trace identities. Full stream,
+compiler, build, source and retirement checks still apply.
+
 Prepare explicit requests from a newline-delimited list of completed build
 reports, then review them. Preparation writes only small request files under
 the new cleanup output directory:
@@ -360,13 +394,14 @@ Two reviewed families are supported:
 
 Both use disposable output retention. Reports, commands and existing recorded
 diagnostics remain. Source or build-configuration archives are not required.
-Arbitrary assembly sources and extensionless executables are not admitted.
+This adapter does not admit arbitrary assembly sources or extensionless test
+executables; the command-output adapter above handles named test products.
 Current pins, holds, metadata/hashes, hardlinks and active consumers still
 protect files; an active parent integrated job protects its finished subtests.
 Files with multiple hardlinks remain held by the single-file collector.
 
-Within a completed integrated run, eligible named outputs are collected as one
-guarded batch. The collector journals every original path, hash and metadata,
+Eligible named outputs use the bounded file batches described above. The
+collector journals every original path, hash and metadata,
 quarantines only those files, then refreshes holds, pins and consumers before
 unlinking. A failure before unlinking restores every original name; an
 interruption or partial removal leaves a pending journal that blocks another

@@ -92,9 +92,11 @@ pub const Engine = struct {
     retained_declarations: std.ArrayList([]const u8) = .empty,
     release_holds: std.ArrayList([]const u8) = .empty,
     allow_capture_aliases: bool = false,
+    allow_artifact_aliases: bool = false,
+    command_output_records: std.StringHashMap([]const @import("command_outputs.zig").Record),
 
     pub fn init(c: *u.Context, config: p.Config, output: []const u8, zigrep: []const u8) Engine {
-        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a), .git_sources = .init(c.a) };
+        return .{ .c = c, .config = config, .output = output, .zigrep = zigrep, .now_ns = std.Io.Clock.real.now(c.io).nanoseconds, .control_hashes = .init(c.a), .hash_cache = .init(c.a), .observed_reads = .init(c.a), .pin_manifests = .init(c.a), .git_sources = .init(c.a), .command_output_records = .init(c.a) };
     }
     pub fn absolute(e: *Engine, path: []const u8) ![]const u8 {
         return e.c.join(&.{path});
@@ -256,7 +258,7 @@ pub const Engine = struct {
         }
         var present = false;
         for (r.value.artifacts) |a| {
-            if (!p.artifactName(a) or !p.within(r.value.run_root, a.path)) return error.InvalidReleaseArtifact;
+            if ((!p.artifactName(a) and !(r.value.command_outputs != null and p.commandOutputName(a))) or !p.within(r.value.run_root, a.path)) return error.InvalidReleaseArtifact;
             _ = e.metadata(a.path) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
@@ -723,7 +725,7 @@ pub const Engine = struct {
         const processes = try e.c.capture(&.{ "ps", "-eo", "pid,args" });
         for (e.actions.items) |*a| {
             if (a.status == .removed or a.status == .absent or a.status == .skipped) continue;
-            const consumer_root = if (a.kind == .temporary_workspace or a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm")) @import("generated.zig").consumerRoot(a.run_root) else a.run_root;
+            const consumer_root = @import("generated.zig").consumerRoot(a.run_root);
             const absolute_run = try e.absolute(consumer_root);
             var busy = commandUsesRun(processes, consumer_root, std.os.linux.getpid());
             const temporary = if (a.kind == .temporary_workspace) try e.absolute(a.path) else absolute_run;
@@ -819,6 +821,9 @@ pub const Engine = struct {
         defer rp.deinit();
         const r = rp.value;
         if (r.state == .held) return error.ReleaseHeld;
+        const named_test = std.mem.eql(u8, std.fs.path.basename(a.path), "local") or std.mem.eql(u8, std.fs.path.basename(a.path), "reference");
+        if (named_test and r.command_outputs == null) return error.MissingCommandOutputBinding;
+        if (r.command_outputs != null and (r.state != .disposable or a.kind != .build_output)) return error.InvalidCommandOutputRelease;
         const generated = a.kind == .generated_assembly or std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm");
         if (generated and r.state != .disposable) return error.GeneratedOutputRequiresDisposable;
         var compiler_proof: ?retired_compiler.Proof = null;
@@ -852,6 +857,7 @@ pub const Engine = struct {
                 try e.keep(list, row.path, row.sha256);
             }
             if (a.released_cache) try private_cache.verify(e, a.*, r, producer.value);
+            if (r.command_outputs != null) try @import("command_outputs.zig").verify(e, a.*, r, producer.value, list);
             if (generated) try @import("generated.zig").verify(e, a.*, r, producer.value, list);
             try e.releaseTransitions(a, list, r);
             try e.keep(list, a.producer, null);
@@ -1016,10 +1022,10 @@ pub const Engine = struct {
     }
     fn completeCaptureSet(e: *Engine, index: usize, expected: fa.Metadata) !bool {
         const action = e.actions.items[index];
-        if (!e.allow_capture_aliases or action.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(action.path), "capture-zllvm")) return false;
+        if (!e.aliasAllowed(action)) return false;
         var count: usize = 0;
         for (e.actions.items) |other| {
-            if (other.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(other.path), "capture-zllvm")) continue;
+            if (!e.aliasAllowed(other)) continue;
             const m = e.metadata(other.path) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
@@ -1030,18 +1036,22 @@ pub const Engine = struct {
         }
         return count == expected.links;
     }
+    pub fn aliasAllowed(e: *Engine, a: Action) bool {
+        return (e.allow_artifact_aliases and (a.kind == .build_output or a.kind == .raw_trace)) or
+            (e.allow_capture_aliases and a.kind == .build_output and std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm"));
+    }
     /// A hold on one alias protects the physical inode. Charge its allocation
     /// once, to the last name, whose unlink actually releases the data.
     pub fn guardCaptureGroups(e: *Engine) !void {
-        if (!e.allow_capture_aliases) return;
+        if (!e.allow_capture_aliases and !e.allow_artifact_aliases) return;
         for (e.actions.items) |*a| {
-            if (a.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm") or a.status == .removed or a.status == .absent) continue;
+            if (!e.aliasAllowed(a.*) or a.status == .removed or a.status == .absent) continue;
             if (a.metadata == null) a.metadata = try e.metadata(a.path);
         }
         var seen = std.AutoHashMap(fa.metadata.Identity, void).init(e.c.a);
         for (e.actions.items) |a| {
             const m = a.metadata orelse continue;
-            if (a.kind != .build_output or !std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm") or m.links <= 1 or a.status == .removed or a.status == .absent) continue;
+            if (!e.aliasAllowed(a) or m.links <= 1 or a.status == .removed or a.status == .absent) continue;
             if ((try seen.getOrPut(fa.metadata.identity(m))).found_existing) continue;
             var last: usize = 0;
             var count: usize = 0;
@@ -1050,9 +1060,9 @@ pub const Engine = struct {
                 if (om.device != m.device or om.inode != m.inode) continue;
                 count += 1;
                 last = i;
-                if (other.status != .ready) reason = other.reason orelse "capture alias is not qualified";
+                if (other.status != .ready or !e.aliasAllowed(other)) reason = other.reason orelse "alias is not qualified";
             };
-            if (count != m.links) reason = "incomplete capture alias group";
+            if (count != m.links) reason = "incomplete artifact alias group";
             for (e.actions.items, 0..) |*other, i| if (other.metadata) |om| {
                 if (om.device != m.device or om.inode != m.inode) continue;
                 other.allocated_bytes = if (i == last) m.allocated_bytes else 0;
@@ -1143,6 +1153,33 @@ pub const Engine = struct {
         for (a.retained) |row| try e.check(row);
         if (a.retired_compiler) |compiler| try retired_compiler.absent(e, compiler.path);
         if (a.replay_required) {
+            try e.verifyRevisions();
+            try historical.verifyLibraries(e);
+        }
+    }
+    /// Fresh evidence once per distinct pathname in this bounded transaction.
+    /// Each phase starts with an empty hash cache; metadata is checked on reads.
+    pub fn verifyBatchEvidence(e: *Engine, indexes: []const usize) !void {
+        e.hash_cache.clearRetainingCapacity();
+        var checked = std.StringHashMap([]const u8).init(e.c.gpa);
+        defer checked.deinit();
+        for (e.controls.items) |row| try e.check(row);
+        var replay = false;
+        for (indexes) |index| {
+            const a = e.actions.items[index];
+            for (a.retained) |row| {
+                // Keep checking conflicting declarations even for a shared path.
+                if (checked.get(row.path)) |sha| {
+                    if (!std.mem.eql(u8, sha, row.sha256)) return error.EvidenceHashMismatch;
+                    continue;
+                }
+                try e.check(row);
+                try checked.put(row.path, row.sha256);
+            }
+            if (a.retired_compiler) |compiler| try retired_compiler.absent(e, compiler.path);
+            replay = replay or a.replay_required;
+        }
+        if (replay) {
             try e.verifyRevisions();
             try historical.verifyLibraries(e);
         }

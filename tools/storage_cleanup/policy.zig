@@ -47,6 +47,7 @@ pub const Release = struct {
     retired_pins: []const PinTransition = &.{},
     cache_owner: ?CacheOwner = null,
     compiler_retirement: ?Evidence = null,
+    command_outputs: ?Evidence = null,
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');
@@ -99,11 +100,18 @@ pub fn artifactName(a: Artifact) bool {
     const name = std.fs.path.basename(a.path);
     return switch (a.kind) {
         .raw_trace => std.mem.eql(u8, name, "profile.events.jsonl") and a.audit != null,
-        .build_output => std.mem.eql(u8, name, "z_llvm") or std.mem.eql(u8, name, "capture-zllvm") or std.mem.endsWith(u8, name, ".o") or std.mem.endsWith(u8, name, ".obj") or std.mem.endsWith(u8, name, ".exe") or std.mem.endsWith(u8, name, ".a"),
+        .build_output => std.mem.eql(u8, name, "local") or std.mem.eql(u8, name, "reference") or std.mem.eql(u8, name, "z_llvm") or std.mem.eql(u8, name, "capture-zllvm") or std.mem.endsWith(u8, name, ".o") or std.mem.endsWith(u8, name, ".obj") or std.mem.endsWith(u8, name, ".exe") or std.mem.endsWith(u8, name, ".a"),
         .generated_assembly => std.mem.eql(u8, name, "linked-harness.s"),
         .log => std.mem.endsWith(u8, name, ".log") or std.mem.endsWith(u8, name, ".stdout") or std.mem.endsWith(u8, name, ".stderr"),
         .private_cache => unreachable,
     };
+}
+/// Test runners also produce names such as case-reference and linked-harness.
+/// These names are admitted only with a verified command-output owner; the
+/// collector additionally requires ELF/archive bytes before any removal.
+pub fn commandOutputName(a: Artifact) bool {
+    return a.kind == .build_output and candidate(a.path) and hash(a.sha256) and
+        (artifactName(a) or std.mem.indexOfScalar(u8, std.fs.path.basename(a.path), '.') == null);
 }
 pub fn validate(c: Config) !void {
     if (c.schema != 1 or c.max_candidates == 0 or c.max_candidates > 1024 or c.max_candidate_entries == 0 or c.max_candidate_entries > 1_000_000 or c.max_reclaim_bytes == 0 or !relative(c.holds_file)) return error.InvalidPolicy;
