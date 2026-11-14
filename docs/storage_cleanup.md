@@ -337,6 +337,30 @@ the evidence, original holds, directory membership and consumers. This command
 does not delete payloads. A subsequent ordinary collection still checks all
 independent holds, current pins and live uses.
 
+`retire-held-products --review PLAN --minimal` reviews explicitly selected
+ordinary compiler files and old shared Zig caches. Add `--apply` to collect the
+eligible products. Its `zllvm-held-products-review-v1` plan binds the original
+hold document, a passed checkpoint, retained acceptance evidence and exact
+product paths by SHA-256. Compiler entries name their original build reports;
+shared-cache entries name closed checked-run receipts selecting that cache with
+cache flags, leading `env` assignments or a cached executable. Cache layout,
+ownership, complete file snapshots and hashes must also pass verification.
+
+This command can except the selected **exact manual holds** for this invocation
+and the generic `local-state/caches` policy parent for a reviewed shared cache.
+Other manual ancestors or descendants, job holds, specific policy protections,
+current integrity contracts, pins and active readers still prevent removal.
+Changing the reviewed hold file or evidence invalidates the operation. Ordinary
+collection never gets these exceptions. Existing file/cache transactions perform
+the removal; raw event traces, special entries and aliased cache files are
+rejected. The command removes a manual hold only after its product was actually
+collected, saving the before/after hold documents. Blocked products keep their
+holds and all existing build/results records remain.
+
+A review is a deliberate lifecycle decision after checking current acceptance,
+queued work and all known users. A cache's age or an idle process list alone is
+insufficient. The collector does not infer this decision from historical names.
+
 For older whole-compiler runs without a separate checked-run receipt, the trace
 auditor also accepts the original passed `whole-compiler-diagnostic-v1` report
 as its producer. It requires completed build/source verification, a successful

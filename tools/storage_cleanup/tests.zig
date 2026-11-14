@@ -11,6 +11,7 @@ const generated = @import("generated.zig");
 const command_outputs = @import("command_outputs.zig");
 const legacy_outputs = @import("legacy.zig");
 const cache_holds = @import("cache_holds.zig");
+const held_products = @import("held_products.zig");
 const cache_batch = @import("cache_batch.zig");
 const p = core.p;
 const workspaces = @import("workspaces.zig");
@@ -26,6 +27,160 @@ const assembly_path = assembly_dir ++ "/linked-harness.s";
 
 const receipt_root = "local-state/validations/legacy";
 const receipt_path = receipt_root ++ "/build-run.json";
+const shared_cache = "local-state/caches/retired-tools";
+const held_plan = output ++ "/held-products.json";
+fn heldProductsFixture(f: *Fixture, finished: bool) !void {
+    var e = f.engine();
+    try f.build(&e);
+    try f.tmp.dir.createDirPath(t.io, shared_cache ++ "/o");
+    try f.tmp.dir.createDirPath(t.io, shared_cache ++ "/h");
+    try f.write(shared_cache ++ "/o/tool", "compiled cache tool");
+    try f.write(output ++ "/checkpoint.json", "{\"status\":\"passed\"}");
+    const receipt = output ++ "/cache-run.json";
+    try e.write(receipt, .{ .status = if (finished) "finished" else "running", .outcome = "completed", .actual_returncode = 0, .started_ns = 1, .finished_ns = 2, .argv = [_][]const u8{ "zig", "run", "--cache-dir", shared_cache, "tool.zig" } });
+    try e.write(e.config.holds_file, p.Holds{ .paths = &.{ shared_cache, run ++ "/z_llvm", report } });
+    try e.write(held_plan, held_products.Plan{
+        .reason = "Explicit review of closed ordinary products",
+        .holds = .{ .path = e.config.holds_file, .sha256 = try e.digest(e.config.holds_file) },
+        .checkpoint = .{ .path = output ++ "/checkpoint.json", .sha256 = try e.digest(output ++ "/checkpoint.json") },
+        .retained = &.{.{ .path = "toolchain/zig", .sha256 = try e.digest("toolchain/zig") }},
+        .products = &.{
+            .{ .path = shared_cache, .kind = .shared_zig_cache, .closed_receipts = &.{.{ .path = receipt, .sha256 = try e.digest(receipt) }} },
+            .{ .path = run ++ "/z_llvm", .kind = .compiler_build, .build_report = .{ .path = report, .sha256 = try e.digest(report) } },
+        },
+    });
+}
+
+test "storage cleanup: explicit held products retire through guarded batches and preserve records" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try heldProductsFixture(f, true);
+    var e = f.engine();
+    e.now_ns = 0; // Exercise qualification of release records staged by prepare.
+    e.config.protected_paths = &.{"local-state/caches"};
+    const before = try e.digest(e.config.holds_file);
+    try held_products.prepare(&e, held_plan);
+    try e.loadHolds();
+    try e.qualify(0);
+    try e.qualify(1);
+    try e.protectRetained();
+    try t.expectEqualStrings(before, try e.digest(e.config.holds_file));
+    try cache_batch.apply(&e, &.{0});
+    try mutation.applyFileBatch(&e, &.{1});
+    try held_products.finish(&e);
+    for (e.actions.items) |a| try t.expectEqual(.removed, a.status);
+    var fresh = f.engine();
+    try fresh.loadHolds();
+    try t.expectEqual(@as(usize, 1), fresh.held.items.len);
+    try t.expectEqualStrings(report, fresh.held.items[0]);
+    for ([_][]const u8{ report, run ++ "/build.stdout", output ++ "/checkpoint.json", output ++ "/cache-run.json", "toolchain/zig", output ++ "/holds-before.json" }) |path| _ = try fresh.metadata(path);
+}
+
+test "storage cleanup: reviewed hold exceptions do not override independent or policy holds" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try heldProductsFixture(f, true);
+        var e = f.engine();
+        e.config.protected_paths = if (case == 3) &.{ shared_cache, "local-state/caches" } else &.{"local-state/caches"};
+        try held_products.prepare(&e, held_plan);
+        if (case != 3) try e.release_holds.append(e.c.a, switch (case) {
+            0 => shared_cache,
+            1 => "local-state/caches",
+            else => shared_cache ++ "/o/tool",
+        });
+        try e.loadHolds();
+        try t.expectEqual(.skipped, e.actions.items[0].status);
+        try held_products.finish(&e);
+        var fresh = f.engine();
+        try fresh.loadHolds();
+        try t.expectEqual(@as(usize, 3), fresh.held.items.len);
+        _ = try fresh.metadata(shared_cache ++ "/o/tool");
+    }
+}
+
+test "storage cleanup: held release remains authoritative in explicit product review" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try heldProductsFixture(f, true);
+    var e = f.engine();
+    var held = try releases.disposableBuild(&e, report, "Active exact product investigation");
+    held.state = .held;
+    try e.write(run ++ "/storage-release.json", held);
+    var fresh = f.engine();
+    try held_products.prepare(&fresh, held_plan);
+    try fresh.loadHolds();
+    try t.expectEqual(@as(usize, 2), fresh.actions.items.len);
+    try t.expectEqual(.skipped, fresh.actions.items[1].status);
+    try t.expectEqual(.discovered, fresh.actions.items[0].status);
+}
+
+test "storage cleanup: held products reject running owners and changed review controls" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try heldProductsFixture(f, case != 0);
+        var e = f.engine();
+        if (case == 0) {
+            try t.expectError(error.CacheReceiptNotClosed, held_products.prepare(&e, held_plan));
+            continue;
+        }
+        try held_products.prepare(&e, held_plan);
+        if (case == 1) {
+            try f.write(e.config.holds_file, "{\"schema\":1,\"paths\":[]}");
+            if (e.loadHolds()) |_| return error.ChangedReviewAccepted else |_| {}
+        } else {
+            try e.loadHolds();
+            try e.qualify(0);
+            try f.write(output ++ "/cache-run.json", "{\"status\":\"running\"}");
+            if (cache_batch.apply(&e, &.{0})) |_| return error.ChangedReceiptAccepted else |_| {}
+        }
+        _ = try e.metadata(shared_cache ++ "/o/tool");
+    }
+}
+
+test "storage cleanup: shared cache env ownership stops at the actual command" {
+    for ([_]bool{ false, true }) |leading| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try heldProductsFixture(f, true);
+        var e = f.engine();
+        const receipt = output ++ "/cache-run.json";
+        const argv = if (leading) &[_][]const u8{ "env", "ZIG_LOCAL_CACHE_DIR=" ++ shared_cache, "zig", "build" } else &[_][]const u8{ "env", "zig", "build", "ZIG_LOCAL_CACHE_DIR=" ++ shared_cache };
+        try e.write(receipt, .{ .status = "finished", .outcome = "completed", .actual_returncode = 1, .started_ns = 1, .finished_ns = 2, .argv = argv });
+        var old = try e.load(e.c.gpa, held_plan);
+        defer old.deinit();
+        const parsed = try std.json.parseFromValue(held_products.Plan, e.c.a, old.value, .{ .allocate = .alloc_always });
+        var plan = parsed.value;
+        const products = try e.c.a.dupe(held_products.Product, plan.products);
+        products[0].closed_receipts = &.{.{ .path = receipt, .sha256 = try e.digest(receipt) }};
+        plan.products = products;
+        try e.write(held_plan, plan);
+        var fresh = f.engine();
+        if (leading) try held_products.prepare(&fresh, held_plan) else try t.expectError(error.CacheReceiptDoesNotOwnRoot, held_products.prepare(&fresh, held_plan));
+    }
+}
+
+test "storage cleanup: reviewed caches retain pinned bytes and reject misplaced raw traces" {
+    for ([_]bool{ false, true }) |trace| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try heldProductsFixture(f, true);
+        if (trace) try f.write(shared_cache ++ "/o/profile.events.jsonl", "raw evidence");
+        var e = f.engine();
+        try held_products.prepare(&e, held_plan);
+        try e.loadHolds();
+        if (trace) {
+            try t.expectError(error.WorkspaceContainsRawTrace, e.qualify(0));
+        } else {
+            try e.qualify(0);
+            try f.write(run ++ "/pinned.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(shared_cache ++ "/o/tool"), shared_cache ++ "/o/tool" }));
+            try t.expectError(error.CacheBatchBecameHeld, cache_batch.apply(&e, &.{0}));
+        }
+        _ = try e.metadata(shared_cache ++ "/o/tool");
+    }
+    for ([_][]const u8{ "local-state/caches", "local-state/caches/a/child", "local-state/inputs/a", "local-state/validations/a/b/source", "../cache" }) |path| try t.expect(!held_products.cacheScope(path));
+}
 fn receiptFixture(f: *Fixture, cwd: ?[]const u8, destination: []const u8, code: i32) !void {
     try f.tmp.dir.createDirPath(t.io, receipt_root);
     try f.write(receipt_root ++ "/compiler-old", "\x7fELFclosed compiler");
@@ -2543,6 +2698,26 @@ test "storage cleanup: shared input migration preserves aliases and rolls back a
         try t.expectEqual(@as(u32, 0o444), current.mode & 0o7777);
         try t.expectEqualStrings(sha, try e.digest(a.path));
     }
+}
+
+test "storage cleanup: held release prevents input sharing without a repeated manual hold" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    try f.build(&e);
+    try f.write(run ++ "/input.ll", "retained input\n");
+    const before = try e.metadata(run ++ "/input.ll");
+    var held = try releases.disposableBuild(&e, report, "Active investigation");
+    held.state = .held;
+    try e.write(run ++ "/storage-release.json", held);
+    const plan = output ++ "/inputs.json";
+    try e.write(plan, .{ .schema = "zllvm-shared-inputs-v1", .inputs = .{.{ .sha256 = try e.digest(run ++ "/input.ll"), .paths = [_][]const u8{run ++ "/input.ll"} }} });
+    var fresh = f.engine();
+    try @import("shared_inputs.zig").run(&fresh, plan, true);
+    try t.expectEqual(@as(usize, 1), fresh.actions.items.len);
+    try t.expectEqual(.skipped, fresh.actions.items[0].status);
+    try t.expect(before.eql(try fresh.metadata(run ++ "/input.ll")));
+    try t.expect(!u.exists(t.io, try fresh.absolute("local-state/artifacts")));
 }
 
 test "storage cleanup: shared input migration rejects incomplete aliases and changed content" {

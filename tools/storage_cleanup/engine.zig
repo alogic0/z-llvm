@@ -51,6 +51,7 @@ pub const Action = struct {
     idle_seconds: ?i64 = null,
     replay_required: bool = true,
     released_cache: bool = false,
+    reviewed_shared_cache: bool = false,
     workspace_release: ?[]const u8 = null,
     retired_compiler: ?Evidence = null,
     retired_pins: []const p.PinTransition = &.{},
@@ -91,6 +92,10 @@ pub const Engine = struct {
     pin_references: std.ArrayList(PinReference) = .empty,
     retained_declarations: std.ArrayList([]const u8) = .empty,
     release_holds: std.ArrayList([]const u8) = .empty,
+    // Explicit one-invocation review, bound to the unchanged manual-hold file.
+    // Independent job, descendant, ancestor and retention holds still apply.
+    reviewed_holds: ?Evidence = null,
+    reviewed_hold_paths: []const []const u8 = &.{},
     allow_capture_aliases: bool = false,
     allow_artifact_aliases: bool = false,
     command_output_records: std.StringHashMap([]const @import("command_outputs.zig").Record),
@@ -306,7 +311,7 @@ pub const Engine = struct {
     }
     pub fn loadHolds(e: *Engine) !void {
         e.held.clearRetainingCapacity();
-        for (e.config.protected_paths) |s| try e.held.append(e.c.a, s);
+        if (e.reviewed_holds) |review| try e.check(review);
         try e.held.appendSlice(e.c.a, e.release_holds.items);
         try @import("jobs.zig").scan(e, false);
         if (e.metadata(e.config.holds_file)) |_| {
@@ -318,6 +323,7 @@ pub const Engine = struct {
             if (h.value.schema != 1) return error.InvalidHolds;
             for (h.value.paths) |path| {
                 if (!p.relative(path)) return error.InvalidHolds;
+                if (@import("held_products.zig").reviewedManualHold(e, path)) continue;
                 try e.held.append(e.c.a, try e.c.a.dupe(u8, path));
             }
         } else |err| if (err != error.FileNotFound) return err;
@@ -338,6 +344,18 @@ pub const Engine = struct {
             a.reason = try e.c.fmt("protected by hold: {s}", .{held});
             break;
         };
+        // Only the generic shared-cache policy parent can be excepted. A job
+        // or manual hold naming the same parent was checked above and wins.
+        for (e.config.protected_paths) |held| {
+            try e.held.append(e.c.a, held);
+            for (e.actions.items) |*a| {
+                if (a.reviewed_shared_cache and std.mem.eql(u8, held, "local-state/caches")) continue;
+                if (a.status != .removed and (p.overlaps(held, a.path) or (a.kind == .temporary_workspace and p.overlaps(held, a.run_root)))) {
+                    a.status = .skipped;
+                    a.reason = try e.c.fmt("protected by policy: {s}", .{held});
+                }
+            }
+        }
     }
     fn pinResolved(e: *Engine, path: []const u8, source: []const u8) !void {
         if (e.pin_index) |index| {
@@ -1012,7 +1030,10 @@ pub const Engine = struct {
             try @import("workspaces.zig").verify(e, a.*, &kept);
             a.replay_required = false;
         } else if (a.kind == .cache) {
-            if (a.released_cache) {
+            if (a.reviewed_shared_cache) {
+                for (a.retained) |ev| try e.keep(&kept, ev.path, ev.sha256);
+                a.replay_required = false;
+            } else if (a.released_cache) {
                 try e.releaseEvidence(a, &kept);
             } else {
                 a.replay_required = e.config.cache_evidence == .replay;
@@ -1030,7 +1051,7 @@ pub const Engine = struct {
             var snap = try fa.scan(e.c.gpa, e.c.io, try e.absolute(a.path), .{ .hash_files = true, .max_entries = e.config.max_candidate_entries });
             defer snap.deinit();
             try e.checkCache(snap.value);
-            if (a.kind == .temporary_workspace) for (snap.value.entries) |entry| {
+            if (a.kind == .temporary_workspace or a.reviewed_shared_cache) for (snap.value.entries) |entry| {
                 // Misfiled raw evidence never inherits a blanket scratch release.
                 if (std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.WorkspaceContainsRawTrace;
             };

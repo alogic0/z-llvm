@@ -142,6 +142,9 @@ pub fn migrate(e: *core.Engine, store: *storage.Store, indexes: []const usize, m
 
 pub fn run(e: *core.Engine, plan_path: []const u8, apply: bool) !void {
     if (!p.relative(plan_path)) return error.InvalidEvidencePath;
+    // A held release protects inputs even when no manual/job hold repeats it.
+    try e.discover();
+    e.actions.clearRetainingCapacity();
     try e.addControl(plan_path);
     var parsed = try e.load(e.c.gpa, plan_path);
     defer parsed.deinit();
