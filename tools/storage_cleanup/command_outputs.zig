@@ -32,12 +32,19 @@ fn outputPath(e: *core.Engine, command: u.Value, raw: []const u8, binding: ?p.Ca
         return error.MissingOutputWorkingDirectory;
     return e.relative(try e.c.fmt("{s}/{s}", .{ cwd, raw }));
 }
+fn affinityArgs(args: []const []const u8) ![]const []const u8 {
+    if (args.len == 0 or !same(args[0], "/usr/bin/taskset")) return args;
+    // The fixed legacy build wrapper selects CPU 0 for a new child. Never
+    // interpret taskset's pid-changing form or infer other wrapper options.
+    if (args.len < 4 or !same(args[1], "--cpu-list") or !same(args[2], "0")) return error.UnsupportedOutputWrapper;
+    return args[3..];
+}
 fn compilerArgs(args: []const []const u8) ![]const []const u8 {
-    if (args.len == 0 or !same(args[0], "/usr/bin/time")) return args;
-    // Only the recorded transparent time wrapper is supported, never a shell.
+    if (args.len == 0 or !same(args[0], "/usr/bin/time")) return affinityArgs(args);
+    // Only recorded transparent wrappers are supported, never a shell.
     var i: usize = 1;
     while (i < args.len) {
-        if (same(args[i], "--")) return args[i + 1 ..];
+        if (same(args[i], "--")) return affinityArgs(args[i + 1 ..]);
         if ((same(args[i], "-f") or same(args[i], "-o")) and i + 1 < args.len) {
             i += 2;
         } else return error.UnsupportedOutputWrapper;

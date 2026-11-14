@@ -360,6 +360,35 @@ test "storage cleanup: timed whole-compiler build requires exact installed candi
     try t.expectError(error.NoBoundOutputs, command_outputs.request(&warmup, report, "Warmup is not a build"));
 }
 
+test "storage cleanup: fixed affinity wrapper binds successful compiler builds only" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try wholeCompilerFixture(f, null, false);
+        var prepare = f.engine();
+        try prepare.write(run ++ "/commands.json", .{.{
+            .argv = [_][]const u8{ "/usr/bin/time", "--", "/usr/bin/taskset", if (case == 1) "--pid" else "--cpu-list", if (case == 2) "0-1" else "0", "/toolchain/zig", "build", "--prefix", try prepare.absolute(run ++ "/install") },
+            .outcome = "completed",
+            .actual_returncode = if (case == 3) @as(i32, 1) else @as(i32, 0),
+            .returncode = if (case == 3) @as(i32, 1) else @as(i32, 0),
+            .stdout = run ++ "/build.stdout",
+            .stderr = run ++ "/build.stderr",
+        }});
+        var e = f.engine();
+        if (case != 0) {
+            try t.expectError(if (case == 3) error.OutputCommandNotSuccessful else error.UnsupportedOutputWrapper, command_outputs.request(&e, report, "Reject unknown or failed wrapper"));
+        } else {
+            try e.write(output ++ "/affinity.json", try command_outputs.request(&e, report, "Closed affinity-bound build"));
+            try e.discoverRelease(output ++ "/affinity.json", true);
+            try e.qualify(0);
+            try mutation.applyFileBatch(&e, &.{0});
+            try t.expectEqual(.removed, e.actions.items[0].status);
+            _ = try e.metadata(run ++ "/commands.json");
+            _ = try e.metadata(run ++ "/build.stdout");
+        }
+    }
+}
+
 test "storage cleanup: report toolchain binds compiler stdout and selected output owners" {
     const f = try Fixture.init();
     defer f.deinit();

@@ -320,10 +320,12 @@ override a conflicting recorded directory or infer an implicit build product.
 
 Passed `whole-compiler-diagnostic-v1` reports can bind their named `candidate` or
 `rebuilt_candidate` to a successful `zig build --prefix` command and the report's
-exact binary hash. The recorded `/usr/bin/time -f ... -o ... --` wrapper is
-supported. Help invocations, arbitrary wrappers and unnamed install outputs do
-not establish ownership. Reports may also identify their compiler/emitter in
-the `toolchain` object.
+exact binary hash. The recorded `/usr/bin/time -f ... -o ... --` wrapper and
+the fixed `/usr/bin/taskset --cpu-list 0` child wrapper are supported, including
+that exact affinity wrapper inside `time`. Other affinity options and process-ID
+forms are rejected. Help invocations, arbitrary wrappers and unnamed install
+outputs do not establish ownership. Reports may also identify their
+compiler/emitter in the `toolchain` object.
 
 `prepare-aliases --requests FILE --reason TEXT` searches the validation tree for
 every name of the requested compiled-output inodes. It preserves the original
