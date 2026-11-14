@@ -43,7 +43,7 @@ names; interruption or partial removal leaves a durable journal.
 
 ## Qualification and initial review
 
-All 141 collector tests pass in Debug and ReleaseFast, including missing aliases,
+All 142 collector tests pass in Debug and ReleaseFast, including missing aliases,
 new pins, evidence changes, noncompiled payloads, output binding and allocation.
 Four targeted native-event auditor tests pass in both modes. The full storage
 suite passed ten build steps; the final collector also passed the eight targeted
@@ -81,3 +81,11 @@ changed after the first qualification, and exact per-file historical exceptions.
 The indexed preparer produced 7,909 exact historical pin transitions in 1.50
 seconds with 345,460 KiB maximum resident memory. The declarations remain subject
 to fresh qualification, current pins, holds and consumers during collection.
+
+The first live apply exposed an older inventory format: `files[path]` contains
+`{bytes, sha256}` instead of a bare hash string. The pin reader previously kept
+these paths protected without extracting their recorded hashes. It now reads
+both formats. Regression coverage checks matching, mismatched, missing and
+non-string hashes, as well as preparation of an explicitly reviewed inventory
+exception. Current contracts still cannot be retired. This affects 1,075 otherwise
+qualified products in the two reviewed performance inventories.

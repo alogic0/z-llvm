@@ -666,7 +666,11 @@ pub const Engine = struct {
                     } else try e.jsonPins(v, path);
                 } else if (has(v, "root", .string) and has(v, "files", .object)) {
                     var it = (try get(v, "files")).object.iterator();
-                    while (it.next()) |kv| try e.pinHash(try e.c.fmt("{s}/{s}", .{ try str(v, "root"), kv.key_ptr.* }), path, if (kv.value_ptr.* == .string) kv.value_ptr.string else null);
+                    while (it.next()) |kv| {
+                        const value = kv.value_ptr.*;
+                        const sha = if (value == .string) value.string else if (has(value, "sha256", .string)) try str(value, "sha256") else null;
+                        try e.pinHash(try e.c.fmt("{s}/{s}", .{ try str(v, "root"), kv.key_ptr.* }), path, sha);
+                    }
                 }
             } else {
                 var entries = std.mem.tokenizeScalar(u8, bytes, '\n');

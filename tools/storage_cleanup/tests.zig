@@ -83,6 +83,38 @@ test "storage cleanup: multi-product requests retain only exact per-file pin exc
     _ = try e.metadata(manifest);
 }
 
+test "storage cleanup: object-valued inventory pins require an exact recorded hash" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var initial = f.engine();
+        try commandOutputFixture(f, &initial, true);
+        var r = try command_outputs.request(&initial, report, "Closed inventoried product");
+        const artifact = r.artifacts[0];
+        try t.expectEqualStrings(run ++ "/local", artifact.path);
+        const manifest = run ++ "/artifact-manifest.json";
+        var row = try u.toValue(f.c.a, .{ .bytes = @as(u64, 23), .sha256 = artifact.sha256 });
+        switch (case) {
+            1 => try u.put(f.c.a, &row, "sha256", u.s("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")),
+            2 => try u.put(f.c.a, &row, "sha256", .{ .integer = 7 }),
+            3 => _ = row.object.swapRemove("sha256"),
+            else => {},
+        }
+        try initial.write(manifest, .{ .root = run, .files = .{ .local = row } });
+        r.retired_pins = &.{.{ .manifest = .{ .path = manifest, .sha256 = try initial.digest(manifest) }, .reference = artifact.path, .target = .{ .path = artifact.path, .sha256 = artifact.sha256 }, .reason = "Reviewed exact historical entry" }};
+        try initial.write(run ++ "/products-release.json", r);
+        var e = f.engine();
+        try e.discoverRelease(run ++ "/products-release.json", true);
+        for (0..2) |index| try e.qualify(index);
+        try e.pins();
+        try t.expectEqual(@as(@FieldType(core.Action, "status"), if (case == 0) .ready else .skipped), e.actions.items[0].status);
+        // The unrelated product stays eligible; cached manifests give the same decision.
+        try t.expectEqual(.ready, e.actions.items[1].status);
+        try e.pins();
+        _ = try e.metadata(artifact.path);
+    }
+}
+
 test "storage cleanup: other extensionless executables require commands and compiled bytes" {
     const f = try Fixture.init();
     defer f.deinit();
@@ -899,7 +931,14 @@ test "storage cleanup: staged historical requests verify hashes and retire only 
     try initial.write(output ++ "/requests.json", .{ .schema = "zllvm-storage-requests-v1", .requests = .{.{ .path = request_path, .sha256 = try initial.digest(request_path) }} });
     try initial.write("local-state/retirements/record-old.json", .{ .status = "complete", .retained = .{.{ .path = artifact.path, .sha256 = artifact.sha256.? }} });
     try f.write(run ++ "/milestone.sha256", try f.c.fmt("{s}  {s}\n", .{ artifact.sha256.?, artifact.path }));
-    try initial.write(output ++ "/manifest-review.json", .{ .schema = "zllvm-reviewed-pin-manifests-v1", .reason = "Reviewed completed milestone's temporary output", .manifests = .{.{ .path = run ++ "/milestone.sha256", .sha256 = try initial.digest(run ++ "/milestone.sha256") }} });
+    var files = u.object(f.c.a);
+    try u.put(f.c.a, &files, std.fs.path.basename(artifact.path), try u.toValue(f.c.a, .{ .bytes = artifact.allocated_bytes, .sha256 = artifact.sha256.? }));
+    const inventory_manifest = run ++ "/artifact-manifest.json";
+    try initial.write(inventory_manifest, .{ .root = std.fs.path.dirname(artifact.path).?, .files = files });
+    try initial.write(output ++ "/manifest-review.json", .{ .schema = "zllvm-reviewed-pin-manifests-v1", .reason = "Reviewed completed milestone's temporary output", .manifests = .{
+        .{ .path = run ++ "/milestone.sha256", .sha256 = try initial.digest(run ++ "/milestone.sha256") },
+        .{ .path = inventory_manifest, .sha256 = try initial.digest(inventory_manifest) },
+    } });
     var review = f.engine();
     try review.discover();
     try batches.discover(&review, output ++ "/requests.json");
