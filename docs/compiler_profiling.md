@@ -132,6 +132,17 @@ between profiled and unprofiled runs of the same compiler, then apply the task's
 existing baseline equivalence and correctness checks. Compiler throughput and
 generated-program runtime performance are separate measurements.
 
+## Measured owner-removal workload
+
+The [2026-11-14 follow-up](evidence/compiler_throughput_20261114.md) applies this
+workflow to the fixed 7,874-definition Debug behavior input. A fresh complete
+recording has 23,115 user-space cycle samples, decoded callers and no reported
+losses. Removing redundant dependency-domain copies reduces the median of three
+unprofiled measurement pairs from 114.39 to 109.66 seconds (4.1%), preserving
+object and ownership bytes. The separate complete compiler replay proves
+preservation; its instrumentation and overlapping validation do not provide a
+paired whole-compiler speedup measurement.
+
 ## Verified host smoke run
 
 The 2026-11-09 verification used the retained compiler at

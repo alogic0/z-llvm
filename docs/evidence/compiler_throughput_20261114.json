@@ -1,0 +1,380 @@
+{
+  "schema": "compiler-throughput-checkpoint-v1",
+  "status": "passed",
+  "date": "2026-11-14",
+  "scope": "One measured selector throughput improvement; fixed postopt objects and complete native corpus preserved",
+  "code_revision": "7e7a1063fe67b3f814b2244b26a2b0ccefcecc66",
+  "code_tree": "01398e09b16a83f5f2e614accdb92fe495cd3e10",
+  "validation_source": {
+    "parent_revision": "dcb7b03374f9da27ff6ccef07725cf1002f730a3",
+    "committed_delta_sha256": "b7870c657fd456e384dd045f6f58fd87ed6e8fdca03d7734b41b66e861174aae",
+    "source_build_files": 661,
+    "backend_source_files": 659,
+    "qualified_snapshot_sha256": "35d4b7b010556392873fd6183569cd18ca4bf10dd68326627d908479c5ac9939",
+    "qualified_snapshot_files": 3844,
+    "main_snapshot_sha256": "ef8ebc178f293f02174a887f98086204453a5a305839b38bac54904d22fbe758",
+    "main_snapshot_files": 3845,
+    "main_verified_before_documentation_edits": true,
+    "qualified_verified_after_native_qualification": true
+  },
+  "backend_builds": {
+    "baseline": {
+      "source_head": "43a509cc411fadefb9e8f0250daaf6e082266038",
+      "sha256": "b3b2ba872791ddf17826fc9ffd58353ea08d5e956b58feccc8928ffb85d055f9",
+      "mode": "ReleaseFast",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    },
+    "candidate": {
+      "source_head": "dcb7b03374f9da27ff6ccef07725cf1002f730a3",
+      "sha256": "1dddbb73fb3e5e6d3a13a24fcddad5c5ce1f2fb9945cd25832edf55f62b1c11e",
+      "mode": "ReleaseFast",
+      "target": "x86_64-linux-gnu",
+      "cpu": "baseline",
+      "strip": false,
+      "omit_frame_pointer": false
+    },
+    "debug": {
+      "sha256": "fe36a8c3228f1bd9d308119456cd31ec6754448409c0051905efba35119c7468",
+      "mode": "Debug"
+    },
+    "tooling_zig": {
+      "path": "/home/oleg/.zig/0.17.0/files/zig",
+      "sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+      "version": "0.17.0",
+      "host_target": "x86_64-linux.7.0...7.0-gnu.2.39",
+      "library": {
+        "path": "/home/oleg/.zig/0.17.0/files/lib",
+        "files": 19501,
+        "sha256": "da12ef3b9d8d4a6120652a8b53e18a905dace8a7eeb10a260c3db619a10f4a99"
+      }
+    }
+  },
+  "change": {
+    "domain_bytes": 149761,
+    "clone_and_copy_back_removed_from_infallible_removal": true,
+    "empty_replacement_uses_removal": true,
+    "nonempty_replacement_atomicity_and_rollback_unchanged": true,
+    "abi_and_limits_unchanged": true
+  },
+  "measurement": {
+    "input": {
+      "definitions": 7874,
+      "bytes": 67658559,
+      "sha256": "d8b983f4686a19acdf9f5bcc84c084b6fbc68e104e1671032509f7180c9aa02b"
+    },
+    "build_mode": "ReleaseFast",
+    "hardware_and_builtin_profiling": false,
+    "overlapping_qualification": false,
+    "warmups": 2,
+    "pairs": 3,
+    "pair_order": [
+      "baseline/candidate",
+      "candidate/baseline",
+      "baseline/candidate"
+    ],
+    "baseline_wall_seconds": [
+      113.93,
+      114.77,
+      114.39
+    ],
+    "candidate_wall_seconds": [
+      109.62,
+      110.04,
+      109.66
+    ],
+    "baseline_median_seconds": 114.39,
+    "candidate_median_seconds": 109.66,
+    "median_reduction_seconds": 4.73,
+    "median_reduction_percent_rounded": 4.135,
+    "baseline_max_peak_rss_kib": 1329124,
+    "candidate_max_peak_rss_kib": 1329008,
+    "identical_objects_and_owners_including_warmups": 8,
+    "object_bytes": 27286368,
+    "object_sha256": "4ea9c9b39f5ab18be66f1e6f1293652ce2e9ba68fe93edbf0aad00324954eb2e",
+    "owners_sha256": "50a5e008c6f1a489cd8c71bf9be2fcc3d24e61f53820064f0065ae2da3a2b075"
+  },
+  "profiling": {
+    "complete_debug_baseline_samples": 23115,
+    "reported_lost_samples": 0,
+    "decoded_callers": true,
+    "memcpy_self_sample_percent": 41.01,
+    "compiler_and_extracted_function_limit_seconds": 120,
+    "bounded_profile_actual_status": 124,
+    "bounded_profiles_diagnostic_only": true
+  },
+  "fixed_object_preservation": {
+    "compiler": {
+      "definitions": 8928,
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "object_bytes": 149620056,
+      "object_sha256": "d10d05451b6e553a3bbdd364f5709097df2fdfac208f25fb47a27974723cfeef",
+      "census_sha256": "873d76839cf25af26b5767df9cc8083f30539e66ac9e29b82356eb45f4996521",
+      "owners_equal": true
+    },
+    "runtime_debug": {
+      "definitions": 455,
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "object_sha256": "0c8d7d0f39cf20f4a95fee6ba9a49e4d3fe9a9bcfd025b03fe26046bf3bb428d",
+      "owners_equal": true
+    },
+    "runtime_fast": {
+      "definitions": 455,
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "object_sha256": "0c8d7d0f39cf20f4a95fee6ba9a49e4d3fe9a9bcfd025b03fe26046bf3bb428d",
+      "owners_equal": true
+    },
+    "runtime_small": {
+      "definitions": 503,
+      "input_sha256": "e480b71b5e90c088cabda455b52238f6fe72333db6e7e6a565fed322be083fc3",
+      "object_sha256": "5e1b10b5797907231dcec3a3fb904b98bd913bfa412b14c81768cedc8a51aae8",
+      "owners_equal": true
+    },
+    "independent_census_elf_audits": 4,
+    "compiler_events": {
+      "records": 6123234,
+      "selected": 8928,
+      "failed": 0,
+      "complete": true,
+      "succeeded": true
+    },
+    "runtime_events": [
+      {
+        "root": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/runtime-Debug",
+        "records": 182330,
+        "selected": 455,
+        "failed": 0,
+        "complete": true,
+        "succeeded": true
+      },
+      {
+        "root": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/runtime-ReleaseFast",
+        "records": 182330,
+        "selected": 455,
+        "failed": 0,
+        "complete": true,
+        "succeeded": true
+      },
+      {
+        "root": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/runtime-Small",
+        "records": 192100,
+        "selected": 503,
+        "failed": 0,
+        "complete": true,
+        "succeeded": true
+      }
+    ]
+  },
+  "validation": {
+    "unit_modes": [
+      "Debug",
+      "ReleaseSafe"
+    ],
+    "units_per_mode": 2365,
+    "structural_per_mode": 65,
+    "profile_per_mode": 2,
+    "focused_tests": 14,
+    "integration_gates": 17,
+    "air_cache_hits": 3,
+    "backend_and_native_executions_fresh": true,
+    "native_populations_per_build": 225,
+    "native_release_pipelines": [
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "debug_comparison": {
+      "status": "passed",
+      "outcomes": 8204,
+      "new_commands": 0,
+      "artifacts": {
+        "--emit=selection-owner-manifest": 1353,
+        "optimizer": 684,
+        "--emit=obj": 1362
+      },
+      "differences": 0,
+      "verified_source_files": 456
+    },
+    "fast_comparison": {
+      "status": "passed",
+      "outcomes": 8204,
+      "new_commands": 0,
+      "artifacts": {
+        "--emit=selection-owner-manifest": 1353,
+        "optimizer": 684,
+        "--emit=obj": 1362
+      },
+      "differences": 0,
+      "verified_source_files": 456
+    },
+    "original_path_sensitive_comparisons_retained_as_failed": true,
+    "source_prefixes_normalized_only_after_fixture_hash_verification": true,
+    "source_mutation_control_rejected": true,
+    "native_debug_faults": 3348,
+    "native_fast_faults": 3348,
+    "runtime_faults": 28,
+    "required_fault_controls": 6724,
+    "runtime_observations_per_backend": {
+      "local": 21792,
+      "reference": 21792
+    },
+    "runtime_unsigned_division_cases": 641,
+    "runtime_unsigned_division_helpers": 4
+  },
+  "previous_acceptance": {
+    "path": "docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json",
+    "sha256": "cd4482d1bb132721b7f6084481e95a83bb0ec62d2974877f75fbf2fd84326906",
+    "original_eight_milestones_unchanged": true,
+    "generation_matrix_and_self_rebuild_not_rerun_in_this_slice": true
+  },
+  "receipts": [
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/units-Debug.json",
+      "sha256": "6e0ab968280558d5b231872335820254c2434631438e67f079af3337c230923c",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/units-ReleaseSafe.json",
+      "sha256": "2ad71af42ab1bd88b31f305d6c1ca511d008556b32d4773ac7bc792f8f8ec280",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/units-and-native.json",
+      "sha256": "f4f111e04f99a45c9399b5023ca9f326fe9d158d524036931795711c70e5e0a8",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/runtime-replays.json",
+      "sha256": "44d0b9e38441c2a5b501517d4c27ee5645115e8868d10e6cdd6d040e7baab6d7",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/audit-runtimes.json",
+      "sha256": "5b6b211a856c74bf9de523fc057bd6f5db11f675b91f85b6c228a1ec034e2ea9",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/audit-runtime-events-v3.json",
+      "sha256": "7892288416f0eea818036d3845209df872bb4bc457a04bff8d9ac8f31c944995",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/original-compiler.json",
+      "sha256": "9a9a346ab7617728a0de8225cd17e9ccd5bc2205b2fc31e59011743c5338d12a",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/audit-compiler-object.json",
+      "sha256": "0ec206b3e1362dfcc865b56b456381cbe9ce6632e73ce7e0a1f7558dda5be294",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/audit-compiler-events.json",
+      "sha256": "e1206bf7ca8b7dc0d3935fd88a9022cf8250269874f23631f20257fa422d06e2",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/compare-checkout-self.json",
+      "sha256": "e70b73b8e1818159928d1cbad72157969c005f67f8872a170c96f837d9f01845",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/projection-source-guard-v2.json",
+      "sha256": "f3520261ba61fb4e849ef7750fe3130b5f908315cb3ad6bb9dc41625f43d9095",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/compare-checkout-Debug.json",
+      "sha256": "7690856da0732b672515f67e44f38dc51281819e3776ad2eab6627346b2a12ed",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/fault-native-Debug.json",
+      "sha256": "1dbe8885f7c6caa1ef3bfe8467d6cdb8a138c0c9426232596733934c3efa5753",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/qualified/local-state/validations/throughput/batch-01/checks/verify-source-qualified.json",
+      "sha256": "8a720a543f5f3767e0e4ee7b0ebc5b1472b3b5bb9399423f5244a0d7be6c5546",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/main-qualification/checks/row-repro-v3.json",
+      "sha256": "54f4f40c378df17ce9b8a3e32e6ef25c12a0c70703f9864772c099522e96416a",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/main-qualification/checks/full-t3-main.json",
+      "sha256": "8a282586da66fbac73207c66fc444d7be9f2a86da56d96f4d015c70a17fb95ac",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/main-qualification/checks/verify-source-main.json",
+      "sha256": "ebf36326de3e35140d49d6215e72d7bae99007d4fcbbedf5ebf54c8a0fd58f7b",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/main-qualification/checks/compare-checkout-ReleaseFast.json",
+      "sha256": "af746296cc209a0b2b8693a72bc646df7803de120d5086313f38129eb751ce52",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/main-qualification/checks/fault-native-ReleaseFast.json",
+      "sha256": "130d221fe87f1b28241533f44df8e63693bd36e64fe746e2c2996cbe3c52489c",
+      "status": "finished",
+      "outcome": "completed",
+      "actual_returncode": 0
+    }
+  ],
+  "accepted_artifact_manifest": "/home/oleg/prog/z_llvm/local-state/validations/compiler-throughput-20261114/batch-01/accepted-artifacts.sha256",
+  "accepted_artifact_manifest_sha256": "184a43fc349af600d3beda1c086ee26c1f99c85903da696675835642f987e0de",
+  "sealed_files": 64529,
+  "limitations": [
+    "Measured throughput covers the fixed Debug postopt emission workload only",
+    "No comparable whole-compiler, frontend-build, self-rebuild or generated-program speedup claim",
+    "Bounded interrupted hardware recordings have no complete-object credit",
+    "LLVM frontend optimization and declared providers remain dependencies"
+  ],
+  "successor": {
+    "plan": "docs/plans/2026-11-14-release-safe-preopt-behavior.md",
+    "status": "proposed; not implemented"
+  }
+}

@@ -18,6 +18,11 @@ frontend optimization and declared providers remain in use.
 For compiler performance investigations, follow [compiler profiling](compiler_profiling.md)
 for the verified hardware-sampling setup, recording commands and evidence checks.
 
+The [measured throughput follow-up](evidence/compiler_throughput_20261114.md)
+records a 4.1% median reduction for the fixed Debug behavior emission workload.
+The [ReleaseSafe preopt behavior plan](plans/2026-11-14-release-safe-preopt-behavior.md)
+proposes the next bounded LLVM-optimization removal milestone.
+
 The [validation and compiler performance improvement plan](plans/2026-11-09-validation-performance-improvement.md)
 records the toolchain, profiling, and validation-reuse work. See
 [next steps](next_steps.md) for the active direction and

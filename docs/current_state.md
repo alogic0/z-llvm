@@ -33,8 +33,9 @@ stack policy, 8 MiB generated-frame guard and 64 KiB stack-object guard are
 unchanged. Ordinary call limits remain 64 direct arguments, 16 indirect arguments
 and 128 stack words; the ordinary ninth SSE argument remains closed.
 
-Debug and ReleaseSafe each pass 2,364 unit tests, 65 structural checks and two
-profiling checks. All eight readiness procedures and 17 integration gates pass.
+That acceptance records 2,364 unit tests, 65 structural checks and two profiling
+checks per Debug/ReleaseSafe build. All eight readiness procedures and 17
+integration gates pass.
 Both 225-population native suites pass across all three release pipelines; all
 6,724 required fault controls are detected. Strict comparisons preserve 7,160 prior
 command outcomes per backend build. The 21 changed native objects per build
@@ -46,6 +47,33 @@ The original five-milestone acceptance and fixed compiler-core cohort below
 remain unchanged. LLVM frontend optimization and declared LLVM/system providers
 remain part of this proof. See [next steps](next_steps.md) for future work and
 [validation tools](validation_tools.md) for the maintained commands.
+
+## Measured compiler throughput
+
+The [2026-11-14 follow-up](evidence/compiler_throughput_20261114.md), accepted at
+`7e7a1063`, removes
+redundant whole-domain copies during infallible address-owner removal and empty
+dependency replacement. Nonempty replacement validation, rollback snapshots,
+ownership, capacities, ABI and frame policies are unchanged.
+
+On the fixed 7,874-definition Debug input, three timed pairs reduce median
+backend emission from 114.39 to 109.66 seconds (4.1%). All runs, including both
+warmups, reproduce the accepted object and owner bytes; peak RSS is essentially
+unchanged. This establishes one postopt backend workload, without a comparable
+whole-compiler or generated-program speedup claim.
+
+Debug and ReleaseSafe each pass 2,365 unit, 65 structural and two profile checks.
+All 17 integration gates pass. Fresh complete compiler and runtime objects match
+acceptance and pass independent census, ELF and ordered-event audits. Both complete
+225-population native suites pass; verified comparisons preserve all 8,204 command
+outcomes and 3,399 backend artifacts per build. All 6,724 required fault controls
+pass. The [acceptance record](evidence/compiler_throughput_20261114.json) binds the
+source, binaries, terminal receipts and artifact seal.
+
+The proposed [ReleaseSafe preopt milestone](plans/2026-11-14-release-safe-preopt-behavior.md)
+will audit local optimization and object emission separately for one complete
+unchanged behavior suite. It is not implemented; LLVM IR construction, target
+setup and declared providers remain explicit dependencies.
 
 ## Fixed compiler-core execution cohort
 

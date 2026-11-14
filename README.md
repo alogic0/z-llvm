@@ -21,10 +21,17 @@ reference outcomes, including reference skips, in every mode through both the
 normal LLVM and local-hook routes: **16 complete results and 33,552 exact outcome
 comparisons**. All 20 delivered local objects pass independent audits.
 
-Debug and ReleaseSafe each pass 2,364 unit tests, 65 structural checks, and two
-profiling checks. All eight readiness procedures, 17 integration gates and both
-225-population native suites pass; all 6,724 required fault controls are detected.
+That acceptance records 2,364 unit tests, 65 structural checks and two profiling
+checks per Debug/ReleaseSafe build. All eight readiness procedures, 17 integration
+gates and both 225-population native suites pass; all 6,724 required fault controls
+are detected.
 LLVM frontend optimization and declared LLVM/system providers remain in use.
+
+The [2026-11-14 throughput follow-up](docs/evidence/compiler_throughput_20261114.md)
+removes redundant address-dependency copies. Median backend emission for the
+fixed Debug behavior input falls from 114.39 to 109.66 seconds (4.1%), with
+byte-identical objects and ownership. This measures one postopt module;
+whole-compiler throughput and generated-program performance are separate scopes.
 
 See the [final acceptance](docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json),
 [completed plan](docs/plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),

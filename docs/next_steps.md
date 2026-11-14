@@ -17,19 +17,38 @@ Small-runtime objects. Both 225-population native suites, all 17 integration
 gates and all 6,724 required faults pass. See [current state](current_state.md)
 for the resource settings, unit checks and acceptance limits.
 
-Further work starts from this accepted baseline:
+The [throughput follow-up](plans/2026-11-14-compiler-throughput.md) is complete at
+`7e7a1063`. It implements
+infallible address-owner removal without redundant whole-domain copies. Its
+[measurements](evidence/compiler_throughput_20261114.md) reduce median backend
+emission for the fixed Debug input from 114.39 to 109.66 seconds (4.1%), with
+identical object and owner bytes. Both complete native suites, all 17 integration
+gates, all 6,724 required faults and final source verification pass; the
+[acceptance record](evidence/compiler_throughput_20261114.json) binds the proof.
+
+The proposed successor is the
+[ReleaseSafe preopt behavior milestone](plans/2026-11-14-release-safe-preopt-behavior.md).
+It runs the unchanged complete suite through local optimization and object
+emission, matches every named reference outcome including skips, and proves no
+LLVM optimization/object pass or fallback delivered the accepted objects.
+LLVM IR construction, bitcode parsing, target setup and declared providers remain.
+This proposal is separate from the completed compiler/self-rebuild plan.
+
+Further work starts from the accepted baseline:
 
 1. Preserve the fixed inputs, generation identities, capture reports and sealed
    evidence. Keep the original five-milestone acceptance and fixed compiler-core
    cohort as separate records.
-2. For compiler performance work, use the
+2. Keep LLVM dependency removal bounded by the ReleaseSafe preopt plan's explicit
+   stage captures, independently inventoried inputs, negative control and
+   single-mode acceptance. Debug, other release modes, complete compiler preopt
+   builds and provider removal remain separate milestones.
+3. For further compiler performance work, use the
    [profiling guide](compiler_profiling.md) and
    [validation performance results](evidence/validation_performance.md).
    Measure a specific workload before selecting another optimization or caching
    change, and keep compiler throughput separate from generated-code performance.
-3. Further LLVM dependency removal needs its own bounded scope and acceptance
-   criteria. LLVM still owns frontend optimization and declared providers in
-   the accepted build. The [architecture](architecture.md) describes that boundary.
+   The [architecture](architecture.md) describes the remaining LLVM boundary.
 
 Apply the [validation tiers](validation_tiers.md) to future changes and use the
 maintained [Zig validation tools](validation_tools.md), `jqz` and
