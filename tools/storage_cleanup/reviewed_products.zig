@@ -13,6 +13,7 @@ pub const Product = struct {
     run_root: []const u8,
     reason: []const u8,
     consumers_closed: bool,
+    retired_pins: []const p.PinTransition = &.{},
 };
 pub const Plan = struct {
     schema: []const u8 = "zllvm-reviewed-products-v1",
@@ -57,11 +58,28 @@ pub fn prepare(e: *core.Engine, path: []const u8) !void {
         if (seen.contains(product.path)) return error.DuplicateReviewedProduct;
         try seen.put(product.path, {});
         for (kept.items) |ev| if (p.overlaps(product.path, ev.path)) return error.RetentionOverlap;
+        var product_kept: std.ArrayList(p.Evidence) = .empty;
+        try product_kept.appendSlice(e.c.a, kept.items);
+        for (product.retired_pins) |transition| {
+            if (!p.relative(transition.manifest.path) or !p.hash(transition.manifest.sha256) or
+                u.trim(transition.reason).len == 0 or transition.reference.len == 0 or
+                !std.mem.eql(u8, transition.target.path, product.path) or
+                !std.mem.eql(u8, transition.target.sha256, product.sha256)) return error.InvalidPinTransition;
+            for (e.config.current_manifests) |current| if (std.mem.eql(u8, current, transition.manifest.path)) return error.CurrentManifestCannotBeRetired;
+            if (!p.within("local-state/retirements", transition.manifest.path) and !p.validationOutput(transition.manifest.path)) return error.InvalidPinTransition;
+            try e.keep(&product_kept, transition.manifest.path, transition.manifest.sha256);
+            if (p.within("local-state/retirements", transition.manifest.path) and std.mem.endsWith(u8, transition.manifest.path, ".json")) {
+                var old = try e.load(e.c.gpa, transition.manifest.path);
+                defer old.deinit();
+                if (!core.eq(old.value, "status", "complete")) return error.IncompletePinRetirement;
+            }
+        }
         const index = try e.add(product.path, product.run_root, path, .build_output, product.sha256);
         const action = &e.actions.items[index];
         action.reviewed_build_output = true;
         action.replay_required = false;
-        action.retained = kept.items;
+        action.retained = product_kept.items;
+        action.retired_pins = product.retired_pins;
         _ = e.metadata(product.path) catch |err| switch (err) {
             error.FileNotFound => {
                 action.status = .absent;

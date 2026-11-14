@@ -206,7 +206,7 @@ independent copy for consumers that need writable content. Object-store GC keeps
 objects with installed aliases, even without a manifest. Concurrent producers
 serialize publication through the store lock.
 
-Existing duplicate IR can be migrated through a reviewed plan:
+Existing duplicate IR and AIR exports can be migrated through a reviewed plan:
 
 ```sh
 tools/clean-storage share-inputs --inputs INPUTS.json
@@ -224,6 +224,12 @@ are verified before and after migration. The report separates retired allocation
 from newly created store allocation, so only their difference is net reclamation.
 Original filenames and content hashes remain available. Arbitrary mixed run
 directories are never removed by this operation.
+
+The explicit list can include `.ll` and `.air` files under validation storage,
+`local-state/inputs/` and `local-state/caches/`, including shallow legacy paths.
+Only generic input/cache policy protection is excepted for sharing. Manual and
+job holds, held releases and more specific policy entries still block it.
+Inputs become read-only; writable consumers must obtain independent copies.
 
 Capture helpers shared across completed runs require every name in the request
 list. After `prepare-generated`, use `--complete-capture-aliases` during both
@@ -528,10 +534,18 @@ Only regular ELF/archive files under `local-state/validations/` qualify. Names
 must be extensionless helpers or end in `.o`, `.obj`, `.a` or `.exe`; source,
 IR, traces, logs, records and mixed directories are excluded. All pins, holds,
 retained dependencies, active consumers, ownership, hashes, current-manifest
-checks and mutation guards still apply. No hold or pin exception is supported.
+checks and mutation guards still apply. No hold exception is supported.
 `--complete-artifact-aliases` permits a fully reviewed hardlink group; any
 unlisted or protected alias blocks the entire physical inode. Changed audit
 notes or a changed plan reject mutation. A repeated completed plan is a no-op.
+
+After reviewing a historical checksum reference, a product may list exact
+`retired_pins` using the release-record format above. The plan and audit bind
+this decision. Every transition must name that product's hash, the original
+manifest's hash and reference, and its disposal reason. Original manifests stay
+unchanged; current manifests, unfinished retirement records, independent pins,
+holds and replay dependencies still block collection. A missing or hashless
+reference cannot be bypassed by such a transition.
 
 ### Private caches recorded in command ledgers
 
@@ -611,6 +625,10 @@ For example:
 
 Omit `compiler_retirement` when the original compiler remains available. An
 entry can also supply `source_reconstructions` as path/hash evidence pairs.
+Compatible captures from the same run and producer are prepared as one release
+with all their audits and artifacts. This avoids each capture retaining another
+planned raw stream as an ordinary sibling. Different producers or source/compiler
+retirement proofs remain separate; independent holds and pins still apply.
 Preparation writes small request files; the subsequent review qualifies the
 full audit, evidence, pins and consumers. A prepared request is not permission
 to skip those checks.
@@ -645,6 +663,9 @@ rechecks file identities and report hashes after reading. Failed compilations
 remain failed outcomes. Truncation, mismatched hashes, unrelated producers and
 changed controls cannot produce a verified audit. Results preserve failure
 details, event offsets, source snapshots and the auditor's Git revision.
+Successful whole-build reports also bind nested self-rebuild traces through
+their separate completed build command and `self_rebuild_invocations` list.
+Reused backend outputs and warmup/help commands cannot establish a new capture.
 It does not delete files or replace the collector's separate source/build,
 retired-compiler, alias, hold and pin checks. Unrecognized producer layouts
 remain explicit review cases.

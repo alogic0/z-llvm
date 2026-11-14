@@ -53,6 +53,7 @@ pub const Action = struct {
     released_cache: bool = false,
     reviewed_shared_cache: bool = false,
     reviewed_build_output: bool = false,
+    shared_input: bool = false,
     workspace_release: ?[]const u8 = null,
     retired_compiler: ?Evidence = null,
     retired_pins: []const p.PinTransition = &.{},
@@ -350,6 +351,7 @@ pub const Engine = struct {
         for (e.config.protected_paths) |held| {
             try e.held.append(e.c.a, held);
             for (e.actions.items) |*a| {
+                if (a.shared_input and @import("shared_inputs.zig").genericPolicyRoot(held)) continue;
                 if (a.reviewed_shared_cache and std.mem.eql(u8, held, "local-state/caches")) continue;
                 if (a.status != .removed and (p.overlaps(held, a.path) or (a.kind == .temporary_workspace and p.overlaps(held, a.run_root)))) {
                     a.status = .skipped;

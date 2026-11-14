@@ -191,6 +191,145 @@ test "storage cleanup: reviewed products require every alias and charge its inod
     for (complete.actions.items) |a| try t.expectEqual(.removed, a.status);
 }
 
+fn reviewedPinFixture(f: *Fixture, manifest: []const u8) !reviewed_products.Plan {
+    var plan = try reviewedProductFixture(f);
+    var e = f.engine();
+    try f.tmp.dir.createDirPath(t.io, std.fs.path.dirname(manifest).?);
+    try f.write(manifest, try f.c.fmt("{s}  {s}\n", .{ plan.products[0].sha256, reviewed_file }));
+    var product = plan.products[0];
+    product.retired_pins = try e.c.a.dupe(p.PinTransition, &.{.{
+        .manifest = .{ .path = manifest, .sha256 = try e.digest(manifest) },
+        .reference = reviewed_file,
+        .target = .{ .path = reviewed_file, .sha256 = product.sha256 },
+        .reason = "Reviewed historical identity of a completed temporary helper",
+    }});
+    plan.products = try e.c.a.dupe(reviewed_products.Product, &.{product});
+    try e.write(reviewed_plan, plan);
+    return plan;
+}
+
+test "storage cleanup: reviewed product transitions only its exact historical reference" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const manifest = "local-state/retirements/earlier/retained.sha256";
+    const plan = try reviewedPinFixture(f, manifest);
+    var e = f.engine();
+    try reviewed_products.prepare(&e, reviewed_plan);
+    try e.qualify(0);
+    try e.pins();
+    try t.expectEqual(.ready, e.actions.items[0].status);
+    try mutation.applyFileBatch(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    try t.expectEqualStrings(plan.products[0].retired_pins[0].manifest.sha256, try e.digest(manifest));
+}
+
+test "storage cleanup: reviewed pin transitions reject current manifests and wrong targets" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const manifest = run ++ "/historical.sha256";
+        var plan = try reviewedPinFixture(f, manifest);
+        var e = f.engine();
+        if (case == 0) {
+            e.config.current_manifests = &.{manifest};
+        } else {
+            var product = plan.products[0];
+            var transition = product.retired_pins[0];
+            switch (case) {
+                1 => transition.target.path = run ++ "/unreviewed-helper",
+                2 => transition.target.sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                else => transition.reason = " ",
+            }
+            product.retired_pins = &.{transition};
+            plan.products = &.{product};
+            try e.write(reviewed_plan, plan);
+        }
+        try t.expectError(if (case == 0) error.CurrentManifestCannotBeRetired else error.InvalidPinTransition, reviewed_products.prepare(&e, reviewed_plan));
+        _ = try e.metadata(reviewed_file);
+    }
+}
+
+test "storage cleanup: reviewed transitions preserve independent pins and changed manifests" {
+    for ([_]bool{ false, true }) |changed| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const manifest = run ++ "/historical.sha256";
+        const plan = try reviewedPinFixture(f, manifest);
+        var e = f.engine();
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        if (changed) {
+            try f.write(manifest, "changed historical manifest");
+            try t.expectError(error.EvidenceHashMismatch, mutation.applyFileBatch(&e, &.{0}));
+        } else {
+            try f.write(run ++ "/independent.sha256", try f.c.fmt("{s}  {s}\n", .{ plan.products[0].sha256, reviewed_file }));
+            try t.expectError(error.GeneratedBatchBecameHeld, mutation.applyFileBatch(&e, &.{0}));
+        }
+        _ = try e.metadata(reviewed_file);
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: reviewed transitions reject incomplete historical retirement records" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const manifest = "local-state/retirements/earlier/record.json";
+    var plan = try reviewedPinFixture(f, manifest);
+    try f.write(manifest, "{\"status\":\"pending\"}");
+    var e = f.engine();
+    var product = plan.products[0];
+    var transition = product.retired_pins[0];
+    transition.manifest.sha256 = try e.digest(manifest);
+    product.retired_pins = &.{transition};
+    plan.products = &.{product};
+    try e.write(reviewed_plan, plan);
+    try t.expectError(error.IncompletePinRetirement, reviewed_products.prepare(&e, reviewed_plan));
+}
+
+test "storage cleanup: joint traces retain both audits without raw sibling cycles" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const first: p.Release = .{
+        .schema = "zllvm-storage-release-v1",
+        .state = .audited,
+        .run_root = run,
+        .reason = "Joint capture review",
+        .producer = .{ .path = report, .sha256 = hash },
+        .artifacts = &.{.{ .path = run ++ "/one/profile.events.jsonl", .sha256 = hash, .kind = .raw_trace, .audit = output ++ "/audit-one.json" }},
+        .retained = &.{ .{ .path = output ++ "/audit-one.json", .sha256 = hash, .role = .audit }, .{ .path = run ++ "/two/profile.events.jsonl", .sha256 = hash, .role = .other }, .{ .path = report, .sha256 = hash, .role = .result }, .{ .path = report, .sha256 = hash, .role = .source }, .{ .path = report, .sha256 = hash, .role = .build } },
+    };
+    var second = first;
+    second.artifacts = &.{.{ .path = run ++ "/two/profile.events.jsonl", .sha256 = hash, .kind = .raw_trace, .audit = output ++ "/audit-two.json" }};
+    second.retained = &.{ .{ .path = output ++ "/audit-two.json", .sha256 = hash, .role = .audit }, .{ .path = run ++ "/one/profile.events.jsonl", .sha256 = hash, .role = .other }, .{ .path = report, .sha256 = hash, .role = .result } };
+    const joined = try batches.jointTraces(&e, &.{ first, second });
+    try t.expectEqual(@as(usize, 1), joined.len);
+    try t.expectEqual(@as(usize, 2), joined[0].artifacts.len);
+    try t.expectEqual(@as(usize, 5), joined[0].retained.len);
+    var audits: usize = 0;
+    for (joined[0].retained) |row| {
+        if (row.role == .audit) audits += 1;
+        try t.expect(!std.mem.endsWith(u8, row.path, "/profile.events.jsonl"));
+    }
+    try t.expectEqual(@as(usize, 2), audits);
+    for (0..4) |case| {
+        var different = second;
+        switch (case) {
+            0 => different.run_root = run ++ "-other",
+            1 => different.producer.sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            2 => different.compiler_retirement = .{ .path = output ++ "/record.json", .sha256 = hash },
+            else => different.source_reconstructions = &.{.{ .path = output ++ "/sources.json", .sha256 = hash }},
+        }
+        const separate = try batches.jointTraces(&e, &.{ first, different });
+        try t.expectEqual(@as(usize, 2), separate.len);
+        try t.expectEqual(@as(usize, 5), separate[0].retained.len);
+    }
+    second.retained = &.{.{ .path = run ++ "/one/profile.events.jsonl", .sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", .role = .other }};
+    try t.expectError(error.RetainedArtifactHashMismatch, batches.jointTraces(&e, &.{ first, second }));
+    try t.expectError(error.DuplicateTraceArtifact, batches.jointTraces(&e, &.{ first, first }));
+}
+
 fn heldProductsFixture(f: *Fixture, finished: bool) !void {
     var e = f.engine();
     try f.build(&e);
@@ -3367,6 +3506,67 @@ test "storage cleanup: shared input migration preserves aliases and rolls back a
         try t.expectEqual(@as(u32, 0o444), current.mode & 0o7777);
         try t.expectEqualStrings(sha, try e.digest(a.path));
     }
+}
+
+test "storage cleanup: AIR sharing preserves cache aliases and current contracts" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const original = "local-state/caches/compiler/export/input.air";
+    const alias = "local-state/inputs/compiler/input.air";
+    const copy = "local-state/validations/legacy/input.air";
+    try f.tmp.dir.createDirPath(t.io, std.fs.path.dirname(original).?);
+    try f.tmp.dir.createDirPath(t.io, std.fs.path.dirname(copy).?);
+    try f.write(original, "identical serialized compiler input\n");
+    try f.tmp.dir.createDirPath(t.io, "local-state/inputs/compiler");
+    {
+        const file = try f.tmp.dir.openFile(t.io, original, .{});
+        defer file.close(t.io);
+        try file.hardLink(t.io, f.tmp.dir, alias, .{});
+    }
+    try f.write(copy, "identical serialized compiler input\n");
+    const sha = try e.digest(original);
+    const plan = output ++ "/inputs.json";
+    try e.write(plan, .{ .schema = "zllvm-shared-inputs-v1", .inputs = .{.{ .sha256 = sha, .paths = [_][]const u8{ original, alias, copy } }} });
+    const manifest = output ++ "/current.sha256";
+    try f.write(manifest, try f.c.fmt("{s}  {s}\n{s}  {s}\n{s}  {s}\n", .{ sha, original, sha, alias, sha, copy }));
+    e.config.current_manifests = &.{manifest};
+    e.config.protected_paths = &.{ "local-state/caches", "local-state/inputs" };
+    try @import("shared_inputs.zig").run(&e, plan, true);
+    const object = try e.metadata(try f.c.fmt("local-state/artifacts/objects/{s}", .{sha}));
+    for ([_][]const u8{ original, alias, copy }) |path| {
+        try t.expectEqual(object.inode, (try e.metadata(path)).inode);
+        try t.expectEqualStrings(sha, try e.digest(path));
+    }
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: input sharing honors manual generic and specific policy holds" {
+    for ([_]bool{ false, true }) |manual| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const input = "local-state/caches/compiler/export/input.air";
+        try f.tmp.dir.createDirPath(t.io, std.fs.path.dirname(input).?);
+        try f.write(input, "held immutable input");
+        const before = try e.metadata(input);
+        const plan = output ++ "/inputs.json";
+        try e.write(plan, .{ .schema = "zllvm-shared-inputs-v1", .inputs = .{.{ .sha256 = try e.digest(input), .paths = [_][]const u8{input} }} });
+        if (manual) try e.write(e.config.holds_file, p.Holds{ .paths = &.{"local-state/caches"} }) else e.config.protected_paths = &.{"local-state/caches/compiler"};
+        try @import("shared_inputs.zig").run(&e, plan, true);
+        try t.expectEqual(.skipped, e.actions.items[0].status);
+        try t.expect(before.eql(try e.metadata(input)));
+        try t.expect(!u.exists(t.io, try e.absolute("local-state/artifacts")));
+    }
+}
+
+test "storage cleanup: input sharing restricts file scope and observes shallow parent consumers" {
+    const shared = @import("shared_inputs.zig");
+    for ([_][]const u8{ "local-state/validations/legacy/input.ll", "local-state/inputs/input.air", "local-state/caches/compiler/input.air" }) |path| try t.expect(shared.scope(path));
+    for ([_][]const u8{ "src/input.ll", "local-state/worktrees/x/input.ll", "local-state/caches/../src/input.ll", "local-state/inputs/source.zig", "local-state/caches/compiler/object.o" }) |path| try t.expect(!shared.scope(path));
+    try t.expectEqualStrings("local-state/validations/legacy", shared.consumerRoot("local-state/validations/legacy/input.ll"));
+    try t.expectEqualStrings("local-state/inputs", shared.consumerRoot("local-state/inputs/input.air"));
+    try t.expectEqualStrings("local-state/caches/compiler", shared.consumerRoot("local-state/caches/compiler/export/input.air"));
 }
 
 test "storage cleanup: held release prevents input sharing without a repeated manual hold" {

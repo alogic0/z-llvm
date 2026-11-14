@@ -38,6 +38,24 @@ fn binding(e: *storage.Engine, value: u.Value) !p.Evidence {
     return result;
 }
 
+fn buildArgs(args: []const []const u8) ![]const []const u8 {
+    var command = args;
+    if (command.len > 0 and std.mem.eql(u8, command[0], "/usr/bin/time")) {
+        var i: usize = 1;
+        while (i < command.len and !std.mem.eql(u8, command[i], "--")) {
+            if (i + 1 >= command.len or (!std.mem.eql(u8, command[i], "-f") and !std.mem.eql(u8, command[i], "-o"))) return error.UnboundProducer;
+            i += 2;
+        }
+        if (i == command.len) return error.UnboundProducer;
+        command = command[i + 1 ..];
+    }
+    if (command.len > 0 and std.mem.eql(u8, command[0], "/usr/bin/taskset")) {
+        if (command.len < 4 or !std.mem.eql(u8, command[1], "--cpu-list") or !std.mem.eql(u8, command[2], "0")) return error.UnboundProducer;
+        command = command[3..];
+    }
+    return command;
+}
+
 fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !i64 {
     if (!p.relative(entry.path) or !p.candidate(entry.path) or !std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.InvalidTracePath;
     const run = std.fs.path.dirname(entry.top_report.path) orelse return error.InvalidTraceScope;
@@ -50,28 +68,36 @@ fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !i64 {
         if (!storage.eq(producer, "schema", "whole-compiler-diagnostic-v1") or !storage.eq(producer, "status", "passed") or
             !try storage.boolean(producer, "build_completed") or try storage.integer(producer, "build_returncode") != 0 or
             !try storage.boolean(producer, "all_hook_objects_complete") or !try storage.boolean(producer, "source_and_backend_verified")) return error.ProducerNotTerminal;
+        const self_root = try e.c.fmt("{s}/self-rebuild", .{run});
+        const self_rebuild = p.within(self_root, entry.path);
+        if (self_rebuild and (!try storage.boolean(producer, "self_rebuild_passed") or try storage.boolean(producer, "self_rebuild_backend_reuse"))) return error.ProducerNotTerminal;
+        const build_root = if (self_rebuild) self_root else run;
         const commands = try storage.get(producer, "commands");
         if (commands != .array) return error.UnboundProducer;
         var build_bound = false;
         for (commands.array.items) |command| {
-            const args = try u.stringSlice(e.c.a, try storage.get(command, "argv"));
-            var build = false;
+            const args = try buildArgs(try u.stringSlice(e.c.a, try storage.get(command, "argv")));
+            if (args.len < 2 or !std.mem.eql(u8, std.fs.path.basename(args[0]), "zig") or !std.mem.eql(u8, args[1], "build")) continue;
+            if (self_rebuild) {
+                const expected = try e.c.fmt("{s}/install/bin/zig", .{run});
+                if (!std.mem.eql(u8, args[0], expected) and !std.mem.eql(u8, args[0], try e.absolute(expected))) continue;
+            }
+            var warmup = false;
             var prefix: ?[]const u8 = null;
             for (args, 0..) |arg, i| {
-                if (std.mem.eql(u8, std.fs.path.basename(arg), "zig") and i + 1 < args.len and std.mem.eql(u8, args[i + 1], "build") and
-                    (i == 0 or (i > 0 and std.mem.eql(u8, args[i - 1], "--") and std.mem.eql(u8, std.fs.path.basename(args[0]), "time")))) build = true;
+                if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) warmup = true;
                 if (std.mem.eql(u8, arg, "--prefix")) {
                     if (prefix != null or i + 1 == args.len) return error.UnboundProducer;
                     prefix = try e.relative(args[i + 1]);
                 }
             }
-            if (build and prefix != null and std.mem.eql(u8, prefix.?, try e.c.fmt("{s}/install", .{run}))) {
+            if (!warmup and prefix != null and std.mem.eql(u8, prefix.?, try e.c.fmt("{s}/install", .{build_root}))) {
                 if (!storage.eq(command, "outcome", "completed") or try storage.integer(command, "actual_returncode") != 0 or try storage.integer(command, "returncode") != 0) return error.ProducerNotTerminal;
                 build_bound = true;
             }
         }
         if (!build_bound) return error.UnboundProducer;
-        const invocations = try storage.get(producer, "invocations");
+        const invocations = try storage.get(producer, if (self_rebuild) "self_rebuild_invocations" else "invocations");
         if (invocations != .array) return error.UnboundProducer;
         var matches: usize = 0;
         var backend = try e.load(e.c.gpa, entry.backend_report.path);
@@ -418,6 +444,55 @@ test "native event audit: terminal whole-build reports bind the build and exact 
         var parsed = try e.load(t.allocator, top.path);
         defer parsed.deinit();
         if (case == 0) try t.expectEqual(@as(i64, 0), try validateEntry(&e, entry, parsed.value)) else if (case == 1 or case == 4)
+            try t.expectError(error.ProducerNotTerminal, validateEntry(&e, entry, parsed.value))
+        else
+            try t.expectError(error.UnboundProducer, validateEntry(&e, entry, parsed.value));
+    }
+}
+
+test "native event audit: self-rebuild requires its own command and bound captures" {
+    const t = std.testing;
+    const run = "local-state/validations/audit/test/run";
+    const capture = run ++ "/self-rebuild/captures/1";
+    for (0..8) |case| {
+        var tmp = t.tmpDir(.{ .iterate = true });
+        defer tmp.cleanup();
+        var arena = std.heap.ArenaAllocator.init(t.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        var c: u.Context = .{ .a = a, .gpa = t.allocator, .io = t.io, .root = try tmp.dir.realPathFileAlloc(t.io, ".", a), .env = try t.environ.createMap(a), .quiet = true };
+        try tmp.dir.createDirPath(t.io, capture);
+        var e = storage.Engine.init(&c, .{}, run, "zigrep");
+        const raw: p.Evidence = .{ .path = capture ++ "/profile.events.jsonl", .sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+        const input: p.Evidence = .{ .path = capture ++ "/input.ll", .sha256 = raw.sha256 };
+        try e.write(capture ++ "/report.json", .{ .profile_events = raw, .input = input });
+        try e.write(run ++ "/report.json", .{
+            .schema = "whole-compiler-diagnostic-v1",
+            .status = "passed",
+            .build_completed = true,
+            .build_returncode = @as(i32, 0),
+            .all_hook_objects_complete = true,
+            .source_and_backend_verified = true,
+            .self_rebuild_passed = case != 1,
+            .self_rebuild_backend_reuse = case == 2,
+            .commands = .{ .{
+                .argv = [_][]const u8{ "/outside/zig", "build", "--prefix", run ++ "/install", "--help" },
+                .outcome = "completed",
+                .actual_returncode = @as(i32, 0),
+                .returncode = @as(i32, 0),
+            }, .{
+                .argv = [_][]const u8{ "/usr/bin/time", "-o", "timing.txt", "--", "/usr/bin/taskset", "--cpu-list", if (case == 6) "1" else "0", if (case == 7) "zig" else run ++ "/install/bin/zig", "build", "--prefix", if (case == 3) run ++ "/install" else run ++ "/self-rebuild/install", if (case == 4) "--help" else "-j1" },
+                .outcome = "completed",
+                .actual_returncode = @as(i32, 0),
+                .returncode = @as(i32, 0),
+            } },
+            .self_rebuild_invocations = .{.{ .directory = if (case == 5) run ++ "/captures/1" else capture, .process_completed = true, .object_complete = true, .returncode = @as(i32, 0), .profile_events = raw, .input = input }},
+        });
+        const top: p.Evidence = .{ .path = run ++ "/report.json", .sha256 = try e.digest(run ++ "/report.json") };
+        const entry: Entry = .{ .path = raw.path, .producer = top, .top_report = top, .backend_report = .{ .path = capture ++ "/report.json", .sha256 = try e.digest(capture ++ "/report.json") } };
+        var parsed = try e.load(t.allocator, top.path);
+        defer parsed.deinit();
+        if (case == 0) try t.expectEqual(@as(i64, 0), try validateEntry(&e, entry, parsed.value)) else if (case == 1 or case == 2)
             try t.expectError(error.ProducerNotTerminal, validateEntry(&e, entry, parsed.value))
         else
             try t.expectError(error.UnboundProducer, validateEntry(&e, entry, parsed.value));

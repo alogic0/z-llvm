@@ -4,6 +4,7 @@ const core = @import("engine.zig");
 const release = @import("release.zig");
 const private_cache = @import("private_cache.zig");
 const p = core.p;
+const u = @import("../validation/common.zig");
 pub const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requests: []const p.Evidence };
 pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
 
@@ -66,19 +67,79 @@ pub fn traces(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void 
         defer audit.deinit();
         try peers.append(e.c.a, .{ .path = try e.relative(try core.str(audit.value, "path")), .sha256 = try e.c.a.dupe(u8, try core.str(audit.value, "sha256")) });
     }
-    var requests: std.ArrayList(p.Evidence) = .empty;
+    var candidates: std.ArrayList(p.Release) = .empty;
     for (plan.value.traces) |entry| {
         const retired: ?p.Evidence = if (entry.compiler_retirement) |path| blk: {
             if (!p.relative(path)) return error.InvalidEvidencePath;
             break :blk .{ .path = path, .sha256 = try e.digest(path) };
         } else null;
         const candidate = try release.traceRequestWithPeers(e, entry.audit, entry.build, reason, entry.source_reconstructions, retired, peers.items);
+        try candidates.append(e.c.a, candidate);
+    }
+    var requests: std.ArrayList(p.Evidence) = .empty;
+    for (try jointTraces(e, candidates.items)) |candidate| {
         const destination = try e.c.fmt("{s}/request-{d}.json", .{ e.output, requests.items.len });
         try e.write(destination, candidate);
         try requests.append(e.c.a, .{ .path = destination, .sha256 = try e.digest(destination) });
     }
     try e.write(try e.c.fmt("{s}/requests.json", .{e.output}), List{ .requests = requests.items });
     try e.c.print("Prepared {d} audited-trace requests; no payloads changed. Review with:\ntools/clean-storage --requests {s}/requests.json\n", .{ requests.items.len, e.output });
+}
+
+/// Distinct captures of one producer must not pin each other's raw streams.
+/// Join only compatible explicit requests; retain every audit and all other
+/// evidence. Each artifact still passes its own native qualification/mutation.
+pub fn jointTraces(e: *core.Engine, candidates: []const p.Release) ![]const p.Release {
+    var groups: std.ArrayList(p.Release) = .empty;
+    for (candidates) |candidate| {
+        if (candidate.state != .audited or candidate.retired_pins.len != 0) return error.InvalidTraceGroup;
+        for (candidate.artifacts) |artifact| if (artifact.kind != .raw_trace) return error.InvalidTraceGroup;
+        var match: ?usize = null;
+        for (groups.items, 0..) |group, i| {
+            if (std.mem.eql(u8, group.run_root, candidate.run_root) and
+                u.json.eql(try u.toValue(e.c.a, group.producer), try u.toValue(e.c.a, candidate.producer)) and
+                u.json.eql(try u.toValue(e.c.a, group.compiler_retirement), try u.toValue(e.c.a, candidate.compiler_retirement)) and
+                u.json.eql(try u.toValue(e.c.a, group.source_reconstructions), try u.toValue(e.c.a, candidate.source_reconstructions)))
+            {
+                match = i;
+                break;
+            }
+        }
+        if (match) |i| {
+            groups.items[i].artifacts = try std.mem.concat(e.c.a, p.Artifact, &.{ groups.items[i].artifacts, candidate.artifacts });
+            groups.items[i].retained = try std.mem.concat(e.c.a, p.Retained, &.{ groups.items[i].retained, candidate.retained });
+        } else try groups.append(e.c.a, candidate);
+    }
+    for (groups.items) |*group| {
+        var artifacts = std.StringHashMap([]const u8).init(e.c.a);
+        for (group.artifacts) |artifact| {
+            const entry = try artifacts.getOrPut(artifact.path);
+            if (entry.found_existing) return error.DuplicateTraceArtifact;
+            entry.value_ptr.* = artifact.sha256;
+        }
+        var seen = std.StringHashMap([]const u8).init(e.c.a);
+        var roles = std.StringHashMap(void).init(e.c.a);
+        var kept: std.ArrayList(p.Retained) = .empty;
+        for (group.retained) |row| {
+            if (artifacts.get(row.path)) |hash| {
+                if (!std.mem.eql(u8, row.sha256, hash)) return error.RetainedArtifactHashMismatch;
+                continue;
+            }
+            const entry = try seen.getOrPut(row.path);
+            if (entry.found_existing) {
+                if (!std.mem.eql(u8, entry.value_ptr.*, row.sha256)) return error.EvidenceHashMismatch;
+            } else {
+                entry.value_ptr.* = row.sha256;
+            }
+            // A canonical build receipt is both build and source evidence.
+            // Preserve distinct roles even when the path and hash coincide.
+            const role_key = try e.c.fmt("{s}\n{s}", .{ row.path, @tagName(row.role) });
+            if ((try roles.getOrPut(role_key)).found_existing) continue;
+            try kept.append(e.c.a, row);
+        }
+        group.retained = kept.items;
+    }
+    return groups.items;
 }
 
 pub fn caches(e: *core.Engine, plan_path: []const u8, reason: []const u8) !void {

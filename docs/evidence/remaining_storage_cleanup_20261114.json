@@ -1,0 +1,373 @@
+{
+  "schema": "zllvm-remaining-storage-resolution-v1",
+  "status": "complete",
+  "date": "2026-11-14",
+  "scope": "Resolve reviewed duplicate inputs, historical product pins and self-rebuild traces; document concrete remaining consumers and proof gaps",
+  "source_parent": "8d82c533133ea4774db79086c1b3cceafe005e65",
+  "evidence_root": "local-state/storage-cleanup/remaining-storage-20261114",
+  "inventory": {
+    "before": {
+      "allocated_bytes": 84059295744,
+      "unresolved_bytes": 60517105664,
+      "required_by_current_contract_bytes": 23542190080
+    },
+    "after": {
+      "allocated_bytes": 78136582144,
+      "unresolved_bytes": 54594428928,
+      "required_by_current_contract_bytes": 23542153216,
+      "eligible_bytes": 0,
+      "paths": 1759286,
+      "unique_inodes": 1750089,
+      "foreign_device_entries": 0,
+      "vanished_entries": 0
+    },
+    "observed_reduction_bytes": 5922713600,
+    "existing_payload_reclaimed_bytes": 5953155072,
+    "other_net_allocation_change_bytes": 30441472,
+    "note": "Payload savings exclude task-created scratch. Inventory reduction also reflects new audit records and other allocations. Unresolved bytes are not classified as necessary."
+  },
+  "shared_inputs": {
+    "old_inode_groups_retired": 7,
+    "paths_preserved": 10,
+    "held_inode_groups": 17,
+    "held_paths": 182,
+    "removed_allocated_file_bytes": 7849791488,
+    "created_object_allocated_bytes": 3923845120,
+    "net_reclaimed_bytes": 3925946368
+  },
+  "collections": [
+    {
+      "pass": "product",
+      "report": {
+        "path": "local-state/retirements/automatic-storage-cleanup/1794691650243996868-2367554/report.json",
+        "sha256": "368d4cac53e224fafea228bd4133cd74e3cf19a2ef4ec88ff6965c2bbd3cf67d"
+      },
+      "status": "complete",
+      "removed": 33,
+      "skipped": 370,
+      "reclaimed_allocated_file_bytes": 123703296,
+      "current_integrity_verified": true
+    },
+    {
+      "pass": "fibonacci",
+      "report": {
+        "path": "local-state/retirements/automatic-storage-cleanup/1794692072138744647-2374787/report.json",
+        "sha256": "257de9fb3225740f5924bb3aec781183b81e00c31c2d7cf368ce3f205ce00270"
+      },
+      "status": "complete",
+      "removed": 5,
+      "skipped": 6,
+      "reclaimed_allocated_file_bytes": 435032064,
+      "current_integrity_verified": true
+    },
+    {
+      "pass": "trace",
+      "report": {
+        "path": "local-state/retirements/automatic-storage-cleanup/1794693275288179430-2397872/report.json",
+        "sha256": "313bd9fb62cab0b638ac071d3e00f52953765480f45b24c637f3d1a9d9c48064"
+      },
+      "status": "complete",
+      "removed": 2,
+      "skipped": 7,
+      "reclaimed_allocated_file_bytes": 1468473344,
+      "current_integrity_verified": true
+    }
+  ],
+  "trace_audit": {
+    "status": "verified",
+    "captures": 2,
+    "event_counts": [
+      135024,
+      4763096
+    ],
+    "original_producer": "whole-compiler-diagnostic-v1 self_rebuild_invocations",
+    "historical_references_transitioned": 12,
+    "original_manifests_preserved": true
+  },
+  "qualification": {
+    "collector_tests_per_mode": 196,
+    "auditor_tests_per_mode": 17,
+    "modes": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "installed_optimization": "ReleaseFast",
+    "zig": "0.17.0",
+    "general_cli_passed": true,
+    "reviewed_product_cli_passed_both_modes": true,
+    "real_grouped_trace_collection_passed": true,
+    "format_and_diff_checks_passed": true,
+    "earlier_failures": "Diagnosed fixture directories, task-owner launcher forwarding, external warmup binding and retained-role deduplication; original failure receipts remain"
+  },
+  "task_storage": {
+    "workspaces_removed": 7,
+    "workspace_allocated_bytes_removed": 733077504,
+    "bootstrap_allocated_bytes_removed": 117972992,
+    "excluded_from_existing_payload_savings": true,
+    "evidence_promoted_with_byte_comparison": true,
+    "scratch_absent": true,
+    "pending_transaction": false
+  },
+  "final_integrity": {
+    "status": "passed",
+    "current_contracts": 6,
+    "accepted_external_artifacts": 4,
+    "removed_paths_absent": 40,
+    "retained_identities_verified": 512,
+    "shared_input_paths_verified": 10,
+    "manual_holds_unchanged": 517,
+    "policy_unchanged": true,
+    "original_trace_manifests_unchanged": true,
+    "accepted_fibonacci_compiler_unchanged": true,
+    "installed_tools_match": true,
+    "compiled_sources_match": true,
+    "pending_transaction": false,
+    "task_scratch_absent": true
+  },
+  "remaining_review_cases": [
+    {
+      "family": "Independently held duplicate inputs",
+      "paths": 182,
+      "inode_groups": 17,
+      "release_condition": "Resolve each manual/job/release owner and writable-consumer expectation before migration"
+    },
+    {
+      "family": "Interrupted v854 event trace",
+      "allocated_bytes": 1263316992,
+      "producer_outcome": "supervision_failed, returncode -9, no terminal backend report",
+      "release_condition": "Diagnose the partial stream and publish a diagnostic-retirement decision; do not substitute a successful complete-stream audit"
+    },
+    {
+      "family": "Unaliased artifact objects",
+      "files": 3599,
+      "allocated_bytes": 678174720,
+      "consumer": "Five committed artifact manifests reference every object hash",
+      "release_condition": "Review original input, diagnostic and archive contracts before changing the manifests"
+    },
+    {
+      "family": "Historical per-instruction census",
+      "allocated_bytes": 326066176,
+      "consumer": "Batch-03 acceptance seal; no current code consumer found",
+      "release_condition": "Review accepted summary and transition detailed census retention"
+    },
+    {
+      "family": "Automatic cleanup reports and records",
+      "consumer": "Compiler/source retirement proof chains plus repeated reports and inventories",
+      "release_condition": "Compact with reference-aware archival; distinguish proof records from repeated reports"
+    },
+    {
+      "family": "Throughput pipeline workspaces",
+      "count": 7,
+      "compiler_dependencies": 3,
+      "independently_maintained_object_aliases": 4,
+      "release_condition": "Resolve exact raw-event/build/measurement consumers or publish selected maintained objects before workspace release"
+    },
+    {
+      "family": "Other compiled products",
+      "consumer": "Current acceptance, replay or diagnostic contracts, independent holds, or incomplete alias groups",
+      "release_condition": "Per-path reviewed transition; no blanket historical-pin override"
+    }
+  ],
+  "evidence": {
+    "baseline_inventory": {
+      "id": "baseline_inventory",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794688188340970878-2306664/inventory.json",
+      "sha256": "3e185c2fdf9251ab96f78b4de6eb46439c50833b108f2494c80364e1feb64789"
+    },
+    "final_inventory": {
+      "id": "final_inventory",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794693597024750224-2403338/inventory.json",
+      "sha256": "ddbd84156c3ef880620c55f871eb6ca991f53e1a8fbb421c826e931216dd346d"
+    },
+    "shared_input_collection": {
+      "id": "shared_input_collection",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794691441475862837-2364005/shared-input-review.json",
+      "sha256": "66838712227f3846aad7725b372a0cf900a9c3d33c276b18207affdb89b76605"
+    },
+    "final_integrity": {
+      "id": "final_integrity",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/final-integrity.json",
+      "sha256": "f34fbf68d4e9b394c04deb4c1bf5d0c4dcf50df41d5bc076edd9ebe381b6ed8d"
+    },
+    "installed_tools": {
+      "id": "installed_tools",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/installed-tools.txt",
+      "sha256": "a8cb0082cf3a411d206eae762e1ceb434bf11b7ac940e9621e92592b63ffd815"
+    },
+    "qualified_sources": {
+      "id": "qualified_sources",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualified-sources.txt",
+      "sha256": "231d36f06f99013a501b9cf7c6c684f83ba718db96c94c280e6c424f6ebb05c3"
+    },
+    "embedded_sources": {
+      "id": "embedded_sources",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/embedded-source-identities.txt",
+      "sha256": "253c39ff5aced67b8be3bcaadd6f35a4d35e63e4e60c72f73488d069634c9620"
+    },
+    "qualified_source_patch": {
+      "id": "qualified_source_patch",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualified-source.patch",
+      "sha256": "400668c8d551fd52b214858070486cd3d30694aaed5bf7797f38c637d510e286"
+    },
+    "source_parent": {
+      "id": "source_parent",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/source-parent.txt",
+      "sha256": "dbabf38537072cb345df1b9510f6af197c0c0f52511bea787ae45a67ac42b9e5"
+    },
+    "input_plan": {
+      "id": "input_plan",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/input-plan.json",
+      "sha256": "2a596c86e6687f4eab2cfd8db13b82ed59a60374905915301d4c2d9e7c53ae4b"
+    },
+    "product_plan": {
+      "id": "product_plan",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/product-plan.json",
+      "sha256": "a9c7c4b53d9936a204c92338bf71e03420bd119ee80fde27f822192819f92e76"
+    },
+    "product_review": {
+      "id": "product_review",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/product-review.md",
+      "sha256": "01a56ab425361d819db37278135554c4e97a54a101007cab9a2ecfc4ca0d1358"
+    },
+    "fibonacci_plan": {
+      "id": "fibonacci_plan",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/fibonacci-plan.json",
+      "sha256": "b5eefbae0d261abbcc258a6748af8ae72888c04879f71fad8f8be265dc355d8b"
+    },
+    "fibonacci_review": {
+      "id": "fibonacci_review",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/fibonacci-review.md",
+      "sha256": "38bee7e3b05af5989b0230f6f15ab8b2e774498fb28cfad65c43d76a4e123d0f"
+    },
+    "trace_audit_plan": {
+      "id": "trace_audit_plan",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/trace-audit-plan.json",
+      "sha256": "e9b17c79eb6f00159c6ea540d14414896a16639ed10cd4e917cd0a5b61739e43"
+    },
+    "trace_audit_summary": {
+      "id": "trace_audit_summary",
+      "path": "local-state/retirements/native-event-audit/1794691890723626275-2371748/summary.json",
+      "sha256": "11d4b43380f6d24ae6bc9857ba35a01d9d2ccacc754c46b81627d1410e07e7cc"
+    },
+    "trace_requests": {
+      "id": "trace_requests",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794693260034092560-2397576/requests.json",
+      "sha256": "1c0fad93f35408a283920c06a30cd2ccf3864f2cf1f3fa8025e21cc93f35440a"
+    },
+    "trace_pin_review": {
+      "id": "trace_pin_review",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/trace-pin-review.md",
+      "sha256": "a8ad51884d811fe1d2814097d41a374638c18b630fccb5700e9dd5018d313f7c"
+    },
+    "trace_original_manifests": {
+      "id": "trace_original_manifests",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/trace-reviewed-manifests.json",
+      "sha256": "bae45ecfbcec03f876d44cfca5787da2438b354a9e4e33e256fa210ae376ec0e"
+    },
+    "retained_identities": {
+      "id": "retained_identities",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/retained-identities.txt",
+      "sha256": "6442265be41f5b733a0dc63fccdad629748ad03d0e72cfa74c24eb8d8b2e0e18"
+    },
+    "shared_input_identities": {
+      "id": "shared_input_identities",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/shared-input-identities.txt",
+      "sha256": "61ada2d9b14654d7cab2da60c4e220b365af7c01b5b248a54f62dad2accae834"
+    },
+    "remaining_purposes": {
+      "id": "remaining_purposes",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/remaining-purpose-review.md",
+      "sha256": "18b10db2da633ac5e0473662cf4f7965a8864e995cbd33a2da77ed1ec52f9553"
+    },
+    "qualification_disposition": {
+      "id": "qualification_disposition",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-disposition.md",
+      "sha256": "87bba7ae4085d2b97e972297bf04b95008e6eb8f5354f452e71263cc52ec309d"
+    },
+    "qualification_collection": {
+      "id": "qualification_collection",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/retirements/automatic-storage-cleanup/1794693535820698301-2402179/report.json",
+      "sha256": "3b63d44205186c9a0cc71422d739649dd3c6834afc6b788582675f7d93284966"
+    },
+    "bootstrap_retirement": {
+      "id": "bootstrap_retirement",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/bootstrap-retirement.json",
+      "sha256": "0822bb3ddc799dddb2d99265f04aa057834f42a5b83b7fadbd01b96df34c042d"
+    },
+    "qualification_closure": {
+      "id": "qualification_closure",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-closure.log",
+      "sha256": "2c8ece8292d550c7ff617a14ce911e7262fc6b2996d579c13609b256f539e2bd"
+    },
+    "collector_qualification": {
+      "id": "collector_qualification",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/collector-final-v2/qualification.json",
+      "sha256": "0b14ea82f777e479724554a93bf8c55a76a4cca0f7608f690366d0792c99dd89"
+    },
+    "auditor_qualification": {
+      "id": "auditor_qualification",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/auditor-qualification-v2/qualification.json",
+      "sha256": "c392fa6e3c5bd61280c18537a574a5c57258bf7fce526251dfc36a38bd404245"
+    },
+    "collector_debug": {
+      "id": "collector_debug",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/collector-final-v2/tests-Debug.log",
+      "sha256": "03c46cb77ff9290c06abb0818e21475975f3bec22510ea8e3a4a36bac6d10df6"
+    },
+    "collector_releasefast": {
+      "id": "collector_releasefast",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/collector-final-v2/tests-ReleaseFast.log",
+      "sha256": "03c46cb77ff9290c06abb0818e21475975f3bec22510ea8e3a4a36bac6d10df6"
+    },
+    "auditor_debug": {
+      "id": "auditor_debug",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/auditor-qualification-v2/tests-Debug.log",
+      "sha256": "5f01e5ee32bddae588cf20e785114d9df5b5951175769d3a8d08a741d2b83505"
+    },
+    "auditor_releasefast": {
+      "id": "auditor_releasefast",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/auditor-qualification-v2/tests-ReleaseFast.log",
+      "sha256": "5f01e5ee32bddae588cf20e785114d9df5b5951175769d3a8d08a741d2b83505"
+    },
+    "general_cli": {
+      "id": "general_cli",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/qualification-v2/general-cli.log",
+      "sha256": "16abf522c71d95872823dfc498f6d9deae81e11552719c3b757997b6f0e73f10"
+    },
+    "reviewed_products_cli_debug": {
+      "id": "reviewed_products_cli_debug",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/qualification-v2/reviewed-products-Debug.log",
+      "sha256": "ba2ea885f695d337d4e9f444718a8643c770fef7522119933c1af797d439279d"
+    },
+    "reviewed_products_cli_releasefast": {
+      "id": "reviewed_products_cli_releasefast",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualification-storage/local-state/validations/collector/batch-01/qualification-v2/reviewed-products-ReleaseFast.log",
+      "sha256": "ba2ea885f695d337d4e9f444718a8643c770fef7522119933c1af797d439279d"
+    },
+    "collector_build_command": {
+      "id": "collector_build_command",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualify-final.sh",
+      "sha256": "a8a9eaeaad8829aa41155366efc6acd5f45cbf2a88b297a5178bebad5a2126ba"
+    },
+    "auditor_build_command": {
+      "id": "auditor_build_command",
+      "path": "local-state/storage-cleanup/remaining-storage-20261114/qualify-auditor.sh",
+      "sha256": "b036b3dcaac779fdec7f375720361c6f84b248500d1c5ed9a0162a398cd20078"
+    },
+    "product_collection": {
+      "id": "product_collection",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794691650243996868-2367554/report.json",
+      "sha256": "368d4cac53e224fafea228bd4133cd74e3cf19a2ef4ec88ff6965c2bbd3cf67d"
+    },
+    "fibonacci_collection": {
+      "id": "fibonacci_collection",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794692072138744647-2374787/report.json",
+      "sha256": "257de9fb3225740f5924bb3aec781183b81e00c31c2d7cf368ce3f205ce00270"
+    },
+    "trace_collection": {
+      "id": "trace_collection",
+      "path": "local-state/retirements/automatic-storage-cleanup/1794693275288179430-2397872/report.json",
+      "sha256": "313bd9fb62cab0b638ac071d3e00f52953765480f45b24c637f3d1a9d9c48064"
+    }
+  }
+}

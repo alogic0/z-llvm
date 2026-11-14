@@ -1,4 +1,4 @@
-//! Explicit migration of complete IR inode groups to immutable shared storage.
+//! Explicit migration of complete IR/AIR inode groups to immutable shared storage.
 //! Names and bytes remain available; only redundant allocated data is retired.
 const std = @import("std");
 const core = @import("engine.zig");
@@ -12,12 +12,27 @@ pub const Plan = struct { schema: []const u8 = "zllvm-shared-inputs-v1", inputs:
 const Group = struct { metadata: fa.Metadata, sha256: []const u8, indexes: std.ArrayList(usize) = .empty, status: []const u8 = "review", reclaimed_file_bytes: u64 = 0 };
 const Move = struct { path: []const u8, backup: []const u8, temporary: []const u8, parent_mode: u32 };
 
+pub fn scope(path: []const u8) bool {
+    if (!p.relative(path) or !(std.mem.endsWith(u8, path, ".ll") or std.mem.endsWith(u8, path, ".air"))) return false;
+    return p.validationOutput(path) or std.mem.startsWith(u8, path, "local-state/inputs/") or
+        std.mem.startsWith(u8, path, "local-state/caches/");
+}
+
+/// Only generic policy roots are excepted for this byte-preserving operation.
+/// An explicit hold, queued job or more specific policy entry still wins.
+pub fn genericPolicyRoot(path: []const u8) bool {
+    return std.mem.eql(u8, path, "local-state/inputs") or std.mem.eql(u8, path, "local-state/caches");
+}
+
 /// Older validation trees omit the batch level. Inventory bucket depth is not
 /// a consumer boundary: a queued parent job may not yet have opened its input.
 pub fn consumerRoot(path: []const u8) []const u8 {
     var parts = std.mem.splitScalar(u8, path, '/');
     for (0..3) |_| _ = parts.next() orelse return path;
+    const family_end = parts.index orelse return std.fs.path.dirname(path) orelse path;
+    if (!std.mem.startsWith(u8, path, "local-state/validations/")) return path[0 .. family_end - 1];
     const fourth = parts.next() orelse return path;
+    if (parts.index == null) return path[0 .. family_end - 1];
     if (std.mem.eql(u8, fourth, "batch") or std.mem.startsWith(u8, fourth, "batch-")) _ = parts.next() orelse return path;
     const end = parts.index orelse return path;
     return path[0 .. end - 1];
@@ -156,7 +171,7 @@ pub fn run(e: *core.Engine, plan_path: []const u8, apply: bool) !void {
     for (plan.value.inputs) |family| {
         if (!p.hash(family.sha256)) return error.InvalidSharedInputPlan;
         for (family.paths) |path| {
-            if (seen.count() >= 2048 or !p.candidate(path) or !std.mem.endsWith(u8, path, ".ll") or seen.contains(path)) return error.InvalidSharedInputPlan;
+            if (seen.count() >= 16_384 or !scope(path) or seen.contains(path)) return error.InvalidSharedInputPlan;
             try seen.put(path, {});
             const m = try e.metadata(path);
             if (m.kind != .file or m.uid != std.os.linux.getuid() or m.mode & 0o111 != 0) return error.InvalidSharedInput;
@@ -171,7 +186,7 @@ pub fn run(e: *core.Engine, plan_path: []const u8, apply: bool) !void {
                 try groups.append(e.c.a, .{ .metadata = m, .sha256 = try e.c.a.dupe(u8, family.sha256) });
             }
             const index = e.actions.items.len;
-            try e.actions.append(e.c.a, .{ .path = try e.c.a.dupe(u8, path), .run_root = try e.c.a.dupe(u8, consumerRoot(path)), .producer = plan_path, .kind = .build_output, .status = .ready, .sha256 = groups.items[group_index.?].sha256, .metadata = m });
+            try e.actions.append(e.c.a, .{ .path = try e.c.a.dupe(u8, path), .run_root = try e.c.a.dupe(u8, consumerRoot(path)), .producer = plan_path, .kind = .build_output, .status = .ready, .sha256 = groups.items[group_index.?].sha256, .metadata = m, .shared_input = true });
             try groups.items[group_index.?].indexes.append(e.c.a, index);
         }
     }
