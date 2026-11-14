@@ -20,6 +20,18 @@ the project policy under `local-state/validations/`. Existing mixed runs and
 standalone outputs keep their original paths and retention rules. There is no
 bulk move of historical files or rewrite of current manifests.
 
+For a sibling source checkout, use `tools/run-validation --project-root SOURCE
+--storage-root OWNER ...`. The owner must contain the project storage policy and
+collector. `ZLLVM_PROJECT_ROOT` remains the source and command working directory;
+`ZLLVM_STORAGE_ROOT` selects the evidence, workspace, lease and job-record owner.
+The launcher requires managed output under the owner's
+`local-state/validations/SUITE/BATCH/RUN` and rejects a silent fallback into mixed
+storage. Child tools inherit this requirement. External source paths in job
+records describe the command identity and never extend collection scope.
+See [the launcher example](validation_tools.md#launch-current-tools-with-another-source-checkout)
+for relative-path rules. Existing direct tool invocations retain their optional
+layout unless they set `ZLLVM_REQUIRE_MANAGED_STORAGE=1`.
+
 `run_checked` gives commands `ZLLVM_TEMP_ROOT` and defaults `TMPDIR`,
 `ZIG_LOCAL_CACHE_DIR` and `ZIG_GLOBAL_CACHE_DIR` to that workspace. Explicit cache
 environment variables and command-line paths remain caller-owned overrides.

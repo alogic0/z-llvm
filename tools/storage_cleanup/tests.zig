@@ -2180,3 +2180,92 @@ test "storage cleanup: reopening a compiler cannot overwrite unresolved failure 
     try t.expectError(error.WorkspaceNotReusable, workspace.compiler(&f.c, root));
     try t.expectEqualStrings(hash, try f.c.digest(w.record_path));
 }
+
+test "storage cleanup: external source checkout uses its explicit owner's workspace and terminal job" {
+    const lifecycle = @import("../validation/storage_lifecycle.zig");
+    const jobs = @import("jobs.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    const source = try Fixture.init();
+    defer source.deinit();
+    const initial = try workspaceFixture(f, true);
+    initial.close(&f.c);
+    const copied = try workspaceFixture(source, true);
+    copied.close(&source.c);
+    const owner = f.c.root;
+    const evidence = try f.c.join(&.{run ++ "/external"});
+    try f.c.env.put("ZLLVM_STORAGE_ROOT", owner);
+    try f.c.env.put("ZLLVM_REQUIRE_MANAGED_STORAGE", "1");
+    f.c.root = source.c.root;
+    defer f.c.root = owner;
+    try t.expectEqualStrings(owner, (try lifecycle.projectRoot(&f.c)).?);
+    _ = try f.c.newOutput(evidence);
+    const result_path = try f.c.fmt("{s}/run.json", .{evidence});
+    const session = (try lifecycle.start(&f.c, evidence, result_path, 1)).?;
+    defer session.close(&f.c);
+    try t.expectEqualStrings(source.c.root, session.job.external_working_directory.?);
+    const w = (try workspace.start(&f.c, evidence, "check")).?;
+    defer w.close(&f.c);
+    var env = try f.c.cleanEnvironment();
+    try workspace.exportPaths(&f.c, &env);
+    try t.expectEqualStrings(owner, env.get("ZLLVM_STORAGE_ROOT").?);
+    try t.expectEqualStrings("1", env.get("ZLLVM_REQUIRE_MANAGED_STORAGE").?);
+    f.c.env = env;
+    f.c.workspace_paths = null;
+    try workspace.adopt(&f.c);
+    const product = try f.c.temporaryPath(&.{ evidence, "subject.o" });
+    try t.expect(p.within(owner, product));
+    try t.expect(!p.within(source.c.root, product));
+    try f.c.write(product, "temporary object");
+    try f.c.writeJson(result_path, .{ .status = "finished", .outcome = "completed", .returncode = 0, .actual_returncode = 0, .started_ns = 1, .finished_ns = 2, .cwd = source.c.root });
+    try w.finish(&f.c, result_path, &.{});
+    try session.finish(&f.c);
+    f.c.root = owner;
+    const saved = try std.json.parseFromValue(lifecycle.Job, f.c.a, try f.c.load(session.path), .{});
+    var e = f.engine();
+    try t.expect(try jobs.validate(&e, saved.value));
+    try jobs.scan(&e, true); // does not infer ownership of the external checkout's caches
+    try f.c.writeJson(result_path, .{ .status = "finished", .outcome = "completed", .actual_returncode = 0, .started_ns = 1, .finished_ns = 2, .cwd = owner });
+    var wrong = saved.value;
+    wrong.producer.sha256 = try f.c.digest(result_path);
+    var fresh = f.engine();
+    try t.expectError(error.CacheWorkingDirectoryMismatch, jobs.validate(&fresh, wrong));
+}
+
+test "storage cleanup: managed admission rejects source outputs and symlink escapes before creation" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const source = try Fixture.init();
+    defer source.deinit();
+    const initial = try workspaceFixture(f, true);
+    initial.close(&f.c);
+    const owner = f.c.root;
+    try f.c.env.put("ZLLVM_STORAGE_ROOT", owner);
+    try f.c.env.put("ZLLVM_REQUIRE_MANAGED_STORAGE", "1");
+    f.c.root = source.c.root;
+    const bad = try source.c.join(&.{"local-state/isolated-validations/run"});
+    try t.expectError(error.ValidationFailed, f.c.newOutput(bad));
+    try t.expect(!u.exists(f.c.io, bad));
+    try t.expectError(error.ValidationFailed, workspace.start(&f.c, bad, "validation"));
+    const alias = try f.c.fmt("{s}/{s}/source-link", .{ owner, run });
+    try std.Io.Dir.cwd().symLink(f.c.io, source.c.root, alias, .{});
+    try t.expectError(error.ValidationFailed, f.c.newOutput(try f.c.fmt("{s}/escaped", .{alias})));
+    try t.expect(!u.exists(f.c.io, try source.c.join(&.{"escaped"})));
+    try f.c.env.put("ZLLVM_STORAGE_ROOT", source.c.root);
+    try t.expectError(error.InvalidStorageOwner, f.c.newOutput(bad));
+}
+
+test "storage cleanup: external job source identities cannot become relative deletion scopes" {
+    const lifecycle = @import("../validation/storage_lifecycle.zig");
+    const jobs = @import("jobs.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    var job: lifecycle.Job = .{ .run_root = run, .working_directory = ".", .external_working_directory = "../source", .producer = .{ .path = report, .sha256 = "" }, .started_ns = 1 };
+    try t.expectError(error.InvalidStorageJob, jobs.validate(&e, job));
+    job.external_working_directory = "/tmp/source/../other";
+    try t.expectError(error.InvalidStorageJob, jobs.validate(&e, job));
+    job.external_working_directory = "/tmp/source";
+    job.working_directory = run;
+    try t.expectError(error.InvalidStorageJob, jobs.validate(&e, job));
+}

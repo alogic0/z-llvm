@@ -381,6 +381,10 @@ pub fn build(b: *std.Build) void {
     storage_workspace_tests.addArtifactArg(storage_cleanup);
     storage_workspace_tests.addArtifactArg(storage_checked_runner);
     storage_cleanup_test_step.dependOn(&storage_workspace_tests.step);
+    const storage_worktree_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/worktree_cli_tests.sh" });
+    storage_worktree_tests.addArtifactArg(storage_cleanup);
+    storage_worktree_tests.addArtifactArg(storage_checked_runner);
+    storage_cleanup_test_step.dependOn(&storage_worktree_tests.step);
     const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
         .target = b.graph.host,

@@ -66,8 +66,7 @@ pub fn compiler(c: *u.Context, evidence: []const u8) !?Workspace {
 }
 
 fn startOwned(c: *u.Context, evidence: []const u8, key: []const u8, lifetime: @FieldType(paths.Record, "lifetime"), reopen: bool) !?Workspace {
-    const project = (try lifecycle.projectRoot(c)) orelse return null;
-    if (evidence.len <= project.len or !p.within(project, evidence) or !p.candidate(evidence[project.len + 1 ..])) return null;
+    const project = (try lifecycle.outputRoot(c, evidence)) orelse return null;
     const relative = evidence[project.len + 1 ..];
     var evidence_dir = try store.openDirectory(c.io, evidence, false);
     evidence_dir.close(c.io);
@@ -139,6 +138,8 @@ pub fn inspect(c: *u.Context, evidence: []const u8, key: []const u8) !?paths.Pat
 /// arbitrary deletion root. The parent retains its lease until they complete.
 pub fn exportPaths(c: *u.Context, env: *std.process.Environ.Map) !void {
     if (c.workspace_paths) |mapping| {
+        try env.put("ZLLVM_STORAGE_ROOT", (try lifecycle.projectRoot(c)) orelse return error.InvalidStorageOwner);
+        if (try lifecycle.requireManaged(c)) try env.put("ZLLVM_REQUIRE_MANAGED_STORAGE", "1");
         try env.put("ZLLVM_EVIDENCE_ROOT", mapping.evidence);
         try env.put("ZLLVM_TEMPORARY_ROOT", mapping.temporary);
     }

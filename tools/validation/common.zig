@@ -133,7 +133,8 @@ pub const Context = struct {
     pub fn cleanEnvironment(c: Context) !std.process.Environ.Map {
         var env = std.process.Environ.Map.init(c.a);
         for (c.env.keys(), c.env.values()) |key, value| {
-            if (!std.mem.startsWith(u8, key, "ZLLVM_") and !std.mem.startsWith(u8, key, "ZIG_USE_ZLLVM")) try env.put(key, value);
+            if ((!std.mem.startsWith(u8, key, "ZLLVM_") and !std.mem.startsWith(u8, key, "ZIG_USE_ZLLVM")) or
+                std.mem.eql(u8, key, "ZLLVM_STORAGE_ROOT") or std.mem.eql(u8, key, "ZLLVM_REQUIRE_MANAGED_STORAGE")) try env.put(key, value);
         }
         return env;
     }
@@ -165,7 +166,13 @@ pub const Context = struct {
 
     pub fn ownedPath(c: *Context, name: []const u8) ![]const u8 {
         const resolved = try c.resolveParent(name);
-        if (!isWithin(c.root, resolved) or std.mem.eql(u8, c.root, resolved)) return c.fail("evidence must stay in a new path inside the project", .{});
+        const storage = @import("storage_lifecycle.zig");
+        if (try storage.requireManaged(c)) {
+            _ = try storage.outputRoot(c, resolved);
+        } else if (!isWithin(c.root, resolved) or std.mem.eql(u8, c.root, resolved)) {
+            if (c.env.get("ZLLVM_STORAGE_ROOT") == null or (try storage.outputRoot(c, resolved)) == null)
+                return c.fail("evidence must stay inside the source project or the explicit owner's managed validation roots", .{});
+        }
         return resolved;
     }
 

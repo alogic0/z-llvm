@@ -11,6 +11,8 @@ pub const Job = struct {
     state: enum { running, finished } = .running,
     run_root: []const u8,
     working_directory: []const u8,
+    // Source checkout identity only; never a collector deletion root.
+    external_working_directory: ?[]const u8 = null,
     producer: p.Evidence,
     started_ns: i128,
 };
@@ -35,6 +37,15 @@ pub const Session = struct {
 };
 
 pub fn projectRoot(c: *u.Context) !?[]const u8 {
+    if (c.env.get("ZLLVM_STORAGE_ROOT")) |selected| {
+        if (!std.fs.path.isAbsolute(selected)) return error.InvalidStorageOwner;
+        const owner = try std.Io.Dir.cwd().realPathFileAlloc(c.io, selected, c.a);
+        var directory = try store.openDirectory(c.io, owner, false);
+        directory.close(c.io);
+        if (!u.exists(c.io, try c.fmt("{s}/docs/storage_cleanup_policy.json", .{owner})) or
+            !u.exists(c.io, try c.fmt("{s}/tools/clean-storage", .{owner}))) return error.InvalidStorageOwner;
+        return owner;
+    }
     var root: ?[]const u8 = c.root;
     var found: ?[]const u8 = null;
     while (root) |path| : (root = std.fs.path.dirname(path)) {
@@ -49,9 +60,27 @@ pub fn projectRoot(c: *u.Context) !?[]const u8 {
     return found;
 }
 
+pub fn requireManaged(c: *u.Context) !bool {
+    const value = c.env.get("ZLLVM_REQUIRE_MANAGED_STORAGE") orelse return false;
+    if (std.mem.eql(u8, value, "1")) return true;
+    if (std.mem.eql(u8, value, "0")) return false;
+    return error.InvalidManagedStorageSetting;
+}
+
+/// Admission is independent of cwd. A managed launch never silently falls back
+/// to a mixed output directory, including through a nested tool.
+pub fn outputRoot(c: *u.Context, output: []const u8) !?[]const u8 {
+    const owner = try projectRoot(c);
+    if (owner) |root| {
+        if (output.len > root.len and p.within(root, output) and p.candidate(output[root.len + 1 ..])) return root;
+    }
+    if (try requireManaged(c)) return c.fail("managed output must be under {s}/local-state/validations/SUITE/BATCH/RUN; got {s}", .{ owner orelse "STORAGE_OWNER", output });
+    return null;
+}
+
 pub fn start(c: *u.Context, output: []const u8, producer: []const u8, started_ns: i128) !?Session {
-    const root = (try projectRoot(c)) orelse return null;
-    if (!p.within(root, output) or !p.within(output, producer)) return null;
+    const root = (try outputRoot(c, output)) orelse return null;
+    if (!p.within(output, producer)) return error.InvalidWorkspaceEvidence;
     const run = if (p.within(try c.fmt("{s}/local-state/validations", .{root}), c.root)) c.root else output;
     const run_relative = run[root.len + 1 ..];
     if (!p.candidate(run_relative)) return null;
@@ -67,7 +96,8 @@ pub fn start(c: *u.Context, output: []const u8, producer: []const u8, started_ns
         .path = try c.fmt("{s}/{s}/{d}-{d}.json", .{ root, jobs_directory, started_ns, std.os.linux.getpid() }),
         .job = .{
             .run_root = run_relative,
-            .working_directory = if (std.mem.eql(u8, c.root, root)) "." else c.root[root.len + 1 ..],
+            .working_directory = if (std.mem.eql(u8, c.root, root) or !p.within(run, c.root)) "." else c.root[root.len + 1 ..],
+            .external_working_directory = if (std.mem.eql(u8, c.root, root) or p.within(run, c.root)) null else c.root,
             .producer = .{ .path = producer[root.len + 1 ..], .sha256 = "" },
             .started_ns = started_ns,
         },
@@ -81,6 +111,7 @@ pub fn start(c: *u.Context, output: []const u8, producer: []const u8, started_ns
 /// A failed hook preserves the producer result and leaves durable job evidence.
 pub fn collect(c: *u.Context, root: []const u8, code: u8) void {
     c.env.put("ZLLVM_PROJECT_ROOT", root) catch return;
+    for ([_][]const u8{ "ZLLVM_REQUIRE_MANAGED_STORAGE", "ZLLVM_EVIDENCE_ROOT", "ZLLVM_TEMPORARY_ROOT", "ZLLVM_TEMP_ROOT" }) |key| _ = c.env.swapRemove(key);
     const argv = [_][]const u8{
         c.fmt("{s}/tools/clean-storage", .{root}) catch return,
         "__finish-job",

@@ -8,6 +8,10 @@ pub fn validate(e: *core.Engine, job: lifecycle.Job) !bool {
     if (!std.mem.eql(u8, job.schema, "zllvm-storage-job-v1") or !p.candidate(job.run_root) or
         !p.within(job.run_root, job.producer.path) or !p.relative(job.producer.path) or job.started_ns <= 0 or
         (!std.mem.eql(u8, job.working_directory, ".") and (!p.candidate(job.working_directory) or !p.within(job.run_root, job.working_directory)))) return error.InvalidStorageJob;
+    if (job.external_working_directory) |cwd| {
+        if (!std.mem.eql(u8, job.working_directory, ".") or !std.fs.path.isAbsolute(cwd) or
+            !std.mem.eql(u8, cwd, try std.fs.path.resolve(e.c.a, &.{cwd}))) return error.InvalidStorageJob;
+    }
     if (job.state == .running) return false;
     try e.check(job.producer);
     var parsed = try e.load(e.c.gpa, job.producer.path);
@@ -16,7 +20,7 @@ pub fn validate(e: *core.Engine, job: lifecycle.Job) !bool {
     if (!core.eq(v, "status", "finished") or (!core.eq(v, "outcome", "completed") and !core.eq(v, "outcome", "canceled")) or
         try core.integer(v, "started_ns") != job.started_ns or try core.integer(v, "finished_ns") <= job.started_ns) return error.StorageJobNotTerminal;
     _ = try core.integer(v, "actual_returncode");
-    const cwd = if (std.mem.eql(u8, job.working_directory, ".")) e.c.root else try e.absolute(job.working_directory);
+    const cwd = job.external_working_directory orelse if (std.mem.eql(u8, job.working_directory, ".")) e.c.root else try e.absolute(job.working_directory);
     if (!core.eq(v, "cwd", cwd)) return error.CacheWorkingDirectoryMismatch;
     return true;
 }
@@ -37,7 +41,9 @@ pub fn scan(e: *core.Engine, discover: bool) !void {
         }
         if (!discover) continue;
         try e.addControl(job.producer.path);
-        const request = @import("private_cache.zig").request(e, .{
+        // External source trees and explicit shared caches stay caller-owned.
+        // Their default caches are inside the separately verified workspace.
+        const request = if (job.external_working_directory != null) null else @import("private_cache.zig").request(e, .{
             .producer = job.producer.path,
             .run_root = job.run_root,
             .working_directory = job.working_directory,

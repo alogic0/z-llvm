@@ -38,6 +38,7 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     var record = u.object(c.a);
     try u.put(c.a, &record, "argv", try u.strings(c.a, args[4..]));
     try u.put(c.a, &record, "cwd", u.s(c.root));
+    if (c.env.get("ZLLVM_STORAGE_ROOT")) |owner| try u.put(c.a, &record, "storage_owner", u.s(owner));
     try u.put(c.a, &record, "status", u.s("running"));
     try u.put(c.a, &record, "started_ns", u.n(std.Io.Clock.real.now(c.io).nanoseconds));
     try u.put(c.a, &record, "samples", u.array(c.a));

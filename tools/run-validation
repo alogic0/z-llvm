@@ -3,30 +3,52 @@
 set -euo pipefail
 validation_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 validation_project=$validation_source
-if [[ ${1:-} == --project-root ]]; then
-    if [[ $# -lt 2 ]]; then printf '%s\n' '--project-root requires a directory' >&2; exit 2; fi
-    validation_project=$(realpath -- "$2")
+validation_storage=$validation_source
+while [[ ${1:-} == --project-root || ${1:-} == --storage-root ]]; do
+    if [[ $# -lt 2 ]]; then printf '%s requires a directory\n' "$1" >&2; exit 2; fi
+    if [[ $1 == --project-root ]]; then validation_project=$(realpath -- "$2"); else validation_storage=$(realpath -- "$2"); fi
     shift 2
-fi
+done
 if [[ $# -lt 4 || $1 != --output-root ]]; then
-    printf 'usage: tools/run-validation [--project-root DIR] --output-root DIR LABEL TOOL [ARG...]\n' >&2
+    printf 'usage: tools/run-validation [--project-root DIR] [--storage-root DIR] --output-root DIR LABEL TOOL [ARG...]\n' >&2
     exit 2
 fi
 validation_output=$2
+if [[ $validation_output != /* ]]; then validation_output=$validation_storage/$validation_output; fi
+validation_output=$(realpath -m -- "$validation_output")
 validation_label=$3
 validation_tool=$4
 shift 4
+if [[ ! -f $validation_storage/docs/storage_cleanup_policy.json || ! -f $validation_storage/tools/clean-storage ]]; then
+    printf 'invalid storage owner: %s\n' "$validation_storage" >&2; exit 2
+fi
+if [[ $validation_output != "$validation_storage"/local-state/validations/*/*/* || ! $validation_label =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    printf 'managed output must be under %s/local-state/validations/SUITE/BATCH/RUN; got %s\n' "$validation_storage" "$validation_output" >&2; exit 2
+fi
 if [[ ! $validation_tool =~ ^[a-zA-Z0-9_]+$ || ! -f $validation_source/tools/$validation_tool.zig ]]; then
     printf 'unknown validation tool: %s\n' "$validation_tool" >&2
     exit 2
 fi
 validation_zig=${ZIG:-zig}
-validation_bootstrap=$validation_source/local-state/tmp/validation-tools
-for validation_dir in "$validation_source/local-state" "$validation_source/local-state/tmp" "$validation_bootstrap" "$validation_bootstrap/local-cache" "$validation_bootstrap/global-cache"; do
+validation_bootstrap=$validation_storage/local-state/tmp/validation-tools
+for validation_dir in "$validation_storage/local-state" "$validation_storage/local-state/tmp" "$validation_bootstrap" "$validation_bootstrap/local-cache" "$validation_bootstrap/global-cache"; do
     if [[ -L $validation_dir ]]; then printf 'refusing symlink: %s\n' "$validation_dir" >&2; exit 2; fi
     mkdir -p -- "$validation_dir"
 done
 export ZLLVM_PROJECT_ROOT=$validation_project
-exec "$validation_zig" run -O ReleaseFast --cache-dir "$validation_bootstrap/local-cache" --global-cache-dir "$validation_bootstrap/global-cache" \
-    "$validation_source/tools/run_checked.zig" -- --output-root "$validation_output" "$validation_label" -- \
+export ZLLVM_STORAGE_ROOT=$validation_storage
+export ZLLVM_REQUIRE_MANAGED_STORAGE=1
+for validation_file in "$validation_bootstrap/build.lock" "$validation_bootstrap/run-checked" "$validation_bootstrap/run-checked.new"; do
+    if [[ -L $validation_file ]]; then printf 'refusing symlink: %s\n' "$validation_file" >&2; exit 2; fi
+done
+exec 9> "$validation_bootstrap/build.lock"
+flock --exclusive 9
+"$validation_zig" build-exe -O ReleaseFast --cache-dir "$validation_bootstrap/local-cache" --global-cache-dir "$validation_bootstrap/global-cache" \
+    "$validation_source/tools/run_checked.zig" -femit-bin="$validation_bootstrap/run-checked.new"
+mv -- "$validation_bootstrap/run-checked.new" "$validation_bootstrap/run-checked"
+flock --unlock 9
+exec 9>&-
+# A waiting `zig run` parent retains the output path in its argv and looks like
+# a live consumer during the checked runner's completion collection.
+exec "$validation_bootstrap/run-checked" --output-root "$validation_output" "$validation_label" -- \
     "$validation_zig" run -O ReleaseFast "$validation_source/tools/$validation_tool.zig" -- "$@"

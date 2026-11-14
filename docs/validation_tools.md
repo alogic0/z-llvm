@@ -464,23 +464,39 @@ procedure; cross-engine differences do not establish a compiler speedup. Compile
 build time, links and verification remain outside the measured IR-to-object
 interval. The adoption checks exercise timeout handling but do not rerun the
 performance matrix or claim a speedup.
-## Launch current tools with copied test inputs
+## Launch current tools with another source checkout
 
-Use the tracked launcher when a validation project contains copied fixtures:
+Use the tracked launcher for copied fixtures or a sibling Git worktree. Select
+the source project and storage owner independently:
 
 ```sh
 ZIG=/home/oleg/.zig/0.17.0/files/zig tools/run-validation \
-  --project-root /absolute/copied/project \
-  --output-root /absolute/copied/project/evidence native-check run_native_canary \
-  --output-root /absolute/copied/project/evidence/native \
+  --project-root /absolute/source-worktree \
+  --storage-root /absolute/storage-owner \
+  --output-root local-state/validations/example/batch-01/check native-check run_native_canary \
+  --output-root /absolute/storage-owner/local-state/validations/example/batch-01/check/native \
   --population module_dependencies --mode ReleaseFast --zllvm /absolute/compiler
 ```
 
 The launcher compiles the current checkout's checked runner and selected tool in
-ReleaseFast mode.
-`ZLLVM_PROJECT_ROOT` selects the inputs; it does not select frozen tool sources.
-The checked child uses its workspace for default caches and temporary files.
-The launcher's reusable bootstrap cache lives in `local-state/tmp/validation-tools`.
-Explicit cache environment overrides still take precedence. Running a previously
+ReleaseFast mode. `--project-root` / `ZLLVM_PROJECT_ROOT` selects the inputs and
+command working directory; it does not select frozen tool sources.
+`--storage-root` defaults to the launcher's checkout and exports
+`ZLLVM_STORAGE_ROOT`. The launcher's relative output root is resolved against
+that owner. Pass absolute owner paths to child tools, whose relative arguments
+still resolve against the source project.
+
+The launcher sets `ZLLVM_REQUIRE_MANAGED_STORAGE=1`: its output and child output
+roots must be under the owner's `local-state/validations/SUITE/BATCH/RUN`.
+Unmanaged paths and symlink escapes fail before output creation or execution.
+The checked child uses the owner's workspace for default caches and temporary
+files, and the collector records the external source directory only as job
+identity. It never treats that directory as a deletion root. The owner's
+reusable bootstrap cache lives in `local-state/tmp/validation-tools`.
+The launcher builds the checked runner under a bootstrap lock and executes it
+directly, so a waiting `zig run` parent cannot falsely hold completed output
+during collection.
+Explicit cache environment overrides still take precedence and remain
+caller-owned; omit them when using the workspace defaults. Running a previously
 cached executable or `zig run` against a frozen checkout keeps that old tool's
 behavior; updating the main checkout alone cannot migrate such jobs.
