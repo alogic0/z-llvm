@@ -24,6 +24,12 @@ reuse. `docs/working-cycle.md` applies that policy to worker mechanics and
 active goal selection. Historical roadmap wording does not override either
 file.
 
+Every cycle also follows the [development storage contract](development_storage.md).
+Before execution, name its evidence root, temporary producers, retained
+dependencies and release conditions in the plan. Use the managed launcher for
+custom commands as well as maintained tools. Close temporary pipelines and
+record remaining consumers before reporting the cycle complete.
+
 ## Work Selection Priority
 
 Pick work in this order:
@@ -115,6 +121,9 @@ Mode/target/stage row:
 Upstream mapping:
 Known boundary:
 Validation gate:
+Storage roots and temporary producers:
+Retained exceptions, consumers and release conditions:
+Storage closure receipt:
 Commit:
 ```
 

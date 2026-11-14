@@ -25,16 +25,21 @@ One cycle means:
 
 1.  Confirm the explicitly authorized goal through the Goal Selection rules
     below.
-2.  Implement only that checklist item.
+2.  Declare the cycle's evidence root, temporary producers and retained
+    exceptions under the [development storage contract](development_storage.md),
+    then implement only that checklist item.
 3.  Select and record the validation tier per the authoritative
     [`docs/validation_tiers.md`](validation_tiers.md), then run it:
     focused commits pass their change-impact gate; capability-closing,
     ratchet-moving, ABI-affecting, and milestone commits pass
     `distribution-all`.
-4.  Save important logs under `tmp/`.
+4.  Save commands, outcomes and diagnostic logs under the maintained run root.
+    Put ordinary build products in managed temporary workspaces; custom scripts
+    use `tools/run-validation ... --command ...`.
 5.  Update docs, counters, or readiness notes when ownership or evidence
     changes.
-6.  Commit the completed goal.
+6.  Close completed temporary pipelines, record remaining consumers and cleanup
+    receipts, then commit the completed goal.
 7.  Confirm `git status --short` is clean.
 8.  Report the cycle result.
 9.  Start a successor only when the same directive explicitly authorizes it;
@@ -78,7 +83,7 @@ At the start of every cycle:
 3.  Read `docs/roadmap/convergence_progress.md` for historical progress and
     ranking context only.
 4.  Check the latest tracked evidence summaries under `docs/evidence/` (and
-    saved logs under `tmp/` for the current cycle only).
+    the current cycle's maintained run logs).
 5.  Start only the action explicitly authorized by the controlling Active
     inbox directive or `docs/next_steps.md`. If neither authorizes an action,
     stop. A failing `distribution-real-rows` entry, a failing real-program
@@ -400,11 +405,12 @@ minimum validation is:
 
 ```text
 zig build test
-focused row/case/family gate > tmp/<family>_<item>_<gate>.log 2>&1
+tools/run-validation --output-root local-state/validations/FAMILY/BATCH/RUN gate --command YOUR_FOCUSED_COMMAND ARGUMENTS
 git diff --check
 ```
 
-Use stable, descriptive `tmp/` log names. Do not create new counter logs just
+The managed launcher retains the command log and terminal receipt under the run
+root. Use fresh run names for new attempts. Do not create new counter logs just
 to preserve identical numbers.
 
 ### Counter And Inventory Refreshes
@@ -450,6 +456,7 @@ item=<completed checklist item>
 goal=<one sentence summary>
 architectural_choice=<none or short decision>
 validation=<commands/logs>
+storage=<evidence root, collection receipt, remaining temporary roots and reasons>
 progress_before=<key counters>
 progress_after=<key counters>
 target_scope=<x86_64 only, or named cross-target boundary>

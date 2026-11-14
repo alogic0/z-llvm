@@ -111,4 +111,35 @@ env -u TMPDIR -u ZIG_LOCAL_CACHE_DIR -u ZIG_GLOBAL_CACHE_DIR \
 test -f "$cleanup_owner/local-state/validations/worktree/batch/launcher/check.storage-layout.json"
 test ! -e "$cleanup_owner/local-state/tmp/validations/worktree/batch/launcher/.workspaces/check"
 test ! -e "$cleanup_source/local-state"
-printf 'Eight worktree CLI checks passed: source cwd, passed collection, failed retention, nested ownership, unmanaged roots, symlink escape, external source preservation and launcher completion collection.\n'
+# Custom scripts get the same managed layout and literal argv forwarding.
+cat > "$cleanup_source/tools/custom command" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+test "$PWD" = "$CLEANUP_SOURCE_ROOT"
+test "$ZLLVM_REQUIRE_MANAGED_STORAGE" = 1
+printf '%s' "$1" > "$ZLLVM_RUN_ROOT/argument.txt"
+printf 'temporary object\n' > "$ZLLVM_TEMP_ROOT/output.o"
+printf 'custom diagnostic\n'
+EOF
+chmod 755 "$cleanup_source/tools/custom command"
+cleanup_literal='spaces * ; $(must-not-run)'
+for cleanup_case in command command-pipeline; do
+    cleanup_retention=()
+    if [[ $cleanup_case == command-pipeline ]]; then cleanup_retention=(--retain-products); fi
+    cleanup_run=local-state/validations/worktree/batch/$cleanup_case
+    cleanup_work=local-state/tmp/validations/worktree/batch/$cleanup_case/.workspaces/check
+    env -u TMPDIR -u ZIG_LOCAL_CACHE_DIR -u ZIG_GLOBAL_CACHE_DIR \
+        ZIG="$cleanup_fixture/zig" CLEANUP_TEST_RUNNER="$cleanup_runner" \
+        CLEANUP_SOURCE_ROOT="$cleanup_source" CLEANUP_TEST_BINARY="$cleanup_binary" \
+        "$cleanup_owner/tools/run-validation" --project-root "$cleanup_source" --storage-root "$cleanup_owner" "${cleanup_retention[@]}" \
+        --output-root "$cleanup_run" check --command "$cleanup_source/tools/custom command" "$cleanup_literal" > "$cleanup_fixture/$cleanup_case.log" 2>&1
+    test "$(cat "$cleanup_owner/$cleanup_run/argument.txt")" = "$cleanup_literal"
+    test -f "$cleanup_owner/$cleanup_run/check.json"
+    if [[ $cleanup_case == command ]]; then test ! -e "$cleanup_owner/$cleanup_work"; else test -f "$cleanup_owner/$cleanup_work/output.o"; fi
+done
+cleanup_actual=0
+ZIG="$cleanup_fixture/zig" "$cleanup_owner/tools/run-validation" --output-root local-state/validations/worktree/batch/empty check --command > "$cleanup_fixture/empty-command.log" 2>&1 || cleanup_actual=$?
+test "$cleanup_actual" = 2
+test ! -e "$cleanup_owner/local-state/validations/worktree/batch/empty"
+test ! -e "$cleanup_source/local-state"
+printf 'Eleven worktree CLI checks passed: source cwd, passed collection, failed retention, nested ownership, unmanaged roots, symlink escape, external source preservation, native launcher collection, literal custom command arguments, custom pipeline retention and empty command rejection.\n'

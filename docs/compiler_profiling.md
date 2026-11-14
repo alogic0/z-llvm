@@ -46,8 +46,8 @@ their original runs.
 ## Record the current compiler
 
 Use the pinned Zig 0.17.0 and a ReleaseFast compiler with debug symbols and
-frame pointers retained. Install into a new run directory so the ordinary
-`zig-out` installation is preserved. The following Bash example uses the
+frame pointers retained. Use a managed pipeline workspace for the compiler,
+objects and raw sampling work. The following Bash example uses the
 retained Safe Fibonacci IR; input mode and compiler build mode are independent.
 
 This input is local retained state, not a checked-in fixture. Check that it is
@@ -59,36 +59,81 @@ invocation identical across a comparison.
 set -euo pipefail
 profile_input=local-state/validations/zig-input-20261106/fibonacci/ReleaseSafe/capture/object-input.ll
 test -r "$profile_input"
-mkdir -p local-state/validations
-profile_run=$(mktemp -d local-state/validations/compiler-perf.XXXXXX)
-zig build -Doptimize=ReleaseFast --prefix "$profile_run/compiler"
-profile_compiler="$profile_run/compiler/bin/z_llvm"
+profile_run=local-state/validations/compiler-perf/batch-01/sample
+test ! -e "$profile_run"
+mkdir -p "$profile_run"
+cat > "$profile_run/retention.md" <<'RETENTION'
+Temporary producer: profile.storage-layout.json (pipeline)
+Temporary products: compiler, caches, output.o, perf.data, expanded stacks
+Consumers: sample/stack review and required object/ownership comparisons
+Maintained: script, commands/logs, identities, source delta, owners, report summaries
+Release condition: consumers complete and their results are recorded
+Input: existing verified retained IR; its independent retention remains effective
+RETENTION
+cat > "$profile_run/profile.sh" <<'PROFILE'
+#!/usr/bin/env bash
+set -euo pipefail
+set -x
+profile_run=${ZLLVM_RUN_ROOT:?managed evidence root required}
+profile_work=${ZLLVM_TEMP_ROOT:?managed temporary root required}
+profile_input=${1:?verified input required}
+"${ZIG:-zig}" build -Doptimize=ReleaseFast -Dstrip=false -Domit-frame-pointer=false \
+  --prefix "$profile_work/compiler"
+profile_compiler="$profile_work/compiler/bin/z_llvm"
 
 git rev-parse HEAD > "$profile_run/revision.txt"
 git diff --binary -- src build.zig .zigversion > "$profile_run/source.patch"
-sha256sum "$profile_compiler" "$profile_input" > "$profile_run/identities.sha256"
+sha256sum "$profile_compiler" "$profile_input" > "$profile_run/identities.txt"
 perf --version > "$profile_run/perf-version.txt"
 uname -r > "$profile_run/kernel.txt"
 cat /proc/sys/kernel/perf_event_paranoid > "$profile_run/perf-event-paranoid.txt"
 
 profile_status=0
 timeout --signal=INT --kill-after=5s 120s \
-  perf record -e cycles:u -F 199 --call-graph fp --user-callchains \
-  -o "$profile_run/perf.data" -- \
+  perf record --no-buildid-cache -e cycles:u -F 199 --call-graph fp --user-callchains \
+  -o "$profile_work/perf.data" -- \
   "$profile_compiler" --generic-cfg-selector --codegen-reachable \
   --target=x86_64-unknown-linux-gnu --input-limit=67108864 --emit=obj \
   --selection-owner-output="$profile_run/owners.tsv" \
-  "$profile_input" > "$profile_run/output.o" 2> "$profile_run/record.log" || profile_status=$?
+  "$profile_input" > "$profile_work/output.o" 2> "$profile_run/record.log" || profile_status=$?
 printf '%s\n' "$profile_status" > "$profile_run/exit-status.txt"
-test "$profile_status" -eq 0
+if [[ $profile_status != 0 ]]; then exit "$profile_status"; fi
 
 perf report --stdio --no-children -g none \
-  -i "$profile_run/perf.data" > "$profile_run/self.txt"
+  -i "$profile_work/perf.data" > "$profile_run/self.txt"
 perf report --stdio --no-children --percent-limit 5 -g graph,5,caller \
-  -i "$profile_run/perf.data" > "$profile_run/callers.txt"
-perf script --max-stack 16 -i "$profile_run/perf.data" > "$profile_run/stacks.txt"
+  -i "$profile_work/perf.data" > "$profile_run/callers.txt"
+perf script --max-stack 16 -i "$profile_work/perf.data" > "$profile_work/stacks.txt"
+sed -n '1,120p' "$profile_work/stacks.txt" > "$profile_run/stacks-sample.txt"
+sha256sum "$profile_work/output.o" "$profile_work/perf.data" "$profile_work/stacks.txt" > "$profile_run/products.txt"
 printf 'Profile saved in %s\n' "$profile_run"
+PROFILE
+
+tools/run-validation --retain-products --output-root "$profile_run" profile \
+  --command bash "$PWD/$profile_run/profile.sh" "$(realpath -- "$profile_input")"
 ```
+
+The script records commands in the checked log. `identities.txt` and
+`products.txt` are provenance, not retention manifests. The compiler, object,
+raw samples and full stacks remain in the pipeline workspace for equality
+checks and analysis; summaries, diagnostics and a bounded stack excerpt remain
+in the evidence root. `--no-buildid-cache` avoids a second implicit compiler
+copy in perf's persistent build-ID cache. Use the pinned Zig on `PATH` or set
+`ZIG` to its absolute path.
+
+After verifying the recording and completing the declared downstream checks,
+save their results and close this pipeline:
+
+```sh
+tools/clean-storage release-workspace --layout "$profile_run/profile.storage-layout.json" \
+  --reason 'Sampling analysis and required object/ownership comparisons completed'
+tools/clean-storage --minimal --apply
+```
+
+If raw sampling data or an exact executable is still needed, record its consumer
+and release condition in the run's `retention.md`. A failed/interrupted producer
+keeps its workspace until diagnosed and explicitly released. Follow the
+[development storage contract](development_storage.md) for the full cycle.
 
 Save the actual invocation with the run, including any changed flags, time
 limit and untracked source inputs. Treat object and ownership output as
@@ -100,7 +145,8 @@ For accepted evidence, follow the existing
 ## Verify and interpret the recording
 
 Check `record.log` for sample counts, `self.txt` for lost samples and named
-functions, and `stacks.txt` for multiple named caller frames from compiler work.
+functions, and `stacks-sample.txt` for named caller frames from compiler work.
+Inspect the full temporary `stacks.txt` when the excerpt is insufficient.
 An empty recording or unresolved stacks do not establish a caller-level hotspot.
 Report losses and stack limitations with the findings.
 

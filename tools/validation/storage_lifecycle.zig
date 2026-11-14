@@ -111,7 +111,7 @@ pub fn start(c: *u.Context, output: []const u8, producer: []const u8, started_ns
 /// A failed hook preserves the producer result and leaves durable job evidence.
 pub fn collect(c: *u.Context, root: []const u8, code: u8) void {
     c.env.put("ZLLVM_PROJECT_ROOT", root) catch return;
-    for ([_][]const u8{ "ZLLVM_REQUIRE_MANAGED_STORAGE", "ZLLVM_EVIDENCE_ROOT", "ZLLVM_TEMPORARY_ROOT", "ZLLVM_TEMP_ROOT" }) |key| _ = c.env.swapRemove(key);
+    for ([_][]const u8{ "ZLLVM_REQUIRE_MANAGED_STORAGE", "ZLLVM_EVIDENCE_ROOT", "ZLLVM_TEMPORARY_ROOT", "ZLLVM_RUN_ROOT", "ZLLVM_TEMP_ROOT" }) |key| _ = c.env.swapRemove(key);
     const argv = [_][]const u8{
         c.fmt("{s}/tools/clean-storage", .{root}) catch return,
         "__finish-job",

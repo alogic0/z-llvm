@@ -385,6 +385,15 @@ pub fn build(b: *std.Build) void {
     storage_worktree_tests.addArtifactArg(storage_cleanup);
     storage_worktree_tests.addArtifactArg(storage_checked_runner);
     storage_cleanup_test_step.dependOn(&storage_worktree_tests.step);
+    const storage_behavior_runner = b.addExecutable(.{ .name = "storage-behavior-runner", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/run_upstream_behavior.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    const storage_behavior_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/behavior_cli_tests.sh" });
+    storage_behavior_tests.addArtifactArg(storage_cleanup);
+    storage_behavior_tests.addArtifactArg(storage_behavior_runner);
+    storage_cleanup_test_step.dependOn(&storage_behavior_tests.step);
     const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
         .target = b.graph.host,

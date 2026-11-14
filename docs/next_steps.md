@@ -55,6 +55,11 @@ maintained [Zig validation tools](validation_tools.md), `jqz` and
 `zigrep --no-config` for the workflow. No behavior repair or final-generation
 matrix remains open in the completed plan.
 
+Every new cycle follows the [development storage contract](development_storage.md):
+declare temporary products and retained consumers before execution, use managed
+launchers for scripts and tools, and close temporary pipelines with a recorded
+storage disposition. The proposed successor includes this requirement.
+
 ## Previous checkpoints
 
 The entries below preserve earlier results and the work proposed at each

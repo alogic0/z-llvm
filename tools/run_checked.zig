@@ -19,9 +19,11 @@ pub fn main(init: std.process.Init) !void {
     std.process.exit(exit_code);
 }
 
-fn run(c: *u.Context, args: []const []const u8) !i64 {
+fn run(c: *u.Context, supplied: []const []const u8) !i64 {
+    const retain_products = supplied.len != 0 and std.mem.eql(u8, supplied[0], "--retain-products");
+    const args = if (retain_products) supplied[1..] else supplied;
     if (args.len == 1 and std.mem.eql(u8, args[0], "--help")) {
-        try c.print("usage: zig run tools/run_checked.zig -- --output-root DIR LABEL -- COMMAND [ARG...]\n", .{});
+        try c.print("usage: zig run tools/run_checked.zig -- [--retain-products] --output-root DIR LABEL -- COMMAND [ARG...]\n", .{});
         return 0;
     }
     if (args.len < 5 or !std.mem.eql(u8, args[0], "--output-root") or !std.mem.eql(u8, args[3], "--")) return error.InvalidArguments;
@@ -29,6 +31,7 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     const label = args[2];
     if (label.len == 0) return error.InvalidLabel;
     for (label) |ch| if (!std.ascii.isAlphanumeric(ch) and ch != '-' and ch != '_') return error.InvalidLabel;
+    if (retain_products and try storage.outputRoot(c, output) == null) return error.PipelineRequiresManagedStorage;
     try c.mkdir(output);
     const record_path = try c.join(&.{ output, try c.fmt("{s}.json", .{label}) });
     const log_path = try c.join(&.{ output, try c.fmt("{s}.log", .{label}) });
@@ -55,21 +58,36 @@ fn run(c: *u.Context, args: []const []const u8) !i64 {
     }
     const session = try storage.start(c, output, record_path, (try u.get(record, "started_ns")).integer);
     defer if (session) |s| s.close(c);
-    const workspace = try workspaces.start(c, output, label);
+    const workspace = if (retain_products) try workspaces.startPipeline(c, output, label) else try workspaces.start(c, output, label);
     defer if (workspace) |w| w.close(c);
     if (c.workspace_paths) |mapping| {
+        try c.env.put("ZLLVM_RUN_ROOT", mapping.evidence);
         try c.env.put("ZLLVM_TEMP_ROOT", mapping.temporary);
+        var overrides = u.array(c.a);
         for ([_][2][]const u8{ .{ "TMPDIR", "temp" }, .{ "ZIG_LOCAL_CACHE_DIR", "local-cache" }, .{ "ZIG_GLOBAL_CACHE_DIR", "global-cache" } }) |pair| {
             if (c.env.get(pair[0]) == null) {
                 const path = try c.temporaryPath(&.{ output, pair[1] });
                 try c.mkdir(path);
                 try c.env.put(pair[0], path);
+            } else {
+                // Inherited/explicit overrides have another owner. Recording
+                // them never makes that path part of this disposable workspace.
+                const path = c.env.get(pair[0]).?;
+                if (!u.isWithin(mapping.temporary, try c.join(&.{path})))
+                    try u.add(&overrides, try u.toValue(c.a, .{ .variable = pair[0], .path = path }));
             }
         }
         var environment = u.object(c.a);
-        for ([_][]const u8{ "TMPDIR", "ZIG_LOCAL_CACHE_DIR", "ZIG_GLOBAL_CACHE_DIR", "ZLLVM_TEMP_ROOT" }) |key|
+        for ([_][]const u8{ "TMPDIR", "ZIG_LOCAL_CACHE_DIR", "ZIG_GLOBAL_CACHE_DIR", "ZLLVM_RUN_ROOT", "ZLLVM_TEMP_ROOT" }) |key|
             try u.put(c.a, &environment, key, u.s(c.env.get(key).?));
         try u.put(c.a, &record, "workspace_environment", environment);
+        try u.put(c.a, &record, "storage", try u.toValue(c.a, .{
+            .evidence_root = mapping.evidence,
+            .temporary_root = mapping.temporary,
+            .layout = workspace.?.record_path,
+            .lifetime = workspace.?.record.lifetime,
+            .caller_owned_overrides = overrides,
+        }));
     }
     // Storage admission can wait for a collector; exclude that wait from the
     // supervised command's wall time.

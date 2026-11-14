@@ -16,13 +16,18 @@ Failed jobs keep their exit code and diagnostics. Manual investigation holds
 remain independent. Whole-compiler `backend/input.ll` captures use verified
 read-only artifact-store aliases, preserving their content hashes and paths.
 
-Checked commands, real-program validation, execution-breadth controls and the
-whole-compiler diagnostic now allocate caches and executable products under
+Checked commands, real-program validation, execution-breadth controls, upstream
+behavior and the whole-compiler diagnostic allocate caches and executable
+products under
 `local-state/tmp/validations/.../.workspaces/`. Their original output root keeps
 reports, logs, sources, captured inputs and traces. Each run writes a
 `*.storage-layout.json` mapping. Successful workspaces are collected by the
 storage tool; failed or interrupted workspaces remain available for review.
-See [storage cleanup](storage_cleanup.md) for the layout and lifetime contract.
+New cycles use the managed launcher and the
+[development storage contract](development_storage.md), including custom
+commands. See [storage cleanup](storage_cleanup.md) for the layout and lifetime
+mechanics. Short standalone API examples below retain their legacy admission
+rules; use a full `local-state/validations/SUITE/BATCH/RUN` root for new cycles.
 
 The [migration acceptance](evidence/python_tools_migration_20261105.json) and
 [gate summary](evidence/python_tools_migration_20261105.summary) bind the source,
@@ -89,6 +94,14 @@ uses the historical CPU-0 / 1 GiB setup. `--test-filter` is diagnostic-only and
 sets `full_suite=false`. Every invocation requires a new output directory.
 The local-only `--profile-events` option retains a nonempty event stream and its
 hash for every capture; ordered-event auditing is a separate completion check.
+For managed roots, private caches, the test executable and captured local objects
+use the temporary workspace; reports, captured inputs, event traces and logs
+stay in evidence. Pass this tool's `--retain-products` while independent object
+audits or later comparisons still need those temporary products. Release its
+`validation.storage-layout.json` after those consumers finish. Completed failures
+record `status=failed` and keep their scratch until diagnosis and explicit
+release; standalone legacy roots retain their old layout, while explicit
+pipeline retention requires a managed root.
 The [final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
 contains all 16 complete results: two compiler generations, four modes and both
 routes, with exact named pass/skip comparison against the reference.
@@ -391,12 +404,16 @@ and the required Debug/ReleaseSafe coverage.
 Prepare one required compiler mode with a separate install prefix:
 
 ```sh
-zig build validation-compiler -- \
-  --output-root local-state/validation-compilers --mode ReleaseFast
+tools/run-validation \
+  --output-root local-state/validations/example/batch-01/prepare build build_validation_compiler \
+  --output-root local-state/validations/example/batch-01/compilers --mode ReleaseFast
 ```
 
-This installs `local-state/validation-compilers/ReleaseFast/bin/z_llvm` and an
-adjacent `.build.json` receipt. `--mode Debug` and `--mode ReleaseSafe` use
+This provides `local-state/validations/example/batch-01/compilers/ReleaseFast/bin/z_llvm`
+as a stable alias, with an adjacent `.build.json` receipt. The actual compiler
+and private build products live in a managed pipeline workspace. Release its
+`ReleaseFast/compiler.storage-layout.json` after the last consumer completes.
+`--mode Debug` and `--mode ReleaseSafe` use
 separate directories. Optional `--zig`, `--target` and `--cpu` select build
 inputs; the defaults are the project-pinned Zig, `x86_64-linux-gnu` and baseline
 CPU. Symbols and frame pointers are retained. Zig validates its dependency cache
@@ -419,7 +436,7 @@ For a full run with a prepared ReleaseFast compiler and durable nested reports:
 
 ```sh
 validation_emitter="$(realpath ../ziglang/build/stage4/bin/zig)"
-ZLLVM_EXE="$PWD/local-state/validation-compilers/ReleaseFast/bin/z_llvm" \
+ZLLVM_EXE="$PWD/local-state/validations/example/batch-01/compilers/ReleaseFast/bin/z_llvm" \
 ZIG_EMITTER="$validation_emitter" \
 ZIG_SOURCE_DIR="$PWD/../ziglang" \
 ZLLVM_INTEGRATED_OUTPUT_ROOT=local-state/validations/my-validation/integrated \
@@ -503,15 +520,15 @@ stderr writers cannot overwrite earlier diagnostics. The unchanged-program
 runner retains both the text summary and its original one-line JSON summary.
 
 ```sh
-zig run tools/run_checked.zig -- \
-  --output-root local-state/validations/my-run checks -- \
-  zig build real-program-policy-tests
+tools/run-validation \
+  --output-root local-state/validations/example/batch-01/my-run checks \
+  --command zig build real-program-policy-tests
 zig run tools/validation_progress.zig -- \
-  --record local-state/validations/my-run/checks.json
+  --record local-state/validations/example/batch-01/my-run/checks.json
 zig run tools/validation_snapshot.zig -- \
-  --output local-state/validations/my-run/source.json
+  --output local-state/validations/example/batch-01/my-run/source.json
 zig run tools/validation_snapshot.zig -- \
-  --verify local-state/validations/my-run/source.json
+  --verify local-state/validations/example/batch-01/my-run/source.json
 ```
 
 Snapshots check Git HEAD/tree, file membership and SHA-256 for tracked and
@@ -564,6 +581,23 @@ reusable bootstrap cache lives in `local-state/tmp/validation-tools`.
 The launcher builds the checked runner under a bootstrap lock and executes it
 directly, so a waiting `zig run` parent cannot falsely hold completed output
 during collection.
+
+For scripts and other executables, replace the tool name with
+`--command COMMAND [ARG...]`. Arguments are forwarded literally. The child gets
+`ZLLVM_RUN_ROOT` for maintained reports and `ZLLVM_TEMP_ROOT` for disposable work.
+The receipt's `storage` object records the roots, layout path, lifetime and
+caller-owned environment overrides. To keep these temporary products through
+later consumers, pass `--retain-products` before `--output-root`, then release
+the named layout after those consumers finish. This flag controls the checked
+command's workspace; a nested tool's own workspace uses that tool's retention
+option. Failed/interrupted work remains available for diagnosis.
+
+```sh
+tools/run-validation --retain-products \
+  --output-root local-state/validations/example/batch-01/compare compare \
+  --command bash /absolute/path/to/compare.sh
+```
+
 For an automated `bash -c` wrapper, use `exec` for its final launcher command.
 A surviving supervisor whose argv still names the run deliberately defers
 collection until that supervisor exits.

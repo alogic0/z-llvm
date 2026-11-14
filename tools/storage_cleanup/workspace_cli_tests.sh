@@ -18,6 +18,8 @@ cat > "$cleanup_fixture/tools/clean-storage" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 test "$1" = __finish-job
+test -z "${ZLLVM_RUN_ROOT+x}"
+test -z "${ZLLVM_TEMP_ROOT+x}"
 "$CLEANUP_TEST_BINARY" --minimal --apply
 exit "$2"
 EOF
@@ -28,6 +30,7 @@ mkdir -p "$ZIG_LOCAL_CACHE_DIR/o" "$ZIG_GLOBAL_CACHE_DIR/o" "$TMPDIR"
 printf 'temporary compiler\n' > "$ZIG_LOCAL_CACHE_DIR/o/compiler"
 printf 'temporary global cache\n' > "$ZIG_GLOBAL_CACHE_DIR/o/object"
 printf 'temporary executable\n' > "$ZLLVM_TEMP_ROOT/test-exe"
+printf 'kept analysis\n' > "$ZLLVM_RUN_ROOT/analysis.txt"
 printf 'transient file\n' > "$TMPDIR/test"
 printf 'retained command diagnostic\n'
 if [[ ${CLEANUP_RAW_TRACE:-0} == 1 ]]; then printf 'unique raw trace\n' > "$ZLLVM_TEMP_ROOT/profile.events.jsonl"; fi
@@ -56,6 +59,10 @@ for cleanup_case in success failure held raw; do
     test -f "$cleanup_fixture/$cleanup_run/check.storage-layout.json"
     test -f "$cleanup_fixture/$cleanup_run/check.json"
     test -s "$cleanup_fixture/$cleanup_run/check.log"
+    test "$(cat "$cleanup_fixture/$cleanup_run/analysis.txt")" = 'kept analysis'
+    "${JQZ:-jqz}" -e --arg evidence "$cleanup_fixture/$cleanup_run" --arg work "$cleanup_fixture/$cleanup_work" \
+        '.storage.evidence_root == $evidence and .storage.temporary_root == $work and .storage.lifetime == "validation" and length(.storage.caller_owned_overrides) == 0' \
+        "$cleanup_fixture/$cleanup_run/check.json" > /dev/null
     test "$(cat "$cleanup_fixture/$cleanup_run/input.ll")" = 'unique retained input'
     test ! -e "$cleanup_fixture/$cleanup_run/local-cache"
     if [[ $cleanup_case == success ]]; then
@@ -70,6 +77,9 @@ env -u TMPDIR -u ZIG_GLOBAL_CACHE_DIR ZIG_LOCAL_CACHE_DIR="$cleanup_fixture/shar
     ZLLVM_PROJECT_ROOT="$cleanup_fixture" CLEANUP_TEST_BINARY="$cleanup_binary" \
     "$cleanup_runner" --output-root "$cleanup_fixture/$cleanup_run" check -- "$cleanup_fixture/tools/produce" > "$cleanup_fixture/override.log" 2>&1
 test -f "$cleanup_fixture/shared-cache/o/compiler"
+"${JQZ:-jqz}" -e --arg path "$cleanup_fixture/shared-cache" \
+    'length(.storage.caller_owned_overrides) == 1 and .storage.caller_owned_overrides[0].variable == "ZIG_LOCAL_CACHE_DIR" and .storage.caller_owned_overrides[0].path == $path' \
+    "$cleanup_fixture/$cleanup_run/check.json" > /dev/null
 test ! -e "$cleanup_fixture/local-state/tmp/validations/test/batch/override/.workspaces/check"
 ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply > "$cleanup_fixture/repeat.log" 2>&1
 test ! -e "$cleanup_fixture/local-state/storage-cleanup/pending.json"
@@ -87,4 +97,24 @@ ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply > "$cl
 test ! -e "$cleanup_fixture/local-state/tmp/validations/test/batch/failure/.workspaces/check"
 sha256sum --check --status "$cleanup_fixture/failure.sha256"
 test -f "$cleanup_fixture/local-state/tmp/validations/test/batch/raw/.workspaces/check/profile.events.jsonl"
-printf 'Eight workspace CLI checks passed: successful collection, failed retention, evidence hold, raw-trace guard, explicit cache override, repeat, held release refusal and reviewed failure release.\n'
+# Pipeline products survive a successful producer until the owner closes its consumers.
+cleanup_run=local-state/validations/test/batch/pipeline
+cleanup_work=local-state/tmp/validations/test/batch/pipeline/.workspaces/check
+env -u TMPDIR -u ZIG_LOCAL_CACHE_DIR -u ZIG_GLOBAL_CACHE_DIR \
+    ZLLVM_PROJECT_ROOT="$cleanup_fixture" CLEANUP_TEST_BINARY="$cleanup_binary" \
+    "$cleanup_runner" --retain-products --output-root "$cleanup_fixture/$cleanup_run" check -- "$cleanup_fixture/tools/produce" > "$cleanup_fixture/pipeline.log" 2>&1
+test -f "$cleanup_fixture/$cleanup_work/test-exe"
+"${JQZ:-jqz}" -e '.lifetime == "pipeline" and .state == "retained"' "$cleanup_fixture/$cleanup_run/check.storage-layout.json" > /dev/null
+"${JQZ:-jqz}" -e '.storage.lifetime == "pipeline"' "$cleanup_fixture/$cleanup_run/check.json" > /dev/null
+sha256sum "$cleanup_fixture/$cleanup_run/check.json" "$cleanup_fixture/$cleanup_run/check.log" "$cleanup_fixture/$cleanup_run/analysis.txt" > "$cleanup_fixture/pipeline.sha256"
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" release-workspace --layout "$cleanup_run/check.storage-layout.json" --reason 'All comparison consumers completed' > "$cleanup_fixture/pipeline-release.log" 2>&1
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_binary" --minimal --apply > "$cleanup_fixture/pipeline-apply.log" 2>&1
+test ! -e "$cleanup_fixture/$cleanup_work"
+sha256sum --check --status "$cleanup_fixture/pipeline.sha256"
+# Retention must not silently fall back to a mixed, unmanaged output directory.
+cleanup_actual=0
+ZLLVM_PROJECT_ROOT="$cleanup_fixture" "$cleanup_runner" --retain-products --output-root "$cleanup_fixture/unmanaged" check -- touch "$cleanup_fixture/should-not-run" > "$cleanup_fixture/unmanaged.log" 2>&1 || cleanup_actual=$?
+test "$cleanup_actual" = 2
+test ! -e "$cleanup_fixture/unmanaged"
+test ! -e "$cleanup_fixture/should-not-run"
+printf 'Eleven workspace CLI checks passed: successful collection, failed retention, evidence hold, raw-trace guard, recorded cache override, repeat, held release refusal, reviewed failure release, pipeline retention, pipeline release and unmanaged retention rejection.\n'

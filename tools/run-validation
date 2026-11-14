@@ -4,13 +4,15 @@ set -euo pipefail
 validation_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 validation_project=$validation_source
 validation_storage=$validation_source
-while [[ ${1:-} == --project-root || ${1:-} == --storage-root ]]; do
+validation_retain=()
+while [[ ${1:-} == --project-root || ${1:-} == --storage-root || ${1:-} == --retain-products ]]; do
+    if [[ $1 == --retain-products ]]; then validation_retain=(--retain-products); shift; continue; fi
     if [[ $# -lt 2 ]]; then printf '%s requires a directory\n' "$1" >&2; exit 2; fi
     if [[ $1 == --project-root ]]; then validation_project=$(realpath -- "$2"); else validation_storage=$(realpath -- "$2"); fi
     shift 2
 done
 if [[ $# -lt 4 || $1 != --output-root ]]; then
-    printf 'usage: tools/run-validation [--project-root DIR] [--storage-root DIR] --output-root DIR LABEL TOOL [ARG...]\n' >&2
+    printf 'usage: tools/run-validation [--project-root DIR] [--storage-root DIR] [--retain-products] --output-root DIR LABEL TOOL [ARG...]\n       tools/run-validation [OPTIONS] --output-root DIR LABEL --command COMMAND [ARG...]\n' >&2
     exit 2
 fi
 validation_output=$2
@@ -25,11 +27,18 @@ fi
 if [[ $validation_output != "$validation_storage"/local-state/validations/*/*/* || ! $validation_label =~ ^[a-zA-Z0-9_-]+$ ]]; then
     printf 'managed output must be under %s/local-state/validations/SUITE/BATCH/RUN; got %s\n' "$validation_storage" "$validation_output" >&2; exit 2
 fi
-if [[ ! $validation_tool =~ ^[a-zA-Z0-9_]+$ || ! -f $validation_source/tools/$validation_tool.zig ]]; then
+if [[ $validation_tool == --command ]]; then
+    if [[ $# == 0 ]]; then printf '%s\n' '--command requires a command' >&2; exit 2; fi
+elif [[ ! $validation_tool =~ ^[a-zA-Z0-9_]+$ || ! -f $validation_source/tools/$validation_tool.zig ]]; then
     printf 'unknown validation tool: %s\n' "$validation_tool" >&2
     exit 2
 fi
 validation_zig=${ZIG:-zig}
+if [[ $validation_tool == --command ]]; then
+    validation_command=("$@")
+else
+    validation_command=("$validation_zig" run -O ReleaseFast "$validation_source/tools/$validation_tool.zig" -- "$@")
+fi
 validation_bootstrap=$validation_storage/local-state/tmp/validation-tools
 for validation_dir in "$validation_storage/local-state" "$validation_storage/local-state/tmp" "$validation_bootstrap" "$validation_bootstrap/local-cache" "$validation_bootstrap/global-cache"; do
     if [[ -L $validation_dir ]]; then printf 'refusing symlink: %s\n' "$validation_dir" >&2; exit 2; fi
@@ -50,5 +59,5 @@ flock --unlock 9
 exec 9>&-
 # A waiting `zig run` parent retains the output path in its argv and looks like
 # a live consumer during the checked runner's completion collection.
-exec "$validation_bootstrap/run-checked" --output-root "$validation_output" "$validation_label" -- \
-    "$validation_zig" run -O ReleaseFast "$validation_source/tools/$validation_tool.zig" -- "$@"
+exec "$validation_bootstrap/run-checked" "${validation_retain[@]}" --output-root "$validation_output" "$validation_label" -- \
+    "${validation_command[@]}"

@@ -1,6 +1,7 @@
 const std = @import("std");
 const u = @import("common.zig");
 const Runner = @import("runner.zig").Runner;
+const storage = @import("storage_workspace.zig");
 
 fn outcomeStatus(text: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, text, "OK") or std.mem.eql(u8, text, "SKIP")) return text;
@@ -61,8 +62,8 @@ pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
     u.installSignals();
     const argv = try init.minimal.args.toSlice(c.a);
-    if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("usage: run_upstream_behavior --output-root DIR --compiler EXE --zig-source DIR --libc-file FILE --mode Debug|ReleaseSafe|ReleaseFast|ReleaseSmall --route llvm|local [--zllvm EXE] [--reference-report FILE] [--resources normal|accepted] [--test-filter TEXT] [--profile-events]\n", .{});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "compiler", "zig-source", "libc-file", "mode", "route", "zllvm", "reference-report", "resources", "test-filter" }, &.{"profile-events"});
+    if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("usage: run_upstream_behavior --output-root DIR --compiler EXE --zig-source DIR --libc-file FILE --mode Debug|ReleaseSafe|ReleaseFast|ReleaseSmall --route llvm|local [--zllvm EXE] [--reference-report FILE] [--resources normal|accepted] [--test-filter TEXT] [--profile-events] [--retain-products]\n", .{});
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "compiler", "zig-source", "libc-file", "mode", "route", "zllvm", "reference-report", "resources", "test-filter" }, &.{ "profile-events", "retain-products" });
     const mode = try args.require("mode");
     const route = try args.require("route");
     const resources = args.get("resources") orelse "normal";
@@ -71,7 +72,11 @@ pub fn main(init: std.process.Init) !void {
     if (!u.contains(&.{ "normal", "accepted" }, resources)) return error.InvalidResources;
     if (std.mem.eql(u8, route, "local") and args.get("zllvm") == null) return error.MissingBackend;
     if (args.flag("profile-events") and !std.mem.eql(u8, route, "local")) return error.ProfileEventsRequireLocalRoute;
-    const output = try c.newOutput(try args.require("output-root"));
+    const requested_output = try c.ownedPath(try args.require("output-root"));
+    if (args.flag("retain-products") and try @import("storage_lifecycle.zig").outputRoot(&c, requested_output) == null) return error.PipelineRequiresManagedStorage;
+    const output = try c.newOutput(requested_output);
+    const workspace = if (args.flag("retain-products")) try storage.startPipeline(&c, output, "validation") else try storage.start(&c, output, "validation");
+    defer if (workspace) |w| w.close(&c);
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("upstream-behavior-v1"));
     try u.put(c.a, &report, "status", u.s("incomplete"));
@@ -82,10 +87,12 @@ pub fn main(init: std.process.Init) !void {
     try u.put(c.a, &report, "profile_events_requested", u.b(args.flag("profile-events")));
     var runner = Runner.init(&c, output);
     execute(&c, args, output, &runner, &report) catch |err| {
+        try u.put(c.a, &report, "status", u.s("failed"));
         try u.put(c.a, &report, "error", u.s(c.diagnostic orelse @errorName(err)));
     };
     try u.put(c.a, &report, "commands", runner.commands);
     try c.writeJson(try c.join(&.{ output, "report.json" }), report);
+    if (workspace) |w| try w.finishReport(&c);
     try c.print("upstream behavior status={s} report={s}/report.json\n", .{ try u.str(report, "status"), output });
     if (report.object.get("error")) |err| try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("{s}\n", .{err.string}));
     std.process.exit(if (u.json.is(try u.get(report, "status"), "passed")) 0 else 1);
@@ -112,10 +119,12 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     var env = std.process.Environ.Map.init(c.a);
     for ([_][2][]const u8{
         .{ "PATH", "/home/oleg/bin:/usr/lib/llvm-22/bin:/usr/bin:/bin" }, .{ "LC_ALL", "C" },    .{ "TZ", "UTC0" },
-        .{ "ZLLVM_PROJECT_ROOT", c.root },                                .{ "ZIG_LIBC", libc }, .{ "HOME", try c.join(&.{ output, "home" }) },
-        .{ "TMPDIR", try c.join(&.{ output, "temp" }) },
+        .{ "ZLLVM_PROJECT_ROOT", c.root },                                .{ "ZIG_LIBC", libc }, .{ "HOME", try c.temporaryPath(&.{ output, "home" }) },
+        .{ "TMPDIR", try c.temporaryPath(&.{ output, "temp" }) },
     }) |pair| try env.put(pair[0], pair[1]);
-    for ([_][]const u8{ "home", "temp", "local-cache", "global-cache", "captures" }) |name| try c.mkdir(try c.join(&.{ output, name }));
+    for ([_][]const u8{ "home", "temp", "local-cache", "global-cache" }) |name| try c.mkdir(try c.temporaryPath(&.{ output, name }));
+    try c.mkdir(try c.join(&.{ output, "captures" }));
+    try storage.exportPaths(c, &env);
     if (local) {
         const backend = try c.join(&.{try args.require("zllvm")});
         try u.put(c.a, report, "backend", try identity(c, backend));
@@ -129,8 +138,8 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     }
     var command: std.ArrayList([]const u8) = .empty;
     if (accepted) try command.appendSlice(c.a, &.{ "/usr/bin/prlimit", "--stack=1073741824:1073741824", "--", "/usr/bin/taskset", "--cpu-list", "0" });
-    const executable = try c.join(&.{ output, "behavior" });
-    try command.appendSlice(c.a, &.{ compiler, "test", input, try c.fmt("-O{s}", .{try args.require("mode")}), "-target", "x86_64-linux-gnu", "-mcpu=baseline", "-fllvm", "-lc", "--zig-lib-dir", try c.join(&.{ source, "lib" }), "--libc", libc, "--cache-dir", try c.join(&.{ output, "local-cache" }), "--global-cache-dir", try c.join(&.{ output, "global-cache" }), "--test-no-exec", try c.fmt("-femit-bin={s}", .{executable}) });
+    const executable = try c.temporaryPath(&.{ output, "behavior" });
+    try command.appendSlice(c.a, &.{ compiler, "test", input, try c.fmt("-O{s}", .{try args.require("mode")}), "-target", "x86_64-linux-gnu", "-mcpu=baseline", "-fllvm", "-lc", "--zig-lib-dir", try c.join(&.{ source, "lib" }), "--libc", libc, "--cache-dir", try c.temporaryPath(&.{ output, "local-cache" }), "--global-cache-dir", try c.temporaryPath(&.{ output, "global-cache" }), "--test-no-exec", try c.fmt("-femit-bin={s}", .{executable}) });
     if (args.get("test-filter")) |filter| try command.appendSlice(c.a, &.{ "--test-filter", filter });
     try c.writeJson(try c.join(&.{ output, "report.json" }), report.*);
     const compiled = try runner.run(command.items, try c.join(&.{ output, "compile" }), &env, .{ .timeout_ms = 7200000 });

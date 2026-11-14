@@ -1,7 +1,13 @@
 # Automatic project storage cleanup
 
-New checked commands, real-program validations, execution-breadth controls and
-whole-compiler diagnostics separate their work files from maintained evidence:
+For each new development cycle, follow the
+[storage contract](development_storage.md): classify outputs before execution,
+name retained consumers and close temporary pipelines at handoff. Managed
+launchers implement the workspace lifecycle; a bare reader lock does not.
+
+New checked commands, real-program validations, execution-breadth controls,
+upstream behavior and whole-compiler diagnostics separate their work files from
+maintained evidence:
 
 | Location | Contents and lifetime |
 | --- | --- |
@@ -32,18 +38,29 @@ See [the launcher example](validation_tools.md#launch-current-tools-with-another
 for relative-path rules. Existing direct tool invocations retain their optional
 layout unless they set `ZLLVM_REQUIRE_MANAGED_STORAGE=1`.
 
-`run_checked` gives commands `ZLLVM_TEMP_ROOT` and defaults `TMPDIR`,
+`run_checked` gives commands `ZLLVM_RUN_ROOT` for maintained evidence,
+`ZLLVM_TEMP_ROOT` for temporary products and defaults `TMPDIR`,
 `ZIG_LOCAL_CACHE_DIR` and `ZIG_GLOBAL_CACHE_DIR` to that workspace. Explicit cache
 environment variables and command-line paths remain caller-owned overrides.
 Commands can put additional ordinary build products in `$ZLLVM_TEMP_ROOT`;
 reports, unique inputs and diagnostics belong in the supplied output root.
+The terminal receipt's `storage` field records both roots, the layout path,
+lifetime and environment overrides owned by other callers. Command-line cache
+overrides remain visible in the recorded argv and need their own declared owner.
 For example:
 
 ```sh
-zig run tools/run_checked.zig -- \
-  --output-root local-state/validations/example/batch-01/unit test -- \
-  zig build test-unit
+tools/run-validation \
+  --output-root local-state/validations/example/batch-01/unit test \
+  --command zig build test-unit
 ```
+
+Custom scripts use this same `--command` entry point. Pass `--retain-products`
+before `--output-root` when later comparison, fault or profiling consumers need
+the checked command's workspace. Its successful terminal result retains a
+`pipeline` workspace until `release-workspace --layout ... --reason ...` closes
+that use. Direct `run_checked` supports the same flag and rejects it for
+unmanaged output roots. Nested tools keep their own lifetime decisions.
 
 A passed report or successful completed checked command releases its workspace
 for the normal collector. Failed or interrupted runs retain their scratch for

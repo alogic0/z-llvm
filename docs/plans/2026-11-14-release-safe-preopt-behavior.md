@@ -66,6 +66,21 @@ capture proxy and object auditor cannot count optimizer text output as an object
 
 ## Acceptance and stop boundary
 
+Apply the [development storage contract](../development_storage.md) before
+starting this milestone. The concrete run plan must name evidence and temporary
+roots and the consumers of each retained exception. Private caches, compiler
+build trees, intermediate objects and test executables use managed workspaces;
+keep baseline/candidate products with pipeline lifetime through comparison and
+fault checks, then release them. Invoke `run_upstream_behavior` with its own
+`--retain-products` until the independent captured-object audits and comparisons
+finish; the outer checked command's retention flag does not retain a nested
+tool's workspace. Preserve stage inputs/outputs needed by the
+accepted preopt proof, command/result records and diagnostics as explicitly
+maintained data. Raw compiler event traces stay outside disposable scratch
+until audited retirement. Accepted manifests pin only the selected maintained
+files. Close the milestone's own queued holds and completed pipelines, and
+record the collector receipt and any remaining dependencies at handoff.
+
 - One complete ReleaseSafe behavior result, with all 2,097 named reference
   outcomes compared if the unchanged reference retains that population.
 - Every optimizer and object invocation completes with actual exit zero; all
