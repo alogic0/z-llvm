@@ -2,7 +2,7 @@
 
 Date: 2026-11-11
 Status: milestones 1–5 complete at `b738377e`, backend implementation `e398030f`;
-follow-up milestones 6–8 authorized on 2026-11-11 and in progress. The normal-resource
+follow-up milestones 6–8 complete with backend source `dbf7ade0`. The normal-resource
 self-rebuild and both normal-LLVM matrices pass at `ba05fef4`; the runtime
 remainder error is repaired at `9cb21139`. Twenty behavior-family populations
 pass cumulative validation at `d9148ebc`; eight additional families pass at
@@ -49,9 +49,19 @@ Small runtime aliases reproduce their before/after encodings exactly; twelve
 compiler jump-table relocations retain their proven source-block targets.
 A verified 77,351-file successor seal retains this evidence. See the
 [complete cumulative checkpoint](../evidence/compiler_behavior_complete_checkpoint_20261113.json).
-The complete local-hook matrices and
-final-source generations remain open. The original
-five-milestone acceptance remains unchanged. See the
+Final acceptance now passes for both source-bound compiler generations. Each
+matches all 2,097 named reference outcomes in all four normal LLVM and all four
+local-hook modes: 16 complete results and 33,552 exact outcome comparisons.
+All 20 delivered local objects pass census, ELF and full ordered-event audits.
+Both generations pass nine f80 observations and four compile-time layout checks.
+The normal-resource self-rebuild executes the backend afresh; compiler IR and
+the compiler object match the fixed original input and qualified object exactly.
+The two separate executable identities contain the same 150,448,328-byte file,
+SHA-256 `972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b`.
+A verified 4,610-file final seal retains the final evidence and the inherited
+77,351-file cumulative checkpoint. See the
+[follow-up acceptance](../evidence/compiler_behavior_follow_up_acceptance_20261113.json).
+The original five-milestone acceptance remains unchanged. See the
 [completion evidence](../evidence/compiler_object_self_rebuild.md) and
 [acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
 Baseline: accepted code `efa62fa2d182bf0a5f2c5e7b1b239dcbb0aab898`, documentation
@@ -794,7 +804,7 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    now pass with explicit reviews for all changed objects. The complete
    cumulative checkpoint retains 77,351 files. Proceed to the final generations
    in step 12; their acceptance remains separate.
-12. Build the final two compiler generations from the accepted source under
+12. **Complete at `dbf7ade0`.** Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
    pinned reference, and audit every delivered hook object before publishing
@@ -824,6 +834,16 @@ open. Registry ordering was corrected after the frozen run, with identical
 population contracts and fresh strict preservation comparisons.
 
 ## Follow-up milestone 8: normal-resource self-rebuild
+
+Complete with backend source `dbf7ade0`. The final build and fresh self-rebuild
+pass under normal scheduling; both complete LLVM/local four-mode matrices and
+all capture audits pass. The service starts with an 8 MiB soft stack limit.
+The pinned Zig runner's existing ELF stack request passes a 46 MiB limit to
+the validation controller; the actual frontend also has 46 MiB, 16 threads and
+CPU affinity 0–15. No validation stack or affinity override is added. Raw limits,
+process identities, mappings and encoded entry-allocation measurements are
+retained in the final acceptance. The original five-milestone seal and all
+failed resource attempts remain unchanged.
 
 Measure the final accepted compiler under inherited normal stack limits and
 normal CPU affinity before assuming that earlier resource failures still apply.
@@ -869,13 +889,13 @@ new evidence seal. Reuse unchanged gates only under the existing reuse policy.
 
 - [x] Run the complete four-mode reference matrix.
 - [x] Build the first repaired generation and match all four normal-LLVM reference outcomes.
-- [ ] Produce the final second generation and complete both final candidate matrices.
-- [ ] Prove complete local-hook captures and matching named test outcomes.
-- [ ] Repair observed failures with focused regressions and required cumulative validation.
+- [x] Produce the final second generation and complete both final candidate matrices.
+- [x] Prove complete local-hook captures and matching named test outcomes.
+- [x] Repair observed failures with focused regressions and required cumulative validation.
 - [x] Diagnose and remove special CPU-affinity and main-stack requirements at `ba05fef4`.
 - [x] Prove normal-resource self-rebuild and both normal-LLVM four-mode matrices at `ba05fef4`.
 - [x] Repair the independently reproduced unsigned multiword remainder error and repeat affected production proofs at `9cb21139`.
-- [ ] Publish follow-up acceptance and seal successor evidence.
+- [x] Publish follow-up acceptance and seal successor evidence.
 
 The completed PHI, vector and
 [frame checkpoints](../evidence/compiler_behavior_frame_checkpoint_20261111.json)

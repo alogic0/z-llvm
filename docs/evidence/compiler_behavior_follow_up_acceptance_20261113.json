@@ -1,0 +1,548 @@
+{
+  "schema": "compiler-behavior-follow-up-acceptance-v1",
+  "status": "passed",
+  "final_follow_up_complete": true,
+  "scope": "Complete unchanged compiler/runtime/Debug inputs, cumulative validation, two final source-bound compiler generations, every complete LLVM/local behavior matrix, every delivered local object, normal-resource fresh backend self-rebuild and f80 layout. LLVM frontend optimization and declared providers remain in scope",
+  "code_revision": "dbf7ade023f53394e5719c3344e512446a0b09a1",
+  "backend_source_files": 659,
+  "source_snapshot": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/source-frozen-qualified-behavior-v1461.json",
+  "source_snapshot_sha256": "baa58b507dba59b5a75d553b4829da45e4818b53b6166e67186542449f239cab",
+  "tooling_zig": {
+    "path": "/home/oleg/.zig/0.17.0/files/zig",
+    "sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+    "version": "0.17.0"
+  },
+  "validation_tool_package_sha256": "a0fb512ea3b5b1b72505a956a62c5f34ce728a743312f21e87ff3ad823aaffec",
+  "cumulative_checkpoint": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/complete-checkpoint-v1542/record.json",
+  "cumulative_checkpoint_sha256": "34e8323aad90339c80a89982ebf39f8ff1c13576c4387eb4853b0e21ef5ded21",
+  "inherited_cumulative_files": 77351,
+  "native_populations_per_build": 225,
+  "native_release_modes": 3,
+  "required_fault_controls": 6724,
+  "integration_gates": 17,
+  "preserved_prior_outcomes_per_build": 7160,
+  "original_compiler_definitions": 8928,
+  "original_runtime_definitions": 455,
+  "small_runtime_definitions": 503,
+  "original_debug_behavior_definitions": 7874,
+  "original_debug_remaining": 0,
+  "generation1": {
+    "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/install/bin/zig",
+    "bytes": 150448328,
+    "sha256": "972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b"
+  },
+  "generation1_metadata": {
+    "device": 1112396529666,
+    "inode": 3178499,
+    "links": 1,
+    "size": 150448328,
+    "allocated_bytes": 150454272,
+    "mode": 509,
+    "uid": 1000,
+    "gid": 1000,
+    "mtime_ns": 1794621747423695760,
+    "ctime_ns": 1794621747694717156,
+    "kind": "file"
+  },
+  "generation2": {
+    "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/self-rebuild/install/bin/zig",
+    "bytes": 150448328,
+    "sha256": "972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b"
+  },
+  "generation2_metadata": {
+    "device": 1112396529666,
+    "inode": 3277959,
+    "links": 1,
+    "size": 150448328,
+    "allocated_bytes": 150454272,
+    "mode": 509,
+    "uid": 1000,
+    "gid": 1000,
+    "mtime_ns": 1794626416561676741,
+    "ctime_ns": 1794626416816696694,
+    "kind": "file"
+  },
+  "distinct_executable_identities": true,
+  "normal_resources": {
+    "resources": "normal",
+    "service_main_stack_soft_bytes": 8388608,
+    "controller_inherited_main_stack_soft_bytes": 48234496,
+    "existing_pinned_zig_elf_stack_request_bytes": 48234496,
+    "inherited_main_stack_hard": "unlimited",
+    "runtime_cpu_affinity_override": false,
+    "self_build_command": [
+      "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/install/bin/zig",
+      "build",
+      "--build-file",
+      "/home/oleg/prog/ziglang/build.zig",
+      "--cache-dir",
+      "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/self-rebuild/local-cache",
+      "--prefix",
+      "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/self-rebuild/install",
+      "-j1",
+      "--verbose",
+      "--summary",
+      "all",
+      "-Dtarget=x86_64-linux-gnu",
+      "-Dcpu=baseline",
+      "-Doptimize=ReleaseFast",
+      "-Dstrip=true",
+      "-Ddev=full",
+      "-Denable-llvm=true",
+      "-Duse-llvm=true",
+      "-Ddebug-extensions=true",
+      "-Dno-lib=true",
+      "-Dno-langref=true",
+      "-Dconfig_h=/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/resolved-config.h"
+    ],
+    "limits": {
+      "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/process-limits.txt",
+      "bytes": 1323,
+      "sha256": "a26eb597bbe3ffe367132021e8d9b5229926138b42f0f14c9692208a8704ab06"
+    },
+    "live_frontend_sample": {
+      "status": "sampled",
+      "scope": "Live candidate frontend limits, affinity and mappings; final successful rebuild and complete object audits remain separately required",
+      "pid": 907090,
+      "start_ticks": 43312970,
+      "observed_utc_ns": 1794622949607540000,
+      "expected_executable": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/install/bin/zig",
+      "actual_executable": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/install/bin/zig",
+      "executable_sha256": "972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b",
+      "cpu_affinity": "0-15",
+      "threads": 16,
+      "main_stack_soft_bytes": 48234496,
+      "main_stack_hard": "unlimited",
+      "raw_files": {
+        "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/live-self-frontend-resources-v1554/stat": "e6d19e2203f244fa19518ca4d30dd7a13c756898922b7fa7b17ba7cf517ac553",
+        "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/live-self-frontend-resources-v1554/status": "f61ececa64711477c0d18831c18ae77483bba853dfabf3f02f53a137b6b1d5c0",
+        "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/live-self-frontend-resources-v1554/limits": "a26eb597bbe3ffe367132021e8d9b5229926138b42f0f14c9692208a8704ab06",
+        "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/live-self-frontend-resources-v1554/maps": "c84e4f05d046e327f9ae4480d960de66b684fbb344debf1d27cbe3665c4e34df",
+        "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/live-self-frontend-resources-v1554/cmdline": "0bff35be1087d3ae7d0d82b6d35acad6434dd9ce7fa2318e2d8d6524f8352c25"
+      }
+    },
+    "live_frontend_sample_sha256": "b0780776b29a1936d78aa8e3deda8b9865c3a2bddba589958a8d73244b4d2308",
+    "encoded_entry_allocations": {
+      "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-compiler-entry-allocations-v1556/report.json",
+      "report_sha256": "7ffd4cfffbaf698daa92941fc82a7a22ac3fb1653d2f6344fba14fb953e4b1c5",
+      "function_symbols": 8929,
+      "largest_prefix_bytes": 2493960,
+      "largest_prefix_function": "codegen.loongarch.Assemble.parseInstruction",
+      "scope": "Measured encoded entry-allocation prefixes; dynamic outgoing allocations and peak call chains are separate"
+    },
+    "scope": "No validation stack or CPU override; the pinned upstream build retains its existing compiler ELF stack request and worker-stack policy"
+  },
+  "self_rebuild_backend_reuse": false,
+  "initial_verified_reuse_captures": 1,
+  "fresh_generation_backend_captures": 3,
+  "generation_object_audits": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation-capture-audits-v1551/report.json",
+  "generation_object_audits_sha256": "93832a6d8bd6c8899616d0d86448ecec6ca545a78f7496980a6e8f2cc70d980d",
+  "matrix_results": [
+    {
+      "generation": "generation1",
+      "route": "llvm",
+      "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549/report.json",
+      "report_sha256": "849919c5ade6a5265aef98963fb11bf382ed2e5c3ef1ded61cb14331af55dbfc",
+      "modes": [
+        {
+          "mode": "Debug",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549/Debug/report.json",
+          "report_sha256": "61a6a91d1dc921f35720259ad450ba2c662af48c80942dd2cda6d091e2eed673",
+          "capture_audits": []
+        },
+        {
+          "mode": "ReleaseSafe",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549/ReleaseSafe/report.json",
+          "report_sha256": "8725f82704a5df72e40afaccf0c8f39ca20913c5cae7dcddaf877142b7909305",
+          "capture_audits": []
+        },
+        {
+          "mode": "ReleaseFast",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549/ReleaseFast/report.json",
+          "report_sha256": "33ac5970f58e8250448272dbaabd9251ac9cdbdbb8e839cb671b6bd54947c00a",
+          "capture_audits": []
+        },
+        {
+          "mode": "ReleaseSmall",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549/ReleaseSmall/report.json",
+          "report_sha256": "9fe0c436e40e5edc77bde977d028dd4f22f00209f6eeb8e5a37d60796881dc53",
+          "capture_audits": []
+        }
+      ],
+      "delivered_objects_audited": 0
+    },
+    {
+      "generation": "generation1",
+      "route": "local",
+      "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/report.json",
+      "report_sha256": "b60d92fdc8fbc80873b9e2af1aa312e31e31c39b552d09ff0248c69d04b9d1f6",
+      "modes": [
+        {
+          "mode": "Debug",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/Debug/report.json",
+          "report_sha256": "fb88acb07e6b21cd2888689108d47a92186efe8cd4765af623127ec0be44858a",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/Debug/captures/906871",
+              "definitions": 455,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-Debug-0/census.jsonl",
+              "census_sha256": "0ed7944b6dd6b3b5844ed6164daaa016d49baed0654f5c7dc239b88b0840d843",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-Debug-0/elf/report.json",
+              "elf_report_sha256": "e2a66eff2051a5153ad669b96735423074c2fbc103dc1ced5b3e08dab5ea006d",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-Debug-0/events/report.json",
+              "events_report_sha256": "7275b5911e1a5d909836ab8eac057f774ffca14a97f2c21b4618e72e1ce09e34"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/Debug/captures/907501",
+              "definitions": 7874,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-Debug-1/census.jsonl",
+              "census_sha256": "dd8d7a461520e7279affa88f0a0cde0d763c22ad14d631b77b3e6738ee9250f2",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-Debug-1/elf/report.json",
+              "elf_report_sha256": "d515fb3577636ce07f58bde4ed03af8f2768509f760570d718a27f15edfb45e0",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-Debug-1/events/report.json",
+              "events_report_sha256": "f16b48f184ec85f5993e1e8fa2cb61ec04075b30ae48382f19b9e82fd0c1d07a"
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSafe",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseSafe/report.json",
+          "report_sha256": "8d279b3f589ed7305c8b55fc51cc1273943193596467ad0be5141957a8a9aa7d",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseSafe/captures/916305",
+              "definitions": 455,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSafe-0/census.jsonl",
+              "census_sha256": "5f024eca35c36d3364ff6b66ee4b952ac501d211294fb76bfea8e71381825b2e",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSafe-0/elf/report.json",
+              "elf_report_sha256": "3fb766addd2c4a6a8398ce8e15dab17bcee0332910d1e810c321dcbb6c92637c",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSafe-0/events/report.json",
+              "events_report_sha256": "cbbc9eb370c6ca14ac3c86f1fe7da18def18ee33617dd32e16493b5dd2379037"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseSafe/captures/916875",
+              "definitions": 904,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSafe-1/census.jsonl",
+              "census_sha256": "09eacc428d01ad7dc2a41d3db8b2ea88f0f4cae7d38510ef84ac77ad28ad4a0d",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSafe-1/elf/report.json",
+              "elf_report_sha256": "c58e9fb388dc1b7f2a5d02be27344045379cd88a7b26bd895c1e86c5da8c46dd",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSafe-1/events/report.json",
+              "events_report_sha256": "1806d5a77dd19c4cf61d7e62abbb6a5123c987ba117d881fa90516adb617218d"
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseFast",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseFast/report.json",
+          "report_sha256": "4c4cedceed64865e0460593dbd00fcc7d956e67d06dbcda02ae23d80c0cdc85c",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseFast/captures/922853",
+              "definitions": 455,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseFast-0/census.jsonl",
+              "census_sha256": "926c72df984d87bc594e640767930e4d74e8c67917669bd6b558dbc2cde07dc4",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseFast-0/elf/report.json",
+              "elf_report_sha256": "80af89ccd35e81aab2697b5141bb4bdf4e6af1393cb81a451510d87d6595251f",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseFast-0/events/report.json",
+              "events_report_sha256": "db12a3485fd4e18121f2cd71a28a42bc7e2f2a4815cd0943245e91ca12c92fca"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseFast/captures/923435",
+              "definitions": 743,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseFast-1/census.jsonl",
+              "census_sha256": "9b44cf538d0a3569ff9ffde66837814f17ba04910ca8076484da3e8456adc9ef",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseFast-1/elf/report.json",
+              "elf_report_sha256": "77b7aaa29a93a0bd53ad232da35308ae204b4a001546e75c194fccdf8ad2a66c",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseFast-1/events/report.json",
+              "events_report_sha256": "6e02d92253016f9ccb87f1992db4abc096f95952fde8566d9d773bf6142db4d3"
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSmall",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseSmall/report.json",
+          "report_sha256": "605acf5e849f35e7d57396e120be21137ae04a72953388c50379776cf6506162",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseSmall/captures/931115",
+              "definitions": 503,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSmall-0/census.jsonl",
+              "census_sha256": "a3a294200e7799554e58867064673955f51ee56e967718a558655ea2baba18f6",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSmall-0/elf/report.json",
+              "elf_report_sha256": "71ac05d2b06ceab6626100700c6f4b160ea817f8b78974b6262fdb70f02ead4d",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSmall-0/events/report.json",
+              "events_report_sha256": "a491eea7aa65ef0f6ca7c7ccdb7c69661e568dc6a292700bb4690c28c48e47bd"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/ReleaseSmall/captures/931463",
+              "definitions": 1014,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSmall-1/census.jsonl",
+              "census_sha256": "70b6bd24d780fc304707fb1bec1946a7675f53ba02d3ce81ffe9a65684854d25",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSmall-1/elf/report.json",
+              "elf_report_sha256": "a37973971b25a45570f501de3ba4f7899ddb09df3584c35f990de43f9b427c33",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549/audit-ReleaseSmall-1/events/report.json",
+              "events_report_sha256": "d4fcae93e5897bd0f4559b318ea0f52b4575bc511983b232b7ac7f98ef760bc5"
+            }
+          ]
+        }
+      ],
+      "delivered_objects_audited": 8
+    },
+    {
+      "generation": "generation2",
+      "route": "llvm",
+      "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-llvm-v1550/report.json",
+      "report_sha256": "a6d989f4bb2b0eeca95d338732b7456fbdc0fef52d62074a99c0d673c984d044",
+      "modes": [
+        {
+          "mode": "Debug",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-llvm-v1550/Debug/report.json",
+          "report_sha256": "35baa0d2e47490d9a105777b1407745949d04c519bb60eed70d17105c906ec1e",
+          "capture_audits": []
+        },
+        {
+          "mode": "ReleaseSafe",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-llvm-v1550/ReleaseSafe/report.json",
+          "report_sha256": "9e03a318e8c5a1452bebbed3e871ba911ea8f81e42aa9c31342921fa8e4f88d1",
+          "capture_audits": []
+        },
+        {
+          "mode": "ReleaseFast",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-llvm-v1550/ReleaseFast/report.json",
+          "report_sha256": "947c908aab4d551db5975c3fa354705aa40e1f470a26de9a459cacad925cf3a1",
+          "capture_audits": []
+        },
+        {
+          "mode": "ReleaseSmall",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-llvm-v1550/ReleaseSmall/report.json",
+          "report_sha256": "e08d33dc2084f4c4e38fa3370f4077565faa56bada259fc59a5f18d581862cf4",
+          "capture_audits": []
+        }
+      ],
+      "delivered_objects_audited": 0
+    },
+    {
+      "generation": "generation2",
+      "route": "local",
+      "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/report.json",
+      "report_sha256": "92665505b38f8b78a03191e80d920fddedaf3473e2b26b845de3e5fef3e9d899",
+      "modes": [
+        {
+          "mode": "Debug",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/Debug/report.json",
+          "report_sha256": "a825d81f79ccbfa9aa1f20b077cd8d2b738284e64459d871b6eee64b3122bc2a",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/Debug/captures/992601",
+              "definitions": 455,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-Debug-0/census.jsonl",
+              "census_sha256": "fd388516152c136a4078a61cda61e42a6d98ead1a76b50a64c7c5380b34a0892",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-Debug-0/elf/report.json",
+              "elf_report_sha256": "d8c4b4ed22b5140b2dcbf4e76d3f11f22b6673ce60434a210e89ee30f912f3bc",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-Debug-0/events/report.json",
+              "events_report_sha256": "df8fcac7f60f6281a54954ee2479f1bb615fb048dd4b3f6debdfcedc44d9b7b9"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/Debug/captures/993042",
+              "definitions": 7874,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-Debug-1/census.jsonl",
+              "census_sha256": "c17b812b71172765e659f2843120d7efcbaa33888308536bb1259f86af45c4d9",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-Debug-1/elf/report.json",
+              "elf_report_sha256": "76bd3d2044f0f6da54c1aec22e34985842306b88c2fceff23f6a026a76f3c276",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-Debug-1/events/report.json",
+              "events_report_sha256": "5eed651f8e954a2477bf41d2b8e6e61e664a3043580a3c8f297665ec3303fa5d"
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSafe",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseSafe/report.json",
+          "report_sha256": "77f43ded1a197dce3e35dd8148ce1d03153f86787e9eb8a2a373a55e7d6e4ed4",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseSafe/captures/1000231",
+              "definitions": 904,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSafe-0/census.jsonl",
+              "census_sha256": "313ad94b72b9b3a98de5d0e3e7d09f63424cc2058780a97e8a210e7dac2f11f1",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSafe-0/elf/report.json",
+              "elf_report_sha256": "b8e393133454222beea14ce32846bf6472bc4aab099ddd974181449387f7c273",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSafe-0/events/report.json",
+              "events_report_sha256": "b15b47afc6c10c7614b313240300444115c9e571b484f44487c02cdf34da3bdb"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseSafe/captures/999760",
+              "definitions": 455,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSafe-1/census.jsonl",
+              "census_sha256": "5a50153ea3970fd83498cd0719a3ec5f68bb38c77099f9cd3fdaafd9bd5eaeca",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSafe-1/elf/report.json",
+              "elf_report_sha256": "8dfc0606ebe49fa6c55573b2c2f4954252012adfae72186ee19d219daddd952c",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSafe-1/events/report.json",
+              "events_report_sha256": "088089a63e777df4ffbe7ffda007c66c132b80382b2ed9f23dd755ef32b37b03"
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseFast",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseFast/report.json",
+          "report_sha256": "8965ffabd2f5bf6674cdf3d923e973eaac2c5208a07abdc16de39c3562882633",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseFast/captures/1004732",
+              "definitions": 455,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseFast-0/census.jsonl",
+              "census_sha256": "50af530959a1c4ed9c783c8f9d9623672b82a272832330b2d726198b3007a5cb",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseFast-0/elf/report.json",
+              "elf_report_sha256": "ba31e1884a0c4ef2cdf73c29aa2dfde27e9af7494b73ad8f90f7028f30bcb1ca",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseFast-0/events/report.json",
+              "events_report_sha256": "d75e2743fcf7241c2697d016403676a075c59ddc443dc951d1a5c5c184f7ba59"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseFast/captures/1005207",
+              "definitions": 743,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseFast-1/census.jsonl",
+              "census_sha256": "6f8674b9e11ed61b9a578606af3bbd614e9011273fc10a28af97d6b063220bc9",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseFast-1/elf/report.json",
+              "elf_report_sha256": "9d54c4fe962f952db3c9b7710f0dc2f6f8c30e0f0df5fa329e74a2d70a9b72fc",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseFast-1/events/report.json",
+              "events_report_sha256": "1ce816d8320e89184b2b39c23a3173aa0bfcda2672a825fe8054cf7adfeb2222"
+            }
+          ]
+        },
+        {
+          "mode": "ReleaseSmall",
+          "tests": 2097,
+          "reference_outcomes_identical": true,
+          "report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseSmall/report.json",
+          "report_sha256": "ee3beb314f2845ee93b042e084f46488a11e001b0edf8e6bf051e3961cc64cc3",
+          "capture_audits": [
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseSmall/captures/1009810",
+              "definitions": 503,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSmall-0/census.jsonl",
+              "census_sha256": "a3a294200e7799554e58867064673955f51ee56e967718a558655ea2baba18f6",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSmall-0/elf/report.json",
+              "elf_report_sha256": "487f2796547d13803ae55d31d1c73e2a9349a43c99af4ee0bb78dee5a0174264",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSmall-0/events/report.json",
+              "events_report_sha256": "8009f8703bdd6bff7c412a1334f2620e0fb921f30ad02aa548515f70124c13d8"
+            },
+            {
+              "directory": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/ReleaseSmall/captures/1010060",
+              "definitions": 1014,
+              "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSmall-1/census.jsonl",
+              "census_sha256": "70b6bd24d780fc304707fb1bec1946a7675f53ba02d3ce81ffe9a65684854d25",
+              "elf_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSmall-1/elf/report.json",
+              "elf_report_sha256": "dfa0d7f7fd063b8f2acabe88d3948361f6d41c52e0aca75e6eece60f9ed6d6c9",
+              "events_report": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550/audit-ReleaseSmall-1/events/report.json",
+              "events_report_sha256": "eddf2ceda9483e003a2de2d73a92754bf09603e155148968699190d014a2bce7"
+            }
+          ]
+        }
+      ],
+      "delivered_objects_audited": 8
+    }
+  ],
+  "matrix_modes": 16,
+  "named_reference_outcomes_per_mode": 2097,
+  "named_reference_outcomes_compared": 33552,
+  "matrix_local_objects_audited": 16,
+  "generation_local_objects_audited": 4,
+  "total_delivered_local_objects_audited": 20,
+  "frontend_f80_observations_per_generation": 9,
+  "frontend_f80_compile_time_checks_per_generation": 4,
+  "source_and_value_use_interfaces_unchanged": true,
+  "stack_object_bytes": 65536,
+  "stack_frame_bytes": 8388608,
+  "ordinary_direct_arguments": 64,
+  "ordinary_indirect_arguments": 16,
+  "stack_argument_words": 128,
+  "ordinary_ninth_sse_argument_closed": true,
+  "ordinary_sixty_fifth_direct_argument_closed": true,
+  "receipts": {
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/publish-complete-checkpoint-v1542-run.json": "32f39e23fddffb9b731b197e8b447fef8b97471eeca0cf6beb0220ea1c12b667",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/verify-complete-checkpoint-v1547-run.json": "a621fa9b1f419b35d80a0d27780f4ce7765d9f5808f1c2de25bd0b52fec9954f",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490-run.json": "066aebacecce8cee5114680dbc657d09361254686a395049055ea0bba6767425",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549-run.json": "d92ea2924e4513d66aee5fa6b537c92007ea1207da5c85f6010cb01b35c6cb52",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-local-v1549-run.json": "bc8c05862f784eb13538d2b3efa09301290d132220f49b74a20f5d710742fc96",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-llvm-v1550-run.json": "79bcad52d5b6f88b6a593e88cff3ad923736fdfe3213daa8b3513ebd0bf5e80d",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation2-local-v1550-run.json": "a2c4286849091dfad6ec9781f864b73ac58a515c46f10607afa1aecf7150c8e9",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-final-generation-captures-v1551-run.json": "afd3bed8aea53a6f235c246e0b165530dfcc04a0b4baaa48f0d252b29f6024be",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/sample-live-self-frontend-resources-v1554-run.json": "20e6b7dbca26d7764051f28b25e62f870b379d5a5b86dd54c61ebe233fc5c3c3",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/summarize-final-compiler-entry-allocations-v1556-run.json": "7e5346a90c427b661467e8f8f48229095bbb1bb6eb94acbd3ec5338bc30b412e",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/capture-service-stack-baseline-v1558-run.json": "a94baba1b3e05aabfee3a17f2bf425439654a6e4635743ffd7adfebf2acbeb02",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/capture-pinned-runner-elf-v1558-run.json": "d9d5fdd39fa7286b6acd4ab02e5e20940d544710c10d3628f1e7fb5f0480c316"
+  },
+  "seal_commands": [
+    {
+      "argv": [
+        "/usr/bin/sha256sum",
+        "--check",
+        "--status",
+        "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/complete-checkpoint-v1542/accepted-artifacts.sha256"
+      ],
+      "cwd": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461",
+      "returncode": 0,
+      "wall_ns": 10509572381,
+      "timeout_ms": 7200000,
+      "stdout": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-acceptance-v1561/verify-cumulative-seal.stdout",
+      "stderr": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-acceptance-v1561/verify-cumulative-seal.stderr",
+      "outcome": "completed",
+      "actual_returncode": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/env",
+        "-C",
+        "/home/oleg/prog/z_llvm",
+        "/usr/bin/sha256sum",
+        "--check",
+        "--status",
+        "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-30/accepted-artifacts.sha256",
+        "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-30/frozen-contracts-v3.sha256",
+        "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-05/scratch.sha256",
+        "/home/oleg/prog/z_llvm/local-state/validations/compiler-selection-completion-20261108/batch-12/air-pins-v12.sha256",
+        "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/pinned-upstream-providers-v7.sha256"
+      ],
+      "cwd": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461",
+      "returncode": 0,
+      "wall_ns": 14926845548,
+      "timeout_ms": 7200000,
+      "stdout": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-acceptance-v1561/verify-protected-pins.stdout",
+      "stderr": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-acceptance-v1561/verify-protected-pins.stderr",
+      "outcome": "completed",
+      "actual_returncode": 0
+    }
+  ],
+  "accepted_artifact_manifest": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-acceptance-v1561/accepted-artifacts.sha256",
+  "accepted_artifact_manifest_sha256": "fe01c24bbff93cb1c8407875062fdefb52c1dc6d185d88f809c47dbc3ba2669b",
+  "sealed_files": 4610
+}
