@@ -111,11 +111,23 @@ comptime {
     if (cases.len != 7) @compileError("mandatory integrated-exe inventory must remain exactly seven cases");
 }
 
+fn aggregateTimeout(text: ?[]const u8) !u32 {
+    // This wraps the entire integration suite, including every native population
+    // in all three modes. Individual commands retain their own deadlines.
+    const value = text orelse return 6 * 60 * 60 * 1000;
+    if (value.len == 0) return error.InvalidIntegratedTimeout;
+    for (value) |byte| if (!std.ascii.isDigit(byte)) return error.InvalidIntegratedTimeout;
+    const timeout_ms = std.fmt.parseInt(u32, value, 10) catch return error.InvalidIntegratedTimeout;
+    if (timeout_ms == 0) return error.InvalidIntegratedTimeout;
+    return timeout_ms;
+}
+
 pub fn main(init: std.process.Init) !void {
     const root = init.environ_map.get("ZLLVM_INTEGRATED_OUTPUT_ROOT") orelse return run(init);
     if (init.environ_map.get("ZLLVM_INTEGRATED_WORKER") != null) return run(init);
     var c = try u.Context.init(init);
     u.installSignals();
+    const timeout_ms = try aggregateTimeout(c.env.get("ZLLVM_INTEGRATED_TIMEOUT_MS"));
     const output = try c.newOutput(root);
     const storage = @import("validation/storage_workspace.zig");
     const workspace = try storage.start(&c, output, "validation");
@@ -137,15 +149,27 @@ pub fn main(init: std.process.Init) !void {
     const command = try c.a.dupe([]const u8, argv);
     command[0] = try std.Io.Dir.cwd().realPathFileAlloc(c.io, "/proc/self/exe", c.a);
     var runner = @import("validation/runner.zig").Runner.init(&c, output);
-    const result = try runner.run(command, try c.join(&.{ output, "integrated" }), &env, .{ .timeout_ms = 3_600_000 });
+    const result = try runner.run(command, try c.join(&.{ output, "integrated" }), &env, .{ .timeout_ms = timeout_ms });
     const passed = result.completed and result.code == 0;
-    try c.writeJson(try c.join(&.{ output, "report.json" }), .{ .schema = "integrated-workspace-v1", .status = if (passed) "passed" else "failed", .returncode = result.code, .completed = result.completed });
+    try c.writeJson(try c.join(&.{ output, "report.json" }), .{ .schema = "integrated-workspace-v1", .status = if (passed) "passed" else "failed", .returncode = result.code, .completed = result.completed, .aggregate_timeout_ms = timeout_ms, .timeout_scope = "entire integrated suite; individual command deadlines remain owned by their runners" });
     if (workspace) |w| try w.finish(&c, try c.join(&.{ output, "report.json" }), &.{ try c.join(&.{ output, "commands.json" }), try c.join(&.{ output, "integrated.stdout" }), try c.join(&.{ output, "integrated.stderr" }) });
     // Existing callers parse these summaries; keep the worker's streams intact
     // while also retaining them as evidence for workspace collection.
     try std.Io.File.stdout().writeStreamingAll(c.io, try c.read(try c.join(&.{ output, "integrated.stdout" })));
     try std.Io.File.stderr().writeStreamingAll(c.io, try c.read(try c.join(&.{ output, "integrated.stderr" })));
     if (!passed) std.process.exit(@intCast(if (result.code < 0) 128 - result.code else result.code));
+}
+
+test "integrated aggregate deadline covers the full suite and accepts explicit budgets" {
+    try std.testing.expectEqual(@as(u32, 21_600_000), try aggregateTimeout(null));
+    try std.testing.expectEqual(@as(u32, 3_600_000), try aggregateTimeout("3600000"));
+    try std.testing.expectEqual(@as(u32, 7), try aggregateTimeout("0007"));
+}
+
+test "integrated aggregate deadline rejects disabled and malformed budgets" {
+    for ([_][]const u8{ "", "0", "000", "-1", "+1", "1_000", "1ms", " 10", "10 ", "4294967296" }) |value| {
+        try std.testing.expectError(error.InvalidIntegratedTimeout, aggregateTimeout(value));
+    }
 }
 
 fn run(init: std.process.Init) !void {

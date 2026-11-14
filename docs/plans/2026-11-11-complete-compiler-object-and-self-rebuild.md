@@ -756,6 +756,14 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    Both backend builds and all 54 fault controls pass. The exact extracted
    reduction body and complete Safe/Fast suites now pass. Complete cumulative
    validation for these repairs before final compiler generations.
+   The first cumulative integration run was canceled by the storage wrapper's
+   new one-hour limit for the entire suite. Its last recorded native compile
+   completed successfully; the partial suite receives no qualification credit.
+   Use a separate six-hour aggregate budget, recorded in the wrapper report and
+   configurable with a positive `ZLLVM_INTEGRATED_TIMEOUT_MS`. Individual
+   compile/execution deadlines remain in force. Retain the failed run and repeat
+   all seventeen gates with the corrected wrapper, binding the unchanged 659
+   backend source files across the two frozen workspaces.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
