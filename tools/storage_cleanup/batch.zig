@@ -8,12 +8,15 @@ pub const List = struct { schema: []const u8 = "zllvm-storage-requests-v1", requ
 pub const TraceEntry = struct { audit: []const u8, build: []const u8, compiler_retirement: ?[]const u8 = null, source_reconstructions: []const p.Evidence = &.{} };
 
 pub fn generated(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
-    return outputRequests(e, paths_file, reason, false);
+    return outputRequests(e, paths_file, reason, false, false);
 }
 pub fn outputs(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
-    return outputRequests(e, paths_file, reason, true);
+    return outputRequests(e, paths_file, reason, true, false);
 }
-fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, commands: bool) !void {
+pub fn closedOutputs(e: *core.Engine, paths_file: []const u8, reason: []const u8) !void {
+    return outputRequests(e, paths_file, reason, true, true);
+}
+fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, commands: bool, closed: bool) !void {
     if (!p.relative(paths_file) or reason.len == 0) return error.InvalidEvidencePath;
     try e.addControl(paths_file);
     const bytes = try e.read(e.c.gpa, paths_file, 1024 * 1024);
@@ -27,7 +30,7 @@ fn outputRequests(e: *core.Engine, paths_file: []const u8, reason: []const u8, c
         if (seen.count() >= 1024 or seen.contains(path)) return error.InvalidRequestList;
         const owned = try e.c.a.dupe(u8, path);
         try seen.put(owned, {});
-        const candidate = (if (commands) @import("command_outputs.zig").request(e, owned, reason) else @import("generated.zig").request(e, owned, reason)) catch |err| {
+        const candidate = (if (closed) @import("command_outputs.zig").requestClosed(e, owned, reason) else if (commands) @import("command_outputs.zig").request(e, owned, reason) else @import("generated.zig").request(e, owned, reason)) catch |err| {
             try rejected.append(e.c.a, .{ .path = owned, .reason = @errorName(err) });
             continue;
         };

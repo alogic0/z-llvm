@@ -31,6 +31,7 @@ const usage =
     \\       tools/clean-storage prepare-traces --traces FILE --reason TEXT
     \\       tools/clean-storage prepare-generated --paths FILE --reason TEXT
     \\       tools/clean-storage prepare-outputs --reports FILE --reason TEXT
+    \\       tools/clean-storage prepare-closed-outputs --reports FILE --reason TEXT
     \\       tools/clean-storage prepare-receipts --receipts PLAN --reason TEXT
     \\       tools/clean-storage prepare-aliases --requests FILE --reason TEXT
     \\       tools/clean-storage narrow-cache-holds --roots FILE --reason TEXT [--apply]
@@ -73,6 +74,8 @@ pub fn main(init: std.process.Init) !void {
     const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
     const prepare_generated = args.len > 1 and std.mem.eql(u8, args[1], "prepare-generated");
     const prepare_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-outputs");
+    const prepare_closed_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-closed-outputs");
+    const prepare_any_outputs = prepare_outputs or prepare_closed_outputs;
     const prepare_receipts = args.len > 1 and std.mem.eql(u8, args[1], "prepare-receipts");
     const prepare_aliases = args.len > 1 and std.mem.eql(u8, args[1], "prepare-aliases");
     const prepare_legacy = prepare_receipts or prepare_aliases;
@@ -95,7 +98,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_legacy or narrow_cache_holds or retire_held_products) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy or narrow_cache_holds or retire_held_products) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -171,12 +174,12 @@ pub fn main(init: std.process.Init) !void {
             compiler_retirement_path = args[i];
             continue;
         }
-        if (((prepare_generated and std.mem.eql(u8, args[i], "--paths")) or (prepare_outputs and std.mem.eql(u8, args[i], "--reports"))) and i + 1 < args.len) {
+        if (((prepare_generated and std.mem.eql(u8, args[i], "--paths")) or (prepare_any_outputs and std.mem.eql(u8, args[i], "--reports"))) and i + 1 < args.len) {
             i += 1;
             generated_paths = args[i];
             continue;
         }
-        if ((prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_legacy or narrow_cache_holds) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
+        if ((prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy or narrow_cache_holds) and std.mem.eql(u8, args[i], "--reason") and i + 1 < args.len) {
             i += 1;
             reason = args[i];
             continue;
@@ -231,8 +234,8 @@ pub fn main(init: std.process.Init) !void {
     if (release_workspace and (apply or minimal or workspace_layout == null or reason == null)) return error.InvalidReleaseArguments;
     if (inventory_requested and apply) return error.InventoryIsReadOnly;
     if (share_inputs and (inputs_plan == null or minimal or requests_path != null)) return error.InvalidSharedInputPlan;
-    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_legacy) and (apply or minimal)) return error.PreparationIsReadOnly;
-    if ((prepare_generated or prepare_outputs) and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
+    if ((prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy) and (apply or minimal)) return error.PreparationIsReadOnly;
+    if ((prepare_generated or prepare_any_outputs) and (generated_paths == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_caches and (caches_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_traces and (traces_path == null or reason == null)) return error.InvalidReleaseArguments;
     if (prepare_builds and (builds_path == null or reason == null)) return error.InvalidReleaseArguments;
@@ -241,7 +244,7 @@ pub fn main(init: std.process.Init) !void {
     if (narrow_cache_holds and (hold_roots == null or reason == null or requests_path != null)) return error.InvalidReleaseArguments;
     if (retire_held_products and (review_path == null or requests_path != null or capture_aliases or artifact_aliases)) return error.InvalidHeldProductReview;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
-    if ((capture_aliases or artifact_aliases) and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_outputs or prepare_pins or prepare_legacy)) return error.InvalidCaptureAliasArguments;
+    if ((capture_aliases or artifact_aliases) and (requests_path == null or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_pins or prepare_legacy)) return error.InvalidCaptureAliasArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
     const policy_absolute = try c.join(&.{policy_path});
     var policy_dir = try core.fa.metadata.openRoot(c.io, std.fs.path.dirname(policy_absolute).?);
@@ -290,8 +293,8 @@ pub fn main(init: std.process.Init) !void {
         status = "complete";
         return;
     }
-    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_outputs) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
+    if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs) {
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_closed_outputs) try batch.closedOutputs(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
         status = "prepared";
         return;
     }
@@ -450,6 +453,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/legacy.zig", .bytes = @embedFile("storage_cleanup/legacy.zig") },
         .{ .path = "tools/storage_cleanup/cache_holds.zig", .bytes = @embedFile("storage_cleanup/cache_holds.zig") },
         .{ .path = "tools/storage_cleanup/held_products.zig", .bytes = @embedFile("storage_cleanup/held_products.zig") },
+        .{ .path = "tools/storage_cleanup/readiness_cache.zig", .bytes = @embedFile("storage_cleanup/readiness_cache.zig") },
         .{ .path = "tools/storage_cleanup/cache_batch.zig", .bytes = @embedFile("storage_cleanup/cache_batch.zig") },
         .{ .path = "tools/storage_cleanup/retired_logs.zig", .bytes = @embedFile("storage_cleanup/retired_logs.zig") },
         .{ .path = "tools/storage_cleanup/jobs.zig", .bytes = @embedFile("storage_cleanup/jobs.zig") },

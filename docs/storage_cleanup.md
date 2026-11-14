@@ -275,6 +275,15 @@ files. The collector keeps the
 report, commands and diagnostics, and checks compiled-file magic. Shell commands,
 implicit build destinations and file names alone cannot authorize collection.
 
+`prepare-closed-outputs --reports FILE --reason TEXT` explicitly includes
+ordinary products from completed commands with nonzero exit codes, including
+negative tests and failed builds. Owners must be passed or failed; every command
+that names a selected product must have a completed outcome and recorded exit
+codes. Running, timed-out or canceled commands remain ineligible. This mode
+preserves reports and diagnostics and uses the same compiled-byte, hold, pin,
+alias and current-consumer checks. The default `prepare-outputs` still requires
+successful commands and passed owners.
+
 The generated-output adapter also accepts older capture-helper runs without a
 batch directory. Such a release must name only the owner's direct `capture-zllvm`
 file; a passed real-program comparison and matching runner-provenance hash are
@@ -345,6 +354,14 @@ product paths by SHA-256. Compiler entries name their original build reports;
 shared-cache entries name closed checked-run receipts selecting that cache with
 cache flags, leading `env` assignments or a cached executable. Cache layout,
 ownership, complete file snapshots and hashes must also pass verification.
+
+An entry with `release_manual_hold: false` reviews an unheld product without
+granting any manual-hold exception. An existing hold therefore still blocks it.
+Legacy readiness caches may supply `readiness_launcher` with hash-bound `script`
+and `source_snapshot` evidence, plus `compiler`, `zig_source_directory` and
+`zig_emitter` paths. The collector accepts only the exact saved 16-line readiness
+launcher template and its successful, ordered `bash SCRIPT` completion receipt;
+it does not interpret arbitrary shell code. Launcher and snapshot records remain.
 
 This command can except the selected **exact manual holds** for this invocation
 and the generic `local-state/caches` policy parent for a reviewed shared cache.

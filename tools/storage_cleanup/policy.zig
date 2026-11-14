@@ -49,6 +49,7 @@ pub const Release = struct {
     compiler_retirement: ?Evidence = null,
     command_outputs: ?Evidence = null,
     command_owner: ?CacheOwner = null,
+    closed_command_outputs: bool = false,
 };
 pub fn within(root: []const u8, p: []const u8) bool {
     return std.mem.eql(u8, root, p) or (p.len > root.len and std.mem.startsWith(u8, p, root) and p[root.len] == '/');

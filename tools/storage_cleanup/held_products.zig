@@ -9,6 +9,8 @@ pub const Product = struct {
     kind: enum { compiler_build, shared_zig_cache },
     build_report: ?p.Evidence = null,
     closed_receipts: []const p.Evidence = &.{},
+    release_manual_hold: bool = true,
+    readiness_launcher: ?@import("readiness_cache.zig").Launcher = null,
 };
 pub const Plan = struct {
     schema: []const u8 = "zllvm-held-products-review-v1",
@@ -129,8 +131,10 @@ pub fn prepare(e: *core.Engine, plan_path: []const u8) !void {
         for (holds.value.paths) |held| if (std.mem.eql(u8, held, product.path)) {
             found = true;
         };
-        if (!found) return error.HoldNotPresent;
-        try selected.append(e.c.a, product.path);
+        if (product.release_manual_hold) {
+            if (!found) return error.HoldNotPresent;
+            try selected.append(e.c.a, product.path);
+        }
         switch (product.kind) {
             .compiler_build => {
                 const build = product.build_report orelse return error.MissingBuildReport;
@@ -148,7 +152,9 @@ pub fn prepare(e: *core.Engine, plan_path: []const u8) !void {
                 try e.keep(&kept, plan_path, null);
                 try e.keep(&kept, review.checkpoint.path, review.checkpoint.sha256);
                 for (product.closed_receipts) |receipt| {
-                    try closedReceipt(e, receipt, product.path);
+                    if (product.readiness_launcher) |launcher| {
+                        try @import("readiness_cache.zig").verify(e, product.path, receipt, launcher, &kept);
+                    } else try closedReceipt(e, receipt, product.path);
                     try e.keep(&kept, receipt.path, receipt.sha256);
                 }
                 try e.actions.append(e.c.a, .{ .path = product.path, .run_root = product.path, .producer = plan_path, .kind = .cache, .reviewed_shared_cache = true, .replay_required = false, .retained = kept.items });
@@ -172,7 +178,7 @@ pub fn finish(e: *core.Engine) !void {
     var after: std.ArrayList([]const u8) = .empty;
     for (holds.value.paths) |path| {
         var removed = false;
-        for (e.actions.items) |action| if (action.status == .removed and std.mem.eql(u8, path, action.path)) {
+        for (e.actions.items) |action| if (reviewedManualHold(e, path) and action.status == .removed and std.mem.eql(u8, path, action.path)) {
             removed = true;
         };
         if (!removed) try after.append(e.c.a, path);

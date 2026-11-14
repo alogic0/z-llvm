@@ -115,6 +115,93 @@ test "storage cleanup: held release remains authoritative in explicit product re
     try t.expectEqual(.discovered, fresh.actions.items[0].status);
 }
 
+test "storage cleanup: product review without hold release preserves existing holds" {
+    for ([_]bool{ false, true }) |held| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try heldProductsFixture(f, true);
+        var prepare = f.engine();
+        if (!held) try prepare.write(prepare.config.holds_file, p.Holds{ .paths = &.{ run ++ "/z_llvm", report } });
+        const json = try prepare.load(prepare.c.a, held_plan);
+        var plan = (try std.json.parseFromValue(held_products.Plan, prepare.c.a, json.value, .{ .allocate = .alloc_always })).value;
+        var products = [_]held_products.Product{plan.products[0]};
+        products[0].release_manual_hold = false;
+        plan.products = &products;
+        plan.holds.sha256 = try prepare.digest(prepare.config.holds_file);
+        try prepare.write(held_plan, plan);
+        var e = f.engine();
+        try held_products.prepare(&e, held_plan);
+        try e.loadHolds();
+        try t.expectEqual(@as(usize, 0), e.reviewed_hold_paths.len);
+        if (held) {
+            try t.expectEqual(.skipped, e.actions.items[0].status);
+            _ = try e.metadata(shared_cache ++ "/o/tool");
+        } else {
+            try e.qualify(0);
+            try cache_batch.apply(&e, &.{0});
+        }
+        try held_products.finish(&e);
+        try t.expectEqualStrings(plan.holds.sha256, try e.digest(e.config.holds_file));
+    }
+}
+
+const readiness = @import("readiness_cache.zig");
+const readiness_root = run ++ "/readiness-zig-local-behavior-v1";
+const readiness_receipt = run ++ "/readiness-behavior-v1-run.json";
+fn readinessFixture(f: *Fixture, e: *core.Engine, case: usize) !readiness.Launcher {
+    const script_path = run ++ "/run-readiness-behavior-v1.sh";
+    const snapshot = run ++ "/source-frozen-v1.json";
+    try f.write(snapshot, "{\"status\":\"passed\"}");
+    var binding: readiness.Launcher = .{
+        .script = .{ .path = script_path, .sha256 = "" },
+        .source_snapshot = .{ .path = snapshot, .sha256 = try e.digest(snapshot) },
+        .compiler = run ++ "/compiler/Debug/bin/z_llvm",
+        .zig_source_directory = "/source/zig",
+        .zig_emitter = "/source/zig/build/bin/zig",
+    };
+    const bytes = try readiness.script(e, readiness_root, binding);
+    try f.write(script_path, if (case == 1) try e.c.fmt("{s}echo changed\n", .{bytes}) else bytes);
+    binding.script.sha256 = try e.digest(script_path);
+    try e.write(readiness_receipt, .{
+        .status = if (case == 2) "running" else "finished",
+        .outcome = "completed",
+        .actual_returncode = 0,
+        .returncode = 0,
+        .started_ns = 1,
+        .finished_ns = if (case == 3) @as(i64, 1) else @as(i64, 2),
+        .cwd = if (case == 4) "/other/repo" else e.c.root,
+        .argv = [_][]const u8{ "bash", if (case == 5) run ++ "/other.sh" else script_path },
+    });
+    return binding;
+}
+
+test "storage cleanup: exact readiness launcher binds closed cache ownership and retained evidence" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const binding = try readinessFixture(f, &e, 0);
+    var kept: std.ArrayList(p.Evidence) = .empty;
+    try readiness.verify(&e, readiness_root, .{ .path = readiness_receipt, .sha256 = try e.digest(readiness_receipt) }, binding, &kept);
+    try t.expectEqual(@as(usize, 3), kept.items.len);
+    for (kept.items) |ev| try e.check(ev);
+}
+
+test "storage cleanup: readiness review rejects changed shell logic and unbound completion" {
+    for (1..6) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const binding = try readinessFixture(f, &e, case);
+        var kept: std.ArrayList(p.Evidence) = .empty;
+        try t.expectError(switch (case) {
+            1 => error.UnsupportedReadinessLauncher,
+            2, 3 => error.ReadinessNotClosed,
+            4 => error.ReadinessWorkingDirectoryMismatch,
+            else => error.UnboundReadinessLauncher,
+        }, readiness.verify(&e, readiness_root, .{ .path = readiness_receipt, .sha256 = try e.digest(readiness_receipt) }, binding, &kept));
+    }
+}
+
 test "storage cleanup: held products reject running owners and changed review controls" {
     for (0..3) |case| {
         const f = try Fixture.init();
@@ -490,6 +577,78 @@ test "storage cleanup: unsuccessful output command cannot release a passed owner
     var e = f.engine();
     try commandOutputFixture(f, &e, false);
     try t.expectError(error.OutputCommandNotSuccessful, command_outputs.request(&e, report, "Rejected output"));
+}
+
+test "storage cleanup: explicit closed outputs retire failed products but retain diagnostics" {
+    for ([_][]const u8{ "passed", "failed" }) |status| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try commandOutputFixture(f, &prepare, false);
+        try prepare.write(report, .{ .schema = "input-program-v1", .status = status });
+        var e = f.engine();
+        const r = try command_outputs.requestClosed(&e, report, "Closed failed or negative-test products");
+        try t.expect(r.closed_command_outputs);
+        try e.write(run ++ "/products-release.json", r);
+        try e.discoverRelease(run ++ "/products-release.json", true);
+        for (0..2) |i| try e.qualify(i);
+        try e.protectRetained();
+        try mutation.applyFileBatch(&e, &.{ 0, 1 });
+        for (e.actions.items) |a| try t.expectEqual(.removed, a.status);
+        for ([_][]const u8{ report, run ++ "/commands.json", run ++ "/input.ll", run ++ "/compile.stdout", run ++ "/compile.stderr" }) |path| _ = try e.metadata(path);
+    }
+}
+
+test "storage cleanup: closed output opt-in rejects unfinished owners and commands" {
+    for (0..5) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try commandOutputFixture(f, &prepare, false);
+        if (case == 0) try prepare.write(report, .{ .status = "running" });
+        if (case != 0) try prepare.write(run ++ "/commands.json", .{.{
+            .argv = [_][]const u8{ "cc", "input.c", "-o", try prepare.absolute(run ++ "/local") },
+            .outcome = switch (case) {
+                1 => "running",
+                2 => "timed_out",
+                3 => "canceled",
+                else => "completed",
+            },
+            .actual_returncode = if (case == 4) @as(?i32, null) else @as(?i32, 1),
+            .returncode = 1,
+            .stdout = run ++ "/compile.stdout",
+            .stderr = run ++ "/compile.stderr",
+        }});
+        var e = f.engine();
+        try t.expectError(if (case == 0) error.UnboundOutputOwner else error.OutputCommandNotSuccessful, command_outputs.requestClosed(&e, report, "Reject incomplete commands"));
+        _ = try e.metadata(run ++ "/local");
+    }
+}
+
+test "storage cleanup: closed output opt-in cannot waive holds pins or compiled magic" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try commandOutputFixture(f, &prepare, false);
+        if (case == 0) try prepare.write(prepare.config.holds_file, p.Holds{ .paths = &.{run ++ "/local"} });
+        if (case == 1) try f.write(run ++ "/historical.sha256", try prepare.c.fmt("{s}  {s}\n", .{ try prepare.digest(run ++ "/local"), run ++ "/local" }));
+        if (case == 2) try f.write(run ++ "/local", "#!/bin/sh\nexit 0\n");
+        var e = f.engine();
+        try e.write(run ++ "/products-release.json", try command_outputs.requestClosed(&e, report, "Keep independently protected files"));
+        try e.discoverRelease(run ++ "/products-release.json", true);
+        try e.loadHolds();
+        if (case == 2) {
+            try t.expectError(error.NotCompiledOutput, e.qualify(0));
+        } else {
+            if (case == 1) {
+                try e.qualify(0);
+                try e.pins();
+            }
+            try t.expectEqual(.skipped, e.actions.items[0].status);
+        }
+        _ = try e.metadata(run ++ "/local");
+    }
 }
 
 test "storage cleanup: multi-product requests retain only exact per-file pin exceptions" {

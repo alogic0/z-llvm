@@ -99,7 +99,7 @@ fn product(e: *core.Engine, command: u.Value, report: u.Value, binding: ?p.Cache
     }
     return if (destination) |path| .{ .path = path } else null;
 }
-pub const Record = struct { output: Product, successful: bool, stdout: []const u8, stderr: []const u8 };
+pub const Record = struct { output: Product, successful: bool, terminal: bool = false, stdout: []const u8, stderr: []const u8 };
 fn records(e: *core.Engine, commands: p.Evidence, report: u.Value, binding: ?p.CacheOwner) ![]const Record {
     // owner() verifies the command hash before consulting this invocation-local
     // index; e.load also binds report/command paths to unchanged observations.
@@ -116,7 +116,8 @@ fn records(e: *core.Engine, commands: p.Evidence, report: u.Value, binding: ?p.C
         if (output.copied_sha256) |sha| output.copied_sha256 = try e.c.a.dupe(u8, sha);
         const stdout = try e.relative(try core.str(command, if (binding != null) "log" else "stdout"));
         const stderr = if (binding != null) stdout else try e.relative(try core.str(command, "stderr"));
-        try result.append(e.c.a, .{ .output = output, .successful = core.eq(command, "outcome", "completed") and try core.integer(command, "actual_returncode") == 0 and try core.integer(command, "returncode") == 0, .stdout = stdout, .stderr = stderr });
+        const terminal = core.eq(command, "outcome", "completed") and core.has(command, "actual_returncode", .integer) and core.has(command, "returncode", .integer);
+        try result.append(e.c.a, .{ .output = output, .terminal = terminal, .successful = terminal and try core.integer(command, "actual_returncode") == 0 and try core.integer(command, "returncode") == 0, .stdout = stdout, .stderr = stderr });
     }
     try e.command_output_records.put(cache_key, result.items);
     return result.items;
@@ -139,7 +140,7 @@ fn owner(e: *core.Engine, r: p.Release, report: u.Value) !p.Evidence {
         try e.check(commands);
         return commands;
     }
-    if (r.state != .disposable or !core.eq(report, "status", "passed") or
+    if (r.state != .disposable or (!core.eq(report, "status", "passed") and !(r.closed_command_outputs and core.eq(report, "status", "failed"))) or
         !same(r.producer.path, try e.c.fmt("{s}/report.json", .{r.run_root}))) return error.UnboundOutputOwner;
     const commands = r.command_outputs orelse return error.MissingCommandOutputBinding;
     if (!same(commands.path, try e.c.fmt("{s}/commands.json", .{r.run_root}))) return error.UnboundOutputCommands;
@@ -154,7 +155,7 @@ pub fn verify(e: *core.Engine, a: core.Action, r: p.Release, report: u.Value, ke
         const output = command.output;
         if (!same(output.path, a.path)) continue;
         if (!p.within(r.run_root, output.path)) return error.UnboundOutputPath;
-        if (!command.successful) return error.OutputCommandNotSuccessful;
+        if (!command.successful and !(r.closed_command_outputs and command.terminal)) return error.OutputCommandNotSuccessful;
         if (r.command_owner != null and same(command.stdout, a.path)) return error.UnboundOutputLog;
         if (output.copied_sha256) |sha| if (!same(sha, a.sha256.?)) return error.CopiedCompilerHashMismatch;
         for ([_][]const u8{ command.stdout, command.stderr }) |log| {
@@ -168,11 +169,17 @@ pub fn request(e: *core.Engine, report_path: []const u8, reason: []const u8) !p.
     return requestSelected(e, report_path, reason, null);
 }
 pub fn requestSelected(e: *core.Engine, report_path: []const u8, reason: []const u8, selected: ?[]const []const u8) !p.Release {
+    return requestMode(e, report_path, reason, selected, false);
+}
+pub fn requestClosed(e: *core.Engine, report_path: []const u8, reason: []const u8) !p.Release {
+    return requestMode(e, report_path, reason, null, true);
+}
+fn requestMode(e: *core.Engine, report_path: []const u8, reason: []const u8, selected: ?[]const []const u8, closed: bool) !p.Release {
     if (!p.validationOutput(report_path) or !same(std.fs.path.basename(report_path), "report.json") or reason.len == 0) return error.UnboundOutputOwner;
     const run_root = std.fs.path.dirname(report_path).?;
     if (!p.validationRun(run_root)) return error.UnboundOutputOwner;
     const commands = try e.c.fmt("{s}/commands.json", .{run_root});
-    const result: p.Release = .{ .schema = "zllvm-storage-release-v1", .state = .disposable, .run_root = try e.c.a.dupe(u8, run_root), .reason = reason, .producer = .{ .path = try e.c.a.dupe(u8, report_path), .sha256 = try e.digest(report_path) }, .command_outputs = .{ .path = commands, .sha256 = try e.digest(commands) }, .retained = &.{}, .artifacts = &.{} };
+    const result: p.Release = .{ .schema = "zllvm-storage-release-v1", .state = .disposable, .run_root = try e.c.a.dupe(u8, run_root), .reason = reason, .producer = .{ .path = try e.c.a.dupe(u8, report_path), .sha256 = try e.digest(report_path) }, .command_outputs = .{ .path = commands, .sha256 = try e.digest(commands) }, .retained = &.{}, .artifacts = &.{}, .closed_command_outputs = closed };
     var report = try e.load(e.c.gpa, report_path);
     defer report.deinit();
     return prepare(e, result, report.value, selected);
