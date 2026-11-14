@@ -1,0 +1,355 @@
+{
+  "schema": "upstream-behavior-complete-cumulative-checkpoint-v1",
+  "status": "cumulative-checkpoint-passed-final-generations-open",
+  "scope": "Complete fixed compiler/runtime/Debug behavior objects, cumulative native coverage and exact raw-difference reviews. Both final compiler generations, their complete LLVM/local matrices and normal-resource self-rebuild remain required",
+  "code_revision": "dbf7ade023f53394e5719c3344e512446a0b09a1",
+  "aggregate_tooling_revision": "f4de8fb686d9c0ce691193c0b75990bdb9d18b63",
+  "backend_source_files": 659,
+  "source_snapshot": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/source-frozen-qualified-behavior-v1461.json",
+  "source_snapshot_sha256": "baa58b507dba59b5a75d553b4829da45e4818b53b6166e67186542449f239cab",
+  "aggregate_source_snapshot": "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/source-frozen-aggregate-budget-v1500.json",
+  "aggregate_source_snapshot_sha256": "35e4ea5b844d47d48280221a079ad9ee0b7ba2e2955d9ff8e362573369a795a5",
+  "official_unit_tests_per_mode": 2364,
+  "structural_checks_per_mode": 65,
+  "profile_event_tests_per_mode": 2,
+  "readiness_procedures": 8,
+  "integration_gates": 17,
+  "native_populations_per_build": 225,
+  "native_builds": [
+    "Debug",
+    "ReleaseFast"
+  ],
+  "native_release_modes": 3,
+  "preserved_prior_outcomes_per_build": 7160,
+  "native_artifact_review": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/native-artifact-review-both-v1536/report.json",
+  "native_artifact_review_sha256": "4e4a70cb2f925d86aa59eb33bffdbe0b89a90ee20ee24284144aeadf5ef08337",
+  "original_compiler_difference_review": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/original-compiler-difference-review-v1526/report.json",
+  "original_compiler_difference_review_sha256": "14fdf4924cca46284c463785a9032168cb6eca810b3cf0a656684d537c596043",
+  "native_fault_controls_per_build": 3348,
+  "runtime_fault_controls_per_build": 14,
+  "required_fault_controls": 6724,
+  "original_objects": [
+    {
+      "population": "compiler",
+      "definitions": 8928,
+      "input_sha256": "de26621926e7262000930b6f28dbb481fba2440be930faafd9fa8f0a4e6a504e",
+      "object": {
+        "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compiler-original-qualified-behavior-v1464/backend/local.o",
+        "bytes": 149620056,
+        "sha256": "d10d05451b6e553a3bbdd364f5709097df2fdfac208f25fb47a27974723cfeef"
+      },
+      "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-compiler-qualified-v1471.jsonl",
+      "census_sha256": "873d76839cf25af26b5767df9cc8083f30539e66ac9e29b82356eb45f4996521"
+    },
+    {
+      "population": "runtime-Debug",
+      "definitions": 455,
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "object": {
+        "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/runtime-Debug-qualified-v1466/backend/local.o",
+        "bytes": 3085376,
+        "sha256": "0c8d7d0f39cf20f4a95fee6ba9a49e4d3fe9a9bcfd025b03fe26046bf3bb428d"
+      },
+      "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-runtime-original-qualified-v1468.jsonl",
+      "census_sha256": "b00356eb9f842746928b857c83282a6862e7991aacec7bc2e882f663ce6709c7"
+    },
+    {
+      "population": "runtime-ReleaseFast",
+      "definitions": 455,
+      "input_sha256": "ca04995e5bc4d6537f6e1b994a79569ed8dc10d64451f89dfc0714fb40a732af",
+      "object": {
+        "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/runtime-ReleaseFast-qualified-v1466/backend/local.o",
+        "bytes": 3085376,
+        "sha256": "0c8d7d0f39cf20f4a95fee6ba9a49e4d3fe9a9bcfd025b03fe26046bf3bb428d"
+      },
+      "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-runtime-original-qualified-v1468.jsonl",
+      "census_sha256": "b00356eb9f842746928b857c83282a6862e7991aacec7bc2e882f663ce6709c7"
+    },
+    {
+      "population": "runtime-Small",
+      "definitions": 503,
+      "input_sha256": "e480b71b5e90c088cabda455b52238f6fe72333db6e7e6a565fed322be083fc3",
+      "object": {
+        "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/runtime-small-qualified-v1466/backend/local.o",
+        "bytes": 2079096,
+        "sha256": "5e1b10b5797907231dcec3a3fb904b98bd913bfa412b14c81768cedc8a51aae8"
+      },
+      "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-runtime-small-qualified-v1468.jsonl",
+      "census_sha256": "62cf07782855b9b7bb93c814672af090cd50aed54610f8c208547e3d4869bac2"
+    },
+    {
+      "population": "behavior-Debug",
+      "definitions": 7874,
+      "input_sha256": "d8b983f4686a19acdf9f5bcc84c084b6fbc68e104e1671032509f7180c9aa02b",
+      "object": {
+        "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/behavior-original-qualified-v1466/backend/local.o",
+        "bytes": 27286368,
+        "sha256": "4ea9c9b39f5ab18be66f1e6f1293652ce2e9ba68fe93edbf0aad00324954eb2e"
+      },
+      "census": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-behavior-original-qualified-v1468.jsonl",
+      "census_sha256": "989e58f8964d34479ed49a5598ad15c5d8f75b18f47fbd0c715e097186a1d8f3"
+    }
+  ],
+  "original_debug_behavior_definitions": 7874,
+  "original_debug_behavior_selected": 7874,
+  "original_debug_behavior_remaining": 0,
+  "original_debug_gained": 14,
+  "original_debug_lost": 0,
+  "original_debug_object_complete": true,
+  "final_follow_up_complete": false,
+  "source_and_value_use_interfaces_unchanged": true,
+  "stack_object_bytes": 65536,
+  "stack_frame_bytes": 8388608,
+  "ordinary_direct_arguments": 64,
+  "ordinary_indirect_arguments": 16,
+  "stack_argument_words": 128,
+  "ordinary_ninth_sse_argument_closed": true,
+  "ordinary_sixty_fifth_direct_argument_closed": true,
+  "receipts": {
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/freeze-qualified-behavior-v1461-run.json": {
+      "sha256": "52456e61a10f6b0401d9ce29681d8851e44fa15d35e87d1fb3288d7c82d8d682",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/preserve-qualified-source-v1462-run.json": {
+      "sha256": "8c7599a2643e09617dc35adebff3a05beeced48fe5feb2a7b69515ec4da4cb29",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/build-qualified-behavior-Debug-v1462-run.json": {
+      "sha256": "fb1c4936d73f85e54a8b7c5e3a30a6aa5b83ae76b585774e5e11b03b32588f9a",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/build-qualified-behavior-ReleaseFast-v1462-run.json": {
+      "sha256": "c1bb7cd2e27a901dd28f3d57ac93a6d2adab5b56fe6e2b7c3be5c90928bb80ba",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/units-qualified-behavior-Debug-v1462-run.json": {
+      "sha256": "4ab77577cb0440f13644a98a61809cf9f5fa1518cafef97c3b7b23bb61687137",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/units-qualified-behavior-ReleaseSafe-v1462-run.json": {
+      "sha256": "7849a09bc8d143678e96dd614d4265a42cb0968842fe9008301bd51b39230bc7",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/readiness-qualified-behavior-v1463-run.json": {
+      "sha256": "4976a5fd00a5ddc6eb5c028e2e4e88405f6b33bb8aa70dc5e9a820e98493a765",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/native-Debug-qualified-behavior-v1463-run.json": {
+      "sha256": "f9d8a23584935115d2f2ec7f4372cd3f936f87699b2889d19e858b6fad7f87d2",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compiler-original-qualified-behavior-v1464-run.json": {
+      "sha256": "2f78cbb2399162fd20b597bfd9cfb7cc0221967fed64ae1fcbb2a16e5fbd9ac8",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/runtime-Debug-qualified-v1466-run.json": {
+      "sha256": "329659255305530c961bc1aa1ab6338f81d19c9e583a8e5a831d93b7b5362b4f",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/runtime-ReleaseFast-qualified-v1466-run.json": {
+      "sha256": "2d6c0ec7547a31577b6061eb7e13fe52ac3a7844ed70f9a19e3ee883727e3551",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/runtime-small-qualified-v1466-run.json": {
+      "sha256": "a4fefce9b46f4b265ad3ed35a3d0b6126ddb752cd70ab8d0573c442d878b7dd7",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/behavior-original-qualified-v1466-run.json": {
+      "sha256": "381a470a09fb5a4165ebb60edcbf5bc79a5b5ba548603ee9b1475c7349ad1b0b",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-compiler-qualified-v1471-run.json": {
+      "sha256": "a2dceecde23cd3231a0731857c2b87127b46da629a43283ecb360f7d756f9c32",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-runtime-original-qualified-v1468-run.json": {
+      "sha256": "9bed4f192ff5d0b2e6c41bca11382f99714a69dc29df9330012b9e1f899fd39e",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-runtime-small-qualified-v1468-run.json": {
+      "sha256": "7ed0a116711d3421d4815389cc773ee3a15061ecc1c8279191e447a1d5d12e20",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/census-behavior-original-qualified-v1468-run.json": {
+      "sha256": "b526b999fbcfb1a82540e1511732d0f5736adcefecfc7e63d886c486aa2cadee",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-elf-compiler-qualified-v1506-run.json": {
+      "sha256": "2227a14339d1e4c7c8330aa400b89c0616041dc7daae679b812721a96977be71",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-events-compiler-qualified-v1506-run.json": {
+      "sha256": "d6d82ec4550fd5e4bdaeece32cbfe06842a51750130e3ee495eee4f083cb440c",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-owners-compiler-qualified-v1506-run.json": {
+      "sha256": "9b14a217401a96882bf261d6a7eb8d63515130ce4656f6856a496d209c6bae73",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-census-compiler-qualified-v1507-run.json": {
+      "sha256": "86b6ac890cf6ebcb8c1ea5107044e92ffa73ec27eaea259616381d88c81ec09b",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-compiler-functions-qualified-v1507-run.json": {
+      "sha256": "3fa8ed117e98df47b9343c50b01ea58753d67bf05caeb4a7ae2350be3527d6b8",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/replay-compiler-functions-qualified-v1509-run.json": {
+      "sha256": "095fd1673d70616382700bdd14df32252c8d21268b7d08963416cbb27d23e00e",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/prove-compiler-blockaddresses-v1519-run.json": {
+      "sha256": "8a47ea56c8d93e645547412f62ac16db78d8cdb9f2dc849a81edcbb1079a0d07",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/review-compiler-blockaddress-metadata-v1520-run.json": {
+      "sha256": "3b65879ef54295563b00f9b24e20a11c7ecf31475714de81e9c5bdc8ad728f85",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/qualify-original-compiler-differences-v1526-run.json": {
+      "sha256": "62ecf2ad27a461a5173419e31fb26e7970c425b33e4c5982806f937618f9f670",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/prepare-fault-manifest-Debug-v1527-run.json": {
+      "sha256": "791cac68fe5daf8f9c9576ce38420bdab45d66d2af4c8fc311c6e51d48e07925",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/native-faults-Debug-qualified-v1528-run.json": {
+      "sha256": "fcb9d6c4c744f1e715843854f224e9bc66e30a9b801312ae0ba0cc722c3b8407",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/review-native-artifacts-both-v1536-run.json": {
+      "sha256": "b84b0d1dcb2a3b8edc8ce19908e42399207e7e8edab3f45491ba3dec3e9059ae",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/retained-pins-complete-v1541-run.json": {
+      "sha256": "f3079dfc783f50539f668ab1d446237dca03b3d428a9f3705daae6352fbf4b50",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-small-runtime-functions-v1544-run.json": {
+      "sha256": "c90394139755dd30aef75490da4f10c537150e97fa1cb0b708bf8e170b729bce",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/replay-small-runtime-functions-v1545-run.json": {
+      "sha256": "9a355c70692aca22cea893c6a3605b5a3f4ef98e7185a25515136abc2b664798",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/review-small-runtime-metadata-v1545-run.json": {
+      "sha256": "ffe1095feb6b2d613245d901f47fabac7bb55073a05a81ec00946908fc06dbab",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-elf-runtime-Debug-qualified-v1467-run.json": {
+      "sha256": "4828c516a9e0619e9a9c4706cd383366bf8433c33880dc99235be8dc35dc9c81",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-events-runtime-Debug-qualified-v1467-run.json": {
+      "sha256": "764da6c7e0a8d864788a992197b730b7f761377c9cf9c80e7db39cf9692977c3",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-owners-runtime-Debug-qualified-v1467-run.json": {
+      "sha256": "93df1d42730d21a0e802c28940ec95c3d488680e9e29b8e39438620c92881f1e",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-elf-runtime-ReleaseFast-qualified-v1467-run.json": {
+      "sha256": "58b8f3e00ea8cbc5a6acb451421ac762846a2504b587f56fdea6b55b2f226caf",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-events-runtime-ReleaseFast-qualified-v1467-run.json": {
+      "sha256": "dfb18df206b509b7816bab2ecc6cbdbc56afa20807e4a6b317339a63189f8d9c",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-owners-runtime-ReleaseFast-qualified-v1467-run.json": {
+      "sha256": "0cbfb7058be51ac3f2c3cf3a8809c30357095e1ccec31653fdf9a6ada1408a8b",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-elf-runtime-Small-qualified-v1467-run.json": {
+      "sha256": "3fd5ec62ca90d3930ac90ee751e7a591c9c7daeb58ac7d18a8466315596e6358",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-events-runtime-Small-qualified-v1467-run.json": {
+      "sha256": "3e79a023a8358f31f50c7fa8018eac96f27918af114db2f7119dbde2a2bfd9b0",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-owners-runtime-Small-qualified-v1467-run.json": {
+      "sha256": "e77642ecd5beaaf3418aa35f42c93e204663fed3db2a3043d15a72c9199c4225",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-elf-behavior-Debug-qualified-v1467-run.json": {
+      "sha256": "e155046b025394a1eb822d7b6aea512acea61f92aa405764e8e7a957ad5b7be4",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/audit-events-behavior-Debug-qualified-v1467-run.json": {
+      "sha256": "7c8bda316c1cfba2f8cad4342def26e1cc30cd4b80f0d1e01e061707e388a3ca",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-owners-behavior-Debug-qualified-v1467-run.json": {
+      "sha256": "e4f4487eaf10efc82815f14ffcd4d59742c30ebe9797ade958674bca49882e5e",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/freeze-aggregate-budget-v1500-run.json": {
+      "sha256": "6e10c85e0987e0930fa5b6a897bf3799314d903983c950186f47393da1d89369",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/preserve-aggregate-source-v1501-run.json": {
+      "sha256": "02ad3b502854822abc20f58301557d396083672688fcd6fc99e20316d572e83b",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/source-bridge-aggregate-budget-v1503-run.json": {
+      "sha256": "e971aa2fd477d558d63595975968f89b145b4ff2bd7b5099f740984b69e36507",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/units-aggregate-budget-Debug-v1501-run.json": {
+      "sha256": "ccf110beab8992549c3fc25874eb66ea2dceb923f594de168101e401fddcdea5",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/units-aggregate-budget-ReleaseSafe-v1501-run.json": {
+      "sha256": "d1f32e37dbe0089b653bd8870d25f19f009da585375a93c20780e515cbe1b524",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/readiness-aggregate-budget-v1502-run.json": {
+      "sha256": "f4fd57d9dfbe00ccfe8bde40b56881b85276747fefdeb087219cc1de0a7106b9",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/full-aggregate-budget-v1504-run.json": {
+      "sha256": "4129fa248a701a9608e6bf76b12f5edcb9d8121a5fff92475c467be4043800c9",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/prepare-fault-manifest-ReleaseFast-v1530-run.json": {
+      "sha256": "6588408e4701d874ffa1ca96f605ec610b781132d0fb17b8f5e17e1d7779e384",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/native-faults-ReleaseFast-qualified-v1531-run.json": {
+      "sha256": "0a1120da8e2948b200592f02edd9374cb3802d1d172721a6edbc89f3168cd8dd",
+      "actual_returncode": 0
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/compare-native-Debug-qualified-v1529-run.json": {
+      "sha256": "4db2b14aa890bb344a8f8638c49383c0ebd0573df8ca551cc17e1e9333da175a",
+      "actual_returncode": 1
+    },
+    "/home/oleg/prog/z_llvm-validation-aggregate-budget-v1500/local-state/isolated-validations-aggregate-budget-v1500/compare-native-ReleaseFast-qualified-v1532-run.json": {
+      "sha256": "698a423e0831b06392aeb62fe7f3771f5e216df918d51330f20a0b5a8fce0d5b",
+      "actual_returncode": 1
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/reject-blockaddress-object-v1522-run.json": {
+      "sha256": "69192737ed48c4825509425663282b134a6f28485883782650fbb51e589be02c",
+      "actual_returncode": 1
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/reject-blockaddress-source-block-v1522-run.json": {
+      "sha256": "a16663dc12d8d37c5e9d1a35ed7afde96e20f67e2279d97fd6f87ed4bae43ca0",
+      "actual_returncode": 1
+    },
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/reject-blockaddress-addend-v1522-run.json": {
+      "sha256": "c22fd6205c6cce44bcaece07ef5beb72cc1b7efccf6dddc26ac204d72def28d5",
+      "actual_returncode": 1
+    }
+  },
+  "retained_nonacceptance_attempts": [
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/full-qualified-behavior-v1464-run.json",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/review-compiler-metadata-qualified-v1510-run.json",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/build-blockaddress-metadata-review-v1517-run.json",
+    "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/build-native-difference-reviewer-v1534-run.json"
+  ],
+  "checkpoint_artifact_manifest": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/complete-checkpoint-v1542/accepted-artifacts.sha256",
+  "checkpoint_artifact_manifest_sha256": "992ca0fe87f247238cdb9946f6b6afae2e20498a3d7a0f8ea94b39ca6c52786a",
+  "checkpoint_files": 77351
+}

@@ -36,6 +36,19 @@ optimizer artifact byte-for-byte. Original compiler/runtime objects remain
 identical. A verified 62,216-file seal retains the evidence. The unchanged Debug
 input selects 7,860/7,874 definitions, gaining 14 without loss; 14 failures remain.
 See the [tail checkpoint](../evidence/compiler_behavior_tail_checkpoint_20261113.json).
+The complete behavior checkpoint passes at `dbf7ade0`, with the aggregate
+validation budget corrected at `f4de8fb6`. Both 2,364-unit builds, 65 structural
+checks per mode, eight readiness procedures, all 17 gates, both complete
+225-population native suites and all 6,724 required faults pass. Each build
+preserves all 7,160 preceding command outcomes. The 21 changed native objects
+per build remain explicit and pass exact encoding and ELF reviews. The original
+compiler, both runtime populations and the unchanged Debug behavior input emit
+complete audited objects. Debug now selects all 7,874 definitions, gaining the
+remaining 14 without loss. All 28 changed compiler symbols and both changed
+Small runtime aliases reproduce their before/after encodings exactly; twelve
+compiler jump-table relocations retain their proven source-block targets.
+A verified 77,351-file successor seal retains this evidence. See the
+[complete cumulative checkpoint](../evidence/compiler_behavior_complete_checkpoint_20261113.json).
 The complete local-hook matrices and
 final-source generations remain open. The original
 five-milestone acceptance remains unchanged. See the
@@ -764,6 +777,23 @@ and rejection controls. Do not normalize the accepted suite or filter cases.
    compile/execution deadlines remain in force. Retain the failed run and repeat
    all seventeen gates with the corrected wrapper, binding the unchanged 659
    backend source files across the two frozen workspaces.
+   The fresh original compiler now emits all 8,928 definitions successfully.
+   Its independent census matches the fixed inventory, all owners are retained,
+   and its ELF and ordered-event audits pass. The original 455-definition
+   runtime, 503-definition Small runtime and unchanged 7,874-definition Debug
+   behavior input also produce complete audited objects. Their independent
+   censuses preserve the fixed inventories. All 28 changed compiler function
+   encodings reproduce exactly with the retained before and after backends.
+   Twelve data relocations in `__jmptab_2225` move with one changed function;
+   separate full-module selections prove each still targets the same source
+   block at its exact encoded offset. The other 42,145 data relocations remain
+   identical. The combined ELF review passes, retaining the raw differences and
+   failed initial metadata review. Negative controls reject altered object
+   identity, source blocks and addends. Both complete 225-population native
+   suites, all 6,724 required faults and the strict prior-artifact comparisons
+   now pass with explicit reviews for all changed objects. The complete
+   cumulative checkpoint retains 77,351 files. Proceed to the final generations
+   in step 12; their acceptance remains separate.
 12. Build the final two compiler generations from the accepted source under
    normal stack limits and CPU scheduling. Run both complete four-mode normal
    LLVM and explicit local-hook matrices, compare every named outcome with the
