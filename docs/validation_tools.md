@@ -45,6 +45,7 @@ remain in this repository.
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
 | Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
 | Full pinned upstream behavior suite with named outcome comparison and optional local hook | `tools/run_upstream_behavior.zig` |
+| Candidate frontend f80 layout and C ABI regression | `tools/run_frontend_f80.zig` |
 | Audit a retained completed object against its command, owners, census and ELF | `tools/audit_captured_object.zig` |
 | Inventory global decoding and shared ELF placement without object credit | `tools/inspect_global_data.zig` / `inspect-global-data` |
 | Generate compiler global and runtime completion fixtures | `tools/generate_global_objects_canary.zig`, `tools/generate_runtime_frontier_canary.zig` |
@@ -63,7 +64,7 @@ remain in this repository.
 | Checked semantic facts | `tools/validation/candidate_facts.zig` library |
 | Fact freezing and replay proof | `tools/freeze_real_candidate_facts.zig` / `freeze-real-candidate-facts` |
 | Frozen performance matrix | `tools/fixed_program_baseline.zig` / `fixed-program-baseline` |
-| Three Python policy test modules | `tools/validation_tests.zig` / `real-program-policy-tests` |
+| Validation policy and lifecycle tests | `tools/validation_tests.zig` / `real-program-policy-tests` |
 
 Run tools from this checkout or a descendant directory. Set
 `ZLLVM_PROJECT_ROOT` explicitly when invoking a compiled tool elsewhere.
@@ -86,6 +87,33 @@ named pass/skip outcome against a passed same-mode report. The default
 `--resources normal` inherits stack and CPU settings; `accepted` explicitly
 uses the historical CPU-0 / 1 GiB setup. `--test-filter` is diagnostic-only and
 sets `full_suite=false`. Every invocation requires a new output directory.
+The local-only `--profile-events` option retains a nonempty event stream and its
+hash for every capture; ordered-event auditing is a separate completion check.
+The [final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+contains all 16 complete results: two compiler generations, four modes and both
+routes, with exact named pass/skip comparison against the reference.
+
+`tools/run_frontend_f80.zig` compiles a retained Zig probe with the candidate's
+normal LLVM route, links an independent C caller, and checks nine native
+observations plus four compile-time layout assertions. It records the compiler,
+source pin, inputs, inherited resources and output hashes, and uses owned local
+and global caches. For the accepted regression, use the unchanged probe and C
+driver identified by the final acceptance's f80 receipts:
+
+```sh
+zig run tools/run_frontend_f80.zig -- \
+  --output-root local-state/validations/frontend-f80 \
+  --compiler /absolute/path/to/candidate/zig \
+  --zig-source /absolute/path/to/pinned/ziglang \
+  --probe /absolute/path/to/retained/probe.zig \
+  --driver /absolute/path/to/retained/driver.c
+```
+
+The integrated-executable wrapper has a six-hour aggregate deadline
+(21,600,000 ms) for the entire suite. `ZLLVM_INTEGRATED_TIMEOUT_MS` overrides it
+with a positive decimal u32 millisecond value; zero, empty, malformed and
+overflowing values fail. Reports retain `aggregate_timeout_ms` and its scope.
+Individual command deadlines remain owned by their runners and are unchanged.
 
 Batch-08 fixture generation, research runs, oracle calibration and comparisons
 also use maintained Zig entry points. The retained `generate-native-pairs.py`,
@@ -177,9 +205,22 @@ for review. Optional registry comparison requires exact retention of every
 prior entry in order and exactly the approved additions. Reports and command
 manifests are hashed into the new comparison report.
 
-Use `jq` and the maintained Zig report tools for inspection, `rg` for searches,
-and patches for source edits. Historical Python files remain immutable evidence;
-new validation commands do not invoke them or inline Python.
+Use `jqz` and the maintained Zig report tools for structured inspection,
+`zigrep --no-config` for searches and file discovery, and patches for source
+edits. For example:
+
+```sh
+jqz '{status, code_revision, complete_results: .matrix_modes, named_reference_outcomes_compared}' \
+  docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json
+zigrep --no-config -n -F 'profile.events.jsonl' tools/validation docs/validation_tools.md
+```
+
+Check jqz's query syntax before assuming jq compatibility. Its default document
+limit is 64 MiB; `--max-document-bytes 134217728` permits inspection of a retained
+report up to 128 MiB. Use `zigrep --no-config --max-depth 1` for shallow discovery
+in large generated-state roots. These inspection CLIs are separate tools, not build
+dependencies. Historical Python files remain immutable evidence; new validation
+commands do not invoke them or inline Python.
 
 The [whole-compiler diagnostic plan](plans/2026-11-07-whole-compiler-diagnostic.md)
 adds an opt-in runner outside the accepted gate inventory. It attempts the
@@ -219,9 +260,13 @@ local compiler/runtime object claim.
 Linux processor through the recorded `/usr/bin/taskset` launcher. The initial
 build keeps the caller's affinity, preserving exact captured-object reuse.
 Reports retain the launcher identity, effective commands and inherited process
-limits. Set any required main-stack allowance in the caller, for example with
-`prlimit --stack=1073741824:1073741824`. The target CPU remains `baseline`, and
-the generated-frame guard remains unchanged. Captured-IR mode rejects this option.
+limits. This option and a caller-supplied 1 GiB main stack describe the historical
+acceptance setup. The final normal-resource acceptance omits both affinity and
+stack overrides: the controller and frontend inherit the pinned tooling Zig's
+existing 46 MiB stack request and full 0–15 affinity. See
+[current state](current_state.md) for the service/controller distinction. The
+target CPU remains `baseline`, and the generated-frame guard remains unchanged.
+Captured-IR mode rejects `--self-cpu`.
 
 `--reuse-captured-objects ROOT` permits the initial build or captured-IR replay
 to reuse completed local objects from a preceding runner root, including a run
@@ -235,18 +280,41 @@ The self-rebuild always executes the backend with reuse disabled.
 For the original 455-definition runtime input, add `--runtime-checks` to a
 captured-IR replay. The runner links the delivered local object and a separately
 compiled LLVM reference to `test/whole_compiler/runtime_completion_driver.c`,
-runs 1,280 observations on each and detects three numbered failures per route.
+runs 21,792 observations on each, including 641 unsigned-division cases over
+four helpers, and detects seven numbered failures per route (14 controls total).
 The input hash is fixed; another module cannot silently replace this population.
 These observations cover the exercised exports, not execution of every definition.
 All object deliveries additionally require nonempty selected function symbols,
 in-bounds symbols/relocations and no unresolved `llvm.*` intrinsic provider.
 
-`audit_captured_object.zig --capture-root DIR --census FILE --output-root NEW`
-can inspect retained output after runner postprocessing failed. It checks the
-recorded actual-zero backend command, exact arguments, unchanged original/copied
-input and binary hashes, profile, owners, census and object contract. It writes
-a separate audit and leaves the failed original runner receipt unchanged. Source
-and build-receipt binding remains a separate requirement.
+`tools/audit_captured_object.zig` can inspect retained output after runner
+postprocessing failed:
+
+```sh
+zig run tools/audit_captured_object.zig -- \
+  --capture-root /absolute/path/to/retained-run \
+  --census /absolute/path/to/complete-census.jsonl \
+  --output-root local-state/validations/retained-object-audit
+```
+
+It checks that the backend command completed with actual exit code zero, plus
+exact arguments, input and binary hashes,
+profile, owners, census and object contract. Add `--capture-directory DIR` to
+select a unique complete capture recorded in the parent's `.captures`,
+`.invocations` or `.self_rebuild_invocations` list. The directory must remain
+inside the capture root and match its recorded capture identity. Retained
+`input.ll` must match its recorded hash and the backend command's actual input.
+An explicitly recorded capture may have a deleted transient frontend IR file;
+if that original still exists, its hash must match too. The default fixed-input
+route retains the strict original-input check.
+
+The auditor writes a separate report and leaves the original runner receipt
+unchanged. It requires one successful actual backend command. A reused initial
+compiler object instead needs the separate source-object audit and exact binding
+of input, object, profile, owners, events and semantic arguments recorded by the
+final acceptance; reuse does not establish fresh execution. The self-rebuild
+always disables reuse. Source and build-receipt binding remains a separate
+requirement for both routes.
 
 Exit zero means the requested route passed; a reproducible compiler rejection
 still returns nonzero and is recorded as a blocked diagnostic, without changing

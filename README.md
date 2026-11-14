@@ -9,18 +9,25 @@ invocation, selector ownership, and the scope of validation evidence.
 
 ## Status
 
-The accepted 2026-11-11 checkpoint emits complete local objects for all
-**8,928 compiler definitions** and **455 runtime definitions**. The unchanged
-pinned Zig compiler builds through the local postopt hook, starts, passes the
-behavior checks, and rebuilds itself through that hook.
+The accepted 2026-11-13 result at backend source `dbf7ade0` emits complete local
+objects for all **8,928 original compiler definitions**, **455 original runtime
+definitions**, and **7,874 original Debug behavior definitions**. The separate
+Small-runtime population also completes all 503 definitions.
 
-Debug and ReleaseSafe each pass 2,182 unit tests, 63 structural checks, and two
-profiling checks. All 17 integration gates and both 115-population native suites
-pass; all 768 cumulative fault controls are detected. The self-build uses CPU 0
-and a 1 GiB main stack. LLVM optimization and declared external providers remain
-part of this configuration.
+The unchanged pinned Zig compiler builds through the local postopt hook and
+rebuilds itself with fresh backend execution, inheriting stack and CPU settings
+without validation overrides. Both compiler generations match all 2,097 named
+reference outcomes, including reference skips, in every mode through both the
+normal LLVM and local-hook routes: **16 complete results and 33,552 exact outcome
+comparisons**. All 20 delivered local objects pass independent audits.
 
-See the [completion evidence](docs/evidence/compiler_object_self_rebuild.md),
+Debug and ReleaseSafe each pass 2,364 unit tests, 65 structural checks, and two
+profiling checks. All eight readiness procedures, 17 integration gates and both
+225-population native suites pass; all 6,724 required fault controls are detected.
+LLVM frontend optimization and declared LLVM/system providers remain in use.
+
+See the [final acceptance](docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json),
+[completed plan](docs/plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),
 [current state](docs/current_state.md), and [next steps](docs/next_steps.md).
 
 ## Build and isolated tests

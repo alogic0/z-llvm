@@ -1,23 +1,51 @@
 # Current state
 
-The compiler-object and self-rebuild objective is complete at accepted code
-`b738377e`, with backend implementation `e398030f`. Complete census, independent
-production and event audits establish local objects for **8,928/8,928 original
-compiler definitions** and **455/455 original runtime definitions**, preserving
-all previously selected identities and owners. The unchanged pinned compiler
-builds through the local postopt hook and rebuilds itself with fresh backend
-executions. Both retained executables pass version, behavior, invalid-source
-and f80 layout checks.
+The compiler-object, upstream behavior and normal-resource self-rebuild
+objective is complete at backend source `dbf7ade0`. The
+[final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+closes all eight milestones in the
+[completed plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),
+building on the [cumulative checkpoint](evidence/compiler_behavior_complete_checkpoint_20261113.json).
 
-Debug and ReleaseSafe each pass 2,182 unit tests, 63 structural checks and two
-profiling checks. All eight readiness procedures, seventeen integration gates
-and both 115-population native suites pass; all 768 cumulative fault controls
-are detected. The self-build uses CPU 0 and a 1 GiB main stack. The 8 MiB
-generated-frame and 64 KiB stack-object guards remain unchanged. LLVM
-optimization and declared LLVM/system providers remain part of this proof.
-See the [completion evidence](evidence/compiler_object_self_rebuild.md),
-[acceptance record](evidence/compiler_object_self_rebuild_acceptance_20261111.json)
-and [completed plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md).
+| Population or stage | Accepted result |
+| --- | --- |
+| Original compiler object | 8,928/8,928 definitions |
+| Original runtime object | 455/455 definitions |
+| Separate Small-runtime object | 503/503 definitions; does not replace the original runtime |
+| Original Debug behavior object | 7,874/7,874 definitions; zero remaining rejections |
+| Final compiler behavior | Both generations, four modes, normal LLVM and local-hook routes: 16 complete results |
+| Named reference comparisons | 2,097 exact outcomes per result, including reference skips; 33,552 comparisons total |
+| Delivered local objects | All 20 independently audited against census, ELF and complete ordered events |
+| Normal-resource self-rebuild | Passed with fresh backend execution and reuse disabled |
+
+Both distinct compiler executables have identical 150,448,328-byte contents and
+pass version, hello, loops, invalid-source and f80 checks. Each generation passes
+nine native f80 observations and four compile-time layout checks. The initial
+compiler object uses explicitly verified same-source reuse; both runtime
+captures and the self-rebuild compiler capture execute the backend afresh.
+
+Normal-resource acceptance uses no stack or CPU-affinity override. The service
+starts with an 8 MiB soft stack limit; the pinned tooling Zig's existing 46 MiB
+ELF stack request raises it during normal startup, and the validation controller
+and candidate frontend inherit 46 MiB with an unlimited hard limit. The live
+frontend sample records 16 threads and affinity 0–15. The upstream 60 MiB worker
+stack policy, 8 MiB generated-frame guard and 64 KiB stack-object guard are
+unchanged. Ordinary call limits remain 64 direct arguments, 16 indirect arguments
+and 128 stack words; the ordinary ninth SSE argument remains closed.
+
+Debug and ReleaseSafe each pass 2,364 unit tests, 65 structural checks and two
+profiling checks. All eight readiness procedures and 17 integration gates pass.
+Both 225-population native suites pass across all three release pipelines; all
+6,724 required fault controls are detected. Strict comparisons preserve 7,160 prior
+command outcomes per backend build. The 21 changed native objects per build
+retain their failed strict-comparison receipts and separate exact encoding and
+ELF reviews.
+
+The final 4,610-file seal inherits the verified 77,351-file cumulative checkpoint.
+The original five-milestone acceptance and fixed compiler-core cohort below
+remain unchanged. LLVM frontend optimization and declared LLVM/system providers
+remain part of this proof. See [next steps](next_steps.md) for future work and
+[validation tools](validation_tools.md) for the maintained commands.
 
 ## Fixed compiler-core execution cohort
 

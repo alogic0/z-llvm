@@ -1,11 +1,14 @@
 # Runtime completion contracts
 
-The [compiler-object and self-rebuild checkpoint](../evidence/compiler_object_self_rebuild.md)
-accepts the original **455/455 runtime definitions** with complete local object
-emission, independent ELF/event/owner audits, linked execution and cumulative
-validation. All 387 preceding selections and owners are preserved. Both fresh
-runtime captures from the unchanged build and self-build also pass independent
-audits and match the original allocated section, symbol and relocation graph.
+The [final compiler behavior and self-rebuild acceptance](../evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+at backend source `dbf7ade0` retains complete local object emission for the
+original **455/455 runtime definitions** and completes the separate **503/503
+Small-runtime definitions**. The Small input does not replace the original
+runtime corpus. Both fresh runtime captures from the unchanged build and
+normal-resource self-rebuild pass independent census, ELF, owner and ordered-event
+audits. The [original checkpoint](../evidence/compiler_object_self_rebuild.md)
+preserves the earlier 387 selections and owners; later changed runtime encodings
+have separate exact before/after reviews in the cumulative acceptance.
 
 The additional integer forms use existing checked typed homes and transfer
 transactions. Pair widening accounts for live incoming physical words in the
@@ -46,8 +49,10 @@ intrinsics fail the whole-compiler object contract instead of earning completion
 Its 852 observations cover the new carriers, caller/callee boundaries, live
 values and store guards; three numbered faults calibrate both local routes and
 the LLVM reference in all release pipelines. The original-object driver adds
-1,280 observations over complex half/float/double/x87/quad operations, wide
-conversions, square roots, comparisons and bit permutations. Its boxed-half and
-sret declarations match the captured ABI explicitly. Neither driver claims that
-all 455 definitions executed. The 24 frozen guard/contracts, Source/value-use
-interfaces and stack limits remain unchanged.
+21,792 observations over complex half/float/double/x87/quad operations, wide
+conversions, square roots, comparisons, bit permutations and unsigned division.
+Its 641 unsigned-division cases exercise four helpers. Seven numbered faults per
+local/reference route give 14 controls. The boxed-half and sret declarations
+match the captured ABI explicitly. Neither driver claims that all 455 definitions
+executed. The 24 frozen guard/contracts, Source/value-use interfaces and stack
+limits remain unchanged.

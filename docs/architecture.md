@@ -1,26 +1,24 @@
 # Current architecture
 
-Source baseline: `1f92385e` (2026-11-03), including the current-pin
-correctness, ABI, export publication, execution, scalar frame stores and startup
-scalar conversions/comparisons.
-This page describes the
-implementation; the
-[refactor plan](roadmap/architecture_refactor_plan.md) records its completed scope.
-The bounded refactors, memset capability,
-[fixed-program performance baseline](evidence/fixed_program_baseline.md),
-[checked memcpy family](evidence/composed_memcpy_family.md),
-[scalar byte-loop slice](evidence/composed_byte_loops.md),
-[loop-memory repair slice](evidence/loops_memory_repair.md), and
-[cyclic byte-vector transfer slice](evidence/cyclic_byte_transfers.md) are complete.
-The accepted checkpoint uses tracked Zig 0.17.0, executes all byte inputs for
-the selected ASCII function, and runs unchanged upstream Zig and C programs.
-Production export publication transfers the original payload into the cache;
-an earlier infrastructure checkpoint passed fresh and cached full integration
-runs against one source snapshot. The current scalar checkpoint reuses verified
-exports and reruns executions.
+Accepted backend source: `dbf7ade0` (2026-11-13), validated with tooling Zig
+0.17.0 and upstream Zig source `1c08b09d`. This page describes implementation
+and ownership; [current state](current_state.md) owns acceptance counts and the
+[refactor plan](roadmap/architecture_refactor_plan.md) records the completed
+bounded consolidation.
+
 The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
-backend for selected Zig inputs. It does not yet provide a complete LLVM
-replacement or a self-hosting Zig backend.
+backend. Through the patched postopt hook, z_llvm emits the complete compiler
+and runtime objects used to build the unchanged pinned Zig compiler and rebuild
+itself under inherited stack and CPU settings. Both resulting compiler
+generations pass the complete four-mode upstream behavior matrix through both
+normal LLVM and local-hook routes. See the
+[final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json).
+
+LLVM still performs frontend optimization and supplies declared external
+providers; Zig owns final executable linking. The accepted build and self-rebuild
+prove this configuration. General LLVM replacement, arbitrary LLVM inputs and
+other targets remain outside that acceptance. The text and AIR adapters retain
+the distinct routes described below.
 
 ## Components and ownership
 

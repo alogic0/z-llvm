@@ -8,9 +8,14 @@ Review baseline: `ee1b8317767eb6de5443fd9850f8a0d6098b6aeb`.
 Implementation results and remaining limits are recorded in
 [validation performance evidence](../evidence/validation_performance.md).
 All 17 integration gates and the three-mode fresh/cache comparison pass.
-That delivery left accepted counters unchanged. The compiler-selection goal has
-since resumed under the [main plan](2026-11-08-complete-compiler-selection.md).
-The subsequent [bounded compiler-throughput slice](../evidence/compiler_throughput.md)
+That delivery left accepted counters unchanged. The
+[compiler-selection plan](2026-11-08-complete-compiler-selection.md) subsequently
+completed, followed by all eight milestones of the
+[compiler-object, behavior and self-rebuild plan](2026-11-11-complete-compiler-object-and-self-rebuild.md).
+The [final acceptance](../evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+records the complete four-mode LLVM/local matrices for both final generations
+and a normal-resource self-rebuild at backend source `dbf7ade0`.
+The earlier [bounded compiler-throughput slice](../evidence/compiler_throughput.md)
 validates faster preservation planning with identical plans and native artifacts.
 
 ## Objective and scope
@@ -22,9 +27,10 @@ reproducible evidence.
 
 This is a follow-up to the completed
 [project improvement plan](../roadmap/project_improvement_plan.md).
-[Active direction](../next_steps.md) continues to govern implementation and the
-complete-selection milestone. This work does not change accepted counters or
-replace that work.
+[Next steps](../next_steps.md) records the completed baseline and future work.
+This performance delivery did not change accepted counters or replace compiler
+acceptance. The phase descriptions below retain the original proposal and its
+measurement conditions; completed results are linked above.
 
 The proposed order is compiler-selection propagation and bounded profiling,
 then harness reuse, followed by remeasurement before artifact caching,

@@ -1,12 +1,52 @@
-# Upstream behavior and normal-resource self-rebuild
+# Next steps
 
-The user authorized follow-up milestones 6–8 in the
-[compiler plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md):
-run the full pinned upstream Zig behavior suite with both compiler generations
-and the reference in all four modes; exercise and audit the local postopt hook;
-repair observed failures; and prove self-rebuild under normal stack and CPU
-settings. These follow-ups are active. Preserve the accepted five-milestone
-baseline below while collecting separate successor evidence.
+The [compiler-object, behavior and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
+is complete through milestone 8 at backend source `dbf7ade0`. The
+[final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+records both final compiler generations matching all 2,097 named reference
+outcomes in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall through normal LLVM
+and local-hook routes. These are 16 complete results and 33,552 exact outcome
+comparisons, including reference skips. All 20 delivered local objects pass
+independent census, ELF and full ordered-event audits. Normal-resource
+self-rebuild passes with fresh backend execution and reuse disabled.
+
+The [cumulative checkpoint](evidence/compiler_behavior_complete_checkpoint_20261113.json)
+also closes the original 7,874-definition Debug input and retains complete
+8,928-definition compiler, 455-definition runtime and separate 503-definition
+Small-runtime objects. Both 225-population native suites, all 17 integration
+gates and all 6,724 required faults pass. See [current state](current_state.md)
+for the resource settings, unit checks and acceptance limits.
+
+Further work starts from this accepted baseline:
+
+1. Preserve the fixed inputs, generation identities, capture reports and sealed
+   evidence. Keep the original five-milestone acceptance and fixed compiler-core
+   cohort as separate records.
+2. For compiler performance work, use the
+   [profiling guide](compiler_profiling.md) and
+   [validation performance results](evidence/validation_performance.md).
+   Measure a specific workload before selecting another optimization or caching
+   change, and keep compiler throughput separate from generated-code performance.
+3. Further LLVM dependency removal needs its own bounded scope and acceptance
+   criteria. LLVM still owns frontend optimization and declared providers in
+   the accepted build. The [architecture](architecture.md) describes that boundary.
+
+Apply the [validation tiers](validation_tiers.md) to future changes and use the
+maintained [Zig validation tools](validation_tools.md), `jqz` and
+`zigrep --no-config` for the workflow. No behavior repair or final-generation
+matrix remains open in the completed plan.
+
+## Previous checkpoints
+
+The entries below preserve earlier results and the work proposed at each
+checkpoint. Their open-task instructions describe those historical states;
+the final acceptance above supersedes them.
+
+Follow-up milestones 6–8 originally required the full pinned upstream Zig
+behavior suite with both compiler generations and the reference in all four
+modes, audited local postopt objects, repairs for observed failures, and
+self-rebuild under normal stack and CPU settings. Successor evidence was
+collected separately from the accepted five-milestone baseline below.
 
 The [normal-resource checkpoint](evidence/compiler_behavior_normal_resources_checkpoint_20261112.json)
 records a successful unchanged build and self-rebuild at `ba05fef4`, with a

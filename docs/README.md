@@ -7,6 +7,14 @@ the completed bounded consolidation and performance baseline. [Current state](cu
 [next steps](next_steps.md) owns active direction. The long roadmap and completion
 lists below are historical context, not proof of current general capability.
 
+The [compiler-object, behavior and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
+is complete through milestone 8 at backend source `dbf7ade0`. The
+[final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+records both compiler generations matching the reference in four modes through
+normal LLVM and local-hook routes, all 20 delivered local objects independently
+audited, and a normal-resource self-rebuild with fresh backend execution. LLVM
+frontend optimization and declared providers remain in use.
+
 For compiler performance investigations, follow [compiler profiling](compiler_profiling.md)
 for the verified hardware-sampling setup, recording commands and evidence checks.
 

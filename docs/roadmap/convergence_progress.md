@@ -4765,6 +4765,29 @@ One line per completed cycle, append-only, newest last. This is the
   Evidence: [completion report](../evidence/compiler_object_self_rebuild.md) and
   [acceptance record](../evidence/compiler_object_self_rebuild_acceptance_20261111.json).
 
+- **2026-11-13 — Final behavior and normal-resource self-rebuild accepted**
+  (backend `dbf7ade0`, acceptance `e8879794`): all 8,928 original compiler,
+  455 original runtime, 503 separate Small-runtime and 7,874 original Debug
+  behavior definitions emit complete audited local objects. Both final compiler
+  generations match 2,097 named reference outcomes, including reference skips,
+  in all four modes through both normal LLVM and local-hook routes: 16 complete
+  results and 33,552 exact comparisons. All 20 delivered local objects pass
+  independent census, ELF and complete ordered-event audits. Normal-resource
+  self-rebuild executes the backend afresh with reuse disabled, without stack or
+  CPU-affinity overrides; the live frontend sample records the inherited 46 MiB
+  stack, 16 threads and affinity 0–15. The distinct generation executables have
+  identical bytes and each passes nine native f80 observations plus four
+  compile-time layout checks. Debug/ReleaseSafe each pass 2,364 units, 65
+  structural and two profile checks; all eight readiness procedures, 17 gates,
+  both 225-population native suites and 6,724 required faults pass. Strict
+  comparisons preserve 7,160 prior command outcomes per backend build; all
+  changed objects retain explicit encoding and ELF reviews. The 4,610-file final
+  seal inherits the verified 77,351-file cumulative checkpoint. Fixed prefix 100,
+  execution cohort twelve and ratchet 130 remain unchanged. LLVM frontend
+  optimization and declared providers remain in use. Evidence:
+  [cumulative checkpoint](../evidence/compiler_behavior_complete_checkpoint_20261113.json)
+  and [final acceptance](../evidence/compiler_behavior_follow_up_acceptance_20261113.json).
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
