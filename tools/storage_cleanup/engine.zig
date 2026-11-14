@@ -1068,9 +1068,10 @@ pub const Engine = struct {
             if (a.kind == .build_output) {
                 var f = try D.cwd().openFile(e.c.io, try e.absolute(a.path), .{});
                 defer f.close(e.c.io);
-                var buffer: [16]u8 = undefined;
+                var buffer: [176]u8 = undefined;
                 const n = try f.readPositionalAll(e.c.io, &buffer, 0);
-                if (!std.mem.startsWith(u8, buffer[0..n], "\x7fELF") and !std.mem.startsWith(u8, buffer[0..n], "!<arch>\n")) return error.NotCompiledOutput;
+                if (!std.mem.startsWith(u8, buffer[0..n], "\x7fELF") and !std.mem.startsWith(u8, buffer[0..n], "!<arch>\n") and
+                    !try @import("command_outputs.zig").incompleteNativeLink(e, a.*, try e.releaseRecord(a.producer), buffer[0..n], m.size)) return error.NotCompiledOutput;
             }
             a.allocated_bytes = m.allocated_bytes;
             a.file_count = 1;

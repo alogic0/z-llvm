@@ -284,6 +284,13 @@ preserves reports and diagnostics and uses the same compiled-byte, hold, pin,
 alias and current-consumer checks. The default `prepare-outputs` still requires
 successful commands and passed owners.
 
+The closed-output mode also recognizes one partial-output layout: an
+`execution-breadth-controls-v1/v2` run's `wrong-symbol` native-link control.
+It requires the recorded failed `zig build-exe -fno-lld -fno-lto` command,
+retained undefined-symbol diagnostic, zeroed ELF header and consistent ELF64
+program-header/table mapping. Empty files, scripts, unrelated data and other
+unfinished binary formats remain ineligible.
+
 The generated-output adapter also accepts older capture-helper runs without a
 batch directory. Such a release must name only the owner's direct `capture-zllvm`
 file; a passed real-program comparison and matching runner-provenance hash are

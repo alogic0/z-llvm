@@ -651,6 +651,57 @@ test "storage cleanup: closed output opt-in cannot waive holds pins or compiled 
     }
 }
 
+fn partialLinkFixture(f: *Fixture, e: *core.Engine, case: usize) !void {
+    try commandOutputFixture(f, e, false);
+    var bytes: [512]u8 = @splat(0);
+    // Zero ELF header, PT_PHDR and the read-only PT_LOAD used by the native
+    // linker, copied structurally from a retained wrong-symbol control.
+    const words = [_]u64{ 0x400000006, 64, 0x1000040, 0x1000040, 448, 448, 8, 0x400000001, 0, 0x1000000, 0x1000000, 512, 512, 4096 };
+    for (words, 0..) |word, i| std.mem.writeInt(u64, bytes[64 + i * 8 ..][0..8], word, .little);
+    if (case == 1) bytes[0] = '#';
+    if (case == 2) bytes[96] = 0; // Invalid program-header table extent.
+    try f.write(run ++ "/wrong-symbol", if (case == 3) bytes[0..175] else &bytes);
+    try f.write(run ++ "/compile.stderr", if (case == 4) "unrelated failure" else "error: undefined symbol: test.symbol\n");
+    try e.write(report, .{ .schema = if (case == 5) "input-program-v1" else "execution-breadth-controls-v2", .status = "passed" });
+    try e.write(run ++ "/commands.json", .{.{
+        .argv = [_][]const u8{ "zig", "build-exe", if (case == 6) "-flld" else "-fno-lld", "-fno-lto", try e.c.fmt("-femit-bin={s}", .{try e.absolute(run ++ "/wrong-symbol")}) },
+        .outcome = "completed",
+        .actual_returncode = if (case == 7) @as(i32, 0) else @as(i32, 1),
+        .returncode = if (case == 7) @as(i32, 0) else @as(i32, 1),
+        .stdout = run ++ "/compile.stdout",
+        .stderr = run ++ "/compile.stderr",
+    }});
+}
+
+test "storage cleanup: closed wrong-symbol link fragments require structural and diagnostic evidence" {
+    for (0..9) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var prepare = f.engine();
+        try partialLinkFixture(f, &prepare, case);
+        var e = f.engine();
+        var r = try command_outputs.requestClosed(&e, report, "Closed partial native-link output");
+        if (case == 8) {
+            // Successful mode must never inherit this partial-file exception.
+            r.closed_command_outputs = false;
+            var kept: std.ArrayList(p.Evidence) = .empty;
+            try t.expectError(error.OutputCommandNotSuccessful, command_outputs.verify(&e, .{ .path = run ++ "/wrong-symbol", .run_root = run, .producer = report, .kind = .build_output, .sha256 = r.artifacts[0].sha256 }, r, (try e.load(e.c.a, report)).value, &kept));
+            continue;
+        }
+        try e.write(run ++ "/products-release.json", r);
+        try e.discoverRelease(run ++ "/products-release.json", true);
+        if (case == 0) {
+            try e.qualify(0);
+            try mutation.applyFileBatch(&e, &.{0});
+            try t.expectEqual(.removed, e.actions.items[0].status);
+            for ([_][]const u8{ report, run ++ "/commands.json", run ++ "/compile.stderr" }) |path| _ = try e.metadata(path);
+        } else {
+            try t.expectError(error.NotCompiledOutput, e.qualify(0));
+            _ = try e.metadata(run ++ "/wrong-symbol");
+        }
+    }
+}
+
 test "storage cleanup: multi-product requests retain only exact per-file pin exceptions" {
     const f = try Fixture.init();
     defer f.deinit();

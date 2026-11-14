@@ -13,7 +13,11 @@ fn named(v: u.Value, key: []const u8, value: []const u8) bool {
     if (item == .string) return same(item.string, value);
     return core.eq(item, "path", value);
 }
-const Product = struct { path: []const u8, copied_sha256: ?[]const u8 = null };
+const Product = struct { path: []const u8, copied_sha256: ?[]const u8 = null, native_link: bool = false };
+fn argument(args: []const []const u8, wanted: []const u8) bool {
+    for (args) |arg| if (same(arg, wanted)) return true;
+    return false;
+}
 fn toolNamed(report: u.Value, key: []const u8, value: []const u8) bool {
     if (named(report, key, value)) return true;
     const chain = core.get(report, "toolchain") catch return false;
@@ -97,7 +101,7 @@ fn product(e: *core.Engine, command: u.Value, report: u.Value, binding: ?p.Cache
         if (destination != null) return error.AmbiguousOutputArgument;
         destination = try e.relative(try core.str(command, "stdout"));
     }
-    return if (destination) |path| .{ .path = path } else null;
+    return if (destination) |path| .{ .path = path, .native_link = zig and same(args[1], "build-exe") and argument(args, "-fno-lld") and argument(args, "-fno-lto") } else null;
 }
 pub const Record = struct { output: Product, successful: bool, terminal: bool = false, stdout: []const u8, stderr: []const u8 };
 fn records(e: *core.Engine, commands: p.Evidence, report: u.Value, binding: ?p.CacheOwner) ![]const Record {
@@ -164,6 +168,40 @@ pub fn verify(e: *core.Engine, a: core.Action, r: p.Release, report: u.Value, ke
         matched = true;
     }
     if (!matched) return error.MissingCommandOutputBinding;
+}
+
+/// The native ELF linker can leave a zeroed ELF header followed by an intact
+/// program-header table when a wrong-symbol control fails to link. Recognize
+/// only that structure, with independent failed-command and diagnostic proof.
+pub fn incompleteNativeLink(e: *core.Engine, a: core.Action, r: p.Release, bytes: []const u8, size: u64) !bool {
+    if (!r.closed_command_outputs or r.command_outputs == null or !same(std.fs.path.basename(a.path), "wrong-symbol") or bytes.len < 176) return false;
+    for (bytes[0..64]) |byte| if (byte != 0) return false;
+    const ph = bytes[64..120];
+    const load = bytes[120..176];
+    const table_size = std.mem.readInt(u64, ph[32..40], .little);
+    const address = std.mem.readInt(u64, ph[16..24], .little);
+    if (table_size < 112 or table_size > 56 * 128 or table_size % 56 != 0 or size < table_size + 64 or address < 64 or (address - 64) % 4096 != 0 or
+        std.mem.readInt(u32, ph[0..4], .little) != 6 or std.mem.readInt(u32, ph[4..8], .little) != 4 or
+        std.mem.readInt(u64, ph[8..16], .little) != 64 or std.mem.readInt(u64, ph[24..32], .little) != address or
+        std.mem.readInt(u64, ph[40..48], .little) != table_size or std.mem.readInt(u64, ph[48..56], .little) != 8 or
+        std.mem.readInt(u32, load[0..4], .little) != 1 or std.mem.readInt(u32, load[4..8], .little) != 4 or
+        std.mem.readInt(u64, load[8..16], .little) != 0 or std.mem.readInt(u64, load[16..24], .little) != address - 64 or
+        std.mem.readInt(u64, load[24..32], .little) != address - 64 or std.mem.readInt(u64, load[32..40], .little) != table_size + 64 or
+        std.mem.readInt(u64, load[40..48], .little) != table_size + 64 or std.mem.readInt(u64, load[48..56], .little) != 4096) return false;
+    var report = try e.load(e.c.gpa, r.producer.path);
+    defer report.deinit();
+    if (!core.eq(report.value, "schema", "execution-breadth-controls-v1") and !core.eq(report.value, "schema", "execution-breadth-controls-v2")) return false;
+    const commands = try owner(e, r, report.value);
+    var matched = false;
+    for (try records(e, commands, report.value, r.command_owner)) |command| {
+        if (!same(command.output.path, a.path)) continue;
+        if (!command.terminal or command.successful or !command.output.native_link or same(command.stderr, a.path)) return false;
+        const diagnostic = e.read(e.c.gpa, command.stderr, 1024 * 1024) catch return false;
+        defer e.c.gpa.free(diagnostic);
+        if (std.mem.indexOf(u8, diagnostic, "error: undefined symbol:") == null) return false;
+        matched = true;
+    }
+    return matched;
 }
 pub fn request(e: *core.Engine, report_path: []const u8, reason: []const u8) !p.Release {
     return requestSelected(e, report_path, reason, null);
