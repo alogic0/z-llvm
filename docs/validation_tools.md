@@ -496,6 +496,9 @@ reusable bootstrap cache lives in `local-state/tmp/validation-tools`.
 The launcher builds the checked runner under a bootstrap lock and executes it
 directly, so a waiting `zig run` parent cannot falsely hold completed output
 during collection.
+For an automated `bash -c` wrapper, use `exec` for its final launcher command.
+A surviving supervisor whose argv still names the run deliberately defers
+collection until that supervisor exits.
 Explicit cache environment overrides still take precedence and remain
 caller-owned; omit them when using the workspace defaults. Running a previously
 cached executable or `zig run` against a frozen checkout keeps that old tool's
