@@ -14,6 +14,7 @@ const observed_compiler = @import("observed_compiler.zig");
 const legacy_outputs = @import("legacy.zig");
 const cache_holds = @import("cache_holds.zig");
 const held_products = @import("held_products.zig");
+const reviewed_products = @import("reviewed_products.zig");
 const cache_batch = @import("cache_batch.zig");
 const p = core.p;
 const workspaces = @import("workspaces.zig");
@@ -31,6 +32,165 @@ const receipt_root = "local-state/validations/legacy";
 const receipt_path = receipt_root ++ "/build-run.json";
 const shared_cache = "local-state/caches/retired-tools";
 const held_plan = output ++ "/held-products.json";
+const reviewed_plan = output ++ "/reviewed-products.json";
+const reviewed_notes = output ++ "/review.md";
+const reviewed_file = run ++ "/old-helper";
+fn reviewedProductFixture(f: *Fixture) !reviewed_products.Plan {
+    try f.write(reviewed_file, "\x7fELFordinary generated helper");
+    try f.write(reviewed_notes, "Reviewed generated helper; completed consumers; no continuing use identified.");
+    var e = f.engine();
+    const plan: reviewed_products.Plan = .{
+        .reason = "Explicit review; original build receipt absent",
+        .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+        .products = try e.c.a.dupe(reviewed_products.Product, &.{.{ .path = reviewed_file, .sha256 = try e.digest(reviewed_file), .run_root = run, .reason = "Disposable completed helper", .consumers_closed = true }}),
+    };
+    try e.write(reviewed_plan, plan);
+    return plan;
+}
+
+test "storage cleanup: explicit reviewed product needs no fabricated producer receipt" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    _ = try reviewedProductFixture(f);
+    try f.write(run ++ "/input.ll", "unique input");
+    try f.write(run ++ "/diagnostic.log", "original diagnostic");
+    var e = f.engine();
+    try reviewed_products.prepare(&e, reviewed_plan);
+    try t.expectEqual(@as(usize, 1), e.actions.items.len);
+    try e.qualify(0);
+    try mutation.applyFileBatch(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    for ([_][]const u8{ reviewed_plan, reviewed_notes, run ++ "/input.ll", run ++ "/diagnostic.log", output ++ "/record-0.json" }) |path| _ = try e.metadata(path);
+    var repeat = f.engine();
+    try reviewed_products.prepare(&repeat, reviewed_plan);
+    try t.expectEqual(.absent, repeat.actions.items[0].status);
+}
+
+test "storage cleanup: reviewed products reject unclosed ownership and nonproduct paths" {
+    for (0..7) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedProductFixture(f);
+        var product = plan.products[0];
+        switch (case) {
+            0 => product.consumers_closed = false,
+            1 => product.run_root = "local-state/validations/unrelated",
+            2 => product.reason = " ",
+            3 => product.path = "local-state/validations/test/../outside.o",
+            4 => product.path = "local-state/inputs/adopted.o",
+            5 => product.path = run ++ "/input.ll",
+            else => product.path = run ++ "/profile.events.jsonl",
+        }
+        plan.products = &.{product};
+        var e = f.engine();
+        try e.write(reviewed_plan, plan);
+        try t.expectError(error.InvalidReviewedProduct, reviewed_products.prepare(&e, reviewed_plan));
+        _ = try e.metadata(reviewed_file);
+    }
+}
+
+test "storage cleanup: reviewed products reject changed hash and noncompiled contents" {
+    for ([_]bool{ false, true }) |bind_text| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedProductFixture(f);
+        try f.write(reviewed_file, "an extensionless source file is not compiled output");
+        var e = f.engine();
+        if (bind_text) {
+            var product = plan.products[0];
+            product.sha256 = try e.digest(reviewed_file);
+            plan.products = &.{product};
+            try e.write(reviewed_plan, plan);
+        }
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try t.expectError(if (bind_text) error.NotCompiledOutput else error.EvidenceHashMismatch, e.qualify(0));
+        _ = try e.metadata(reviewed_file);
+    }
+}
+
+test "storage cleanup: changed review evidence blocks reviewed product mutation" {
+    for ([_][]const u8{ reviewed_plan, reviewed_notes }) |changed| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        _ = try reviewedProductFixture(f);
+        var e = f.engine();
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        try f.write(changed, "changed review");
+        // Parsed controls remember their original metadata; a hash-only review
+        // binding rejects changed bytes at the subsequent digest comparison.
+        try t.expectError(if (std.mem.eql(u8, changed, reviewed_plan)) error.FileChanged else error.EvidenceHashMismatch, mutation.applyFileBatch(&e, &.{0}));
+        _ = try e.metadata(reviewed_file);
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: new pins and holds roll back reviewed products" {
+    for ([_]bool{ false, true }) |hold| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        _ = try reviewedProductFixture(f);
+        var e = f.engine();
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        if (hold) try e.write(e.config.holds_file, p.Holds{ .paths = &.{reviewed_file} }) else try f.write(run ++ "/pin.sha256", try f.c.fmt("{s}  {s}\n", .{ e.actions.items[0].sha256.?, reviewed_file }));
+        try t.expectError(error.GeneratedBatchBecameHeld, mutation.applyFileBatch(&e, &.{0}));
+        _ = try e.metadata(reviewed_file);
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: reviewed products protect current manifests and retained dependencies" {
+    for ([_]bool{ false, true }) |manifest| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        _ = try reviewedProductFixture(f);
+        var e = f.engine();
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        if (manifest) {
+            try f.write(output ++ "/current-contract.txt", try f.c.fmt("{s}  {s}\n", .{ e.actions.items[0].sha256.?, reviewed_file }));
+            e.config.current_manifests = &.{output ++ "/current-contract.txt"};
+            try e.pins();
+        } else {
+            try e.retained_declarations.append(e.c.a, reviewed_file);
+            try e.protectRetained();
+        }
+        try t.expectEqual(.skipped, e.actions.items[0].status);
+        _ = try e.metadata(reviewed_file);
+    }
+}
+
+test "storage cleanup: reviewed products require every alias and charge its inode once" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var plan = try reviewedProductFixture(f);
+    const alias = run ++ "/peer-helper";
+    {
+        const file = try f.tmp.dir.openFile(t.io, reviewed_file, .{});
+        defer file.close(t.io);
+        try file.hardLink(t.io, f.tmp.dir, alias, .{});
+    }
+    var e = f.engine();
+    e.allow_artifact_aliases = true;
+    try reviewed_products.prepare(&e, reviewed_plan);
+    try t.expectError(error.AliasedOrNonRegularArtifact, e.qualify(0));
+    var peer = plan.products[0];
+    peer.path = alias;
+    plan.products = &.{ plan.products[0], peer };
+    try e.write(reviewed_plan, plan);
+    var complete = f.engine();
+    complete.allow_artifact_aliases = true;
+    try reviewed_products.prepare(&complete, reviewed_plan);
+    try complete.qualify(0);
+    try complete.qualify(1);
+    try complete.guardCaptureGroups();
+    const bytes = (try complete.metadata(reviewed_file)).allocated_bytes;
+    try mutation.applyFileBatch(&complete, &.{ 0, 1 });
+    try t.expectEqual(bytes, complete.actions.items[0].reclaimed_file_bytes + complete.actions.items[1].reclaimed_file_bytes);
+    for (complete.actions.items) |a| try t.expectEqual(.removed, a.status);
+}
+
 fn heldProductsFixture(f: *Fixture, finished: bool) !void {
     var e = f.engine();
     try f.build(&e);

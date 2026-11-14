@@ -371,6 +371,9 @@ pub fn build(b: *std.Build) void {
     const command_cache_cli_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/command_cache_cli_tests.sh" });
     command_cache_cli_tests.addArtifactArg(storage_cleanup);
     storage_cleanup_test_step.dependOn(&command_cache_cli_tests.step);
+    const reviewed_products_cli_tests = b.addSystemCommand(&.{ "bash", "tools/storage_cleanup/reviewed_products_cli_tests.sh" });
+    reviewed_products_cli_tests.addArtifactArg(storage_cleanup);
+    storage_cleanup_test_step.dependOn(&reviewed_products_cli_tests.step);
     const storage_checked_runner = b.addExecutable(.{ .name = "storage-checked-runner", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/run_checked.zig"),
         .target = b.graph.host,

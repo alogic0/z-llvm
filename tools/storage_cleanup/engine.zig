@@ -52,6 +52,7 @@ pub const Action = struct {
     replay_required: bool = true,
     released_cache: bool = false,
     reviewed_shared_cache: bool = false,
+    reviewed_build_output: bool = false,
     workspace_release: ?[]const u8 = null,
     retired_compiler: ?Evidence = null,
     retired_pins: []const p.PinTransition = &.{},
@@ -652,7 +653,7 @@ pub const Engine = struct {
         var lines = std.mem.tokenizeScalar(u8, listing, '\n');
         e.checked_manifests = 0;
         while (lines.next()) |path| {
-            if (p.within(e.output, path)) continue;
+            if (p.within(e.output, path) and !u.contains(e.config.current_manifests, path)) continue;
             var retired_manifest = false;
             for (e.config.retired_manifests) |retired| if (std.mem.eql(u8, path, retired.path)) {
                 try e.check(retired);
@@ -1030,7 +1031,11 @@ pub const Engine = struct {
         a.idle_seconds = @intCast(@divFloor(e.now_ns - @max(@max(m.mtime_ns, m.ctime_ns), @max(producer_metadata.mtime_ns, producer_metadata.ctime_ns)), std.time.ns_per_s));
         if (!e.oldEnough(m) or !e.oldEnough(producer_metadata)) return error.TooRecent;
         var kept: std.ArrayList(Evidence) = .empty;
-        if (a.kind == .temporary_workspace) {
+        if (a.reviewed_build_output) {
+            if (a.kind != .build_output or !@import("reviewed_products.zig").scope(a.path) or a.retained.len < 2) return error.InvalidReviewedProduct;
+            for (a.retained) |ev| try e.keep(&kept, ev.path, ev.sha256);
+            a.replay_required = false;
+        } else if (a.kind == .temporary_workspace) {
             try @import("workspaces.zig").verify(e, a.*, &kept);
             a.replay_required = false;
         } else if (a.kind == .cache) {
@@ -1074,8 +1079,9 @@ pub const Engine = struct {
                 defer f.close(e.c.io);
                 var buffer: [176]u8 = undefined;
                 const n = try f.readPositionalAll(e.c.io, &buffer, 0);
-                if (!std.mem.startsWith(u8, buffer[0..n], "\x7fELF") and !std.mem.startsWith(u8, buffer[0..n], "!<arch>\n") and
-                    !try @import("command_outputs.zig").incompleteNativeLink(e, a.*, try e.releaseRecord(a.producer), buffer[0..n], m.size)) return error.NotCompiledOutput;
+                if (!std.mem.startsWith(u8, buffer[0..n], "\x7fELF") and !std.mem.startsWith(u8, buffer[0..n], "!<arch>\n")) {
+                    if (a.reviewed_build_output or !try @import("command_outputs.zig").incompleteNativeLink(e, a.*, try e.releaseRecord(a.producer), buffer[0..n], m.size)) return error.NotCompiledOutput;
+                }
             }
             a.allocated_bytes = m.allocated_bytes;
             a.file_count = 1;

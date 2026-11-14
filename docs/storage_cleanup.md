@@ -510,6 +510,29 @@ whole-cache removal checks used for compiler caches apply. Source/configuration
 reconstruction is not required. Logs, receipts, current pins, queued holds,
 active consumers and retained dependencies remain protected.
 
+### Reviewed compiled products without usable producer receipts
+
+`retire-reviewed-products --review PLAN --minimal` reviews an explicitly audited
+file list; add `--apply` to collect eligible files. This is a present disposal
+decision, separate from reconstructing an original build receipt. It is never
+triggered automatically by age, missing evidence or an unresolved inventory row.
+
+The plan has schema `zllvm-reviewed-products-v1`, a nonempty `reason`, a
+hash-bound `review` (`path` and `sha256` of the audit notes), and `products`.
+Each product supplies its exact `path`, `sha256`, owning `run_root`, individual
+`reason`, and `consumers_closed:true`. The reviewer must establish that it is an
+ordinary generated product with no identified continuing use; the boolean is
+an explicit decision, not automated proof. Original logs and receipts remain.
+
+Only regular ELF/archive files under `local-state/validations/` qualify. Names
+must be extensionless helpers or end in `.o`, `.obj`, `.a` or `.exe`; source,
+IR, traces, logs, records and mixed directories are excluded. All pins, holds,
+retained dependencies, active consumers, ownership, hashes, current-manifest
+checks and mutation guards still apply. No hold or pin exception is supported.
+`--complete-artifact-aliases` permits a fully reviewed hardlink group; any
+unlisted or protected alias blocks the entire physical inode. Changed audit
+notes or a changed plan reject mutation. A repeated completed plan is a no-op.
+
 ### Private caches recorded in command ledgers
 
 `prepare-command-caches --reports FILE --reason TEXT` reads a newline-separated

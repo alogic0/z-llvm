@@ -1,0 +1,61 @@
+{
+  "schema": "zllvm-reviewed-products-cleanup-v1",
+  "status": "complete",
+  "date": "2026-11-14",
+  "scope": "Explicitly reviewed compiled files larger than 1 MiB in six completed validation families, excluding tracked acceptance references and special capture/output names",
+  "disposal_plan": {
+    "path": "local-state/storage-cleanup/reviewed-products-20261114/plan.json",
+    "sha256": "db247f0b9f9beb2590ca03e440bcf67537a405c2a4fe8dd87bd98a1367fafdce",
+    "paths": 1568
+  },
+  "code_and_ownership_audit": {
+    "path": "local-state/storage-cleanup/reviewed-products-20261114/audit.md",
+    "sha256": "bceca48bfd31675f10d2f0859142f8c5eddd42d43b691ac22d4e91699414a09a"
+  },
+  "eligible_set_review": {
+    "path": "local-state/storage-cleanup/reviewed-products-20261114/eligible-review.md",
+    "sha256": "0c885665fb5789f882bca3cd65bd6f2c37c3fea0e2ade82e73e418a8e001d268"
+  },
+  "collection": {
+    "path": "local-state/retirements/automatic-storage-cleanup/1794687918866455299-2302228/report.json",
+    "sha256": "aa746eeb2031c0a6de67752b11bddd1d7844a4f964e0d3559a5345b40989fce5",
+    "removed_paths": 605,
+    "retained_paths": 963,
+    "reclaimed_allocated_file_bytes": 8289349632,
+    "current_integrity_verified": true
+  },
+  "final_integrity": {
+    "path": "local-state/storage-cleanup/reviewed-products-20261114/final-integrity.json",
+    "sha256": "f3d6dd6f745c064d1ef84c465a0868c4aa9034eac5a2549bb62121ece1dcedda",
+    "status": "passed",
+    "current_contracts": 6,
+    "accepted_external_artifacts": 4,
+    "retained_candidate_hashes_unchanged": 963,
+    "manual_holds_unchanged": 517,
+    "policy_unchanged": true,
+    "pending_transaction": false,
+    "task_build_scratch_absent": true
+  },
+  "final_inventory": {
+    "path": "local-state/retirements/automatic-storage-cleanup/1794688188340970878-2306664/inventory.json",
+    "sha256": "3e185c2fdf9251ab96f78b4de6eb46439c50833b108f2494c80364e1feb64789",
+    "allocated_bytes": 84059295744,
+    "paths": 1758934,
+    "unique_inodes": 1749735,
+    "required_by_current_contract_bytes": 23542190080,
+    "unresolved_bytes": 60517105664
+  },
+  "accounting": {
+    "initial_allocated_bytes": 92318474240,
+    "observed_decrease_bytes": 8259178496,
+    "new_audit_overhead_bytes": 30171136,
+    "task_created_scratch_removed_separately": 558010368
+  },
+  "qualification": {
+    "unit_tests_per_mode": 188,
+    "unit_modes": ["Debug", "ReleaseFast"],
+    "general_cli_suite": "passed",
+    "final_reviewed_product_and_root_cache_cli_checks": "passed in Debug and ReleaseFast",
+    "installed_and_applied_releasefast_sha256": "f177969d05c93ef9790083370468496be758fd805aa3815aa21c450b0792c6ab"
+  }
+}
