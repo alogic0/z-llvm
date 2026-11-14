@@ -882,7 +882,9 @@ pub const Engine = struct {
                 for (r.artifacts) |artifact| if (p.overlaps(artifact.path, row.path)) return error.RetentionOverlap;
                 try e.keep(list, row.path, row.sha256);
             }
-            if (a.released_cache) try private_cache.verify(e, a.*, r, producer.value);
+            if (a.released_cache) {
+                if (r.command_caches != null) try @import("command_caches.zig").verify(e, a.*, r, producer.value, list) else try private_cache.verify(e, a.*, r, producer.value);
+            }
             if (r.command_outputs != null) try @import("command_outputs.zig").verify(e, a.*, r, producer.value, list);
             if (r.compiler_observation != null) try @import("observed_compiler.zig").verify(e, a.*, r, producer.value, list);
             if (generated) try @import("generated.zig").verify(e, a.*, r, producer.value, list);

@@ -1,0 +1,71 @@
+{
+  "schema": "zllvm-throughput-storage-retention-v1",
+  "status": "complete",
+  "date": "2026-11-14",
+  "reason": "Terminal comparison, fault, measurement and qualification consumers finished; retire reviewed temporary products while preserving every other original seal entry.",
+  "acceptance": {
+    "path": "docs/evidence/compiler_throughput_20261114.json",
+    "sha256": "cac30020647ca6b10cc60a5cc203be2e19ff5610049868accad8c8ac477b794c",
+    "unchanged": true
+  },
+  "original_manifest": {
+    "path": "local-state/validations/compiler-throughput-20261114/batch-01/accepted-artifacts.sha256",
+    "sha256": "184a43fc349af600d3beda1c086ee26c1f99c85903da696675835642f987e0de",
+    "entries": 64529,
+    "verified_before_transition": true,
+    "role": "Unchanged historical identities, including retired temporary targets"
+  },
+  "current_manifest": {
+    "path": "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-storage-20261114.sha256",
+    "sha256": "e9ac9b30c424b4cd84f9bb19194ba13600936006692440dff90eb690e6092470",
+    "preserved_original_entries": 56054,
+    "entries": 56056,
+    "added_entries": ["original_manifest", "acceptance"],
+    "verified_after_collection": true
+  },
+  "retired_references": {
+    "path": "local-state/storage-cleanup/minimization-20261114/retired-throughput-references.txt",
+    "sha256": "bfed3e7dfbf5c9dce11d6ba85b748b28d7d947d6ee859ec8e3997e5a0b543717",
+    "entries": 8475
+  },
+  "transition": {
+    "path": "local-state/storage-cleanup/minimization-20261114/throughput-transition.json",
+    "sha256": "b581d2534d07c5b82992a740c0f9413064ba08eada0028de3f99ce012c0cbfa1",
+    "closed_hold": "local-state/validations/compiler-throughput-20261114",
+    "unrelated_holds_preserved": 517
+  },
+  "collection": {
+    "removed_workspaces": 41,
+    "reclaimed_allocated_file_bytes": 2460893184,
+    "earlier_empty_workspaces": {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794683135203884168-2194468/report.json",
+      "sha256": "3d5a7b281a03748c678a28bef143ff286d053d07835212e2fc0c719b6c21e58b",
+      "removed": 2,
+      "reclaimed_allocated_file_bytes": 0,
+      "report_status": "applying",
+      "disposition": "Stopped after two completed empty-workspace actions at a boundary without a pending transaction; remaining work completed in the batched collection"
+    },
+    "completed_batch": {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794684390755304789-2227235/report.json",
+      "sha256": "78da741c703c23a95f48c7e1ad37b4a8c53490f496a042fc99ba03833d371f67",
+      "status": "complete",
+      "throughput_workspaces_removed": 39,
+      "note": "This report also covers 1,533 legacy caches; those bytes are excluded from the throughput total above"
+    }
+  },
+  "retained_workspaces": {
+    "count": 7,
+    "path": "local-state/storage-cleanup/minimization-20261114/kept-workspaces.tsv",
+    "sha256": "66aa14e03b0721eddc53e9100c4a25d71715f9ae6c683f8ef40986713562ae30",
+    "compiler_dependencies": 3,
+    "independently_maintained_object_aliases": 4,
+    "reason": "Existing raw-event/build proof and measured baseline consumers, or object inodes with independently maintained aliases"
+  },
+  "final_integrity": {
+    "path": "local-state/storage-cleanup/minimization-20261114/final-integrity.json",
+    "sha256": "566482cfc05c398cf520a550f9c1fdb4c978db28e9f2f32bf579fd4693bf06dc",
+    "status": "passed",
+    "current_contracts": 6,
+    "pending_transaction": false
+  }
+}

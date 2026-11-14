@@ -28,6 +28,7 @@ const usage =
     \\       tools/clean-storage inventory [--policy FILE]
     \\       tools/clean-storage prepare-builds --builds FILE --reason TEXT [--successor FILE]
     \\       tools/clean-storage prepare-caches --caches FILE --reason TEXT
+    \\       tools/clean-storage prepare-command-caches --reports FILE --reason TEXT
     \\       tools/clean-storage prepare-traces --traces FILE --reason TEXT
     \\       tools/clean-storage prepare-generated --paths FILE --reason TEXT
     \\       tools/clean-storage prepare-outputs --reports FILE --reason TEXT
@@ -55,6 +56,12 @@ const usage =
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
     errdefer if (c.diagnostic) |d| c.print("{s}\n", .{d}) catch {};
+    // Context discovery may walk upward for ordinary tools. A collector must
+    // never substitute a parent project for an explicitly selected owner.
+    if (c.env.get("ZLLVM_PROJECT_ROOT")) |chosen| {
+        const expected = try std.Io.Dir.cwd().realPathFileAlloc(c.io, chosen, c.a);
+        if (!std.mem.eql(u8, expected, c.root)) return error.ExplicitStorageRootMismatch;
+    }
     const args = try init.minimal.args.toSlice(c.a);
     var apply = false;
     var minimal = false;
@@ -72,12 +79,13 @@ pub fn main(init: std.process.Init) !void {
     var inputs_plan: ?[]const u8 = null;
     const prepare_builds = args.len > 1 and std.mem.eql(u8, args[1], "prepare-builds");
     const prepare_caches = args.len > 1 and std.mem.eql(u8, args[1], "prepare-caches");
+    const prepare_command_caches = args.len > 1 and std.mem.eql(u8, args[1], "prepare-command-caches");
     const prepare_traces = args.len > 1 and std.mem.eql(u8, args[1], "prepare-traces");
     const prepare_generated = args.len > 1 and std.mem.eql(u8, args[1], "prepare-generated");
     const prepare_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-outputs");
     const prepare_closed_outputs = args.len > 1 and std.mem.eql(u8, args[1], "prepare-closed-outputs");
     const prepare_observed_compilers = args.len > 1 and std.mem.eql(u8, args[1], "prepare-observed-compilers");
-    const prepare_any_outputs = prepare_outputs or prepare_closed_outputs or prepare_observed_compilers;
+    const prepare_any_outputs = prepare_outputs or prepare_closed_outputs or prepare_observed_compilers or prepare_command_caches;
     const prepare_receipts = args.len > 1 and std.mem.eql(u8, args[1], "prepare-receipts");
     const prepare_aliases = args.len > 1 and std.mem.eql(u8, args[1], "prepare-aliases");
     const prepare_legacy = prepare_receipts or prepare_aliases;
@@ -296,7 +304,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     if (prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs) {
-        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_closed_outputs) try batch.closedOutputs(&e, generated_paths.?, reason.?) else if (prepare_observed_compilers) try batch.observedCompilers(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
+        if (prepare_builds) try batch.builds(&e, builds_path.?, successor_path, reason.?) else if (prepare_caches) try batch.caches(&e, caches_path.?, reason.?) else if (prepare_traces) try batch.traces(&e, traces_path.?, reason.?) else if (prepare_generated) try batch.generated(&e, generated_paths.?, reason.?) else if (prepare_command_caches) try @import("storage_cleanup/command_caches.zig").prepare(&e, generated_paths.?, reason.?) else if (prepare_closed_outputs) try batch.closedOutputs(&e, generated_paths.?, reason.?) else if (prepare_observed_compilers) try batch.observedCompilers(&e, generated_paths.?, reason.?) else if (prepare_outputs) try batch.outputs(&e, generated_paths.?, reason.?) else try batch.reviewedPins(&e, requests_path.?, review_path.?, reviewed_manifests);
         status = "prepared";
         return;
     }
@@ -371,7 +379,7 @@ pub fn main(init: std.process.Init) !void {
             try e.consumers();
             try e.guardCaptureGroups();
             if (a.status != .ready) continue;
-            const caches = a.kind == .cache and a.snapshot != null;
+            const caches = cache_batch.accepts(a.*);
             const group = if (mutation.fileAction(a.*)) try mutation.fileBatch(&e, index) else if (caches) try cache_batch.select(&e, index) else &.{};
             if (group.len > 0) {
                 if (caches) try cache_batch.apply(&e, group) else try mutation.applyFileBatch(&e, group);
@@ -380,7 +388,7 @@ pub fn main(init: std.process.Init) !void {
             if (group.len > 0) {
                 var reclaimed_group: u64 = 0;
                 for (group) |member| reclaimed_group += e.actions.items[member].reclaimed_file_bytes;
-                if (caches) try c.print("Removed {d} verified caches ({d} allocated file bytes)\n", .{ group.len, reclaimed_group }) else try c.print("Removed {d} verified files ({d} allocated file bytes)\n", .{ group.len, reclaimed_group });
+                if (caches) try c.print("Removed {d} verified temporary trees ({d} allocated file bytes)\n", .{ group.len, reclaimed_group }) else try c.print("Removed {d} verified files ({d} allocated file bytes)\n", .{ group.len, reclaimed_group });
             } else try c.print("Removed: {s} ({d} allocated file bytes)\n", .{ a.path, a.reclaimed_file_bytes });
         }
         e.hash_cache.clearRetainingCapacity();
@@ -449,6 +457,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/inventory.zig", .bytes = @embedFile("storage_cleanup/inventory.zig") },
         .{ .path = "tools/storage_cleanup/batch.zig", .bytes = @embedFile("storage_cleanup/batch.zig") },
         .{ .path = "tools/storage_cleanup/private_cache.zig", .bytes = @embedFile("storage_cleanup/private_cache.zig") },
+        .{ .path = "tools/storage_cleanup/command_caches.zig", .bytes = @embedFile("storage_cleanup/command_caches.zig") },
         .{ .path = "tools/storage_cleanup/retired_compiler.zig", .bytes = @embedFile("storage_cleanup/retired_compiler.zig") },
         .{ .path = "tools/storage_cleanup/generated.zig", .bytes = @embedFile("storage_cleanup/generated.zig") },
         .{ .path = "tools/storage_cleanup/command_outputs.zig", .bytes = @embedFile("storage_cleanup/command_outputs.zig") },

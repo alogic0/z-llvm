@@ -1,18 +1,25 @@
-//! Bounded private-cache transactions, with fresh guards after all quarantines.
+//! Bounded private-cache/workspace transactions, with fresh guards after quarantine.
 const std = @import("std");
 const core = @import("engine.zig");
 const mutation = @import("mutation.zig");
 const u = @import("../validation/common.zig");
 const fa = core.fa;
 const D = std.Io.Dir;
-const limit = 16;
+// Many validation modes own tiny caches or empty workspaces. Bound the total
+// snapshot files and bytes as well as roots, without repeating the global pin
+// scan for every handful of directories.
+const limit = 128;
+
+pub fn accepts(a: core.Action) bool {
+    return (a.kind == .cache or a.kind == .temporary_workspace) and a.snapshot != null;
+}
 
 pub fn select(e: *core.Engine, start: usize) ![]const usize {
     var indexes: std.ArrayList(usize) = .empty;
     var bytes: u64 = 0;
     var files: usize = 0;
     for (e.actions.items[start..], start..) |a, index| {
-        if (a.status != .ready or a.kind != .cache or a.snapshot == null) continue;
+        if (a.status != .ready or !accepts(a)) continue;
         if (indexes.items.len != 0 and (a.allocated_bytes > (1024 * 1024 * 1024) -| bytes or a.file_count > e.config.max_candidate_entries -| files)) continue;
         try indexes.append(e.c.a, index);
         bytes += a.allocated_bytes;
@@ -59,7 +66,7 @@ pub fn apply(e: *core.Engine, indexes: []const usize) !void {
     }
     for (indexes) |index| {
         const a = e.actions.items[index];
-        if (a.kind != .cache or a.status != .ready or a.snapshot == null or a.metadata == null) return error.InvalidCacheBatch;
+        if (!accepts(a) or a.status != .ready or a.metadata == null) return error.InvalidCacheBatch;
         const metadata = try e.metadata(a.path);
         if (!metadata.eql(a.metadata.?) or metadata.kind != .directory) return error.CandidateChanged;
         try e.check(a.snapshot.?);
@@ -69,6 +76,9 @@ pub fn apply(e: *core.Engine, indexes: []const usize) !void {
         errdefer before.deinit();
         if (!std.mem.eql(u8, before.value.root, try e.absolute(a.path))) return error.InvalidCacheBatch;
         try e.checkCache(before.value);
+        if (a.kind == .temporary_workspace) for (before.value.entries) |entry| {
+            if (std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.WorkspaceContainsRawTrace;
+        };
         try fa.verify(e.c.gpa, e.c.io, before.value);
         var allocation: u64 = 0;
         for (before.value.entries) |entry| if (entry.metadata.kind == .file) {

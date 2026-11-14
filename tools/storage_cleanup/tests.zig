@@ -6,6 +6,7 @@ const mutation = @import("mutation.zig");
 const releases = @import("release.zig");
 const batches = @import("batch.zig");
 const private_cache = @import("private_cache.zig");
+const command_caches = @import("command_caches.zig");
 const retired_compiler = @import("retired_compiler.zig");
 const generated = @import("generated.zig");
 const command_outputs = @import("command_outputs.zig");
@@ -1104,6 +1105,73 @@ test "storage cleanup: a completed separate workspace retires only temporary dat
     try t.expectEqual(@as(usize, 0), again.actions.items.len);
 }
 
+fn workspaceSetFixture(f: *Fixture, count: usize, empty_others: bool) !void {
+    const first = try workspaceFixture(f, true);
+    first.close(&f.c);
+    for (1..count) |i| {
+        const key = if (i == 1) "second" else try f.c.fmt("workspace-{d}", .{i});
+        const next = (try workspace.start(&f.c, try f.c.join(&.{run}), key)).?;
+        if (!empty_others) try f.c.write(try f.c.join(&.{ next.record.temporary_root, "object.o" }), "\x7fELFtemporary object");
+        try next.finish(&f.c, try f.c.join(&.{report}), &.{try f.c.join(&.{ run, "diagnostic.log" })});
+        next.close(&f.c);
+    }
+}
+
+test "storage cleanup: bounded workspace batches retire empty and populated roots with receipts" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try workspaceSetFixture(f, 20, true);
+    var e = f.engine();
+    try workspaces.discover(&e);
+    try t.expectEqual(@as(usize, 20), e.actions.items.len);
+    for (0..20) |i| try e.qualify(i);
+    const selected = try cache_batch.select(&e, 0);
+    try t.expectEqual(@as(usize, 20), selected.len);
+    try cache_batch.apply(&e, selected);
+    for (e.actions.items, 0..) |action, i| {
+        try t.expectEqual(.removed, action.status);
+        try t.expectEqual(action.allocated_bytes, action.reclaimed_file_bytes);
+        try t.expect(!u.exists(f.c.io, try e.absolute(action.path)));
+        _ = try e.metadata(try f.c.fmt("{s}/record-{d}.json", .{ output, i }));
+    }
+    for ([_][]const u8{ report, run ++ "/diagnostic.log", run ++ "/profile.events.jsonl", run ++ "/input.ll" }) |path| _ = try e.metadata(path);
+    try t.expect(!u.exists(f.c.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: workspace batch rolls back both roots on a fresh evidence hold or pin" {
+    for ([_]bool{ false, true }) |hold| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        try workspaceSetFixture(f, 20, false);
+        var e = f.engine();
+        try workspaces.discover(&e);
+        for (0..20) |i| try e.qualify(i);
+        if (hold) try e.write(e.config.holds_file, p.Holds{ .paths = &.{run ++ "/input.ll"} }) else {
+            const member = try f.c.fmt("{s}/object.o", .{try workspace.paths.temporaryRoot(f.c.a, run, "second")});
+            try f.write(run ++ "/new-pin.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(member), member }));
+        }
+        try t.expectError(error.CacheBatchBecameHeld, cache_batch.apply(&e, try cache_batch.select(&e, 0)));
+        for (e.actions.items) |action| {
+            _ = try e.metadata(action.path);
+            try t.expectEqual(@as(u64, 0), action.reclaimed_file_bytes);
+        }
+        try t.expect(!u.exists(f.c.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: workspace batch rejects changed owner evidence before mutation" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try workspaceSetFixture(f, 2, false);
+    var e = f.engine();
+    try workspaces.discover(&e);
+    for (0..2) |i| try e.qualify(i);
+    try f.write(run ++ "/diagnostic.log", "changed diagnostics");
+    if (cache_batch.apply(&e, &.{ 0, 1 })) |_| return error.ChangedWorkspaceEvidenceAccepted else |_| {}
+    for (e.actions.items) |action| _ = try e.metadata(action.path);
+    try t.expect(!u.exists(f.c.io, try e.absolute(mutation.pending_path)));
+}
+
 test "storage cleanup: unfinished and failed workspaces retain their objects" {
     const f = try Fixture.init();
     defer f.deinit();
@@ -1903,6 +1971,129 @@ test "storage cleanup: private test caches preserve diagnostics for passed faile
         _ = try e.metadata(run ++ "/evidence/unit.json");
         _ = try e.metadata(run ++ "/src/main.zig");
     };
+}
+
+fn commandCachesFixture(f: *Fixture, e: *core.Engine) !void {
+    for ([_][]const u8{ run ++ "/global-cache", run ++ "/Debug/reference-cache" }) |path| {
+        try f.tmp.dir.createDirPath(t.io, path);
+        try f.write(try e.c.fmt("{s}/object", .{path}), "temporary compiled bytes");
+    }
+    try f.write(run ++ "/compile.stdout", "");
+    try f.write(run ++ "/compile.stderr", "expected negative-case diagnostics\n");
+    try e.write(report, .{ .status = "passed", .toolchain = .{ .zig_emitter = .{ .path = "/missing/old-emitter" } } });
+    const Command = struct { argv: []const []const u8, outcome: []const u8 = "completed", returncode: i64, actual_returncode: i64, stdout: []const u8, stderr: []const u8 };
+    const argv = [_][]const u8{ "/missing/old-emitter", "build-obj", "--cache-dir", try e.absolute(run ++ "/Debug/reference-cache"), "--global-cache-dir", try e.absolute(run ++ "/global-cache") };
+    try e.write(run ++ "/commands.json", [_]Command{
+        .{ .argv = &argv, .returncode = 0, .actual_returncode = 0, .stdout = try e.absolute(run ++ "/compile.stdout"), .stderr = try e.absolute(run ++ "/compile.stderr") },
+        .{ .argv = &argv, .returncode = 1, .actual_returncode = 1, .stdout = try e.absolute(run ++ "/compile.stdout"), .stderr = try e.absolute(run ++ "/compile.stderr") },
+    });
+}
+
+test "storage cleanup: command ledgers release private mode caches and preserve negative-case evidence" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try commandCachesFixture(f, &initial);
+    try initial.write(run ++ "/storage-release.json", try command_caches.request(&initial, report, "Completed comparison caches"));
+    var e = f.engine();
+    try e.discover();
+    try t.expectEqual(@as(usize, 2), e.actions.items.len);
+    for (0..e.actions.items.len) |i| {
+        try e.qualify(i);
+        try t.expect(!e.actions.items[i].replay_required);
+        try mutation.apply(&e, i);
+    }
+    try t.expectError(error.FileNotFound, e.metadata(run ++ "/Debug/reference-cache"));
+    try t.expectError(error.FileNotFound, e.metadata(run ++ "/global-cache"));
+    for ([_][]const u8{ report, run ++ "/commands.json", run ++ "/compile.stdout", run ++ "/compile.stderr" }) |path| _ = try e.metadata(path);
+}
+
+test "storage cleanup: cache ledger requires a passed parent and every using command to be closed" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var initial = f.engine();
+        try commandCachesFixture(f, &initial);
+        if (case == 0) {
+            try initial.write(report, .{ .status = "failed" });
+        } else {
+            var commands = try initial.load(f.c.a, run ++ "/commands.json");
+            const command = &commands.value.array.items[1];
+            if (case == 1) try u.put(f.c.a, command, "outcome", u.s("running"));
+            if (case == 2) try u.put(f.c.a, command, "actual_returncode", .{ .integer = 2 });
+            if (case == 3) command.object.getPtr("argv").?.array.items[0] = u.s("/unknown/script");
+            try initial.write(run ++ "/commands.json", commands.value);
+        }
+        var e = f.engine();
+        try t.expectError(switch (case) {
+            0 => error.UnboundCommandCacheOwner,
+            3 => error.UnsupportedCacheTool,
+            else => error.CacheCommandNotClosed,
+        }, command_caches.request(&e, report, "Review all cache consumers"));
+        _ = try e.metadata(run ++ "/global-cache/object");
+    }
+}
+
+test "storage cleanup: cache ledger refuses arbitrary locations and diagnostics inside scratch" {
+    try t.expect(!command_caches.owned(run, "local-state/caches/global-cache"));
+    try t.expect(!command_caches.owned(run, run ++ "/src/reference-cache"));
+    try t.expect(!command_caches.owned(run, run ++ "/Debug/source"));
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try commandCachesFixture(f, &initial);
+    var commands = try initial.load(f.c.a, run ++ "/commands.json");
+    try u.put(f.c.a, &commands.value.array.items[0], "stderr", u.s(try initial.absolute(run ++ "/global-cache/object")));
+    try initial.write(run ++ "/commands.json", commands.value);
+    var e = f.engine();
+    try t.expectError(error.RetentionOverlap, command_caches.request(&e, report, "Preserve diagnostics"));
+}
+
+test "storage cleanup: cache ledger binds commands and diagnostics before mutation" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var initial = f.engine();
+        try commandCachesFixture(f, &initial);
+        try initial.write(run ++ "/storage-release.json", try command_caches.request(&initial, report, "Closed caches"));
+        if (case == 0) try f.write(run ++ "/commands.json", "[]\n");
+        if (case == 1) try f.tmp.dir.deleteFile(t.io, run ++ "/compile.stderr");
+        var e = f.engine();
+        try e.discover();
+        if (case == 0) {
+            try t.expectError(error.EvidenceHashMismatch, e.qualify(0));
+        } else if (case == 1) {
+            try t.expectError(error.MissingDiagnosticRetirement, e.qualify(0));
+        } else {
+            try e.qualify(0);
+            try f.write(run ++ "/compile.stderr", "changed diagnostics");
+            if (mutation.apply(&e, 0)) |_| return error.ChangedCacheDiagnosticsAccepted else |_| {}
+        }
+        _ = try e.metadata(run ++ "/global-cache/object");
+        _ = try e.metadata(run ++ "/Debug/reference-cache/object");
+    }
+}
+
+test "storage cleanup: cache ledger preparation reports rejected owners and preserves current pins" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var initial = f.engine();
+    try commandCachesFixture(f, &initial);
+    try f.write("reports.txt", report ++ "\nlocal-state/validations/missing/batch/report.json\n");
+    try command_caches.prepare(&initial, "reports.txt", "Reviewed comparison caches");
+    var e = f.engine();
+    try batches.discover(&e, output ++ "/requests.json");
+    try t.expectEqual(@as(usize, 2), e.actions.items.len);
+    for (0..e.actions.items.len) |i| try e.qualify(i);
+    const member = run ++ "/global-cache/object";
+    try f.write("current-cache", try e.c.fmt("{s}  {s}\n", .{ try e.digest(member), member }));
+    e.config.current_manifests = &.{"current-cache"};
+    try e.pins();
+    for (e.actions.items) |action| if (std.mem.eql(u8, action.path, run ++ "/global-cache")) try t.expectEqual(.skipped, action.status);
+    var review = try e.load(f.c.a, output ++ "/command-cache-review.json");
+    try t.expectEqual(@as(i64, 1), try core.integer(review.value, "prepared"));
+    try t.expectEqual(@as(usize, 1), (try core.get(review.value, "rejected")).array.items.len);
+    review.deinit();
 }
 
 test "storage cleanup: legacy cache cwd requires explicit review and modern cwd must match" {

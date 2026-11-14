@@ -27,8 +27,9 @@ standalone outputs keep their original paths and retention rules. There is no
 bulk move of historical files or rewrite of current manifests.
 
 For a sibling source checkout, use `tools/run-validation --project-root SOURCE
---storage-root OWNER ...`. The owner must contain the project storage policy and
-collector. `ZLLVM_PROJECT_ROOT` remains the source and command working directory;
+--storage-root OWNER ...`. The owner must contain the project storage policy,
+collector, `.zigversion` and `src/main.zig` project markers.
+`ZLLVM_PROJECT_ROOT` remains the source and command working directory;
 `ZLLVM_STORAGE_ROOT` selects the evidence, workspace, lease and job-record owner.
 The launcher requires managed output under the owner's
 `local-state/validations/SUITE/BATCH/RUN` and rejects a silent fallback into mixed
@@ -37,6 +38,11 @@ records describe the command identity and never extend collection scope.
 See [the launcher example](validation_tools.md#launch-current-tools-with-another-source-checkout)
 for relative-path rules. Existing direct tool invocations retain their optional
 layout unless they set `ZLLVM_REQUIRE_MANAGED_STORAGE=1`.
+
+For direct collector invocations, an explicit `ZLLVM_PROJECT_ROOT` selects the
+project/storage owner exactly. The collector rejects `ExplicitStorageRootMismatch`
+if ordinary project discovery would select a parent directory. This applies to
+native invocations as well as the launcher.
 
 `run_checked` gives commands `ZLLVM_RUN_ROOT` for maintained evidence,
 `ZLLVM_TEMP_ROOT` for temporary products and defaults `TMPDIR`,
@@ -233,6 +239,7 @@ applies only to `capture-zllvm`, never arbitrary linked binaries or caches.
 | --- | --- |
 | Completed private compiler caches | A passed isolated compiler `report.json` and completed commands whose cache arguments name direct children of that run. The default project policy does not require source/configuration reconstruction; `cache_evidence:"replay"` optionally adds it. |
 | Released private test caches | An explicit disposable release bound to a terminal `run_checked` receipt, its working directory and exact cache arguments. The producer log remains hash-bound outside the cache, including for failed/canceled tests. |
+| Released comparison caches | A passed `report.json`, its hash-bound sibling `commands.json`, explicit private cache arguments and closed compiler commands. Every using command's diagnostics remain outside the released caches. |
 | Released raw event streams | An explicit owner release, a complete semantic audit bound to the exact raw SHA-256, producer/reports/input hashes, the original compiler or its verified guarded retirement, complete build/source evidence, and the auditor sources. An audited failure retains its original outcome and diagnostics; it does not require a passed successor. |
 | Superseded executable/object files | An explicit release record, accepted successor, complete source/build/input/result evidence and matching bytes. Only the supported output names and ELF/archive formats qualify. |
 | Disposable executable/object files | An explicit `disposable` release, a closed producer in the owning run, and exact output hashes. No source/configuration reconstruction or accepted successor is required. Only compiled ELF/archive output can qualify. |
@@ -365,14 +372,18 @@ separate cap of 1024 names, keeping each alias group indivisible. The durable
 The collector rechecks pins, holds, consumers and retained evidence after
 quarantining all members. Before the first unlink a failure restores every
 name; an interrupted or partially unlinked batch leaves the journal for review.
-Evidence is verified again before clearing the journal. Private caches use a
-separate `cache-batch` transaction of at most 16 roots, normally at most 1 GiB
+Evidence is verified again before clearing the journal. Private caches and
+completed managed workspaces use a
+separate `cache-batch` transaction of at most 128 roots, normally at most 1 GiB
 and the configured file-count budget; a larger single cache retains the existing
 single-root allowance. Every snapshot and allocation is checked before any
 rename. All roots are quarantined before refreshing pins, holds, consumers and
 evidence; failure before the first unlink restores every name. Exact file and
-directory checks continue throughout removal. Directory workspaces retain their
-separate snapshot-based mutation rules.
+directory checks continue throughout removal. Workspace layout, result and
+diagnostic bindings remain mandatory, as do protection of both evidence and
+temporary roots and rejection of raw event streams or external hardlinks.
+Empty workspaces use the same bounded transaction, avoiding a full retention
+scan for each empty directory.
 
 `narrow-cache-holds --roots FILE --reason TEXT` reviews explicitly selected
 run-level manual holds, one path per line. Each run must have a passed producer
@@ -498,6 +509,31 @@ Private-cache artifacts use `kind:"private_cache"` and omit the single-file
 whole-cache removal checks used for compiler caches apply. Source/configuration
 reconstruction is not required. Logs, receipts, current pins, queued holds,
 active consumers and retained dependencies remain protected.
+
+### Private caches recorded in command ledgers
+
+`prepare-command-caches --reports FILE --reason TEXT` reads a newline-separated
+list of project-relative `report.json` paths. It prepares disposable requests
+and `command-cache-review.json`, including reasons for rejected owners. Review
+and apply its `requests.json` through the normal guarded collector.
+
+The parent report must pass. Its sibling `commands.json` must explicitly name
+each cache with an absolute `--cache-dir` or `--global-cache-dir` argument.
+Supported commands directly invoke Zig, or the report's recorded frontend or
+emitter, with `build`, `test`, `build-exe`, `build-obj`, `build-lib`, `cc` or `c++`.
+Every command using an owned cache must have a completed outcome and matching
+recorded/actual return codes. Expected negative compile/link cases are allowed
+inside a passed comparison; their original statuses and diagnostics remain.
+
+Only recognized cache names directly under the run or one standard optimization
+mode qualify. These include `frontend-cache`, `reference-cache`,
+`candidate-cache`, `reference-link-cache`, `candidate-link-cache` and the usual
+local/global Zig cache names. Default caches, shared locations, arbitrary nested
+directories and shell commands are not inferred. Every using command's stdout
+and stderr must remain outside every released cache; an already retired empty
+log needs its existing verified retirement record. Source and old compiler
+preservation are not prerequisites. Current pins, holds, consumers, private
+inode ownership and fresh per-file snapshots still decide actual collection.
 
 ### Generated integrated-test outputs
 

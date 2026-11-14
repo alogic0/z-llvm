@@ -48,6 +48,7 @@ pub const Release = struct {
     cache_owner: ?CacheOwner = null,
     compiler_retirement: ?Evidence = null,
     command_outputs: ?Evidence = null,
+    command_caches: ?Evidence = null,
     command_owner: ?CacheOwner = null,
     closed_command_outputs: bool = false,
     compiler_observation: ?Evidence = null,
@@ -109,6 +110,11 @@ pub fn privateCacheName(name: []const u8) bool {
     return cacheName(name) or (std.mem.startsWith(u8, name, "zig-local-") and name.len > "zig-local-".len) or
         (std.mem.startsWith(u8, name, "zig-global-") and name.len > "zig-global-".len);
 }
+pub fn commandCacheName(name: []const u8) bool {
+    return cacheName(name) or std.mem.eql(u8, name, "frontend-cache") or
+        std.mem.eql(u8, name, "reference-cache") or std.mem.eql(u8, name, "candidate-cache") or
+        std.mem.eql(u8, name, "reference-link-cache") or std.mem.eql(u8, name, "candidate-link-cache");
+}
 pub fn privateCacheOwned(run: []const u8, cwd: []const u8, path: []const u8) bool {
     if (std.mem.eql(u8, cwd, ".")) return privateCacheOwned(run, run, path);
     if (!candidate(cwd) or !candidate(path) or !within(run, cwd) or !within(cwd, path) or !privateCacheName(std.fs.path.basename(path))) return false;
@@ -119,7 +125,7 @@ pub fn privateCacheOwned(run: []const u8, cwd: []const u8, path: []const u8) boo
 }
 pub fn artifactName(a: Artifact) bool {
     if (!candidate(a.path)) return false;
-    if (a.kind == .private_cache) return a.sha256.len == 0 and privateCacheName(std.fs.path.basename(a.path));
+    if (a.kind == .private_cache) return a.sha256.len == 0 and (privateCacheName(std.fs.path.basename(a.path)) or commandCacheName(std.fs.path.basename(a.path)));
     if (!hash(a.sha256)) return false;
     const name = std.fs.path.basename(a.path);
     return switch (a.kind) {

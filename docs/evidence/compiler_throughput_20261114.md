@@ -81,8 +81,15 @@ with event instrumentation and overlapping validation.
 The ignored evidence root is
 `local-state/validations/compiler-throughput-20261114/batch-01/`. Build receipts,
 fixed inputs, measurement scripts, actual statuses, profiles, audits and failed
-attempts are retained there. A queued manual storage hold protects the root.
-Important evidence is outside `.zig-cache`.
+attempts are retained there. After the terminal consumers finished, the
+[reviewed storage transition](compiler_throughput_storage_20261114.json) closed
+this cycle's broad hold and collected 41 temporary workspaces. The unchanged
+acceptance record and original seal preserve historical identities; the old
+seal includes retired targets and is no longer the current file-presence
+contract. `maintained-artifacts-storage-20261114.sha256` covers all 56,054
+remaining original entries plus the original seal and acceptance record. Seven
+workspaces remain for existing compiler dependencies or independently maintained
+object aliases. Important evidence is outside `.zig-cache`.
 
 The first isolated Tier-3 run failed because the frozen compiler-core execution
 cohort resolves relative artifacts against the canonical main checkout. Its
