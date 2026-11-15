@@ -50,6 +50,14 @@ export ZLLVM_REQUIRE_MANAGED_STORAGE=1
 for validation_file in "$validation_bootstrap/build.lock" "$validation_bootstrap/run-checked" "$validation_bootstrap/run-checked.new"; do
     if [[ -L $validation_file ]]; then printf 'refusing symlink: %s\n' "$validation_file" >&2; exit 2; fi
 done
+# Retry completed work deferred by an earlier reader before this job takes its
+# lease. Cleanup uses its own maintenance context and the selected storage owner.
+# The collector still checks queued argv inputs, holds and current pins.
+if ! env -u ZLLVM_REQUIRE_MANAGED_STORAGE -u ZLLVM_EVIDENCE_ROOT -u ZLLVM_TEMPORARY_ROOT \
+    -u ZLLVM_RUN_ROOT -u ZLLVM_TEMP_ROOT ZLLVM_PROJECT_ROOT="$validation_storage" \
+    "$validation_source/tools/clean-storage" --minimal --apply; then
+    printf 'Storage cleanup before validation deferred; continuing with managed ownership.\n' >&2
+fi
 exec 9> "$validation_bootstrap/build.lock"
 flock --exclusive 9
 "$validation_zig" build-exe -O ReleaseFast --cache-dir "$validation_bootstrap/local-cache" --global-cache-dir "$validation_bootstrap/global-cache" \

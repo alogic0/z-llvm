@@ -11,6 +11,10 @@ Before producing build, validation or profiling data, read
 - Use pipeline retention when later consumers need temporary products; release
   the workspace after those consumers finish. Failed work remains until its
   diagnosis and disposition are recorded.
+- Collect at completed stage boundaries and immediately after releasing a
+  pipeline or resolving an investigation. Retry deferred collection at the next
+  idle boundary. Use separate managed stages so long outer leases do not delay
+  cleanup of unrelated completed work until the end of the whole cycle.
 - Record ordinary binary/object identities without turning them into retention
   pins. Accepted manifests list only deliberately maintained files. Existing
   accepted artifacts, exact replay dependencies and independent holds retain

@@ -78,10 +78,20 @@ existing quarantine journal before removing exact inventoried entries. A raw
 unknown folder under `local-state/tmp` is never automatically disposable.
 
 The standalone producers publish their result for the next `clean-storage
---minimal --apply`; `run_checked` also attempts that collection on exit. A parent
+--minimal --apply`; `run_checked` also attempts that collection on exit.
+`tools/run-validation` attempts the same collection before starting the next
+checked command, retrying work deferred by earlier readers. This pass selects
+the storage owner explicitly, including when using another source checkout.
+Its failure is reported and does not replace the command's outcome. A parent
 job or shared lease can defer it. Compiler installations prepared for later
 validation remain live dependencies until the pipeline owner releases them;
 this layout does not infer that build completion closes downstream consumers.
+
+Use separate managed commands for stages with independent lifetimes. Collect
+after the final consumer releases a pipeline and after an investigation resolves
+failed scratch; retry a busy pass at the next idle boundary. An outer command
+that keeps a lease across many independent stages delays their collection, so
+keep such a lease only while its actual consumers need it.
 
 Run the collector to review completed private compiler caches and explicitly
 released artifacts. Ordinary old compiler/test binaries and objects are temporary;

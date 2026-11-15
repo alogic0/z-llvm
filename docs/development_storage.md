@@ -88,6 +88,12 @@ lease over the whole pipeline or declare queued work before releasing that lease
 A bare `flock --shared ...` provides concurrency protection only; it does not
 replace this ownership/lifetime record.
 
+The launcher attempts guarded minimal collection before starting each checked
+command; the checked runner attempts it again on completion. The first pass
+retries work left by earlier busy readers. Cleanup uses the storage owner's
+policy even when the command runs in another source checkout. A busy or failed
+cleanup is reported and the command keeps its own outcome.
+
 For sibling checkouts, use `--project-root SOURCE --storage-root OWNER` as
 described in [validation tools](validation_tools.md#launch-current-tools-with-another-source-checkout).
 Never use a source snapshot as an implicit new storage owner.
@@ -108,6 +114,19 @@ path. Do not hardlink mutable scratch into maintained evidence.
 Existing accepted manifests, replay dependencies and independent holds remain
 effective. Changing their lifetime requires a reviewed transition; changing a
 filename or adding a note does not remove that dependency.
+
+## Collect throughout the cycle
+
+- Use a managed command for each build, test or measurement stage whose lifetime
+  can close independently. Completed ordinary work is collected after that stage.
+- Release a retained pipeline as soon as its last consumer finishes, then run
+  `tools/clean-storage --minimal --apply` at that boundary.
+- Resolve failed scratch and retire audited raw traces when the diagnosis or
+  audit completes. Preserve the original result and required diagnostics.
+- Retry deferred collection at the next idle boundary before starting more work.
+  An enclosing live lease can defer both automatic passes: split independent
+  stages into separate top-level commands, and retain shared inputs through
+  their declared pipelines. Keep leases over work that is still active.
 
 ## Close the cycle
 
@@ -133,7 +152,7 @@ filename or adding a note does not remove that dependency.
    stays unresolved until reviewed. Record the reason when a pin or another
    consumer prevents release. Do not mark all leftover data as required.
 
-Automatic collection can be deferred by another reader/build. Keep the terminal
-receipt and finish collection at the next idle boundary. Completion includes a
+The end-of-cycle review confirms these earlier collections and closes any final
+consumers. Keep the terminal receipts for deferred collection. Completion includes a
 recorded storage disposition even when a real consumer requires retention.
 See [storage cleanup](storage_cleanup.md) for verified release formats and guards.

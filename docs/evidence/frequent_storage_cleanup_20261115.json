@@ -1,0 +1,104 @@
+{
+  "schema": "zllvm-frequent-storage-cleanup-v1",
+  "status": "complete",
+  "date": "2026-11-15",
+  "source_parent": "6610c14089c2e0814cde0343affd1e8a2c70839b",
+  "behavior": {
+    "before_managed_launch": "Retry guarded minimal collection against the selected storage owner",
+    "after_checked_command": "Existing automatic terminal collection remains",
+    "stage_boundaries": "Separate independent managed stages; release and collect after the last consumer",
+    "deferred_collection": "Report deferral and retry at the next idle boundary or managed launch",
+    "cleanup_environment": "Clear validation/workspace context only in the collector subprocess; preserve the checked command environment",
+    "command_outcome": "Busy or failed cleanup does not replace the command exit status"
+  },
+  "qualification": {
+    "runner_optimization": "ReleaseFast",
+    "worktree_launcher_cli_checks": 15,
+    "documentation_checks_passed": true,
+    "shell_syntax_checks_passed": true,
+    "diff_checks_passed": true,
+    "sources_unchanged_during_successful_qualification": true,
+    "collector_code_and_eligibility_rules_unchanged": true,
+    "covered": [
+      "deferred scratch removed before the next command starts",
+      "busy collection and failure preserve exit status 7",
+      "queued input survives pre-run collection and is removed after its final use",
+      "separate source checkout and storage owner",
+      "failed investigation and pipeline retention",
+      "literal command arguments and invalid command rejection"
+    ]
+  },
+  "initial_failure": {
+    "returncode": 1,
+    "cause": "Pre-run collector inherited validation-only output restrictions",
+    "resolution": "Separate maintenance environment and verify cleared variables in the real CLI regression",
+    "original_outcome_preserved": true
+  },
+  "task_storage": {
+    "workspaces_removed": 2,
+    "allocated_workspace_bytes_removed": 120061952,
+    "successful_workspace_collected_automatically": true,
+    "diagnosed_failed_workspace_explicitly_released": true,
+    "maintained_evidence_preserved": true,
+    "task_workspaces_absent": true,
+    "pending_transaction": false,
+    "reusable_bootstrap_owners": [
+      "tools/run-validation",
+      "tools/clean-storage"
+    ]
+  },
+  "evidence": [
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification/qualification.json",
+      "sha256": "e692cb8aa211b5375a008db9abdefae3cc6b918f2008c894c599a84341fa411f"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification/diagnosis.md",
+      "sha256": "d58164562bfd6ebbb58b0feb717d5620ad6bf5df6e8f7c15e1fe6ecf11dbb4c7"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification/qualification.workspace-release.json",
+      "sha256": "58c51132a17fda1c74cc94de3ee9985925ee1c0e9401297e1fcccc2c4c8e6a72"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/qualification.json",
+      "sha256": "38ebe58fa0c906791faa20b05a88c800496efcbefa16c8bdeb73931afc7e12a6"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/worktree-cli.log",
+      "sha256": "930cb524c0a53e14cd82bc3338e8c072b4b9b78dcfc682a8ca74209ec283f878"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/docs.log",
+      "sha256": "fcdf80d1d75ff32f61d3ce5ff7defe36c51efaa000ce3c879b5383cd2772655a"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/sources-before.txt",
+      "sha256": "8b5b046326672e7c06b36e4a4032891e48c610b9b99673680e2292f9c47ebe4f"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/sources-after.txt",
+      "sha256": "8b5b046326672e7c06b36e4a4032891e48c610b9b99673680e2292f9c47ebe4f"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/runner-identity.txt",
+      "sha256": "28f1682a858b5506c82e57c4dfb9c321648fa4c7ad0666e4f53211b964c5ddfc"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/qualification-v2/collector-after.txt",
+      "sha256": "e3ae3658833f688d985e9c40c127756e6d25337f3fa68c475bc7c9e9bf972805"
+    },
+    {
+      "path": "local-state/validations/storage-cadence-20261115/batch-01/closure/retained-identities.txt",
+      "sha256": "75e16f530d996eb9686359224ac7a3378d4f101f5c1765c6689bf1814b523095"
+    },
+    {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794727954393570030-3365202/report.json",
+      "sha256": "062cdf683d0c6e8a0c6e0aeb60fb6f101fcf2b5455bd3b7b536bb28f18f32b8f"
+    },
+    {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794728229740962623-3370273/report.json",
+      "sha256": "5617ca37211c1530c7f04818fe4cbd999dd6ee95c149e022e9fb308a5b16116e"
+    }
+  ]
+}

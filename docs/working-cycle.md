@@ -35,7 +35,9 @@ One cycle means:
     `distribution-all`.
 4.  Save commands, outcomes and diagnostic logs under the maintained run root.
     Put ordinary build products in managed temporary workspaces; custom scripts
-    use `tools/run-validation ... --command ...`.
+    use `tools/run-validation ... --command ...`. Collect at completed stage
+    boundaries, release products after their last consumer, and retry deferred
+    collection at the next idle boundary throughout the cycle.
 5.  Update docs, counters, or readiness notes when ownership or evidence
     changes.
 6.  Close completed temporary pipelines, record remaining consumers and cleanup

@@ -23,6 +23,15 @@ printf '{"schema":1,"minimum_idle_hours":0}\n' > "$cleanup_owner/docs/storage_cl
 cat > "$cleanup_owner/tools/clean-storage" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ $# == 2 && $1 == --minimal && $2 == --apply ]]; then
+    test -z "${ZLLVM_REQUIRE_MANAGED_STORAGE+x}"
+    test -z "${ZLLVM_EVIDENCE_ROOT+x}"
+    test -z "${ZLLVM_TEMPORARY_ROOT+x}"
+    test -z "${ZLLVM_RUN_ROOT+x}"
+    test -z "${ZLLVM_TEMP_ROOT+x}"
+    if [[ ${CLEANUP_TEST_PRE_FAIL:-0} == 1 ]]; then exit 23; fi
+    exec "$CLEANUP_TEST_BINARY" --minimal --apply
+fi
 test "$1" = __finish-job
 "$CLEANUP_TEST_BINARY" --minimal --apply || true
 exit "$2"
@@ -137,9 +146,69 @@ for cleanup_case in command command-pipeline; do
     test -f "$cleanup_owner/$cleanup_run/check.json"
     if [[ $cleanup_case == command ]]; then test ! -e "$cleanup_owner/$cleanup_work"; else test -f "$cleanup_owner/$cleanup_work/output.o"; fi
 done
+# A completed stage can outlive its first collection attempt because another
+# reader holds the owner lease. The next launch must collect it before its child
+# starts, while preserving failed investigations and unreleased pipelines.
+cleanup_deferred_stage() {
+    local cleanup_stage=$1
+    exec 8> "$cleanup_owner/local-state/storage-cleanup/cleanup.lock"
+    flock --shared 8
+    CLEANUP_TEST_EXIT=0 cleanup_invoke --output-root "$cleanup_owner/local-state/validations/worktree/batch/$cleanup_stage" check -- "$cleanup_source/tools/produce" > "$cleanup_fixture/$cleanup_stage.log" 2>&1
+    test -f "$cleanup_owner/local-state/tmp/validations/worktree/batch/$cleanup_stage/.workspaces/check/product"
+    flock --unlock 8
+    exec 8>&-
+}
+cleanup_launch() {
+    env -u TMPDIR -u ZIG_LOCAL_CACHE_DIR -u ZIG_GLOBAL_CACHE_DIR \
+        ZIG="$cleanup_fixture/zig" CLEANUP_TEST_RUNNER="$cleanup_runner" \
+        CLEANUP_SOURCE_ROOT="$cleanup_source" CLEANUP_STORAGE_ROOT="$cleanup_owner" CLEANUP_TEST_BINARY="$cleanup_binary" \
+        "$cleanup_owner/tools/run-validation" --project-root "$cleanup_source" --storage-root "$cleanup_owner" "$@"
+}
+cat > "$cleanup_source/tools/check-boundary" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+    absent) test ! -e "$CLEANUP_PRIOR_TEMP" ;;
+    input) cat -- "$2" > "$ZLLVM_RUN_ROOT/consumed.txt" ;;
+    *) exit 2 ;;
+esac
+printf 'boundary command completed\n'
+EOF
+chmod 755 "$cleanup_source/tools/check-boundary"
+cleanup_deferred_stage deferred-stage
+export CLEANUP_PRIOR_TEMP="$cleanup_owner/local-state/tmp/validations/worktree/batch/deferred-stage/.workspaces/check"
+cleanup_launch --output-root local-state/validations/worktree/batch/retry-before-next check --command "$cleanup_source/tools/check-boundary" absent > "$cleanup_fixture/retry-before-next.log" 2>&1
+test ! -e "$CLEANUP_PRIOR_TEMP"
+test -f "$cleanup_owner/local-state/tmp/validations/worktree/batch/failed/.workspaces/check/product"
+test -f "$cleanup_owner/local-state/tmp/validations/worktree/batch/command-pipeline/.workspaces/check/output.o"
+unset CLEANUP_PRIOR_TEMP
+# A busy collector or failed cleanup must not replace the command's exit code.
+for cleanup_before in busy failed; do
+    cleanup_pre_fail=0
+    if [[ $cleanup_before == busy ]]; then
+        exec 8> "$cleanup_owner/local-state/storage-cleanup/cleanup.lock"
+        flock --shared 8
+    else
+        cleanup_pre_fail=1
+    fi
+    cleanup_actual=0
+    CLEANUP_TEST_PRE_FAIL=$cleanup_pre_fail CLEANUP_TEST_EXIT=7 \
+        cleanup_launch --output-root "local-state/validations/worktree/batch/pre-$cleanup_before" check --command "$cleanup_source/tools/produce" > "$cleanup_fixture/pre-$cleanup_before.log" 2>&1 || cleanup_actual=$?
+    if [[ $cleanup_before == busy ]]; then flock --unlock 8; exec 8>&-; fi
+    test "$cleanup_actual" = 7
+    "${ZIGREP:-zigrep}" --no-config -q -F 'Storage cleanup before validation deferred' "$cleanup_fixture/pre-$cleanup_before.log"
+    test -f "$cleanup_owner/local-state/tmp/validations/worktree/batch/pre-$cleanup_before/.workspaces/check/product"
+done
+# A command-line dependency is a queued consumer during the new pre-run pass.
+# Its last use finishes before the usual terminal pass removes the old workspace.
+cleanup_deferred_stage queued-stage
+cleanup_queued="$cleanup_owner/local-state/tmp/validations/worktree/batch/queued-stage/.workspaces/check/product"
+cleanup_launch --output-root local-state/validations/worktree/batch/consume-queued check --command "$cleanup_source/tools/check-boundary" input "$cleanup_queued" > "$cleanup_fixture/consume-queued.log" 2>&1
+test "$(cat "$cleanup_owner/local-state/validations/worktree/batch/consume-queued/consumed.txt")" = 'temporary product'
+test ! -e "$cleanup_queued"
 cleanup_actual=0
 ZIG="$cleanup_fixture/zig" "$cleanup_owner/tools/run-validation" --output-root local-state/validations/worktree/batch/empty check --command > "$cleanup_fixture/empty-command.log" 2>&1 || cleanup_actual=$?
 test "$cleanup_actual" = 2
 test ! -e "$cleanup_owner/local-state/validations/worktree/batch/empty"
 test ! -e "$cleanup_source/local-state"
-printf 'Eleven worktree CLI checks passed: source cwd, passed collection, failed retention, nested ownership, unmanaged roots, symlink escape, external source preservation, native launcher collection, literal custom command arguments, custom pipeline retention and empty command rejection.\n'
+printf 'Fifteen worktree CLI checks passed: source cwd, passed collection, failed retention, nested ownership, unmanaged roots, symlink escape, external source preservation, native launcher collection, literal custom command arguments, custom pipeline retention, pre-run deferred collection, busy cleanup, failed cleanup, queued input protection and empty command rejection.\n'
