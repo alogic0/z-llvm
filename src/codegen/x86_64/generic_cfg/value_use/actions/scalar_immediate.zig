@@ -507,16 +507,26 @@ fn executeImmediateR01(
     const amount = immediateShiftAmount(action.literal, bits) catch |err|
         return immediateScalarRequestError(Authority, transaction, source_index, err);
     if (bits <= 32) {
+        // The fixed RCX stream remains the framed/default plan. A frameless
+        // expression can retain an earlier shift in RCX; use a proved free
+        // register instead of requiring an unavailable spill frame.
+        const destination: ArgReg = if (transaction.selector.stack_frame_bytes == 0 and
+            !immediateScratchAvailable(transaction.selector, .rcx))
+            for (selector_types.selector_allocatable_regs) |reg| {
+                if (immediateScratchAvailable(transaction.selector, reg)) break reg;
+            } else .rcx
+        else
+            .rcx;
         try selector_state.emitValueIntoScratch(
             transaction.selector,
             .{ .named = source_name },
-            .rcx,
+            destination,
             bits,
         );
         try failImmediateScalarForTest(transaction, .after_rcx_staging);
         if (amount != 0) {
             try emitImmediateWrite(transaction, .{ .shr_arg_imm5 = .{
-                .reg = .rcx,
+                .reg = destination,
                 .amount = @intCast(amount),
             } });
             try failImmediateScalarForTest(transaction, .after_first_instruction);
@@ -526,7 +536,7 @@ fn executeImmediateR01(
             transaction,
             source_index,
             action.result,
-            .rcx,
+            destination,
             bits,
         );
         return;
@@ -646,8 +656,10 @@ fn executeImmediateR02(
     }
 
     const session = try beginImmediateAccumulatorSession(Authority, transaction);
-    if (try session.prepare(
-        .preserve,
+    const displacement = if (bits == 64 and transaction.selector.stack_frame_bytes == 0 and
+        current == .rax and !try Authority.mustSurviveInstruction(Authority, transaction, source_index))
+        AccumulatorDisplacementPolicy{ .reuse_source = source_name }
+    else
         try immediateSourceDisplacement(
             Authority,
             transaction,
@@ -655,7 +667,10 @@ fn executeImmediateR02(
             plan,
             bits,
             if (bits <= 32) .scratch_preferred else .spill_live,
-        ),
+        );
+    if (try session.prepare(
+        .preserve,
+        displacement,
     )) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;

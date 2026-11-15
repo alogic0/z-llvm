@@ -187,6 +187,35 @@ fn supported(access: anytype) bool {
         !access.attrs.isBarrier() and access.attrs.syncscope == null;
 }
 
+// Retaining a typed table load grants no address or range admission. The
+// existing table GEP and load owners still prove those facts. This avoids
+// erasing their double/XMM route during the last-resort pointer rewrite.
+fn scalarTableShape(a: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, pointer: ir.Value, depth: u8) anyerror!?@import("../constant_table.zig").Shape {
+    const ctx = context orelse return null;
+    if (depth >= 16 or pointer != .named) return null;
+    const tables = @import("../constant_table.zig");
+    for (function.blocks.items) |block| for (block.instructions.items) |inst| {
+        if (inst.removed or inst.result == null or !ir.identifiers.eql(inst.result.?, pointer.named)) continue;
+        if (inst.kind != .gep) return null;
+        const gep = inst.kind.gep;
+        if (gep.ptr_addrspace != null or gep.ptr != .named or gep.indices.items.len != 1 or
+            !gep.indices.items[0].ty.eql(.{ .int = 64 })) return null;
+        if (std.mem.startsWith(u8, gep.ptr.named, "@")) {
+            var decoded = (tables.decodeSymbol(a, ctx.*, gep.ptr.named) catch |err| {
+                if (err == error.OutOfMemory) return err;
+                return null;
+            }) orelse return null;
+            defer decoded.deinit(a);
+            return if (decoded.shape != .i16_128 and tables.sourceStrideMatches(gep.source_ty, decoded.shape)) decoded.shape else null;
+        }
+        const index = gep.indices.items[0].value;
+        if (!gep.source_ty.eql(.{ .int = 8 }) or index != .int or index.int < 0 or index.int > 8) return null;
+        const shape = (try scalarTableShape(a, function, context, gep.ptr, depth + 1)) orelse return null;
+        return if (shape.allowsOffset(@intCast(index.int))) shape else null;
+    };
+    return null;
+}
+
 /// Last-resort scalar memory transport after the existing symbolic and stack
 /// owners decline the function. Keep the source access width and all access
 /// attributes while interpreting its captured bits through an integer load.
@@ -206,7 +235,8 @@ pub fn legalizeScalarPointers(allocator: std.mem.Allocator, function: ir.Functio
             };
             if (!inst.removed) if (access) |load| {
                 if ((load.ty == .float or load.ty == .double) and load.ty_addrspace == null and
-                    load.ptr_addrspace == null and !load.attrs.isBarrier() and load.attrs.syncscope == null)
+                    load.ptr_addrspace == null and !load.attrs.isBarrier() and load.attrs.syncscope == null and
+                    !(load.ty == .double and (try scalarTableShape(allocator, function, context, load.ptr, 0)) != null))
                 {
                     try candidate.begin(&block, block_index, instruction_index);
                     // Load metadata describes floating values and must not be

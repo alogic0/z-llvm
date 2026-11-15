@@ -6,6 +6,36 @@ const encoding = @import("../../../mc/encoding.zig");
 const inspection = @import("inspection.zig");
 const selector_impl = @import("composed_selector_impl.zig");
 
+test "generic cfg selector converts every sub-byte integer to scalar FP exactly" {
+    for (1..8) |width| for ([_]bool{ false, true }) |signed| for ([_]bool{ false, true }) |to_float| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "define i64 @convert(i8 %input) {{\nentry:\n %narrow = trunc i8 %input to i{d}\n %fp = {s} i{d} %narrow to {s}\n %raw = bitcast {s} %fp to i{d}\n{s} ret i64 %answer\n}}\n", .{ width, if (signed) "sitofp" else "uitofp", width, if (to_float) "float" else "double", if (to_float) "float" else "double", @as(u16, if (to_float) 32 else 64), if (to_float) " %answer = zext i32 %raw to i64\n" else " %answer = add i64 %raw,0\n" });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var machine = x86_64_machine.MachineFunction.init("convert", .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        const selected = try @import("../generic_cfg_selector.zig").tryLower(std.testing.allocator, &machine, module.functions.items[0]);
+        if (selected == .unsupported) std.debug.print("sub-byte FP i{d}: {s}\n", .{ width, selected.unsupported.detail() });
+        try std.testing.expectEqual(inspection.SelectionResult.selected, selected);
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping[0..bytes.len], bytes);
+        const run: *const fn (u8) callconv(.c) u64 = @ptrCast(mapping.ptr);
+        for (0..256) |input| {
+            const modulus = @as(u16, 1) << @as(u4, @intCast(width));
+            const raw: i32 = @intCast(input & (modulus - 1));
+            const integer: i32 = if (signed and raw >= modulus / 2) raw - modulus else raw;
+            const expected_bits: u64 = if (to_float) @as(u32, @bitCast(@as(f32, @floatFromInt(integer)))) else @bitCast(@as(f64, @floatFromInt(integer)));
+            try std.testing.expectEqual(expected_bits, run(@intCast(input)));
+        }
+        try module.verify();
+    };
+}
+
 const ConversionCase = struct {
     op: ir.CastOp,
     bits: u16,

@@ -893,7 +893,14 @@ fn lowerUnsignedRem(selector: *ComposedBlockSelector, result_name: []const u8, b
         else => false,
     };
     if (rhs_is_accumulator) {
-        try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+        {
+            // The dividend is still an input while the divisor is staged.
+            // Preserve its current-position home if RCX overlaps that input.
+            const previous = selector.preserve_current_position_values;
+            selector.preserve_current_position_values = true;
+            defer selector.preserve_current_position_values = previous;
+            try selector_state.emitValueIntoScratch(selector, binary.rhs, .rcx, bits);
+        }
         try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);
     } else {
         try selector_state.emitValueIntoAccumulator(selector, binary.lhs, bits);

@@ -229,7 +229,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                     continue;
                 } else if ((cast.op == .uitofp or cast.op == .sitofp) and !cast.flags.any() and
                     cast.from_ty == .int and cast.from_ty.int > 0 and cast.from_ty.int < 32 and
-                    cast.to_ty == .half and operand(cast.value, cast.from_ty.int))
+                    (cast.to_ty == .half or (cast.from_ty.int < 8 and
+                        (cast.to_ty == .float or cast.to_ty == .double))) and operand(cast.value, cast.from_ty.int))
                 {
                     try candidate.begin(&block, block_index, instruction_index);
                     const input = try forms.temporary(allocator, function, &serial);

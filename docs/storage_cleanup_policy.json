@@ -7,7 +7,7 @@
   "cache_evidence": "closed_producer",
   "current_manifests": [
     "local-state/validations/compiler-selection-completion-20261108/batch-30/maintained-artifacts-inputs-results-20261114.sha256",
-    "local-state/validations/compiler-selection-completion-20261108/batch-30/frozen-contracts-v3.sha256",
+    "local-state/validations/release-safe-preopt-20261115/batch-01/contract-transition/frozen-contracts-v4.sha256",
     "local-state/validations/compiler-selection-completion-20261108/batch-05/scratch.sha256",
     "local-state/validations/compiler-selection-completion-20261108/batch-12/air-pins-v12.sha256",
     "local-state/validations/compiler-object-completion-20261111/batch-01/pinned-upstream-providers-v7.sha256",
@@ -27,6 +27,10 @@
     }
   ],
   "retired_manifests": [
+    {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-30/frozen-contracts-v3.sha256",
+      "sha256": "8fb313f66ff9ab6a8beb526977c8c3a0c2db534958bbff4771f1fc82a499bf1d"
+    },
     {
       "path": "local-state/validations/compiler-object-completion-20261111/batch-01/accepted-artifacts.sha256",
       "sha256": "1e3024a69bf07fb70a9de6907785bffbc9a765f95c690e1c67e7d24d7beea2d6"

@@ -1376,7 +1376,7 @@ fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const 
         try selector_state.observeRejectedTableGep(selector, result_name, gep, diagnostic, null);
         return diagnostic;
     }
-    if (!hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) {
+    if (!try hasAdmittedIndexProof(selector, index.value.named, decoded.shape)) {
         const diagnostic: Diagnostic = .{ .no_emitter = "composed-block-gep-readonly-table-range" };
         try selector_state.observeRejectedTableGep(selector, result_name, gep, diagnostic, null);
         return diagnostic;
@@ -1437,7 +1437,11 @@ fn lowerReadOnlyTableLoad(
     if (ptr.shape == .i16_128) {
         return .{ .no_emitter = "composed-block-load-readonly-table-type" };
     }
-    if (load.ty != .double) return .{ .no_emitter = "composed-block-load-readonly-table-type" };
+    if (load.ty != .double) {
+        const diagnostic: Diagnostic = .{ .no_emitter = "composed-block-load-readonly-table-type" };
+        try selector_state.observeRejectedInstruction(selector, .{ .result = result_name, .kind = .{ .load = load } }, diagnostic);
+        return diagnostic;
+    }
     try selector_state.clobberXmmReg(selector, .xmm0);
     try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = base, .dst = .xmm0, .offset = ptr.offset } });
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
@@ -1494,7 +1498,7 @@ fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Shape) boo
     return constant_table.sourceStrideMatches(source_ty, shape);
 }
 
-fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Shape) bool {
+fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Shape) !bool {
     const function = selector.function orelse return false;
     const allowed: u64 = switch (shape) {
         .i16_128, .f64_pair_128 => 127,
@@ -1502,6 +1506,7 @@ fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u
         .f64_512_pairs => 510,
     };
     if (maskedIndex(function.*, .{ .named = name }, allowed, 0)) return true;
+    if (try @import("../constant_table_index.zig").proves(selector.allocator, selector.module_context, function.*, name, allowed)) return true;
     const source_name = stripZext(function.*, name) orelse name;
     const mask: i128 = switch (shape) {
         .i16_128, .f64_pair_128 => 127,

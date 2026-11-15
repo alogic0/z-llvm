@@ -130,6 +130,10 @@ pub fn observeRejectedInstruction(selector: *const ComposedBlockSelector, instru
             arguments[0] = .{ .ty = cast.from_ty, .value = cast.value };
             break :count 1;
         },
+        .load => |load| count: {
+            arguments[0] = .{ .ty = .ptr, .value = load.ptr };
+            break :count 1;
+        },
         .store => |store| count: {
             arguments[0] = .{ .ty = store.ty, .value = store.value };
             arguments[1] = .{ .ty = .ptr, .value = store.ptr };

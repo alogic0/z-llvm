@@ -25,6 +25,32 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+test "composed remainder restores simultaneous-input preservation on spill failure" {
+    var machine = MachineFunction.init("remainder-input-guard", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("lhs", 1);
+    try plan.interval_ends.put("rhs", 1);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "lhs", .{ .scratch32 = .rcx });
+    try selector_state.bindValueLoc(&selector, "rhs", .eax);
+    try std.testing.expectError(error.UnsupportedCodegenValue, selector_scalar.lowerUnsignedDivRem(&selector, "result", .{
+        .op = .urem,
+        .ty = .{ .int = 32 },
+        .lhs = .{ .named = "lhs" },
+        .rhs = .{ .named = "rhs" },
+    }, 32));
+    try std.testing.expect(!selector.preserve_current_position_values);
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(ValueLoc{ .scratch32 = .rcx }, selector_state.valueLoc(&selector, "lhs").?);
+    try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "rhs").?);
+    try std.testing.expect(selector_state.valueLoc(&selector, "result") == null);
+}
+
 test "flag-writing accumulator cast rejects live EFLAGS before mutating selector state" {
     var machine = MachineFunction.init("live-flags-cast", .{ .int = 32 });
     defer machine.deinit(std.testing.allocator);

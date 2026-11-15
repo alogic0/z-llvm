@@ -38,9 +38,10 @@ reference preserves all 2,097 ordered outcomes under the current libc/loader.
 Two real attempts captured the complete 921-definition compiler runtime; neither
 delivered an object. Qualified repairs cover proxy path binding, extended fneg
 serialization, constant inline memset and scalar operand/immediate handling.
-The independent runtime census advances 769 to 906 selections without loss;
-15 failures remain. Continue those captured failures and alternate complete local
-capture with focused repairs until one unchanged final run closes all inventories,
+Qualified repairs advance the independent runtime census from 769 to
+all 921 selections without loss. Full units, readiness, structural smoke and the
+fixed runtime object/native replay pass. Build the frozen candidate, then resume complete local
+capture and focused repairs until one unchanged final run closes all inventories,
 audits and 2,097 outcomes. New native populations remain separate from the accepted
 225. No preopt acceptance or complete runtime-object proof is claimed yet.
 The [implementation checkpoint](evidence/release_safe_preopt_checkpoint_20261115.md)

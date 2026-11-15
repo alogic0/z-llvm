@@ -237,8 +237,11 @@ pub fn lowerReturn(selector: *ComposedBlockSelector, ret: anytype) !?Diagnostic 
             try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_eax = try composed_helpers.i32BitPattern(int) })
         else if (bits <= 64)
             try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = try i64Value(int) })
-        else
-            return .{ .unsupported_value = "composed-block-ret-value" },
+        else {
+            const payload: u128 = @bitCast(int);
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rax = @bitCast(@as(u64, @truncate(payload))) });
+            try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rdx = @bitCast(@as(u64, @truncate(payload >> 64))) });
+        },
         .named => {
             _ = selector_state.resolveValue(selector, value) orelse return .{ .unsupported_value = "composed-block-unknown-ret" };
             if (bits == 128) {

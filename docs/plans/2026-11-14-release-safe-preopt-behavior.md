@@ -7,8 +7,9 @@ Status: implementing, authorized by the user on 2026-11-15. Baseline admission
 and Debug/ReleaseFast runner qualification passed. Progressive capture exposed
 and qualified proxy path, extended negative-zero serialization, inline memset
 and scalar operand/immediate repairs. The captured runtime census selects
-906 of 921 definitions without losing a previously selected definition;
-15 failures remain. Full capture and inventory reconciliation continue. No preopt acceptance
+all 921 definitions without losing a previously selected definition. Promoted
+source passes full units, readiness, structural smoke and fixed runtime
+object/native replay. Fresh capture and inventory reconciliation continue. No preopt acceptance
 is claimed until stages E/F/G close.
 The [implementation checkpoint](../evidence/release_safe_preopt_checkpoint_20261115.md)
 records the qualified A/B tooling, first C/D repairs and exact validation limits.

@@ -13666,6 +13666,22 @@
       "functions": ["scalar_mul32_loaded", "scalar_mul32_zext", "scalar_mul32_square", "scalar_sub64_large", "scalar_sub64_exponent", "scalar_sub64_negative_min32", "scalar_sub64_signbit", "scalar_sub32_signbit"],
       "observations": 2048,
       "stdout": "preopt-scalar-ops observations=2048 independent-c-wrapping-goldens=live-operands=large-immediates=call-clobbers=guards=preserved\n"
+    },
+    {
+      "population": "preopt_values",
+      "fixture": "preopt_values",
+      "prefix": "preopt-values",
+      "functions": ["values_bswap32", "values_bswap64", "values_copysign32", "values_copysign64", "values_zero_return", "values_wide_literal", "values_signed3", "values_unsigned3", "values_srem32_call", "values_srem32_plain"],
+      "observations": 2560,
+      "stdout": "preopt-values observations=2560 independent-c-bit-goldens=byte-swaps=fp-payloads=wide-returns=narrow-conversions=signed-remainders=live-values=preserved\n"
+    },
+    {
+      "population": "preopt_memory",
+      "fixture": "preopt_memory",
+      "prefix": "preopt-memory",
+      "functions": ["preopt_pair_read", "preopt_pair_snapshot", "preopt_table_private", "preopt_table_wide", "preopt_table_pair", "preopt_table_roundtrip"],
+      "observations": 1536,
+      "stdout": "preopt-memory observations=1536 exact-fp-payload-pair-snapshots=caller-clobbers=protected-page-edges=unaligned=uniform-private-stores=wide-masks=preserved\n"
     }
   ]
 }

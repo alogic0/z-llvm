@@ -2,6 +2,39 @@ const std = @import("std");
 const ir = @import("../../../ir.zig");
 const forms = @import("pair_memory.zig");
 
+test "scalar FP memory fallback preserves recognized table loads and ordinary pointer transport" {
+    const elements: [16][]const u8 = @splat("double 1.250000e+00");
+    const initializer = try std.mem.join(std.testing.allocator, ",", &elements);
+    defer std.testing.allocator.free(initializer);
+    for ([_]struct { kind: []const u8 = "constant", stride: []const u8 = "[8 x i8]", retained: bool }{
+        .{ .retained = true },
+        .{ .kind = "global", .retained = false },
+        .{ .stride = "double", .retained = false },
+    }) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"\n@table = private {s} [16 x double] [{s}], align 8\ndefine double @read(ptr %ordinary,i64 %input) {{\nentry:\n %index = and i64 %input,15\n %p = getelementptr {s},ptr @table,i64 %index\n %source = load double,ptr %ordinary,align 1\n %value = load double,ptr %p,align 8\n %sum = fadd double %source,%value\n ret double %sum\n}}\n", .{ case.kind, initializer, case.stride });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const context: @import("../machine.zig").ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        const original = module.functions.items[0];
+        const expanded = (try forms.legalizeScalarPointers(arena.allocator(), original, &context)).?;
+        var loads: usize = 0;
+        for (expanded.blocks.items[0].instructions.items) |inst| {
+            if (inst.kind != .load) continue;
+            loads += 1;
+            const expected: ir.Type = if (inst.kind.load.ptr.eql(.{ .named = "p" }) and case.retained) .double else .{ .int = 64 };
+            try std.testing.expect(inst.kind.load.ty.eql(expected));
+        }
+        try std.testing.expectEqual(@as(usize, 2), loads);
+        try std.testing.expect(original.blocks.items[0].instructions.items[2].kind.load.ty == .double);
+        try std.testing.expect(original.blocks.items[0].instructions.items[3].kind.load.ty == .double);
+        try std.testing.expect((try forms.legalizeScalarPointers(arena.allocator(), expanded, &context)) == null);
+    }
+}
+
 test "scalar pointer fallback preserves widths metadata boundaries and source" {
     var module = try ir.Module.parse(std.testing.allocator,
         \\@table = external global [8 x i8]

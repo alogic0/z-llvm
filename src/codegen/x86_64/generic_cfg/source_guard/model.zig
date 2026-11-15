@@ -442,7 +442,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_fp.zig", .function = "lowerFcmp", .body_sha256 = "fa502ad214048f3afb55e11dd87872af687fef9816470ea4c59ee34840665484" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfOeqZero", .body_sha256 = "de1f42d09aebc6de4e9f5c35aeb59330f2e6871443d66e0b870eb46df603aeb5" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfFcmp", .body_sha256 = "e429cc984c62e169d1d294144f8fb330aa6c4fc6b2fc8e7aec4ab2b40bdf194b" },
-    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .body_sha256 = "6b3f326f8c797eaa1b2c559ab0c1d944df96d2dced725d1bcc1477aba7c7b5f0" },
+    .{ .source = "composed_selector_fp.zig", .function = "lowerFpIntBitcast", .body_sha256 = "54c0dbd622d42442c3251405354de8ff38d9f9de6543a4e7773b8beaf7d4795b" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerFloatToHalf", .body_sha256 = "ee1a865fa09595be9ac940a938d7ec3b5996b25a835a92afa7b17fbb72016960" },
     .{ .source = "composed_selector_fp.zig", .function = "lowerHalfExtension", .body_sha256 = "86cd446354c4986acf2cc70c24d18f69f054f2a38703ab9ee7f2e47ae1e6be2c" },
 
@@ -458,7 +458,7 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
 
     .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "44a3371c3c0125f6fc7b76d70cbe1a138c109d94d2b51df69410d7358f970249" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "998d5607e54ad21229f4200922a2b1d123c8a20183afa74836721e37a46d4193" },
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "8536b14d20e330bce4f1717f6dda9d3f6b663664507cf302d1e4d6a68fccf211" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "2b364423a7adff7d0ce6bc31d625b2ab23b6351a7807ba2dee686fbf94722d32" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "00006893705d1a9313e51fff70572cac4aafed354d56edacf66ada2e8203aad1" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "eb1fd1587c460328e15d5fc0a5805364a08b26538f233134211def686696c204" },
 
