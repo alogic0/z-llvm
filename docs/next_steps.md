@@ -35,15 +35,20 @@ LLVM IR construction, bitcode parsing, target setup and declared providers remai
 This work is separate from the completed compiler/self-rebuild plan. Baseline
 admission and Debug/ReleaseFast runner qualification passed. The refreshed normal
 reference preserves all 2,097 ordered outcomes under the current libc/loader.
-Two real attempts captured the complete 921-definition compiler runtime; neither
-delivered an object. Qualified repairs cover proxy path binding, extended fneg
+The third real attempt delivers the complete 921-definition compiler-runtime
+object and captures the test module. Qualified repairs cover proxy path binding, extended fneg
 serialization, constant inline memset and scalar operand/immediate handling.
 Qualified repairs advance the independent runtime census from 769 to
 all 921 selections without loss. Full units, readiness, structural smoke and the
-fixed runtime object/native replay pass. Build the frozen candidate, then resume complete local
-capture and focused repairs until one unchanged final run closes all inventories,
+fixed runtime object/native replay pass. Independent runtime object and both
+ordered-event audits pass; test emission selects 7,707 of 7,716 definitions and
+fails on nine, with no test object or behavior outcomes. The next focused repair
+selects all 7,716 definitions and passes native checks, full units, readiness,
+structural smoke and fixed runtime replay. Build its committed canonical
+candidate, then resume complete local capture until one unchanged final run closes all inventories,
 audits and 2,097 outcomes. New native populations remain separate from the accepted
-225. No preopt acceptance or complete runtime-object proof is claimed yet.
+225. Runtime object proof is scoped to the third attempt; final inventory and
+preopt acceptance remain open.
 The [implementation checkpoint](evidence/release_safe_preopt_checkpoint_20261115.md)
 records the qualified tooling, repairs, source bridge and current limits.
 

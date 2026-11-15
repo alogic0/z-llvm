@@ -103,12 +103,18 @@ pub fn executeImmediateRhsScalar(
         );
     const source_name = try immediateScalarNamedSource(Authority, transaction, source_index);
     try validateImmediateScalarSource(Authority, transaction, source_index, bits);
+    const preamble: ImmediateAccumulatorPreamble = if (bits == 64 and
+        action.operation == .@"and" and action.literal == std.math.maxInt(u32) and
+        transaction.selector.stack_frame_bytes == 0)
+        .scratch_preferred
+    else
+        immediateAccumulatorPreamble(semantic_plan, bits);
     try preserveImmediateUnrelatedAccumulator(
         Authority,
         transaction,
         source_index,
         source_name,
-        immediateAccumulatorPreamble(semantic_plan, bits),
+        preamble,
     );
 
     switch (semantic_plan) {

@@ -746,3 +746,67 @@ test "value-use named scalar request provenance distinguishes lhs and rhs failur
     try std.testing.expect(!transaction.failedRequestIs(lhs));
     try std.testing.expect(transaction.failedRequestIs(rhs));
 }
+
+test "value-use narrow shift preserves a current RCX input while staging a spilled count and rolls back" {
+    const boundaries = [_]?Transaction.NamedScalarTestFailure{ null, .after_first_operand_staging, .after_accumulator_preparation, .after_second_operand_staging, .after_first_arithmetic_write, .after_result_identity_ownership, .after_result_definition, .after_finalization };
+    for ([_]bool{ false, true }) |initial_preservation| for ([_]u16{ 4, 9, 16 }) |bits| for (boundaries) |boundary| {
+        var machine = MachineFunction.init("current-shift-input", .{ .int = bits });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("lhs", 1);
+        try plan.interval_ends.put("rhs", 1);
+        try plan.interval_ends.put("result", 2);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.stack_frame_bytes = 128;
+        selector.next_spill_slot = 1;
+        selector.preserve_current_position_values = initial_preservation;
+        try selector_state.bindValueLoc(&selector, "lhs", .{ .scratch32 = .rcx });
+        try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot0 });
+        const saved_lhs = selector.values.get("lhs").?;
+        const saved_rhs = selector.values.get("rhs").?;
+        const saved_accumulator = selector.accumulator_domain;
+        const saved_flags = selector.eflags.snapshot();
+        const saved_vreg = selector.next_virtual_reg;
+        const saved_spills = selector.spill_slots.count();
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            transaction.named_scalar_test_failure = boundary;
+            const handle = try registerFixture(&transaction, .{
+                .family = .b04,
+                .operation = .shl,
+                .bits = bits,
+                .exact_ei = bits < 16,
+                .lhs_loc = .{ .scratch32 = .rcx },
+                .rhs_loc = .{ .spill64 = .slot0 },
+                .expected_first = .shl_eax_cl,
+            });
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            if (boundary != null) {
+                try std.testing.expectError(error.ValueUseNamedScalarTestFailure, transaction.executePreparedAction(try transaction.preparedView(handle)));
+            } else {
+                try transaction.executePreparedAction(try transaction.preparedView(handle));
+                try transaction.commit();
+            }
+        }
+        try std.testing.expectEqual(initial_preservation, selector.preserve_current_position_values);
+        if (boundary != null) {
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try std.testing.expectEqual(saved_lhs, selector.values.get("lhs").?);
+            try std.testing.expectEqual(saved_rhs, selector.values.get("rhs").?);
+            try std.testing.expect(selector.values.get("result") == null);
+            try std.testing.expectEqual(@as(usize, 1), selector.next_spill_slot);
+            try std.testing.expectEqual(saved_spills, selector.spill_slots.count());
+            try std.testing.expectEqual(saved_vreg, selector.next_virtual_reg);
+            try std.testing.expectEqual(saved_accumulator, selector.accumulator_domain);
+            try selector.eflags.validateSnapshot(saved_flags);
+            try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+        } else try std.testing.expect(selector_state.valueLoc(&selector, "result") != null);
+    };
+}

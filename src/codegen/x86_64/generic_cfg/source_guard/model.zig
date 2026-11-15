@@ -456,11 +456,11 @@ pub const residual_function_fingerprints = [_]FunctionFingerprint{
     .{ .source = "composed_selector_memory.zig", .function = "lowerStoreFp", .body_sha256 = "08773e5639dfcc22a932d0a4d702bbe8ff4b3ecb5e398c3b06a9de056fb8a81d" },
     .{ .source = "composed_selector_memory.zig", .function = "loadStackU64IntoRax", .body_sha256 = "3fd7fcf3653b5083f8123224f83a04abd16bbb7411dac2d4279079a74cf7648d" },
 
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "44a3371c3c0125f6fc7b76d70cbe1a138c109d94d2b51df69410d7358f970249" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerCast", .body_sha256 = "10ea9d672ab91780bee098721668c6137a0fef3f8005a0e48b7d92407272aaf2" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerFreeze", .body_sha256 = "998d5607e54ad21229f4200922a2b1d123c8a20183afa74836721e37a46d4193" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerUnsignedRem", .body_sha256 = "2b364423a7adff7d0ce6bc31d625b2ab23b6351a7807ba2dee686fbf94722d32" },
     .{ .source = "composed_selector_scalar.zig", .function = "lowerBinaryImmediateLhs", .body_sha256 = "00006893705d1a9313e51fff70572cac4aafed354d56edacf66ada2e8203aad1" },
-    .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "eb1fd1587c460328e15d5fc0a5805364a08b26538f233134211def686696c204" },
+    .{ .source = "composed_selector_scalar.zig", .function = "lowerPairBinary", .body_sha256 = "dd3b1b37684527e3764dba776e737ce4b0f0985c052ebc8da141e14c6a1213e0" },
 
     .{ .source = "composed_selector_vector.zig", .function = "lowerMask4ToI4", .body_sha256 = "1e62b361133724f37967c07e4ad6896dd1a83c1b5dd48f394a7f677373f2f912" },
     .{ .source = "composed_selector_vector.zig", .function = "lowerI64x2ExtractElement", .body_sha256 = "a2910ce5399d079e9843b0d0cfb84744322f7a8d8c49c70d3656f3b5b4dadca5" },

@@ -4,10 +4,16 @@ This is an intermediate C/D checkpoint for the
 [active plan](../plans/2026-11-14-release-safe-preopt-behavior.md), not preopt
 milestone acceptance. The qualified repair selects **all 921 captured runtime
 definitions**, up from 769, with no previously selected definition lost.
-Promoted source passes full units, readiness and fixed runtime replay; neither real preopt attempt delivered an
-object or executed the behavior suite. Later test inputs remain not yet
-captured. Final inventory, audits, all 2,097 outcomes and preservation/integration
-remain required.
+Promoted source passes full units, readiness and fixed runtime replay. The third
+real preopt attempt delivered its complete runtime object and captured the test
+module. Independent audits verify the runtime object and both ordered event
+streams. Test emission selected 7,707 of 7,716 definitions and failed on nine;
+no test object or behavior outcomes were delivered. Discovery remains provisional
+until one complete unchanged run closes inventory, audits, all 2,097 outcomes
+and preservation/integration. The next focused repair selects all 7,716 test
+definitions and all 921 runtime definitions without loss. Native checks, full
+units, readiness, structural smoke and fixed runtime replay pass. A fresh
+frontend-driven complete run remains required.
 
 The maintained runner now selects `--local-pipeline preopt` explicitly, binds
 the selected reference hash and providers, exports the Safe hook policy, and
@@ -52,7 +58,8 @@ protected page edges, unaligned exact FP payloads, snapshots across mutation and
 caller clobbers, private stores, wide masks and table-to-frame round trips.
 The full runtime census selects 921/921 with zero losses. These two populations
 bring the registry to 229, separately from the original 225 and 6,724 faults.
-This remains selection/native evidence, not a delivered real preopt object.
+This D4 qualification is selection/native evidence; the subsequent third capture
+provides the first real runtime object evidence below.
 
 The reviewed historical-model transition preserves all 24 ordered byte
 identities from `frozen-contracts-v3.sha256`, including the original seal.
@@ -61,6 +68,24 @@ exact `dd52f632` file. The evolving model's two body fingerprints receive no
 acceptance credit from that historical row; current source guards, mutation
 tests and source receipts qualify them separately. The peer review, exact row
 mapping and publication checks live under `contract-transition/`.
+
+The test-module repair keeps the narrow shift's current LHS alive while staging
+a spilled count in RCX. Frameless word masks and pair OR operations preserve
+live accumulator values through existing owners; pair widening chooses an
+already assigned free result pair before emission. A typed optional legalizer
+folds proven constant four-float insertion views and snapshots all four ordinary
+load lanes at the original load position. It preserves the exact 16-byte access
+span and declines dynamic/unknown lanes, effectful accesses and extra consumers.
+Operand lists are cloned; the original IR remains unchanged and rewriting is
+idempotent. These changes introduce no vector ABI, frame-layout or resolver
+budget expansion.
+
+The separate `preopt_test_frontier` population covers wide masks, exhaustive
+small shifts, signed overflow round trips, live caller-clobbering calls, exact
+FP payloads and unaligned protected-page snapshots across mutation. All three
+release modes and both local routes pass 107,520 local observations against
+53,760 references and all 54 injected faults. This brings the registry to 230;
+the original 225 populations and 6,724 required faults remain separate.
 
 Evidence lives under
 `local-state/validations/release-safe-preopt-20261115/batch-01/`:
@@ -79,6 +104,13 @@ Evidence lives under
 | `precommit-final-checks/` | All 2,370 current-source ReleaseFast units pass; documentation checks validate 24 documents, 517 links and both accepted-status blocks; the unchanged frozen contract verifies. |
 | `residual-focused-r6/` | All 921 captured runtime definitions selected without loss; 121 Debug/Fast focused tests; both added native populations and all 99 controls pass with exact source/fixture binding. |
 | `d4-promoted/` | Promoted source matches R6 exactly; all 2,378 ReleaseFast units, nine readiness procedures, 66 structural tests and all six selected integrity manifests pass. The fixed 455-function runtime object/native replay passes 21,792 local and reference observations plus 14 controls. |
+| `build-residual-r2/`, `tools-residual/` | Canonical backend `4ced5fb1` from commit `4b15d49e`, with complete source membership and hash verification. |
+| `capture-03/` | Both local optimizer stages finish. Runtime emission delivers all 921 definitions; test emission fails on nine of 7,716, preserving all original receipts and complete inputs. |
+| `inventory-capture-03/` | Four complete inputs parse and pass LLVM verify-only checks. Independent runtime census, ownership and ELF audits pass. Full ordered streams verify: 421,726 runtime events and 3,056,459 test events, with the test stream correctly recorded as unsuccessful. |
+| `test-frontier-views-r2/` | Both actual vector-view tests pass in Debug/Fast; all nine original failed definitions select. Earlier import-only checks receive no test credit. |
+| `test-frontier-native/` | Complete test census selects 7,716/7,716; runtime selects 921/921. The new native population and all 54 fault controls pass with exact production-source and fixture binding. |
+| `test-frontier-fingerprint/` | Existing source-guard API derives the reviewed pair OR/widening body hashes. Only those two model rows change; full current guard and mutation tests pass in the broader gate. |
+| `test-frontier-promoted-r3/` | All 2,384 ReleaseFast units, Debug readiness including all 60 ABI comparisons, 66 structural tests and six selected integrity manifests pass. The fixed 455-definition runtime object/native replay passes 21,792 local and reference observations plus 14 controls. New rollback tests cover current RCX inputs, spilled counts, both preservation flags, accumulator aliases and pair pressure. Earlier new-fixture setup failures retain their receipts, patches and diagnoses. |
 
 The first two new native populations (`inline_memset`, `preopt_scalar_ops`) are
 separate from the accepted 225 and the original 6,724 required faults. Existing
@@ -100,10 +132,13 @@ and the superseded fneg compiler reclaimed another 2,245,496,832 allocated bytes
 in receipt `1794751560822798581-4072251`. D4's successful R6 workspaces reclaimed
 544,948,224 bytes in `1794754838419183966-4138219`; original failed attempts
 remain preserved with their diagnoses. This checkpoint does not close milestone storage.
-The original predecessor compiler remains for preservation, the current
-candidate stays stable through its audit consumers, and isolated residual
-development has its own source-worktree pipeline. No ordinary object or binary
-identity was promoted into a new retention pin.
+The original predecessor compiler remains for preservation. D4's isolated source
+worktree and diagnosed scratch were released after promotion. C3's private
+caches and ordinary runtime object were released after audits, reclaiming
+168,235,008 allocated bytes in receipt `1794761053238581973-76545`.
+Complete captured inputs, raw events and the original compiler remain for their
+recorded audit/retirement consumers. No ordinary object or binary identity was
+promoted into a new retention pin.
 
 The prior `fe2d88b4` runtime trace now has a complete verified audit of 182,330
 events and 455 functions under

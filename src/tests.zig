@@ -1,6 +1,7 @@
 const std = @import("std");
 comptime {
     _ = @import("codegen/x86_64/vector_facts.zig");
+    _ = @import("codegen/x86_64/generic_cfg/floating_vector_views.zig");
     _ = @import("ir/inline_asm_attrs_tests.zig");
 }
 comptime {

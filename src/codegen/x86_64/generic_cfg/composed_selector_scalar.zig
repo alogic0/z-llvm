@@ -650,6 +650,13 @@ pub fn lowerBinaryImmediateRhs(selector: *ComposedBlockSelector, result_name: []
 
 pub fn lowerPairBinary(selector: *ComposedBlockSelector, result_name: []const u8, binary: ir.BinaryInst) !?Diagnostic {
     const op = machineBinaryOp(binary.op) orelse return .{ .no_emitter = "composed-block-pair-binary-op" };
+    if (op == .@"or" and selector.stack_frame_bytes == 0) {
+        // Lane emission uses RAX as scratch. A frameless composition can
+        // retain a scalar there; preserve it in an existing free home first.
+        while (try selector_state.liveAccumulatorNameAfterCurrent(selector)) |name| {
+            if (try selector_state.preserveLiveAccumulatorValue(selector, name)) |diagnostic| return diagnostic;
+        }
+    }
     const lhs_existing = selector_state.resolvePairValue(selector, binary.lhs);
     const rhs_existing = selector_state.resolvePairValue(selector, binary.rhs);
     switch (op) {
@@ -983,7 +990,17 @@ pub fn lowerCast(selector: *ComposedBlockSelector, result: ?[]const u8, cast: ir
         },
         .zext => {
             if (from_bits == 64 and to_bits == 128) {
-                const dst = try selector_state.choosePairScratchForClobber(selector, null) orelse return .{ .no_spill_envelope = "composed-block-zext-pair" };
+                var dst = try selector_state.choosePairScratchForClobber(selector, null) orelse return .{ .no_spill_envelope = "composed-block-zext-pair" };
+                if (selector.stack_frame_bytes == 0 and
+                    (try selector_state.liveAccumulatorNameAfterCurrent(selector)) != null)
+                {
+                    // Use an already assigned free pair directly. Relocating
+                    // the completed value would otherwise need RAX scratch.
+                    if (selector_state.plannedResultLoc(selector, result_name, .{ .scratch128 = dst })) |planned| {
+                        if (planned == .scratch128 and
+                            try selector_state.pairScratchIsAvailableForUse(selector, planned.scratch128)) dst = planned.scratch128;
+                    }
+                }
                 try selector_state.emitValueIntoScratch(selector, cast.value, dst.lo, 64);
                 try selector_state.emitZeroArg64(selector, dst.hi);
                 try selector_state.bindPairScratch(selector, result_name, dst);

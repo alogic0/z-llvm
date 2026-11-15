@@ -1551,3 +1551,69 @@ test "value-use immediate shift writeback preserves narrow sources and wide regi
         }
     };
 }
+
+test "value-use frameless word mask preserves unrelated full accumulator aliases and rolls back" {
+    const row = PlanRow{ .id = "frameless-word-mask", .direction = .rhs, .operation = .@"and", .bits = 64, .literal = std.math.maxInt(u32), .accumulator = true, .scratch = false, .writes = 1 };
+    const boundaries = [_]?Transaction.ImmediateScalarTestFailure{ null, .after_preservation, .after_canonical_refresh, .after_accumulator_preparation, .after_rax_staging, .after_first_instruction, .after_result_identity_ownership, .after_result_definition, .after_finalization };
+    for ([_]bool{ false, true }) |initial_preservation| for (boundaries) |boundary| {
+        var machine = MachineFunction.init(row.id, .{ .int = 64 });
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try addAtCurrent(&plan, "source");
+        try support.addLive(&plan, "wide");
+        try support.addLive(&plan, "wide-alias");
+        try support.addLive(&plan, "narrow-alias");
+        try addAtCurrent(&plan, "result");
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        selector.preserve_current_position_values = initial_preservation;
+        try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "wide", .rax);
+        try selector_state.bindValueLoc(&selector, "wide-alias", .rax);
+        try selector_state.bindValueLoc(&selector, "narrow-alias", .eax);
+        const saved_source = selector.values.get("source").?;
+        const saved_wide = selector.values.get("wide").?;
+        const saved_alias = selector.values.get("wide-alias").?;
+        const saved_narrow = selector.values.get("narrow-alias").?;
+        const saved_accumulator = selector.accumulator_domain;
+        const saved_flags = selector.eflags.snapshot();
+        const saved_vreg = selector.next_virtual_reg;
+        {
+            var transaction = try Transaction.begin(&selector);
+            defer transaction.deinit();
+            const handle = try registerImmediate(&transaction, row);
+            try transaction.seal();
+            try transaction.prepare();
+            try transaction.materializeAll();
+            if (boundary) |failure| try transaction.setImmediateScalarTestFailure(failure);
+            if (boundary != null) {
+                try std.testing.expectError(error.ValueUseImmediateScalarTestFailure, transaction.executePreparedAction(try transaction.preparedView(handle)));
+            } else {
+                try transaction.executePreparedAction(try transaction.preparedView(handle));
+                try transaction.commit();
+            }
+        }
+        try std.testing.expectEqual(initial_preservation, selector.preserve_current_position_values);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        if (boundary != null) {
+            try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+            try std.testing.expectEqual(saved_source, selector.values.get("source").?);
+            try std.testing.expectEqual(saved_wide, selector.values.get("wide").?);
+            try std.testing.expectEqual(saved_alias, selector.values.get("wide-alias").?);
+            try std.testing.expectEqual(saved_narrow, selector.values.get("narrow-alias").?);
+            try std.testing.expect(selector.values.get("result") == null);
+            try std.testing.expectEqual(saved_vreg, selector.next_virtual_reg);
+            try std.testing.expectEqual(saved_accumulator, selector.accumulator_domain);
+            try selector.eflags.validateSnapshot(saved_flags);
+            try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+        } else {
+            const home = selector_state.valueLoc(&selector, "wide").?;
+            try std.testing.expect(home == .scratch64);
+            try std.testing.expectEqual(home, selector_state.valueLoc(&selector, "wide-alias").?);
+            try std.testing.expectEqual(@as(usize, 0), selector.stack_frame_bytes);
+        }
+    };
+}

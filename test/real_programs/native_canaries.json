@@ -13682,6 +13682,14 @@
       "functions": ["preopt_pair_read", "preopt_pair_snapshot", "preopt_table_private", "preopt_table_wide", "preopt_table_pair", "preopt_table_roundtrip"],
       "observations": 1536,
       "stdout": "preopt-memory observations=1536 exact-fp-payload-pair-snapshots=caller-clobbers=protected-page-edges=unaligned=uniform-private-stores=wide-masks=preserved\n"
+    },
+    {
+      "population": "preopt_test_frontier",
+      "fixture": "preopt_test_frontier",
+      "prefix": "preopt-test-frontier",
+      "functions": ["frontier_identity96_core", "frontier_not96_core", "frontier_not65_core", "frontier_identity96", "frontier_not96", "frontier_not65", "frontier_word_mask", "frontier_shift4", "frontier_shift9", "frontier_shift16", "frontier_vector_lane", "frontier_vector_snapshot"],
+      "observations": 17920,
+      "stdout": "preopt-test-frontier observations=17920 independent-c-bit-goldens=logical-wide-masks=narrow-shifts=overflow=live-calls=fp-lanes=unaligned-page-edge-snapshots=preserved\n"
     }
   ]
 }

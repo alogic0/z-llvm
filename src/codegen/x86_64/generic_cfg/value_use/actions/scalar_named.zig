@@ -111,13 +111,20 @@ pub fn executeNamedScalarBinary(
     switch (plan) {
         .b01_boolean, .b04_narrow_shift, .b05_wide_shift, .b06_wide_exact_binary => {
             try validateNamedSource(Authority, transaction, rhs_index, bits);
-            try stageNamedSource(
-                Authority,
-                transaction,
-                rhs_index,
-                .rcx,
-                if (plan == .b05_wide_shift or plan == .b06_wide_exact_binary) 64 else bits,
-            );
+            {
+                // The narrow shift's LHS is still an input while a spilled
+                // count is staged. Keep its current home if it occupies RCX.
+                const previous = transaction.selector.preserve_current_position_values;
+                if (plan == .b04_narrow_shift) transaction.selector.preserve_current_position_values = true;
+                defer transaction.selector.preserve_current_position_values = previous;
+                try stageNamedSource(
+                    Authority,
+                    transaction,
+                    rhs_index,
+                    .rcx,
+                    if (plan == .b05_wide_shift or plan == .b06_wide_exact_binary) 64 else bits,
+                );
+            }
             try failNamedForTest(transaction, .after_first_operand_staging);
             try prepareNamedAccumulator(
                 Authority,

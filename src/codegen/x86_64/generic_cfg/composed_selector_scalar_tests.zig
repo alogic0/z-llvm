@@ -2595,3 +2595,70 @@ test "generic cfg selector executes signed power of two division with live sourc
         }
     }
 }
+
+test "frameless pair widening uses a free planned pair without disturbing a live accumulator" {
+    for ([_]bool{ false, true }) |occupied| {
+        // This fixture checks the cast's result home; its surrounding function
+        // leaves that value unused. Native canaries cover the return ABI.
+        var machine = MachineFunction.init("planned-pair-widen", .void);
+        defer machine.deinit(std.testing.allocator);
+        var plan = SelectorAllocationPlan.init(std.testing.allocator);
+        defer plan.deinit();
+        try plan.interval_ends.put("source", 1);
+        try plan.interval_ends.put("live", 10);
+        try plan.interval_ends.put("result", 2);
+        try plan.assignments.put("result", .{ .gpr128 = pair_b });
+        try plan.forward_values.put("result", .{ .definition_position = 1, .metadata = .{ .class = .gpr128, .bits = 128 } });
+        if (occupied) try plan.interval_ends.put("occupied", 10);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 1;
+        try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "live", .rax);
+        if (occupied) try selector_state.bindValueLoc(&selector, "occupied", .{ .scratch128 = pair_b });
+        const cast = ir.CastInst{ .op = .zext, .value = .{ .named = "source" }, .from_ty = .{ .int = 64 }, .to_ty = .{ .int = 128 } };
+        if (occupied) {
+            try std.testing.expectError(error.UnsupportedCodegenValue, selector_scalar.lowerCast(&selector, "result", cast));
+            try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, selector_state.valueLoc(&selector, "occupied").?);
+            try std.testing.expect(selector_state.valueLoc(&selector, "result") == null);
+        } else {
+            try std.testing.expect((try selector_scalar.lowerCast(&selector, "result", cast)) == null);
+            try std.testing.expectEqual(ValueLoc{ .scratch128 = pair_b }, selector_state.valueLoc(&selector, "result").?);
+            try machine.instructions.append(std.testing.allocator, .ret);
+            try x86_64_verify.verifyFunction(machine);
+        }
+        try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "live").?);
+        try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+        try std.testing.expectEqual(@as(usize, 0), selector.stack_frame_bytes);
+    }
+}
+
+test "frameless pair OR preserves full accumulator aliases before lane scratch" {
+    var machine = MachineFunction.init("pair-or-live-accumulator", .{ .int = 128 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try plan.interval_ends.put("source", 1);
+    try plan.interval_ends.put("live", 10);
+    try plan.interval_ends.put("alias", 10);
+    try plan.interval_ends.put("rhs", 1);
+    try plan.interval_ends.put("result", 2);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    selector.current_position = 1;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg128 = pair_a });
+    try selector_state.bindValueLoc(&selector, "rhs", .{ .arg128 = pair_b });
+    try selector_state.bindValueLoc(&selector, "live", .rax);
+    try selector_state.bindValueLoc(&selector, "alias", .rax);
+    try std.testing.expectEqual(@as(?selector_scalar.Diagnostic, null), try selector_scalar.lowerPairBinary(&selector, "result", .{ .op = .@"or", .ty = .{ .int = 128 }, .lhs = .{ .named = "source" }, .rhs = .{ .named = "rhs" } }));
+    const home = selector_state.valueLoc(&selector, "live").?;
+    try std.testing.expect(home == .scratch64);
+    try std.testing.expect(selector_state.valueLoc(&selector, "alias").? == .scratch64);
+    try std.testing.expect(selector_state.valueLoc(&selector, "result") != null);
+    try std.testing.expectEqual(@as(usize, 0), selector.spill_slots.count());
+    try std.testing.expectEqual(@as(usize, 0), selector.stack_frame_bytes);
+    try machine.instructions.append(std.testing.allocator, .ret);
+    try x86_64_verify.verifyFunction(machine);
+}

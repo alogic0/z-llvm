@@ -9,8 +9,13 @@ and qualified proxy path, extended negative-zero serialization, inline memset
 and scalar operand/immediate repairs. The captured runtime census selects
 all 921 definitions without losing a previously selected definition. Promoted
 source passes full units, readiness, structural smoke and fixed runtime
-object/native replay. Fresh capture and inventory reconciliation continue. No preopt acceptance
-is claimed until stages E/F/G close.
+object/native replay. The third actual attempt delivers and independently audits
+the runtime object; it captures 7,716 test definitions, selecting 7,707 and failing
+on nine. Both full ordered event streams verify, preserving the test failure.
+The next repair selects all 7,716 test definitions and passes native checks,
+full units, readiness, structural smoke and fixed runtime replay. Build the
+committed candidate and resume fresh capture. Inventory remains provisional. No
+preopt acceptance is claimed until stages E/F/G close.
 The [implementation checkpoint](../evidence/release_safe_preopt_checkpoint_20261115.md)
 records the qualified A/B tooling, first C/D repairs and exact validation limits.
 
