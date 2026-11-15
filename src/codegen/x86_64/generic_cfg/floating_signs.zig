@@ -26,15 +26,14 @@ fn classify(inst: ir.Instruction) ?Form {
     if (inst.kind == .binary) {
         const binary = inst.kind.binary;
         if (bits(binary.ty) != null and binary.op == .fsub and binary.lhs == .fp and
-            std.mem.eql(u8, binary.lhs.fp, "-0.000000e+00") and operand(binary.rhs))
+            @import("../../../analysis/fp_semantics.zig").isNegativeZeroLiteral(binary.ty, binary.lhs.fp) and operand(binary.rhs))
             return .{ .operation = .negate, .ty = binary.ty, .lhs = binary.rhs };
         return null;
     }
     if (inst.kind != .call) return null;
     const call = inst.kind.call;
     const width = bits(call.ret_ty) orelse return null;
-    const operation: Operation = if (std.mem.eql(u8, call.callee, if (width == 80) "llvm.fabs.f80" else "llvm.fabs.f128")) .absolute else
-        if (std.mem.eql(u8, call.callee, if (width == 80) "llvm.copysign.f80" else "llvm.copysign.f128")) .copy_sign else return null;
+    const operation: Operation = if (std.mem.eql(u8, call.callee, if (width == 80) "llvm.fabs.f80" else "llvm.fabs.f128")) .absolute else if (std.mem.eql(u8, call.callee, if (width == 80) "llvm.copysign.f80" else "llvm.copysign.f128")) .copy_sign else return null;
     if (call.args.items.len != (if (operation == .copy_sign) @as(usize, 2) else 1) or
         call.callee_value != null or call.callee_function_ty != null or call.inline_asm != null or
         call.raw_args != null or call.operand_bundle != null or !helpers.isDefaultOrFastcc(call.calling_conv) or
@@ -90,8 +89,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 const changed = switch (form.operation) {
                     .negate => try b.binary(integer, .xor, raw, sign_value),
                     .absolute => try b.binary(integer, .@"and", raw, magnitude),
-                    .copy_sign => try b.binary(integer, .@"or", try b.binary(integer, .@"and", raw, magnitude),
-                        try b.binary(integer, .@"and", try b.raw(form.ty, form.rhs.?, integer), sign_value)),
+                    .copy_sign => try b.binary(integer, .@"or", try b.binary(integer, .@"and", raw, magnitude), try b.binary(integer, .@"and", try b.raw(form.ty, form.rhs.?, integer), sign_value)),
                 };
                 var copy = inst;
                 copy.kind = .{ .cast = .{ .op = .bitcast, .from_ty = integer, .value = changed, .to_ty = form.ty } };

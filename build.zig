@@ -414,6 +414,14 @@ pub fn build(b: *std.Build) void {
     storage_behavior_tests.step.dependOn(&b.addRunArtifact(captured_object_tests).step);
     storage_cleanup_test_step.dependOn(&storage_behavior_tests.step);
     b.step("test-behavior-storage", "Check behavior capture storage and independent object audits").dependOn(&storage_behavior_tests.step);
+    const preopt_tests = b.addTest(.{ .filters = &.{ "preopt", "upstream outcomes" }, .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/run_upstream_behavior.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    const preopt_step = b.step("test-preopt-behavior", "Check separate local optimization/object captures and behavior bindings");
+    preopt_step.dependOn(&b.addRunArtifact(preopt_tests).step);
+    preopt_step.dependOn(&storage_behavior_tests.step);
     const event_audit = b.addExecutable(.{ .name = "audit-native-events", .root_module = b.createModule(.{
         .root_source_file = b.path("tools/audit_native_events.zig"),
         .target = b.graph.host,

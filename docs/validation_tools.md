@@ -94,6 +94,33 @@ uses the historical CPU-0 / 1 GiB setup. `--test-filter` is diagnostic-only and
 sets `full_suite=false`. Every invocation requires a new output directory.
 The local-only `--profile-events` option retains a nonempty event stream and its
 hash for every capture; ordered-event auditing is a separate completion check.
+
+The local pipeline defaults to `--local-pipeline postopt`. Select `preopt` to
+run the frontend's accepted local optimization pipeline before local object
+emission; Debug is unsupported. Preopt requires both `--reference-report` and
+`--reference-sha256`. The runner verifies the selected normal LLVM reference's
+frontend, source/suite/libc, mode, resources, target/CPU command and complete named
+outcomes. Full preopt runs also bind native startup/runtime provider identities.
+Use `--record-providers` on a fresh normal LLVM reference to record and recheck
+those inputs; unchanged libc configuration text alone does not establish unchanged
+system runtime bytes.
+
+Preopt reports separate `.optimizations` from object `.captures`. Optimizer
+records retain original/effective arguments, input and output IR, actual command
+outcomes and delivery path. Object captures bind their consumed input to that
+delivered optimizer output by path, bytes and hash. Optimizer text never counts
+as a completed object; failed optimization delivers no output or object. Stage
+chains are checked before execution, while independent census/ELF/ordered-event
+audits remain required before closing the inventory. Retained-object audits also
+check the optimizer command and unchanged retained optimizer input/output.
+
+Preopt connects the shared disk admission and reserve monitor. `--reserve-bytes`
+can select a stronger reserve and also enable monitoring for another route; it
+cannot lower the shared floor. `space-admission.json`, `space-samples.tsv` and
+`space.json` record policy and observations. Resource stops are terminal failed
+reports with `resource_stop=true`, a stage and the original error, so diagnosed
+scratch can use the existing explicit workspace-release contract.
+
 For managed roots, private caches, the test executable and captured local objects
 use the temporary workspace; reports, captured inputs, event traces and logs
 stay in evidence. Pass this tool's `--retain-products` while independent object
@@ -330,7 +357,10 @@ after all consumers finish.
 
 The focused `test-behavior-storage` build step exercises managed and legacy
 captures with the real backend and independent auditor, including rejection of
-a missing managed object despite a valid evidence copy.
+a missing managed object despite a valid evidence copy. `test-preopt-behavior`
+also runs the focused stage/reference/headroom units and real two-stage CLI
+controls, including changed optimizer output, partial-output optimizer failure,
+incorrect reference, unsupported mode/route and a stronger reserve.
 
 The auditor writes a separate report and leaves the original runner receipt
 unchanged. It requires one successful actual backend command. A reused initial

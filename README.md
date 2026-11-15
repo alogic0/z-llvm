@@ -33,6 +33,12 @@ fixed Debug behavior input falls from 114.39 to 109.66 seconds (4.1%), with
 byte-identical objects and ownership. This measures one postopt module;
 whole-compiler throughput and generated-program performance are separate scopes.
 
+The active [ReleaseSafe preopt plan](docs/plans/2026-11-14-release-safe-preopt-behavior.md)
+adds local optimization before local object emission. Its
+[implementation checkpoint](docs/evidence/release_safe_preopt_checkpoint_20261115.md)
+records 906 of 921 captured runtime functions selected, with 15 failures still
+open. Complete preopt behavior and object-audit acceptance remain in progress.
+
 See the [final acceptance](docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json),
 [completed plan](docs/plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),
 [current state](docs/current_state.md), and [next steps](docs/next_steps.md).

@@ -3,7 +3,15 @@
 Date: 2026-11-14
 Updated: 2026-11-15 after revised implementation and storage planning with agent
 `01a1c2b0-45c7-7560-9ad0-050e8f6970f8`.
-Status: negotiated successor proposal; implementation has not started.
+Status: implementing, authorized by the user on 2026-11-15. Baseline admission
+and Debug/ReleaseFast runner qualification passed. Progressive capture exposed
+and qualified proxy path, extended negative-zero serialization, inline memset
+and scalar operand/immediate repairs. The captured runtime census selects
+906 of 921 definitions without losing a previously selected definition;
+15 failures remain. Full capture and inventory reconciliation continue. No preopt acceptance
+is claimed until stages E/F/G close.
+The [implementation checkpoint](../evidence/release_safe_preopt_checkpoint_20261115.md)
+records the qualified A/B tooling, first C/D repairs and exact validation limits.
 
 ## Objective
 
@@ -63,6 +71,20 @@ baseline for admission. Run another reference only if a relevant dependency chan
 then account explicitly for any difference from the frozen outcome population.
 Historical references using a different frontend remain ancestry, not substitutes
 for this selected compiler identity.
+
+Execution admission found changed system `libc.so.6` and dynamic-loader bytes;
+the frontend, source/suite/libc configuration and the other 23 checked providers
+still match. The required fresh normal LLVM ReleaseSafe run with this same
+frontend passed all 2,097 ordered outcomes against the original reference.
+Its provider-aware successor is
+`local-state/validations/release-safe-preopt-20261115/batch-01/reference-current-runtime/run/report.json`,
+SHA-256 `eb95b922e6103f495aef5937a0196cad1cef901f3da9036dd286aa39fc99d0c5`.
+Use that report/hash for preopt comparisons under the current runtime. It records
+11 current native inputs and the original `8725f827` reference as its exact
+outcome ancestry. The original reference and existing accepted proofs remain
+unchanged; no compiler baseline is cloned or replaced. Runtime identities and
+the failed historical-provider admission remain under `baseline/` and
+`tooling-debug-r3/`; the refreshed run records providers before and after execution.
 
 The preopt hook selects its optimizer pipeline from the global environment.
 Export `ZLLVM_ZIG_MODE=ReleaseSafe` and require `zig-release-safe-accepted` for
@@ -158,7 +180,8 @@ helpers, `jqz` for structured records and `zigrep --no-config` for searches.
 Evidence starts under
 `local-state/validations/release-safe-preopt-20261115/batch-01/`.
 `planning/` contains the discussion and agreement; `planning-check/` qualifies
-this documentation update only. Implementation uses fresh named stage roots
+the initial documentation update only; `planning-revision/` records its follow-up.
+`baseline/` verifies the selected dependencies in place. Implementation uses fresh named stage roots
 such as `baseline`, `tooling-debug`, `tooling-fast`, `tools`, `capture-01`,
 `repair-FAMILY-ATTEMPT`, `final-behavior`, `preservation` and `integration`.
 Declare each command's concrete producers, consumers and exceptions in its
@@ -239,8 +262,8 @@ never reduce the test population or discard unaudited evidence to fit a forecast
 The [completed storage cleanup](../evidence/resolved_storage_cleanup_20261115.json)
 and [collection cadence qualification](../evidence/frequent_storage_cleanup_20261115.json)
 are the operating baseline. Another broad historical cleanup is not a
-prerequisite for compiler development. This planning agreement starts no compiler
-builds, suite runs or new payload-retirement pass.
+prerequisite for compiler development. Implementation stages now run under the
+ownership and collection boundaries above.
 
 ## Acceptance and stop boundary
 

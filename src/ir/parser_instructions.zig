@@ -64,7 +64,10 @@ pub fn parseInstructionBody(allocator: std.mem.Allocator, line: []const u8) !cor
         errdefer args.deinit(allocator);
         try args.append(allocator, .{ .ty = .ptr, .value = try parseValue(std.mem.trim(u8, source.after, " \t")) });
         return .{ .result = result_text[1..], .kind = .{ .call = .{
-            .va_arg = true, .ret_ty = result_ty, .callee = "", .args = args,
+            .va_arg = true,
+            .ret_ty = result_ty,
+            .callee = "",
+            .args = args,
         } } };
     }
     if (std.mem.startsWith(u8, rhs_text, "call ")) return parseCall(allocator, result_text[1..], rhs_text);
@@ -228,10 +231,12 @@ fn negativeZeroForFneg(ty: core.Type) core.Value {
             .float => .{ .vector = "splat (float -0.000000e+00)" },
             .double => .{ .vector = "splat (double -0.000000e+00)" },
             .x86_fp80 => .{ .vector = "splat (x86_fp80 0xK80000000000000000000)" },
-            .fp128 => .{ .vector = "splat (fp128 -0.000000e+00)" },
+            .fp128 => .{ .vector = "splat (fp128 0xL00000000000000008000000000000000)" },
             .int, .ptr => .{ .fp = "-0.000000e+00" },
         },
-        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => .{ .fp = "-0.000000e+00" },
+        .x86_fp80 => .{ .fp = "0xK80000000000000000000" },
+        .fp128 => .{ .fp = "0xL00000000000000008000000000000000" },
+        .void, .int, .half, .float, .double, .metadata, .ptr, .aggregate => .{ .fp = "-0.000000e+00" },
     };
 }
 

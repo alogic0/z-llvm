@@ -94,11 +94,12 @@ fn stackFpBits(ty: ir.Type) ?u16 {
     return if (ty == .half) 16 else if (ty == .float) 32 else if (ty == .double) 64 else null;
 }
 
-// Scalar conversions and named literals use fixed accumulator/scratch writes.
+// Scalar conversions, named literals and inline fills use fixed register writes.
 // Their preservation demand is additional to virtual-register interval pressure.
 fn needsScalarPreservation(inst: ir.Instruction) bool {
     return switch (inst.kind) {
-        .call => |call| sysv_abi.isVariadicCall(call) and call.args.items.len > 3,
+        .call => |call| (sysv_abi.isVariadicCall(call) and call.args.items.len > 3) or
+            std.mem.eql(u8, call.callee, "llvm.memset.inline.p0.i64"),
         .cast => |cast| cast.op == .zext and cast.from_ty == .int and cast.to_ty == .int and
             cast.from_ty.int < cast.to_ty.int and (cast.to_ty.int == 32 or cast.to_ty.int == 64),
         .binary => |binary| (binary.ty.eql(.{ .int = 32 }) or binary.ty.eql(.{ .int = 64 })) and

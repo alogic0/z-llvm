@@ -13650,6 +13650,22 @@
       ],
       "observations": 36864,
       "stdout": "half-literal-live-values observations=36864 independent-c-integer-and-half-goldens=live-boolean-and-32-and-64-bit-values=scalar-and-vector-half-addition=literal-and-loaded-seeds=signed-zero-and-nan=optional-tail-hints=call-clobbers=guard-pages=preserved\n"
+    },
+    {
+      "population": "inline_memset",
+      "fixture": "inline_memset",
+      "prefix": "inline-memset",
+      "functions": ["inline_set_0", "inline_set_1", "inline_set_2", "inline_set_4", "inline_set_8", "inline_set_16", "inline_set_33", "inline_set_256"],
+      "observations": 2048,
+      "stdout": "inline-memset observations=2048 independent-c-bytes=live-values=zero-length=guard-pages=preserved\n"
+    },
+    {
+      "population": "preopt_scalar_ops",
+      "fixture": "preopt_scalar_ops",
+      "prefix": "preopt-scalar-ops",
+      "functions": ["scalar_mul32_loaded", "scalar_mul32_zext", "scalar_mul32_square", "scalar_sub64_large", "scalar_sub64_exponent", "scalar_sub64_negative_min32", "scalar_sub64_signbit", "scalar_sub32_signbit"],
+      "observations": 2048,
+      "stdout": "preopt-scalar-ops observations=2048 independent-c-wrapping-goldens=live-operands=large-immediates=call-clobbers=guards=preserved\n"
     }
   ]
 }

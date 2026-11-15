@@ -74,6 +74,38 @@ fn expectUnresolvedInlineMemcpyDiagnostic(
     try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
 }
 
+test "inline memset rejects dynamic length volatile and malformed envelopes before mutation" {
+    for (0..6) |boundary| {
+        var machine = MachineFunction.init("inline-memset-closed", .void);
+        defer machine.deinit(std.testing.allocator);
+        var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+        defer selector.deinit();
+        try selector_state.bindValueLoc(&selector, "out", .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "byte", .{ .arg64 = .rsi });
+        try selector_state.bindValueLoc(&selector, "length", .{ .arg64 = .rdx });
+        var call: ir.CallInst = .{ .ret_ty = .void, .callee = "llvm.memset.inline.p0.i64", .args = .empty };
+        defer call.deinit(std.testing.allocator);
+        try call.args.appendSlice(std.testing.allocator, &.{
+            .{ .ty = .ptr, .value = .{ .named = "out" } },
+            .{ .ty = .{ .int = 8 }, .value = .{ .named = "byte" } },
+            .{ .ty = .{ .int = 64 }, .value = .{ .int = 16 } },
+            .{ .ty = .{ .int = 1 }, .value = .{ .int = 0 } },
+        });
+        switch (boundary) {
+            0 => call.args.items[2].value = .{ .named = "length" },
+            1 => call.args.items[3].value = .{ .int = 1 },
+            2 => call.args.items[0].attrs = "addrspace(1)",
+            3 => call.args.items[2].value = .{ .int = -1 },
+            4 => call.args.items[1].ty = .{ .int = 32 },
+            5 => call.tail_kind = "musttail",
+            else => unreachable,
+        }
+        try std.testing.expect((try impl.lowerInstruction(&selector, .{ .result = null, .kind = .{ .call = call } })) != null);
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+    }
+}
+
 test "generic cfg selector lowers lifetime markers as checked no-ops" {
     var machine = MachineFunction.init("lifetime-markers", .void);
     defer machine.deinit(std.testing.allocator);

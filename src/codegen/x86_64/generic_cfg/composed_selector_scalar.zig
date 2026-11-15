@@ -520,12 +520,12 @@ fn scalar_immediate_multi_alias_preservation(
             try finishArithmeticResult(&transaction, result_name, bits);
         },
         .sub => {
-            const imm = try i32Value(literal);
+            const imm = try i32BitPattern(literal);
             var transaction = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
             defer transaction.deinit();
             if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
             try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
-            try emitArithmeticWrite(selector, .{ .add_eax_imm32 = -imm });
+            try emitArithmeticWrite(selector, .{ .add_eax_imm32 = -%imm });
             try finishArithmeticResult(&transaction, result_name, bits);
         },
         .xor => {

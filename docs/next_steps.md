@@ -26,13 +26,25 @@ identical object and owner bytes. Both complete native suites, all 17 integratio
 gates, all 6,724 required faults and final source verification pass; the
 [acceptance record](evidence/compiler_throughput_20261114.json) binds the proof.
 
-The proposed successor is the
+The active, user-authorized successor is the
 [ReleaseSafe preopt behavior milestone](plans/2026-11-14-release-safe-preopt-behavior.md).
 It runs the unchanged complete suite through local optimization and object
 emission, matches every named reference outcome including skips, and proves no
 LLVM optimization/object pass or fallback delivered the accepted objects.
 LLVM IR construction, bitcode parsing, target setup and declared providers remain.
-This proposal is separate from the completed compiler/self-rebuild plan.
+This work is separate from the completed compiler/self-rebuild plan. Baseline
+admission and Debug/ReleaseFast runner qualification passed. The refreshed normal
+reference preserves all 2,097 ordered outcomes under the current libc/loader.
+Two real attempts captured the complete 921-definition compiler runtime; neither
+delivered an object. Qualified repairs cover proxy path binding, extended fneg
+serialization, constant inline memset and scalar operand/immediate handling.
+The independent runtime census advances 769 to 906 selections without loss;
+15 failures remain. Continue those captured failures and alternate complete local
+capture with focused repairs until one unchanged final run closes all inventories,
+audits and 2,097 outcomes. New native populations remain separate from the accepted
+225. No preopt acceptance or complete runtime-object proof is claimed yet.
+The [implementation checkpoint](evidence/release_safe_preopt_checkpoint_20261115.md)
+records the qualified tooling, repairs, source bridge and current limits.
 
 Further work starts from the accepted baseline:
 
@@ -58,7 +70,7 @@ matrix remains open in the completed plan.
 Every new cycle follows the [development storage contract](development_storage.md):
 declare temporary products and retained consumers before execution, use managed
 launchers for scripts and tools, and close temporary pipelines with a recorded
-storage disposition. The proposed successor includes this requirement.
+storage disposition. The active successor includes this requirement.
 
 ## Previous checkpoints
 

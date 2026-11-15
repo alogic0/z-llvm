@@ -285,10 +285,12 @@ fn classifyImmediateRhsSemantic(
         .@"and", .@"or", .add, .sub, .xor => if (bits <= 32)
             .r04_narrow_accumulator_immediate
         else if (action.operation == .sub)
-            if (fitsI32(action.literal))
+            if (fitsI32(action.literal) and action.literal != std.math.minInt(i32))
                 .r06_wide_scratch_immediate
-            else
-                error.ValueUseImmediateScalarLiteralOutOfRange
+            else if (bits == 64) blk: {
+                _ = try immediateI64(action.literal);
+                break :blk .r05_wide_accumulator_immediate;
+            } else error.ValueUseImmediateScalarLiteralOutOfRange
         else if (action.operation == .add and fitsI32(action.literal))
             .r06_wide_scratch_immediate
         else
@@ -765,7 +767,8 @@ fn executeImmediateR04R06(
 ) !void {
     if (bits == 64 and
         (action.operation == .add or action.operation == .sub) and
-        fitsI32(action.literal))
+        fitsI32(action.literal) and
+        (action.operation != .sub or action.literal != std.math.minInt(i32)))
     {
         try selector_state.emitValueIntoScratch(
             transaction.selector,
@@ -819,7 +822,7 @@ fn executeImmediateR04R06(
             .@"and" => try emitImmediateWrite(transaction, .{ .and_eax_imm32 = literal }),
             .@"or" => try emitImmediateWrite(transaction, .{ .or_eax_imm32 = literal }),
             .add => try emitImmediateWrite(transaction, .{ .add_eax_imm32 = literal }),
-            .sub => try emitImmediateWrite(transaction, .{ .add_eax_imm32 = -literal }),
+            .sub => try emitImmediateWrite(transaction, .{ .add_eax_imm32 = -%literal }),
             .mul => try emitImmediateWrite(transaction, .{ .imul_eax_imm32 = literal }),
             .xor => {
                 try transaction.selector.machine.instructions.append(
@@ -853,6 +856,7 @@ fn executeImmediateR04R06(
                     .@"and" => .@"and",
                     .@"or" => .@"or",
                     .add => .add,
+                    .sub => .sub,
                     .xor => .xor,
                     else => unreachable,
                 },

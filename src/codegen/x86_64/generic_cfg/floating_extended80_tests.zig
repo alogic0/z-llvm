@@ -6,9 +6,7 @@ const verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 
 test "floating extended sign operations preserve every payload bit" {
-    const values = [_]u128{ 0, 1, @as(u128, 1) << 127, std.math.maxInt(u128),
-        0x7fff8000000000000001, 0xffffc000000000000123,
-        0x7fff0000000000000000000000000001, 0xffff8000000000000000000000000123 };
+    const values = [_]u128{ 0, 1, @as(u128, 1) << 127, std.math.maxInt(u128), 0x7fff8000000000000001, 0xffffc000000000000123, 0x7fff0000000000000000000000000001, 0xffff8000000000000000000000000123 };
     for ([_]u16{ 80, 128 }) |width| for (0..3) |operation| {
         const ty = if (width == 80) "x86_fp80" else "fp128";
         const suffix = if (width == 80) "f80" else "f128";
@@ -19,17 +17,21 @@ test "floating extended sign operations preserve every payload bit" {
         };
         defer std.testing.allocator.free(statement);
         const finish = if (width == 80) " %answer = zext i80 %raw to i128\n" else " %answer = add i128 %raw,0\n";
-        const source = try std.fmt.allocPrint(std.testing.allocator,
-            "target datalayout = \"e-i128:128-f80:128\"\ndeclare {s} @llvm.fabs.{s}({s})\ndeclare {s} @llvm.copysign.{s}({s},{s})\ndefine i128 @sign(ptr %left,ptr %right,ptr %output) {{\nentry:\n %a = load {s},ptr %left,align 1\n %b = load {s},ptr %right,align 1\n{s} store {s} %r,ptr %output,align 1\n %raw = bitcast {s} %r to i{d}\n{s} ret i128 %answer\n}}\n",
-            .{ ty, suffix, ty, ty, suffix, ty, ty, ty, ty, statement, ty, ty, width, finish });
+        const source = try std.fmt.allocPrint(std.testing.allocator, "target datalayout = \"e-i128:128-f80:128\"\ndeclare {s} @llvm.fabs.{s}({s})\ndeclare {s} @llvm.copysign.{s}({s},{s})\ndefine i128 @sign(ptr %left,ptr %right,ptr %output) {{\nentry:\n %a = load {s},ptr %left,align 1\n %b = load {s},ptr %right,align 1\n{s} store {s} %r,ptr %output,align 1\n %raw = bitcast {s} %r to i{d}\n{s} ret i128 %answer\n}}\n", .{ ty, suffix, ty, ty, suffix, ty, ty, ty, ty, statement, ty, ty, width, finish });
         defer std.testing.allocator.free(source);
         var module = try ir.Module.parse(std.testing.allocator, source);
         defer module.deinit();
         try module.verify();
-        const context: machine.ReadOnlyModuleContext = .{ .globals = module.globals.items, .named_types = module.named_types.items, .target_datalayout = module.target_datalayout };
+        var printed: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        defer printed.deinit();
+        try module.print(&printed.writer);
+        var reparsed = try ir.Module.parse(std.testing.allocator, printed.written());
+        defer reparsed.deinit();
+        try reparsed.verify();
+        const context: machine.ReadOnlyModuleContext = .{ .globals = reparsed.globals.items, .named_types = reparsed.named_types.items, .target_datalayout = reparsed.target_datalayout };
         var output = machine.MachineFunction.init("sign", .{ .int = 128 });
         defer output.deinit(std.testing.allocator);
-        const selected = try selector.tryLowerWithContext(std.testing.allocator, &output, module.functions.items[0], &context);
+        const selected = try selector.tryLowerWithContext(std.testing.allocator, &output, reparsed.functions.items[0], &context);
         if (selected == .unsupported) std.debug.print("floating sign width={d} operation={d}: {s}\n", .{ width, operation, selected.unsupported.detail() });
         try std.testing.expectEqual(selector.SelectionResult.selected, selected);
         try verify.verifyFunction(output);
@@ -42,7 +44,11 @@ test "floating extended sign operations preserve every payload bit" {
         const bit: u128 = @as(u128, 1) << @as(u7, @intCast(width - 1));
         const mask: u128 = if (width == 128) std.math.maxInt(u128) else (@as(u128, 1) << 80) - 1;
         for (values) |left| for (values) |right| {
-            const expected = switch (operation) { 0 => (left ^ bit) & mask, 1 => left & (bit - 1), else => (left & (bit - 1)) | (right & bit) };
+            const expected = switch (operation) {
+                0 => (left ^ bit) & mask,
+                1 => left & (bit - 1),
+                else => (left & (bit - 1)) | (right & bit),
+            };
             var a: [16]u8 = undefined;
             var b: [16]u8 = undefined;
             var stored: [32]u8 = @splat(0xa7);

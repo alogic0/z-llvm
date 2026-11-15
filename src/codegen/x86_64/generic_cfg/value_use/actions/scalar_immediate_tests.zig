@@ -37,6 +37,8 @@ const immediate_plan = [_]PlanRow{
     .{ .id = "R03", .direction = .rhs, .operation = .ashr, .bits = 64, .literal = 5, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "accumulator form materializes EAX; scratch64 form has none", .accumulator_preamble = "scratch-preferred accumulator; none scratch64", .displacement_authority = "<=32 Q2 strict-after; i64 sessionless scratch" },
     .{ .id = "R04", .direction = .rhs, .operation = .add, .bits = 32, .literal = 9, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into EAX", .accumulator_preamble = "scratch-preferred", .displacement_authority = "Q2 strict-after; scratch-preferred fallback" },
     .{ .id = "R05", .direction = .rhs, .operation = .@"and", .bits = 64, .literal = 0x123456789, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into RAX", .accumulator_preamble = "spill-source", .displacement_authority = "inclusive preserve-current; spill-live fallback" },
+    .{ .id = "R05-sub", .direction = .rhs, .operation = .sub, .bits = 64, .literal = 0x123456789, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into RAX", .accumulator_preamble = "spill-source", .displacement_authority = "inclusive preserve-current; spill-live fallback" },
+    .{ .id = "R05-sub-min-i32", .direction = .rhs, .operation = .sub, .bits = 64, .literal = std.math.minInt(i32), .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "session materializes source into RAX", .accumulator_preamble = "spill-source", .displacement_authority = "inclusive preserve-current; spill-live fallback" },
     .{ .id = "R06", .direction = .rhs, .operation = .sub, .bits = 64, .literal = 11, .accumulator = false, .scratch = true, .writes = 1, .first_accumulator_write = "none; result remains in RCX", .accumulator_preamble = "none", .displacement_authority = "sessionless scratch" },
     .{ .id = "L01", .direction = .lhs, .operation = .sub, .bits = 32, .literal = 17, .accumulator = true, .scratch = false, .writes = 1, .first_accumulator_write = "literal materialization into EAX/RAX", .accumulator_preamble = "none; session spill-live authority", .displacement_authority = "hard spill-live" },
     .{ .id = "L02", .direction = .lhs, .operation = .shl, .bits = 16, .literal = 3, .accumulator = true, .scratch = false, .writes = 2, .first_accumulator_write = "literal materialization into EAX", .accumulator_preamble = "none; session spill-live authority", .displacement_authority = "hard spill-live" },
@@ -44,6 +46,10 @@ const immediate_plan = [_]PlanRow{
 };
 
 const DeclaredType = enum { non_integer, i1, i16, i32, i64, i128 };
+fn planRow(id: []const u8) PlanRow {
+    for (immediate_plan) |row| if (std.mem.eql(u8, row.id, id)) return row;
+    unreachable;
+}
 const BindingClass = enum { gpr32, gpr64, gpr128, fp16, fp32, fp64, vector_xmm, aggregate_sse, stack_object, stack_pointer };
 const Home = enum {
     arg32,
@@ -170,9 +176,10 @@ fn executeImmediate(row: PlanRow, source_loc: ValueLoc) !struct {
     };
 }
 
-test "value-use immediate scalar plan table is closed and direction specific" {
-    try std.testing.expectEqual(@as(usize, 10), immediate_plan.len);
-    for (immediate_plan) |row| {
+test "value-use immediate scalar plan representatives have unique identities and directions" {
+    try std.testing.expectEqual(@as(usize, 12), immediate_plan.len);
+    for (immediate_plan, 0..) |row, index| {
+        for (immediate_plan[0..index]) |prior| try std.testing.expect(!std.mem.eql(u8, row.id, prior.id));
         const inst = binary(row);
         try std.testing.expectEqual(
             row.direction == .rhs,
@@ -262,7 +269,7 @@ test "value-use immediate scalar exact R00 and variable lhs streams" {
         expected_instructions: []const machine_module.Instruction,
     }{
         .{
-            .row = immediate_plan[0],
+            .row = planRow("R00"),
             .expected_instructions = &.{
                 .{ .mov_arg_eax = .rdi },
                 .{ .mov_eax_to_arg = .rcx },
@@ -272,7 +279,7 @@ test "value-use immediate scalar exact R00 and variable lhs streams" {
             },
         },
         .{
-            .row = immediate_plan[7],
+            .row = planRow("L01"),
             .expected_instructions = &.{
                 .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
                 .{ .mov_imm_eax = 17 },
@@ -280,7 +287,7 @@ test "value-use immediate scalar exact R00 and variable lhs streams" {
             },
         },
         .{
-            .row = immediate_plan[8],
+            .row = planRow("L02"),
             .expected_instructions = &.{
                 .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
                 .{ .mov_imm_eax = 3 },
@@ -289,7 +296,7 @@ test "value-use immediate scalar exact R00 and variable lhs streams" {
             },
         },
         .{
-            .row = immediate_plan[9],
+            .row = planRow("L03"),
             .expected_instructions = &.{
                 .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
                 .{ .mov_imm_rax = 0x1000 },
@@ -425,7 +432,7 @@ test "value-use immediate scalar source-derived result branches retain accepted 
 }
 
 test "value-use immediate scalar R01 spill source falls back through RAX when scratch is unavailable" {
-    const row = immediate_plan[1];
+    const row = planRow("R01");
     var machine = MachineFunction.init("R01-spill-through-rax", .{ .int = 64 });
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -503,7 +510,7 @@ test "value-use immediate scalar R01 register pressure preserves aliases and rol
         const saved_flags = selector.eflags.snapshot();
         var transaction = try Transaction.begin(&selector);
         defer transaction.deinit();
-        const handle = try registerImmediate(&transaction, immediate_plan[1]);
+        const handle = try registerImmediate(&transaction, planRow("R01"));
         try transaction.seal();
         try transaction.prepare();
         try transaction.materializeAll();
@@ -988,7 +995,7 @@ test "value-use immediate scalar non-accumulator and literal controls remain exa
             },
         },
         .{
-            .row = immediate_plan[9],
+            .row = planRow("L03"),
             .source_loc = .{ .arg64 = .rdi },
             .expected_instructions = &.{
                 .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
@@ -1155,7 +1162,7 @@ test "value-use immediate scalar diagnostics preserve request provenance" {
     }{
         .{
             .loc = .{ .arg128 = .{ .lo = .rdi, .hi = .rsi } },
-            .row = immediate_plan[5],
+            .row = planRow("R05"),
             .expected_error = error.ValueUseImmediateScalarWidthUnsupported,
         },
     };
@@ -1182,11 +1189,11 @@ test "value-use immediate scalar diagnostics preserve request provenance" {
 
 test "value-use immediate scalar literal validation precedes request mutation" {
     const row: PlanRow = .{
-        .id = "R06-sub-out-of-range",
+        .id = "R05-sub-out-of-range",
         .direction = .rhs,
         .operation = .sub,
         .bits = 64,
-        .literal = std.math.maxInt(i32) + 1,
+        .literal = @as(i128, 1) << 64,
         .accumulator = false,
         .scratch = true,
         .writes = 0,
@@ -1223,7 +1230,7 @@ test "value-use immediate scalar rollback restores every tested boundary" {
         .after_finalization,
     };
     for (boundaries) |boundary| {
-        const row = immediate_plan[7];
+        const row = planRow("L01");
         var machine = MachineFunction.init("immediate-rollback", .{ .int = 32 });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -1262,23 +1269,23 @@ test "value-use immediate scalar rollback restores every tested boundary" {
 
 test "value-use immediate scalar rollback spans preservation scratch and multi-instruction stages" {
     const cases = [_]struct {
-        row_index: usize,
+        row_id: []const u8,
         source_loc: ValueLoc,
         boundary: Transaction.ImmediateScalarTestFailure,
     }{
-        .{ .row_index = 2, .source_loc = .{ .scratch32 = .rdi }, .boundary = .after_preservation },
-        .{ .row_index = 2, .source_loc = .{ .scratch32 = .rdi }, .boundary = .after_eax_staging },
-        .{ .row_index = 1, .source_loc = .{ .arg64 = .rdi }, .boundary = .after_scratch_selection },
-        .{ .row_index = 1, .source_loc = .{ .arg64 = .rdi }, .boundary = .after_first_instruction },
-        .{ .row_index = 5, .source_loc = .{ .arg64 = .rdi }, .boundary = .after_rax_staging },
-        .{ .row_index = 5, .source_loc = .{ .arg64 = .rdi }, .boundary = .after_second_instruction },
-        .{ .row_index = 0, .source_loc = .{ .arg32 = .rdi }, .boundary = .after_second_instruction },
-        .{ .row_index = 0, .source_loc = .{ .arg32 = .rdi }, .boundary = .after_third_instruction },
-        .{ .row_index = 6, .source_loc = .{ .arg64 = .rdi }, .boundary = .after_rcx_staging },
-        .{ .row_index = 6, .source_loc = .{ .arg64 = .rdi }, .boundary = .after_result_definition },
+        .{ .row_id = "R02", .source_loc = .{ .scratch32 = .rdi }, .boundary = .after_preservation },
+        .{ .row_id = "R02", .source_loc = .{ .scratch32 = .rdi }, .boundary = .after_eax_staging },
+        .{ .row_id = "R01", .source_loc = .{ .arg64 = .rdi }, .boundary = .after_scratch_selection },
+        .{ .row_id = "R01", .source_loc = .{ .arg64 = .rdi }, .boundary = .after_first_instruction },
+        .{ .row_id = "R05", .source_loc = .{ .arg64 = .rdi }, .boundary = .after_rax_staging },
+        .{ .row_id = "R05", .source_loc = .{ .arg64 = .rdi }, .boundary = .after_second_instruction },
+        .{ .row_id = "R00", .source_loc = .{ .arg32 = .rdi }, .boundary = .after_second_instruction },
+        .{ .row_id = "R00", .source_loc = .{ .arg32 = .rdi }, .boundary = .after_third_instruction },
+        .{ .row_id = "R06", .source_loc = .{ .arg64 = .rdi }, .boundary = .after_rcx_staging },
+        .{ .row_id = "R06", .source_loc = .{ .arg64 = .rdi }, .boundary = .after_result_definition },
     };
     for (cases) |case| {
-        const row = immediate_plan[case.row_index];
+        const row = planRow(case.row_id);
         var machine = MachineFunction.init("immediate-rollback-expanded", .{ .int = row.bits });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);

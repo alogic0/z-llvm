@@ -10,6 +10,7 @@ const policy = @import("../distribution_headroom_policy.zig");
 const retained = @import("whole_compiler_reuse.zig");
 const resources = @import("whole_compiler_resources.zig");
 const storage = @import("storage_workspace.zig");
+const preopt = @import("preopt_capture.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
 const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--self-cpu N] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
 
@@ -452,9 +453,11 @@ fn behaviors(c: *u.Context, output: []const u8, source: []const u8, candidate: [
 
 fn capture(c: *u.Context, root: []const u8, argv: []const []const u8) !u8 {
     try storage.adopt(c);
+    const is_preopt = std.mem.eql(u8, c.env.get("ZLLVM_PIPELINE") orelse "postopt", "preopt");
+    if (is_preopt and try preopt.stage(argv, c.env.get("ZLLVM_ZIG_MODE") orelse return error.MissingPreoptMode) == .optimize) return preopt.optimize(c, root, argv);
     if (argv.len == 0 or !u.contains(argv, "--emit=obj")) return error.UnexpectedHookInvocation;
     const directory = try c.newOutput(try c.fmt("{s}/{d}", .{ root, std.os.linux.getpid() }));
-    const result = try backend(c, directory, c.env.get("ZLLVM_WHOLE_BACKEND") orelse return error.MissingBackend, argv[argv.len - 1], argv, &c.env, try std.fmt.parseInt(u32, c.env.get("ZLLVM_WHOLE_TIMEOUT_MS") orelse "3600000", 10), .child_only);
+    var result = try backend(c, directory, c.env.get("ZLLVM_WHOLE_BACKEND") orelse return error.MissingBackend, argv[argv.len - 1], argv, &c.env, try std.fmt.parseInt(u32, c.env.get("ZLLVM_WHOLE_TIMEOUT_MS") orelse "3600000", 10), .child_only);
     // Only verified successful objects are delivered to Zig. Failed/partial
     // output remains in the retained failed workspace and never reaches the linker.
     if ((try u.get(result, "object_complete")).bool) {
@@ -466,6 +469,13 @@ fn capture(c: *u.Context, root: []const u8, argv: []const []const u8) !u8 {
         var writer = std.Io.File.stdout().writerStreaming(c.io, &out_buffer);
         _ = try input.interface.streamRemaining(&writer.interface);
         try writer.interface.flush();
+        if (is_preopt) {
+            const delivery = try preopt.identity(c, try preopt.deliveryPath(c));
+            if (!u.json.eql(try u.get(delivery, "sha256"), try u.get(try u.get(result, "object"), "sha256"))) return error.ObjectDeliveryChanged;
+            try u.put(c.a, &result, "delivery", delivery);
+            try u.put(c.a, &result, "object_delivered", u.b(true));
+            try c.writeJson(try c.join(&.{ directory, "report.json" }), result);
+        }
         return 0;
     }
     try std.Io.File.stderr().writeStreamingAll(c.io, try c.fmt("whole-compiler backend failed stage={s}; retained {s}/report.json\n", .{ try u.str(result, "failure_stage"), directory }));
@@ -478,12 +488,28 @@ fn backend(c: *u.Context, directory: []const u8, compiler: []const u8, original:
     try u.put(c.a, &report, "original_argv", try u.strings(c.a, original_argv));
     try u.put(c.a, &report, "object_complete", u.b(false));
     try u.put(c.a, &report, "failure_stage", u.s("capture"));
+    const is_preopt = std.mem.eql(u8, env.get("ZLLVM_PIPELINE") orelse "postopt", "preopt");
+    if (is_preopt) {
+        try u.put(c.a, &report, "stage", u.s("emit"));
+        try u.put(c.a, &report, "pipeline", u.s("preopt"));
+        try u.put(c.a, &report, "object_delivered", u.b(false));
+        try u.put(c.a, &report, "input_captured", u.b(false));
+    }
     try c.writeJson(try c.join(&.{ directory, "invocation.json" }), report);
     const input = try c.join(&.{ directory, "input.ll" });
     try @import("shared_input.zig").capture(c, original, input);
     try u.put(c.a, &report, "input", try fileIdentity(c, input));
     if (!std.mem.eql(u8, try c.digest(original), try u.str(try u.get(report, "input"), "sha256"))) return error.InputChangedDuringCapture;
     try u.put(c.a, &report, "text_scan", try scan(c, input));
+    if (is_preopt) {
+        try u.put(c.a, &report, "input_captured", u.b(true));
+        try c.writeJson(try c.join(&.{ directory, "invocation.json" }), report);
+        const resolved = try std.Io.Dir.cwd().realPathFileAlloc(c.io, original, c.a);
+        try u.put(c.a, &report, "original_input_resolved", u.s(resolved));
+        try c.writeJson(try c.join(&.{ directory, "invocation.json" }), report);
+        const optimization = try preopt.find(c, std.fs.path.dirname(directory).?, try u.get(report, "input"), resolved);
+        try u.put(c.a, &report, "optimizer_directory", try u.get(optimization, "directory"));
+    }
     try c.writeJson(try c.join(&.{ directory, "invocation.json" }), report);
     const bytes = (try std.Io.Dir.cwd().statFile(c.io, input, .{})).size;
     const profile_path = try c.join(&.{ directory, "profile.json" });

@@ -46,7 +46,7 @@ pub fn classify(ty: ir.Type, spelling: []const u8) !Classification {
     if (std.mem.eql(u8, text, "-inf")) {
         return .{ .ty = ty, .spelling = spelling, .category = .infinity, .negative = true };
     }
-    if (isNegativeZeroSpelling(text)) {
+    if (isNegativeZeroSpelling(text) or isNegativeZeroLiteral(ty, text)) {
         return .{ .ty = ty, .spelling = spelling, .category = .negative_zero, .negative = true };
     }
     if (isPositiveZeroSpelling(text)) {
@@ -131,6 +131,46 @@ pub fn scalarLiteralBits(ty: ir.Type, text: []const u8) !u128 {
 pub fn isHalfZeroLiteral(spelling: []const u8) bool {
     const bits = halfLiteralBits(spelling) catch return false;
     return bits & 0x7fff == 0;
+}
+
+/// Recognize the sign bit alone in a typed LLVM constant. Preserve the older
+/// synthetic decimal spelling used by parsed fneg in retained project inputs.
+pub fn isNegativeZeroLiteral(ty: ir.Type, spelling: []const u8) bool {
+    const width: u8 = switch (ty) {
+        .half => 16,
+        .float => 32,
+        .double => 64,
+        .x86_fp80 => 80,
+        .fp128 => 128,
+        else => return false,
+    };
+    const text = std.mem.trim(u8, spelling, " \t");
+    if (std.mem.eql(u8, text, "-0.000000e+00")) return true;
+    const raw = scalarLiteralBits(ty, text) catch return false;
+    return raw == @as(u128, 1) << @as(u7, @intCast(width - 1));
+}
+
+test "floating negative zero uses exact typed sign bits and rejects nearby payloads" {
+    const cases = [_]struct { ty: ir.Type, negative: []const u8, positive: []const u8, adjacent: []const u8 }{
+        .{ .ty = .half, .negative = "0xH8000", .positive = "0xH0000", .adjacent = "0xH8001" },
+        .{ .ty = .float, .negative = "0x8000000000000000", .positive = "0x0000000000000000", .adjacent = "0xB6A0000000000000" },
+        .{ .ty = .double, .negative = "0x8000000000000000", .positive = "0x0000000000000000", .adjacent = "0x8000000000000001" },
+        .{ .ty = .x86_fp80, .negative = "0xK80000000000000000000", .positive = "0xK00000000000000000000", .adjacent = "0xK80000000000000000001" },
+        .{ .ty = .fp128, .negative = "0xL00000000000000008000000000000000", .positive = "0xL00000000000000000000000000000000", .adjacent = "0xL00000000000000018000000000000000" },
+    };
+    for (cases) |case| {
+        try std.testing.expect(isNegativeZeroLiteral(case.ty, case.negative));
+        const classification = try classify(case.ty, case.negative);
+        try std.testing.expectEqual(Category.negative_zero, classification.category);
+        try std.testing.expect(classification.negative);
+        try std.testing.expect(isNegativeZeroLiteral(case.ty, "-0.000000e+00"));
+        try std.testing.expect(!isNegativeZeroLiteral(case.ty, case.positive));
+        try std.testing.expect(!isNegativeZeroLiteral(case.ty, case.adjacent));
+        try std.testing.expect(!isNegativeZeroLiteral(case.ty, "not a constant"));
+    }
+    try std.testing.expect(!isNegativeZeroLiteral(.{ .int = 80 }, "0xK80000000000000000000"));
+    try std.testing.expect(!isNegativeZeroLiteral(.x86_fp80, "0xL00000000000000008000000000000000"));
+    try std.testing.expect(!isNegativeZeroLiteral(.fp128, "0xK80000000000000000000"));
 }
 
 fn isPositiveZeroSpelling(text: []const u8) bool {

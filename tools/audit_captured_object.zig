@@ -65,6 +65,7 @@ pub fn main(init: std.process.Init) !void {
         const selected = try c.join(&.{path});
         recorded_capture = try validateCaptureDirectory(original_report, root, selected);
         try validateRecordedCapture(recorded_capture.?, try c.load(try c.join(&.{ selected, "report.json" })));
+        try @import("validation/preopt_capture.zig").audit(&c, root, original_report, recorded_capture.?);
         break :explicit selected;
     } else try c.join(&.{ root, "backend" });
     const invocation = try c.load(try c.join(&.{ directory, "invocation.json" }));
@@ -85,7 +86,8 @@ pub fn main(init: std.process.Init) !void {
     if (!std.mem.eql(u8, try c.digest(input_path), try u.str(input, "sha256"))) return error.InputIdentityChanged;
     if (!u.json.is(effective.array.items[effective.array.items.len - 1], input_path)) return error.BackendInputMismatch;
     const original_input = try u.str(invocation, "original_input");
-    const original_available = u.exists(c.io, original_input);
+    const original_path = if (invocation.object.get("original_input_resolved")) |path| try u.json.text(path) else original_input;
+    const original_available = u.exists(c.io, original_path);
     // Zig removes temporary frontend IR after delivering the captured object.
     // Only an exact complete capture recorded by its enclosing run may rely on
     // the retained input that the recorded backend command actually consumed.
@@ -94,7 +96,7 @@ pub fn main(init: std.process.Init) !void {
             !u.json.is(try u.get(recorded, "original_input"), original_input)) return error.RecordedCaptureChanged;
     }
     if ((original_available or recorded_capture == null) and
-        !std.mem.eql(u8, try c.digest(original_input), try u.str(input, "sha256"))) return error.InputIdentityChanged;
+        !std.mem.eql(u8, try c.digest(original_path), try u.str(input, "sha256"))) return error.InputIdentityChanged;
     const profile = try c.load(try c.join(&.{ directory, "profile.json" }));
     const analysis = try reports.analyze(c.a, try c.read(try c.join(&.{ directory, "backend.stderr" })));
     try reports.validateSuccess(c.a, analysis, profile, try c.read(try c.join(&.{ directory, "owners.tsv" })));

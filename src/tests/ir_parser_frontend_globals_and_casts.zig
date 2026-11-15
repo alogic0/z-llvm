@@ -732,7 +732,7 @@ test "parser lowers fneg to fsub negative zero" {
     const expected =
         \\define internal x86_fp80 @negate_long_double(x86_fp80 %0) {
         \\entry:
-        \\  %1 = fsub x86_fp80 -0.000000e+00, %0
+        \\  %1 = fsub x86_fp80 0xK80000000000000000000, %0
         \\  ret x86_fp80 %1
         \\}
         \\
@@ -749,7 +749,7 @@ test "parser lowers fneg to fsub negative zero" {
     };
     try std.testing.expectEqual(ir.BinaryOp.fsub, binary.op);
     try std.testing.expect(binary.ty.eql(.x86_fp80));
-    try std.testing.expectEqualStrings("-0.000000e+00", binary.lhs.fp);
+    try std.testing.expectEqualStrings("0xK80000000000000000000", binary.lhs.fp);
     try std.testing.expectEqualStrings("0", binary.rhs.named);
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);

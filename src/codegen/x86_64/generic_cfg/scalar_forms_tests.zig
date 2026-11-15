@@ -354,6 +354,25 @@ test "scalar forms reject unsupported intrinsic envelopes and mismatched duplica
     try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].blocks.items.len);
 }
 
+test "inline memset preserves runtime bytes and live values without widening its extent" {
+    for ([_]u64{ 0, 1, 2, 4, 8, 16, 33, 256 }) |length| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "declare void @llvm.memset.inline.p0.i64(ptr,i8,i64,i1)\ndefine i64 @fill(ptr %out,i8 %byte,i64 %keep) {{\nentry:\n call void @llvm.memset.inline.p0.i64(ptr %out,i8 %byte,i64 {0d},i1 false)\n %wide = zext i8 %byte to i64\n %r = xor i64 %keep,%wide\n %answer = xor i64 %r,{0d}\n ret i64 %answer\n}}\n", .{length});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const code = try executable(module);
+        defer std.posix.munmap(code);
+        const run: *const fn (*u8, u8, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+        for ([_]u8{ 0, 1, 127, 128, 255 }) |byte| {
+            var output: [272]u8 = @splat(0xa7);
+            const keep: u64 = 0xfedcba9876543210;
+            try std.testing.expectEqual(keep ^ byte ^ length, run(&output[7], byte, keep));
+            for (output, 0..) |actual, index| try std.testing.expectEqual(if (index >= 7 and index < 7 + length) byte else @as(u8, 0xa7), actual);
+        }
+    }
+}
+
 test "scalar forms bounded stack memset retains unknown extent and volatile boundaries" {
     const text =
         \\declare void @llvm.memset.p0.i64(ptr, i8, i64, i1)

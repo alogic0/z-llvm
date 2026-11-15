@@ -144,7 +144,8 @@ pub fn lowerCall(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir
         if (std.mem.eql(u8, call.callee, "llvm.ucmp.i32.i128")) return try lowerI128Compare(selector, result, call, false);
         if (std.mem.eql(u8, call.callee, "llvm.scmp.i32.i128")) return try lowerI128Compare(selector, result, call, true);
         if (std.mem.eql(u8, call.callee, "llvm.fshl.i32")) return try lowerFshlI32(selector, result, call);
-        if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64")) return try lowerMemset(selector, result, call);
+        if (std.mem.eql(u8, call.callee, "llvm.memset.p0.i64") or
+            std.mem.eql(u8, call.callee, "llvm.memset.inline.p0.i64")) return try lowerMemset(selector, result, call);
         if (std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
             std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64")) return try lowerInlineMemcpy(selector, result, call);
         if (std.mem.eql(u8, call.callee, "llvm.memmove.p0.p0.i64")) return try lowerInlineMemmove(selector, result, call);
@@ -916,6 +917,8 @@ fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.C
     const fill = call.args.items[1];
     const len = call.args.items[2];
     const vol = call.args.items[3];
+    if (std.mem.eql(u8, call.callee, "llvm.memset.inline.p0.i64") and len.value != .int)
+        return .{ .unsupported_value = "composed-block-memset-inline-length" };
     if (dst.ty != .ptr or !fill.ty.eql(.{ .int = 8 }) or !len.ty.eql(.{ .int = 64 }) or
         !vol.ty.eql(.{ .int = 1 }) or !vol.value.eql(.{ .int = 0 }))
         return .{ .no_emitter = "composed-block-memset-args" };

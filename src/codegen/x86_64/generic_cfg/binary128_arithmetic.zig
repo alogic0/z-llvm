@@ -11,7 +11,7 @@ fn negationSpelling(binary: ir.BinaryInst) bool {
     // The parser currently represents fneg with this synthetic fsub operand.
     // Preserve its exact bitwise fallback rather than introducing FP arithmetic.
     return binary.op == .fsub and binary.lhs == .fp and
-        std.mem.eql(u8, binary.lhs.fp, "-0.000000e+00");
+        fp_semantics.isNegativeZeroLiteral(binary.ty, binary.lhs.fp);
 }
 
 const Builder = struct {

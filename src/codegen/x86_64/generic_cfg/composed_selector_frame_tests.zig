@@ -379,3 +379,29 @@ test "generic cfg selector keeps scalar allocas disjoint from emergency FP spill
         try std.testing.expectEqual(bits, @as(u32, @bitCast(out)));
     }
 }
+
+test "composed selector inline memset shares the existing preservation frame and encoding" {
+    for ([_]u64{ 0, 1, 2, 16, 33, 256 }) |length| {
+        var reference: ?[]u8 = null;
+        defer if (reference) |bytes| std.testing.allocator.free(bytes);
+        for ([_][]const u8{ "", ".inline" }) |suffix| {
+            const text = try std.fmt.allocPrint(std.testing.allocator, "declare void @llvm.memset.p0.i64(ptr,i8,i64,i1 immarg)\ndeclare void @llvm.memset.inline.p0.i64(ptr,i8,i64 immarg,i1 immarg)\ndefine i64 @fill(ptr %dst,i8 zeroext %byte,i64 %keep) {{\nentry:\n call void @llvm.memset{s}.p0.i64(ptr %dst,i8 %byte,i64 {d},i1 false)\n ret i64 %keep\n}}\n", .{ suffix, length });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            var machine = MachineFunction.init("fill", .{ .int = 64 });
+            defer machine.deinit(std.testing.allocator);
+            const result = try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]);
+            if (result == .unsupported) std.debug.print("inline frame: {s}\n", .{result.unsupported.detail()});
+            try std.testing.expectEqual(impl.SelectionResult.selected, result);
+            try x86_64_verify.verifyFunction(machine);
+            const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+            defer std.testing.allocator.free(bytes);
+            if (reference) |expected_bytes|
+                try std.testing.expectEqualSlices(u8, expected_bytes, bytes)
+            else
+                reference = try std.testing.allocator.dupe(u8, bytes);
+        }
+    }
+}

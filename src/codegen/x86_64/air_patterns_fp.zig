@@ -187,7 +187,7 @@ pub fn matchesExtendedNegReturn(
         else => return false,
     };
     if (fsub.op != .fsub or !fsub.ty.eql(ty)) return false;
-    if (!isFpText(fsub.lhs, "-0.000000e+00")) return false;
+    if (fsub.lhs != .fp or !@import("../../analysis/fp_semantics.zig").isNegativeZeroLiteral(ty, fsub.lhs.fp)) return false;
     if (!isNamed(fsub.rhs, function.params.items[0].name)) return false;
 
     return true;

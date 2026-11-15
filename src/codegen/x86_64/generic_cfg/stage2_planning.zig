@@ -693,6 +693,7 @@ fn callRequiresPreservationFrame(call: ir.CallInst) bool {
     if (call.isDebugVariableLocation()) return false;
     if (!std.mem.startsWith(u8, call.callee, "llvm.")) return true;
     return std.mem.eql(u8, call.callee, "llvm.memset.p0.i64") or
+        std.mem.eql(u8, call.callee, "llvm.memset.inline.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.memcpy.p0.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.memcpy.inline.p0.p0.i64") or
         std.mem.eql(u8, call.callee, "llvm.abs.i32") or

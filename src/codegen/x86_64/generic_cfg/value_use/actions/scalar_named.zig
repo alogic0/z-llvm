@@ -131,18 +131,27 @@ pub fn executeNamedScalarBinary(
             try failNamedForTest(transaction, .after_second_operand_staging);
         },
         .b03_narrow_multiply => {
+            // Multiplication is commutative. Consume the already prepared
+            // accumulator operand first so preparation cannot expire an
+            // unstaged RHS. The original LHS request still owns the action
+            // and its result; no new resolution or dispatch bypass is needed.
+            const commute = bits == 32 and
+                !locIsAccumulator(transaction.prepared_views[lhs_index].canonical_source_loc) and
+                locIsAccumulator(transaction.prepared_views[rhs_index].canonical_source_loc);
+            const accumulator_index = if (commute) rhs_index else lhs_index;
+            const staged_index = if (commute) lhs_index else rhs_index;
             try prepareNamedAccumulator(
                 Authority,
                 transaction,
-                lhs_index,
+                accumulator_index,
                 session,
-                try displacementForPlan(Authority, transaction, lhs_index, plan),
+                try displacementForPlan(Authority, transaction, accumulator_index, plan),
             );
             try failNamedForTest(transaction, .after_accumulator_preparation);
-            try validateNamedSource(Authority, transaction, rhs_index, bits);
-            try stageNamedSource(Authority, transaction, rhs_index, .rcx, bits);
+            try validateNamedSource(Authority, transaction, staged_index, bits);
+            try stageNamedSource(Authority, transaction, staged_index, .rcx, bits);
             try failNamedForTest(transaction, .after_first_operand_staging);
-            try materializeNamedAccumulator(Authority, transaction, lhs_index, session, bits);
+            try materializeNamedAccumulator(Authority, transaction, accumulator_index, session, bits);
             try failNamedForTest(transaction, .after_second_operand_staging);
         },
         .b07_general_binary => unreachable,

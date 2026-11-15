@@ -348,6 +348,64 @@ test "value-use named scalar B03 prepares before rhs staging" {
     }, machine.instructions.items);
 }
 
+test "value-use named scalar B03 consumes a prepared accumulator rhs and rolls back" {
+    const boundaries = [_]?Transaction.NamedScalarTestFailure{
+        null,                          .after_accumulator_preparation, .after_first_operand_staging,
+        .after_second_operand_staging, .after_first_arithmetic_write,  .after_result_identity_ownership,
+        .after_result_definition,
+    };
+    for ([_]ValueLoc{ .{ .scratch32 = .rdi }, .{ .spill64 = .slot2 } }) |left| {
+        for ([_]ValueLoc{ .eax, .rax }) |right| for (boundaries) |failure| {
+            var machine = MachineFunction.init("b03-prepared-rhs", .{ .int = 32 });
+            defer machine.deinit(std.testing.allocator);
+            var plan = SelectorAllocationPlan.init(std.testing.allocator);
+            defer plan.deinit();
+            try support.addAtCurrent(&plan, "lhs");
+            try support.addAtCurrent(&plan, "rhs");
+            try plan.interval_ends.put("result", 2);
+            var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+            defer selector.deinit();
+            selector.allocation_plan = &plan;
+            selector.current_position = 1;
+            selector.stack_frame_bytes = 128;
+            try selector_state.bindValueLoc(&selector, "lhs", left);
+            try selector_state.bindValueLoc(&selector, "rhs", right);
+            {
+                var transaction = try Transaction.begin(&selector);
+                defer transaction.deinit();
+                transaction.named_scalar_test_failure = failure;
+                const lhs = try registerNamedAction(&transaction, "lhs", "rhs", .mul, 32);
+                try transaction.seal();
+                try transaction.prepare();
+                try transaction.materializeAll();
+                if (failure != null) {
+                    try std.testing.expectError(error.ValueUseNamedScalarTestFailure, transaction.executePreparedAction(try transaction.preparedView(lhs)));
+                } else {
+                    try transaction.executePreparedAction(try transaction.preparedView(lhs));
+                    try transaction.commit();
+                }
+            }
+            if (failure != null) {
+                try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+                try std.testing.expectEqual(left, selector_state.valueLoc(&selector, "lhs").?);
+                try std.testing.expectEqual(right, selector_state.valueLoc(&selector, "rhs").?);
+                try std.testing.expect(selector_state.valueLoc(&selector, "result") == null);
+                try std.testing.expectEqual(@as(usize, 0), selector.eflags_semantics.items.len);
+            } else {
+                try std.testing.expectEqualSlices(machine_module.Instruction, &.{
+                    if (left == .spill64)
+                        .{ .reload_arg_rsp = .{ .reg = .rcx, .frame_index = .slot2 } }
+                    else
+                        .{ .mov_arg_arg = .{ .dst = .rcx, .src = .rdi } },
+                    .{ .imul_eax_arg32 = .rcx },
+                }, machine.instructions.items);
+                try std.testing.expectEqual(ValueLoc.eax, selector_state.valueLoc(&selector, "result").?);
+                try std.testing.expectEqual(@as(usize, 1), selector.eflags_semantics.items.len);
+            }
+        };
+    }
+}
+
 test "value-use named scalar B07 preserves accepted accumulator topology branches" {
     inline for (.{
         .{
