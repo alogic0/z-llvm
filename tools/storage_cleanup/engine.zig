@@ -36,7 +36,7 @@ pub const Action = struct {
     path: []const u8,
     run_root: []const u8,
     producer: []const u8,
-    kind: enum { cache, temporary_workspace, raw_trace, build_output, generated_assembly, log },
+    kind: enum { cache, temporary_workspace, raw_trace, build_output, generated_assembly, log, record_detail },
     status: enum { discovered, ready, skipped, removed, absent } = .discovered,
     reason: ?[]const u8 = null,
     metadata: ?fa.Metadata = null,
@@ -53,6 +53,7 @@ pub const Action = struct {
     released_cache: bool = false,
     reviewed_shared_cache: bool = false,
     reviewed_build_output: bool = false,
+    reviewed_record: bool = false,
     shared_input: bool = false,
     workspace_release: ?[]const u8 = null,
     retired_compiler: ?Evidence = null,
@@ -89,6 +90,7 @@ pub const Engine = struct {
     pin_index: ?*PinIndex = null,
     pin_hash: ?[]const u8 = null,
     pin_reference: ?[]const u8 = null,
+    pin_resolved_target: ?[]const u8 = null,
     git_sources: std.StringHashMap(std.StringHashMap([]const u8)),
     libraries: std.ArrayList(historical.Library) = .empty,
     pin_references: std.ArrayList(PinReference) = .empty,
@@ -204,6 +206,15 @@ pub const Engine = struct {
         if (kind == .temporary_workspace) {
             if (!@import("../validation/storage_paths.zig").validTemporary(path) or !p.candidate(run)) return error.InvalidCandidateScope;
         } else if (!p.candidate(path) and !(kind == .build_output and p.validationOutput(path))) return error.InvalidCandidateScope;
+        return e.addScoped(path, run, producer, kind, sha);
+    }
+    /// Explicit cache review also covers legacy suite-level cache roots. Keep
+    /// ordinary discovery's deeper scope unchanged and retain overlap checks.
+    pub fn addReviewedCache(e: *Engine, path: []const u8, run: []const u8, producer: []const u8) !usize {
+        if (!@import("reviewed_products.zig").cacheScope(path) or !p.validationRun(run) or !p.within(run, path)) return error.InvalidCandidateScope;
+        return e.addScoped(path, run, producer, .cache, null);
+    }
+    fn addScoped(e: *Engine, path: []const u8, run: []const u8, producer: []const u8, kind: @FieldType(Action, "kind"), sha: ?[]const u8) !usize {
         for (e.actions.items, 0..) |*old, index| if (p.overlaps(path, old.path)) {
             if (std.mem.eql(u8, path, old.path) and std.mem.eql(u8, producer, old.producer) and kind == old.kind) return index;
             old.status = .skipped;
@@ -361,6 +372,9 @@ pub const Engine = struct {
         }
     }
     fn pinResolved(e: *Engine, path: []const u8, source: []const u8) !void {
+        const previous_target = e.pin_resolved_target;
+        e.pin_resolved_target = path;
+        defer e.pin_resolved_target = previous_target;
         if (e.pin_index) |index| {
             if (index.ancestors.get(path)) |children| {
                 for (children.items) |i| try e.markPinned(i, source);
@@ -402,8 +416,11 @@ pub const Engine = struct {
         const sha = e.pin_hash orelse return false;
         const reference = e.pin_reference orelse return false;
         for (a.retired_pins) |r| {
+            const exact_member = a.kind == .cache and a.reviewed_shared_cache and
+                p.within(a.path, r.target.path) and !std.mem.eql(u8, a.path, r.target.path) and
+                std.mem.eql(u8, e.pin_resolved_target orelse "", r.target.path);
             if (std.mem.eql(u8, manifest, r.manifest.path) and std.mem.eql(u8, reference, r.reference) and
-                std.mem.eql(u8, a.path, r.target.path) and std.ascii.eqlIgnoreCase(sha, r.target.sha256)) return true;
+                (std.mem.eql(u8, a.path, r.target.path) or exact_member) and std.ascii.eqlIgnoreCase(sha, r.target.sha256)) return true;
         }
         return false;
     }
@@ -754,17 +771,28 @@ pub const Engine = struct {
     pub fn consumers(e: *Engine) !void {
         const listing = try e.c.capture(&.{ "lsof", "-nP", "-u", try e.c.fmt("{d}", .{std.os.linux.getuid()}), "-Fn" });
         const processes = try e.c.capture(&.{ "ps", "-eo", "pid,args" });
+        // Many evidence files share one consumer boundary. Reuse only within
+        // this freshly captured snapshot; a later refresh starts with no cache.
+        var observed = std.StringHashMap(bool).init(e.c.gpa);
+        defer observed.deinit();
         for (e.actions.items) |*a| {
             if (a.status == .removed or a.status == .absent or a.status == .skipped) continue;
             const consumer_root = @import("generated.zig").consumerRoot(a.run_root);
-            const absolute_run = try e.absolute(consumer_root);
-            var busy = commandUsesRun(processes, consumer_root, std.os.linux.getpid());
-            const temporary = if (a.kind == .temporary_workspace) try e.absolute(a.path) else absolute_run;
-            if (a.kind == .temporary_workspace and commandUsesRun(processes, a.path, std.os.linux.getpid())) busy = true;
-            var lines = std.mem.tokenizeScalar(u8, listing, '\n');
-            while (lines.next()) |line| if (line.len > 1 and line[0] == 'n' and (p.within(absolute_run, line[1..]) or p.within(temporary, line[1..]))) {
-                busy = true;
-                break;
+            const temporary_root = if (a.kind == .temporary_workspace) a.path else consumer_root;
+            const key = try std.fmt.allocPrint(e.c.gpa, "{s}\n{s}", .{ consumer_root, temporary_root });
+            defer e.c.gpa.free(key);
+            const busy = observed.get(key) orelse blk: {
+                const absolute_run = try e.absolute(consumer_root);
+                const temporary = try e.absolute(temporary_root);
+                var used = commandUsesRun(processes, consumer_root, std.os.linux.getpid());
+                if (a.kind == .temporary_workspace and commandUsesRun(processes, a.path, std.os.linux.getpid())) used = true;
+                var lines = std.mem.tokenizeScalar(u8, listing, '\n');
+                while (lines.next()) |line| if (line.len > 1 and line[0] == 'n' and (p.within(absolute_run, line[1..]) or p.within(temporary, line[1..]))) {
+                    used = true;
+                    break;
+                };
+                try observed.put(try e.c.a.dupe(u8, key), used);
+                break :blk used;
             };
             if (busy) {
                 a.status = .skipped;
@@ -1035,6 +1063,10 @@ pub const Engine = struct {
         var kept: std.ArrayList(Evidence) = .empty;
         if (a.reviewed_build_output) {
             if (a.kind != .build_output or !@import("reviewed_products.zig").scope(a.path) or a.retained.len < 2) return error.InvalidReviewedProduct;
+            for (a.retained) |ev| try e.keep(&kept, ev.path, ev.sha256);
+            a.replay_required = false;
+        } else if (a.reviewed_record) {
+            try @import("reviewed_records.zig").verifyFile(e, a.*);
             for (a.retained) |ev| try e.keep(&kept, ev.path, ev.sha256);
             a.replay_required = false;
         } else if (a.kind == .temporary_workspace) {

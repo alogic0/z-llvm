@@ -53,8 +53,9 @@ pub fn verify(e: *core.Engine, a: core.Action, r: p.Release, producer: u.Value, 
         return;
     }
     if (a.kind != .generated_assembly or !same(std.fs.path.basename(a.path), "linked-harness.s") or
-        !core.eq(producer, "schema", "execution-breadth-controls-v2") or
-        !same(std.fs.path.basename(r.run_root), "execution-breadth-controls")) return error.UnboundGeneratedAssembly;
+        !core.eq(producer, "schema", "execution-breadth-controls-v2")) return error.UnboundGeneratedAssembly;
+    // The runner accepts a caller-selected output root. Its report, layout and
+    // exact successful producer/consumer commands establish ownership.
     const directory = std.fs.path.dirname(a.path).?;
     const mode_dir = std.fs.path.dirname(directory) orelse return error.UnboundGeneratedAssembly;
     if (!same(std.fs.path.dirname(mode_dir) orelse "", r.run_root)) return error.UnboundGeneratedAssembly;

@@ -1,0 +1,428 @@
+{
+  "schema": "zllvm-continued-storage-resolution-v1",
+  "status": "complete",
+  "date": "2026-11-15",
+  "source_parent": "50abc82ef61bbfced95e3c4373e409f8591b0920",
+  "evidence_root": "local-state/storage-cleanup/resolve-all-20261114",
+  "scope": "Resolve the remaining reviewed temporary products, trace dispositions, historical holds, duplicate evidence and obsolete survey payloads; preserve original results and current reproduction contracts",
+  "inventory": {
+    "before": {
+      "allocated_bytes": 78136582144,
+      "required_by_current_contract_bytes": 23542153216,
+      "unresolved_bytes": 54594428928
+    },
+    "after": {
+      "allocated_bytes": 37171838976,
+      "required_by_current_contract_bytes": 7423053824,
+      "eligible_bytes": 0,
+      "unresolved_bytes": 29748785152,
+      "paths": 1709552,
+      "unique_inodes": 1318027,
+      "foreign_device_entries": 0,
+      "vanished_entries": 0
+    },
+    "observed_net_reduction_bytes": 40964743168,
+    "accounting": "Physical allocation deduplicates device/inode pairs. The difference includes this audit, retained snapshots and all task-created scratch; gross scratch-removal receipts are not added to it. The earlier completed pass is excluded. Native inventory writes its report after observation, so later audit bookkeeping is outside that observation boundary.",
+    "classification": "The native unresolved category still includes historical inputs, source, results and proof records with the separately reviewed purposes below. It is not relabeled as currently required."
+  },
+  "retained_purpose_ledger": "docs/evidence/local_state_purpose_20261114.md",
+  "decisions": {
+    "obsolete_run_holds_closed": 498,
+    "broad_legacy_holds_closed": 26,
+    "reviewed_private_caches_retired": 160,
+    "generated_assembly_files_retired": 112,
+    "accepted_partial_link_controls_retired": 21,
+    "additional_individually_reviewed_partial_products_retired": 49,
+    "ignored_worktree_products_retired": 687,
+    "idle_cache_roots_retired": 7,
+    "superseded_full_survey_payloads_retired": 6,
+    "ordinary_compiled_products": "Completed native and administrative receipts cover superseded compiler, test, object and binary-stdout products, including complete alias groups and exact historical-pin transitions.",
+    "event_streams": "Complete semantic audits or honest interrupted-prefix diagnoses bind the original producer outcomes, inputs and retained successor evidence. Intentional raw-event fixtures remain.",
+    "archive_policy": "Selected expanded diagnostics and unreferenced aggregate observations retain complete verified gzip content, original metadata and both SHA-256 identities. Referenced per-file proofs and applied plans remain directly readable."
+  },
+  "small_immutable_evidence": {
+    "collection": {
+      "plans": 18,
+      "paths": 285274,
+      "groups": 285274,
+      "removed_allocated_file_bytes": 3133931520,
+      "created_object_allocated_bytes": 35688448,
+      "net_reclaimed_bytes": 3098243072
+    },
+    "alias_verification": {
+      "expected_paths": 282199,
+      "observed_paths": 282199,
+      "mismatches": 0
+    },
+    "remaining_held_paths": [
+      {
+        "reason": "protected by hold: local-state/validations/validation-performance-20261109/alternate-source",
+        "paths": 3054
+      },
+      {
+        "reason": "protected by hold: local-state/validations/quoted-symbols-cleanup-20261108",
+        "paths": 13
+      },
+      {
+        "reason": "protected by hold: local-state/validations/candidate-facts-20261103",
+        "paths": 3
+      },
+      {
+        "reason": "protected by hold: local-state/validations/selection-cleanup-20261107",
+        "paths": 3
+      },
+      {
+        "reason": "protected by hold: local-state/validations/whole-compiler-20261107/attempt-4/captures/3276317",
+        "paths": 1
+      },
+      {
+        "reason": "protected by hold: local-state/validations/export-execution-20261102-r2",
+        "paths": 1
+      }
+    ],
+    "scope_exclusions": "Two loose original documentation logs are outside named validation-run scope and remain unchanged."
+  },
+  "qualification": {
+    "collector_tests_per_mode": 230,
+    "event_auditor_tests_per_mode": 18,
+    "interrupted_stream_diagnosis_tests_per_mode": 13,
+    "modes": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "artifact_store_releasefast_tests": 11,
+    "installed_optimization": "ReleaseFast",
+    "final_installed_general_cli_passed": true,
+    "final_installed_reviewed_products_cli_passed": true,
+    "documentation_checks_passed": true,
+    "qualified_collector_sources_unchanged": true,
+    "failed_attempts": "Original failed receipts remain; diagnosis and subsequent qualifications are recorded separately."
+  },
+  "task_storage": {
+    "managed_qualification_workspaces_collected": 50,
+    "evidence_promoted_and_verified": true,
+    "isolated_bootstrap_removed": true,
+    "preliminary_metadata_snapshot_payload_retired": true,
+    "current_compact_snapshot_retained": true,
+    "pending_transaction": false
+  },
+  "final_integrity": {
+    "schema": "zllvm-final-storage-integrity-v1",
+    "status": "passed",
+    "current_contracts_verified": 6,
+    "original_retired_manifests_unchanged": 12,
+    "independent_manual_holds_unchanged": 17,
+    "managed_jobs_finished": 34,
+    "all_canonical_object_hashes_verified": 8256,
+    "artifact_manifests_verified": true,
+    "shared_alias_mapping_verified": true,
+    "source_worktree_states_preserved": true,
+    "retained_failure_records_verified": true,
+    "installed_tools_match": true,
+    "collector_sources_match": true,
+    "promoted_qualification_evidence_verified": true,
+    "task_scratch_absent": true,
+    "pending_transactions": 0,
+    "quarantines": 0
+  },
+  "remaining_contracts": {
+    "current_checksum_manifests": 6,
+    "independent_manual_holds": 17,
+    "current_throughput_workspaces": 7,
+    "workspace_consumers": "Three compiler identities and four captured object workspaces support the current throughput audit/replay contract; release after an accepted replacement and workspace release.",
+    "other_retained_families": [
+      "accepted AIR exports and captured LLVM inputs",
+      "original results, profiles, command ledgers and diagnostics",
+      "saved case sources and source worktrees",
+      "ABI object fixtures and immutable store contents",
+      "per-file retirement proofs and applied plans",
+      "installed maintenance tools"
+    ]
+  },
+  "evidence": [
+    {
+      "path": "docs/evidence/artifacts/retained-validations-20261114-minimal.json",
+      "sha256": "44982c7f66158d296edc300418223f41e152bb6ba86d3ad79a1b2f155de8cc7a"
+    },
+    {
+      "path": "docs/evidence/local_state_purpose_20261114.md",
+      "sha256": "60379618095bf01646384113ed77edc7689c86be171b1492205610f55bbd58ff"
+    },
+    {
+      "path": "docs/evidence/tmp_retention_pins.tsv",
+      "sha256": "8ce4c4e85db552fee5d08b1486c399c8a39e6571bb939ce83f03d2bb275cabc5"
+    },
+    {
+      "path": "docs/storage_cleanup_policy.json",
+      "sha256": "dc10d7854a173ac8ce1ea7db4d3325474b9ff59c2a565afab1f2295e49edc2b2"
+    },
+    {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794693597024750224-2403338/inventory.json",
+      "sha256": "ddbd84156c3ef880620c55f871eb6ca991f53e1a8fbb421c826e931216dd346d"
+    },
+    {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794725482957972274-3324918/inventory.json",
+      "sha256": "e65ab3f6304b806b9caf51101b98f9b832e162f636c0437877f700dbb486d6d5"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/additional-expanded-archives/archives.ndjson",
+      "sha256": "379c200ee7143133facae6fb1345d5dcd6b1ee536c15402e6d277bc7bd2e35d2"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/additional-expanded-archives/result.json",
+      "sha256": "4afebac102294634574b83c1b60e82a936ac0d76802a9fe1f7c3667eb3dc4385"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/administrative-tail/result.json",
+      "sha256": "7c1a0424e3fd08532bbf78b8a0d2a3ff85e386288633de4d1efabae1e20e2c42"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/all-products/collections.ndjson",
+      "sha256": "61c2af86d7fef2f1bca3b89c86e5a964560cb62997d6d87f86ec8c718e24745e"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/archive-result.json",
+      "sha256": "d4cd321f43b0efeb853b574c8ca81fb97788255d6eaf356f5378ccf2df8ec02f"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/cache-contracts/result.json",
+      "sha256": "dc082d67b6a6847902e5a326615f70dd6dcaf135da1a0efbf0fe42c10f268326"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/compacted-staging/archives.ndjson",
+      "sha256": "2564a3c6ab11cafb6ad8e1c23cd9d88a46a96c3b519eb967110acd4cade37918"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/compacted-staging/result.json",
+      "sha256": "6f8304b38432a2dd0e8cb9629b402cfa7a163697dd211dcc8508058737bfd8bc"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/compacted-views/archives.ndjson",
+      "sha256": "1095faf4c451d16c035f0a928c563abf2ca05d590c6d0033b0470fc2701dd174"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/compacted-views/result.json",
+      "sha256": "50d7756fd08a31060d293d34d1e236c93794df556e4f7a3a04832681315fbc85"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/compiled-store-aliases/result.json",
+      "sha256": "f78d45bfeac7ab3c3a1fd65abbbfc4c435649a266ab4ffa4d64d81cc20b8186c"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/completed-cycle-holds-result.json",
+      "sha256": "3b03e76d07a59f627c1b56b389a52b03356f34cf0a87d217c0dedfbe07f87045"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/current-contracts/result.json",
+      "sha256": "27c31309dd8190ea7c4d67de934f27289a2532d72b4d2060867fe45b6294a70e"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/evidence-collections-v2.ndjson",
+      "sha256": "52990eaa40cb88d7eb2bf134f12222d246e7528bd0d783dfe8be663d94c6de43"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-cli-bootstrap-closure/result.json",
+      "sha256": "f9ec69dacb9bbf55e975367ea8e4e647e2e17ff3a4846b3e57198146f9e6e2a2"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-compaction/archives.ndjson",
+      "sha256": "b0069fab387f5ad0ca731b705bbe4474c49719545aeefa1881652189ff90db3f"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-compaction/result.json",
+      "sha256": "d4d1a72d70e4dcf3537a3b560a6ef1c5b1ce1b256ba74748716d07ce20b027e8"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-contracts/result.json",
+      "sha256": "8c01b317f6bd47f335f39696031cdb24326c76c28121f9756c2ab1518debde3b"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-integrity/all-object-identities.txt.gz",
+      "sha256": "f2cbcde143b1835e8825adb5bf06145773d0406d32e79e6e84b825834fcdf871"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-integrity/artifact-manifests.log",
+      "sha256": "e8586851043012f7df59a7f8e7d39e576be7213ce6cab2f6cce68ba287f90501"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-integrity/current-identities.txt",
+      "sha256": "3b964d175544480daee5901eb5a8ef717b94acaa698e24105de43b0ed22c6ae0"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-integrity/final-control-identities.txt",
+      "sha256": "f75f975baa0d8c022495ca7414444fc3ce9ddfa5153f37311015a1512357ebfd"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-integrity/result.json",
+      "sha256": "c0ec8f75e74cc2c7ef46710815f0e14cbd9df1ac873b9e1d2e7b83eef3b80b7b"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-native-collections.ndjson",
+      "sha256": "40a24cecd5714630ee2afac349b79c1df79c3684d0aa33845f77a6c22c29803c"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-product-pins/collections.ndjson",
+      "sha256": "30eecf41a47f19e59ed79ed40932a656a7426773b6ec495d15faca4a8181510e"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-products/collections.ndjson",
+      "sha256": "c06e937120135aa15bed3949a06d6895dc797743978392945b55954d9a0e207a"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-snapshot-pre/payload-retirement.json",
+      "sha256": "7a7b2281ec0e81574f9c0aee3176095749db9700f403eb89acd3529dede498d1"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-snapshot/counts.json",
+      "sha256": "6c955acef43a89e6f2ac86d36730b128eb1171e50a21528568e5aacc1bfdfe1f"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-snapshot/files.tsv.gz",
+      "sha256": "eac039533f7969bf8a03c4b3f7447026eb163c45cc0e777a138fe47ce96a3997"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/final-snapshot/format.md",
+      "sha256": "4a1ffc9667de34841afb742db09a646df32827a9c02d3c3dc5ff9231022820c3"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/fp-bitcast/result.json",
+      "sha256": "1a79758343d6f09264a3bbd2ca5ebe9d4e1fd6f6dca112427986a9a19d36695d"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/generated-collector-qualified-sources.txt",
+      "sha256": "e5a185f68edebfb93c6479201f66dc1a3bafdb20720fa6d41f3fa0d2f8f42a16"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/generated-collector-qualified.patch",
+      "sha256": "b0d1fb1cd8939ff128547a65b561caa9c6432a7f2516d14171f4ff93614aa18b"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/generated-contract/result.json",
+      "sha256": "27f8785700f474bfdf8b56c5e212f6fc2cc48d246c80026ded0099937e50b39a"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/input-collections.ndjson",
+      "sha256": "eb7ab012bab3fd8ee0ee7d283abad40251ea96795c22a04fa7cd0710e7805470"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/installed-generated-collector.txt",
+      "sha256": "06d4aaba55ebfff874eff9ccd1fdde6ef5eec56ab7a985a9646a0eb3568a2595"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/installed-helper-identities.txt",
+      "sha256": "006c94534f002ca2a632080aaaf7e478144c7f8098e8d0863ac08b0baca0ef64"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/latest-promoted-qualification-identities.txt",
+      "sha256": "c2fb51824785c9789aee160ae63434cab919d0c36a8450b80304865462de0d8f"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/legacy-build-products/result.json",
+      "sha256": "94776a1c51373a52734590216722bdcad4754231eff0d48c594d89f5809ecc20"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/legacy-holds/result.json",
+      "sha256": "c0ae24e1e7368b629aeb1ccdb57d5254fef793059ae576de4e8ddd4549914577"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/missing-compiler-alias/result.json",
+      "sha256": "5cd14d698d6f85e31f21abc5a2cc23966449c0287d96771ccfd6779c8b60c82a"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/owner-bootstrap-closure/result.json",
+      "sha256": "ac3b7e0a3ea3e67e87f536069a9b882587f53584164f81af2439f94971a8c3d9"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-disposition.md",
+      "sha256": "5ae9f7f598ae1575e05df762d870abb7ab33891c47cbc211f7dcf7e0b5721bf0"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/artifact-store/qualification.json",
+      "sha256": "e2a0d45b22cc5a7b63ef5d57dde0a146d00355ed9f254c1070644a51224432bc"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/direct-traces-v2/qualification.json",
+      "sha256": "eace338f6351ab3809c3fee94d30bb05f39dd1d6b3529406ea3a2894f402c2a3"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/event-diagnosis/qualification.json",
+      "sha256": "4ca2f37cca014e5b4792cb99f4621a8b990bd12a4dbbdaa263f264ab3ba267c3"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/final-installed-cli/cli.log",
+      "sha256": "16abf522c71d95872823dfc498f6d9deae81e11552719c3b757997b6f0e73f10"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/final-installed-cli/docs.log",
+      "sha256": "fcdf80d1d75ff32f61d3ce5ff7defe36c51efaa000ce3c879b5383cd2772655a"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/final-installed-cli/qualification.json",
+      "sha256": "58754567e4c226c4fa56edef267bb61323b4033b4525345dc49c79523d41aaaf"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/final-installed-cli/reviewed-products-cli.log",
+      "sha256": "ba2ea885f695d337d4e9f444718a8643c770fef7522119933c1af797d439279d"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/qualification-storage/validations/collector/batch-01/shallow-generated-release/qualification.json",
+      "sha256": "69636a68e33f0821dd3e7e9feeee12c80749e9eeb42a6e77b063864b7720192a"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/quoted-prevalidation/result.json",
+      "sha256": "355a6ac8d5fa7e4ff5708cc488f943b0d0ed85880e3a32009d5e47a7af40e6cf"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/ready-plans-collections.ndjson",
+      "sha256": "07ba99d615f917425713b62d79526441fe2ea050c1b91ed37e11d8027494c859"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/remaining-alias-products/result.json",
+      "sha256": "54fd0d2d5f84bd76613ae217462d8e36884a886f21f5ceae66a9cb126d0d19c5"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/residual-assembly-archives/archives.ndjson",
+      "sha256": "763a3d4df31dd515278c6df2af7765ddcc6312035983cb6dfa5c10b24bded760"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/residual-assembly-archives/result.json",
+      "sha256": "8912e846d26e2c0724f1698476e79e52fd212181445ae5fd4e967a5f3af54415"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/shallow-tools/result.json",
+      "sha256": "75016a8c6397ce5692b5735efbb24c638858fe8682741cf87d5f577de8c2b565"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/small-evidence/alias-verification.json",
+      "sha256": "2ba90b4ef6afe45a46d62dc1d8220be738bee17b14f601e2001f75b59c14232f"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/small-evidence/collections.ndjson",
+      "sha256": "8d46635d42aa158e3ba9e1f7211b2ff9cfa1a41dcc5e293fe8ae765d56bc9bbd"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/small-evidence/held-reasons.json",
+      "sha256": "1d99de5ee14e61c22dcb9672f3964898d89f56de81181d1643fd8869224569e3"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/small-evidence/summary.json",
+      "sha256": "551faeeec2e96c36b1832bfcd479b02da66a34cb2b0d9f29e6c541c77a44def1"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/source-parent.txt",
+      "sha256": "b42081f8c129418a52bc40cd257aac222341bc4fd6be11dd83c0b7953de529a8"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/stale-frontier-seal/result.json",
+      "sha256": "4d9d17b7280df14d207b763cc1b2271f14a71aa23bd2dd38a6771bfafe49d355"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/superseded-surveys/result.json",
+      "sha256": "8c58e931bd8c5ec707585d276c64d2834841af83f202038ffe42dd0c4c496cfb"
+    },
+    {
+      "path": "local-state/storage-cleanup/resolve-all-20261114/two-cache-holds/result.json",
+      "sha256": "4184177ab043ca5ae619af80acf06106049799cb5360c8c3b995f146647c620c"
+    }
+  ]
+}

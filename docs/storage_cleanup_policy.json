@@ -6,12 +6,12 @@
   "max_reclaim_bytes": 34359738368,
   "cache_evidence": "closed_producer",
   "current_manifests": [
-    "local-state/validations/compiler-selection-completion-20261108/batch-30/accepted-artifacts.sha256",
+    "local-state/validations/compiler-selection-completion-20261108/batch-30/maintained-artifacts-inputs-results-20261114.sha256",
     "local-state/validations/compiler-selection-completion-20261108/batch-30/frozen-contracts-v3.sha256",
     "local-state/validations/compiler-selection-completion-20261108/batch-05/scratch.sha256",
     "local-state/validations/compiler-selection-completion-20261108/batch-12/air-pins-v12.sha256",
     "local-state/validations/compiler-object-completion-20261111/batch-01/pinned-upstream-providers-v7.sha256",
-    "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-storage-20261114.sha256"
+    "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-minimal-20261114.sha256"
   ],
   "protected_paths": [
     "local-state/caches",
@@ -38,6 +38,42 @@
     {
       "path": "local-state/validations/compiler-throughput-20261114/batch-01/accepted-artifacts.sha256",
       "sha256": "184a43fc349af600d3beda1c086ee26c1f99c85903da696675835642f987e0de"
+    },
+    {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-30/accepted-artifacts.sha256",
+      "sha256": "3654d8c83dc44959da31595592ec03365ec3f5e5cdb18fa5adf84bd460ae0383"
+    },
+    {
+      "path": "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-storage-20261114.sha256",
+      "sha256": "e9ac9b30c424b4cd84f9bb19194ba13600936006692440dff90eb690e6092470"
+    },
+    {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-30/maintained-artifacts-minimal-20261114.sha256",
+      "sha256": "7c082408d3a56a58d430e3dc17795f8fa52e91ba411e06641619691c191a1156"
+    },
+    {
+      "path": "local-state/validations/execution-breadth-20261106/shared-frontier-identities.sha256",
+      "sha256": "70f8efe9780b266b181128a63e967da180c7a6537200fdb40bed63d7b85d95c5"
+    },
+    {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-30/maintained-artifacts-final-20261114.sha256",
+      "sha256": "1492a1fae69bc1ca632e6a05c04d492e12b97358ec1485756b1d14acd8eb4059"
+    },
+    {
+      "path": "local-state/validations/allocation-memory-20261107/fp-bitcast.sha256",
+      "sha256": "98ce624272f88d498d01e2b877dd6bedb96e2ca2a1961cc0fda43228b2d48f0f"
+    },
+    {
+      "path": "local-state/validations/quoted-symbols-20261108/prevalidation/compilers.sha256",
+      "sha256": "957007e557f9b3fdcbb40adb3033f989223079926d760671471fd1a12b882a4d"
+    },
+    {
+      "path": "local-state/validations/quoted-symbols-20261108/prevalidation/census-comparison.sha256",
+      "sha256": "91402fe078fa4c42cb775a017883cce0007338c6afcb1106ea22bb6b82671dd9"
+    },
+    {
+      "path": "local-state/validations/compiler-selection-completion-20261108/batch-30/maintained-artifacts-evidence-20261114.sha256",
+      "sha256": "4ac0784f08b9d560e85a9307bd19d1630b06fc2e9a416f939c6fc3b2a5993003"
     }
   ],
   "holds_file": "local-state/storage-cleanup/holds.json"

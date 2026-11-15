@@ -39,6 +39,7 @@ const usage =
     \\       tools/clean-storage narrow-cache-holds --roots FILE --reason TEXT [--apply]
     \\       tools/clean-storage retire-held-products --review PLAN [--minimal] [--apply]
     \\       tools/clean-storage retire-reviewed-products --review PLAN [--minimal] [--apply]
+    \\       tools/clean-storage retire-reviewed-records --review PLAN [--minimal] [--apply]
     \\       tools/clean-storage prepare-pins --requests FILE --review FILE
     \\       tools/clean-storage [--apply] --requests FILE
     \\
@@ -93,6 +94,7 @@ pub fn main(init: std.process.Init) !void {
     const narrow_cache_holds = args.len > 1 and std.mem.eql(u8, args[1], "narrow-cache-holds");
     const retire_held_products = args.len > 1 and std.mem.eql(u8, args[1], "retire-held-products");
     const retire_reviewed_products = args.len > 1 and std.mem.eql(u8, args[1], "retire-reviewed-products");
+    const retire_reviewed_records = args.len > 1 and std.mem.eql(u8, args[1], "retire-reviewed-records");
     const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
     var requests_path: ?[]const u8 = null;
     var builds_path: ?[]const u8 = null;
@@ -110,7 +112,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy or narrow_cache_holds or retire_held_products or retire_reviewed_products) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy or narrow_cache_holds or retire_held_products or retire_reviewed_products or retire_reviewed_records) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -196,7 +198,7 @@ pub fn main(init: std.process.Init) !void {
             reason = args[i];
             continue;
         }
-        if ((prepare_pins or retire_held_products or retire_reviewed_products) and std.mem.eql(u8, args[i], "--review") and i + 1 < args.len) {
+        if ((prepare_pins or retire_held_products or retire_reviewed_products or retire_reviewed_records) and std.mem.eql(u8, args[i], "--review") and i + 1 < args.len) {
             i += 1;
             review_path = args[i];
             continue;
@@ -256,6 +258,7 @@ pub fn main(init: std.process.Init) !void {
     if (narrow_cache_holds and (hold_roots == null or reason == null or requests_path != null)) return error.InvalidReleaseArguments;
     if (retire_held_products and (review_path == null or requests_path != null or capture_aliases or artifact_aliases)) return error.InvalidHeldProductReview;
     if (retire_reviewed_products and (review_path == null or requests_path != null or capture_aliases)) return error.InvalidReviewedProducts;
+    if (retire_reviewed_records and (review_path == null or requests_path != null or capture_aliases or artifact_aliases)) return error.InvalidReviewedRecords;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
     if ((capture_aliases or artifact_aliases) and ((requests_path == null and !retire_reviewed_products) or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_pins or prepare_legacy)) return error.InvalidCaptureAliasArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
@@ -334,7 +337,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     try c.print("Discovering completed runs and release records...\n", .{});
-    if (retire_held_products) try @import("storage_cleanup/held_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_products) try @import("storage_cleanup/reviewed_products.zig").prepare(&e, review_path.?) else try e.discover();
+    if (retire_held_products) try @import("storage_cleanup/held_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_products) try @import("storage_cleanup/reviewed_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_records) try @import("storage_cleanup/reviewed_records.zig").prepare(&e, review_path.?) else try e.discover();
     if (requests_path) |path| try batch.discover(&e, path);
     try e.loadHolds();
     // Required control files must still exist on a no-op pass. Expensive
@@ -469,6 +472,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/cache_holds.zig", .bytes = @embedFile("storage_cleanup/cache_holds.zig") },
         .{ .path = "tools/storage_cleanup/held_products.zig", .bytes = @embedFile("storage_cleanup/held_products.zig") },
         .{ .path = "tools/storage_cleanup/reviewed_products.zig", .bytes = @embedFile("storage_cleanup/reviewed_products.zig") },
+        .{ .path = "tools/storage_cleanup/reviewed_records.zig", .bytes = @embedFile("storage_cleanup/reviewed_records.zig") },
         .{ .path = "tools/storage_cleanup/readiness_cache.zig", .bytes = @embedFile("storage_cleanup/readiness_cache.zig") },
         .{ .path = "tools/storage_cleanup/cache_batch.zig", .bytes = @embedFile("storage_cleanup/cache_batch.zig") },
         .{ .path = "tools/storage_cleanup/retired_logs.zig", .bytes = @embedFile("storage_cleanup/retired_logs.zig") },

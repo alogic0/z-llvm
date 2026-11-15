@@ -30,7 +30,8 @@ pub fn reviewedManualHold(e: *const core.Engine, path: []const u8) bool {
 pub fn cacheScope(path: []const u8) bool {
     if (!p.relative(path)) return false;
     if (std.mem.eql(u8, std.fs.path.dirname(path) orelse "", "local-state/caches")) return true;
-    return p.candidate(path) and std.mem.indexOf(u8, std.fs.path.basename(path), "zig-local-") != null;
+    return p.candidate(path) and (std.mem.indexOf(u8, std.fs.path.basename(path), "zig-local-") != null or
+        std.mem.indexOf(u8, std.fs.path.basename(path), "zig-global-") != null);
 }
 
 fn receiptUses(e: *core.Engine, value: std.json.Value, cache: []const u8) !bool {
@@ -79,7 +80,7 @@ fn closedReceipt(e: *core.Engine, receipt: p.Evidence, cache: []const u8) !void 
     try e.addControl(receipt.path);
 }
 
-fn cacheLayout(e: *core.Engine, path: []const u8) !void {
+pub fn cacheLayout(e: *core.Engine, path: []const u8) !void {
     var root = try core.fa.metadata.openRoot(e.c.io, try e.absolute(path));
     defer root.close(e.c.io);
     var dir = try root.openDir(e.c.io, ".", .{ .iterate = true, .follow_symlinks = false });
@@ -89,7 +90,7 @@ fn cacheLayout(e: *core.Engine, path: []const u8) !void {
     var hashes = false;
     while (try entries.next(e.c.io)) |entry| {
         if (entry.kind != .directory) return error.NotSharedZigCache;
-        if (std.mem.eql(u8, entry.name, "o")) objects = true else if (std.mem.eql(u8, entry.name, "h")) hashes = true else if (!std.mem.eql(u8, entry.name, "z") and !std.mem.eql(u8, entry.name, "tmp") and !std.mem.eql(u8, entry.name, "c")) return error.NotSharedZigCache;
+        if (std.mem.eql(u8, entry.name, "o")) objects = true else if (std.mem.eql(u8, entry.name, "h")) hashes = true else if (!std.mem.eql(u8, entry.name, "z") and !std.mem.eql(u8, entry.name, "tmp") and !std.mem.eql(u8, entry.name, "c") and !std.mem.eql(u8, entry.name, "b")) return error.NotSharedZigCache;
     }
     if (!objects or !hashes) return error.NotSharedZigCache;
 }

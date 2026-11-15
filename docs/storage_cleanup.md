@@ -231,6 +231,29 @@ Only generic input/cache policy protection is excepted for sharing. Manual and
 job holds, held releases and more specific policy entries still block it.
 Inputs become read-only; writable consumers must obtain independent copies.
 
+Large sharing plans use bounded transactions (up to 4,096 old inodes or 64 MiB,
+with a larger single inode handled alone). Each transaction keeps every old
+inode in backups until fresh holds, jobs, processes, controls and replaced
+contents pass verification. A newly observed hold rolls back the whole batch.
+Current manifests are verified before and after the plan.
+
+Completed immutable reports, logs and source snapshots can use the same command
+with `schema:"zllvm-shared-evidence-v1"`, the `inputs` hash/path families, a
+nonempty `reason`, and a hash-bound `review:{path,sha256}`. The review names their
+completed producers and read-only consumers. Admission is limited to recognized
+evidence/source extensions under validation and retirement storage, plus the
+normal input scope. Raw event streams, compiled-product extensions, executable
+files and arbitrary roots remain excluded. ELF and archive bytes in a text-named
+capture (including nonexecutable `.stdout`) are rejected before sharing.
+Ordinary input plans cannot admit these extra types. All original names and
+contents remain available; specific
+holds and live consumers still block migration.
+For control documents already parsed by the collector, a sharing transaction
+rebinds observations only for its verified replacements and existing aliases of
+the destination object. It rechecks their unchanged bytes and exact allowed
+metadata changes while backups still exist. Unrelated control changes still
+abort and roll back the transaction.
+
 Capture helpers shared across completed runs require every name in the request
 list. After `prepare-generated`, use `--complete-capture-aliases` during both
 review and apply. Every owner must pass the generated-helper proof, every alias
@@ -300,8 +323,10 @@ Completed test products can be prepared with
 `commands.json`. Direct compiler `-o` / `-femit-bin=` arguments or the recorded
 compiler's `--emit=obj` stdout establish the exact output; direct compiler copies
 also require the report's compiler hash. Supported products include `local`,
-`reference`, `z_llvm`, other extensionless products, objects, archives and `.exe`
-files. The collector keeps the
+`reference`, `z_llvm`, other extensionless products, objects, archives, `.exe`
+files and binary `.stdout` captures. The latter still require an actual bound
+compiler output command and ELF/archive bytes; text diagnostics remain evidence.
+The collector keeps the
 report, commands and diagnostics, and checks compiled-file magic. Shell commands,
 implicit build destinations and file names alone cannot authorize collection.
 
@@ -373,7 +398,7 @@ remains the narrower option for capture helpers.
 
 Minimal mode admits up to 16,384 candidates per pass, within the unchanged byte
 budget. Qualified files are collected in batches bounded by that budget and a
-separate cap of 1024 names, keeping each alias group indivisible. The durable
+separate cap of 4,096 names, keeping each alias group indivisible. The durable
 `file-batch` journal records every original/quarantine name, hash and metadata.
 The collector rechecks pins, holds, consumers and retained evidence after
 quarantining all members. Before the first unlink a failure restores every
@@ -531,8 +556,13 @@ ordinary generated product with no identified continuing use; the boolean is
 an explicit decision, not automated proof. Original logs and receipts remain.
 
 Only regular ELF/archive files under `local-state/validations/` qualify. Names
-must be extensionless helpers or end in `.o`, `.obj`, `.a` or `.exe`; source,
-IR, traces, logs, records and mixed directories are excluded. All pins, holds,
+must be extensionless helpers or end in `.o`, `.obj`, `.a`, `.exe`, `.link` or
+`.so`. The known integrated-runner executable suffixes `.syscall_hello`,
+`.compiler_rt_i128_arithmetic`, `.compiler_rt_fma`, `.setcc_predicates`,
+`.aggregate_sse_returns` and `.differential` also qualify. A `.stdout` capture
+qualifies only when it contains an actual ELF/archive product and the same
+explicit consumer review covers it. Text diagnostics are rejected by content.
+Source, IR, traces, text logs, records and mixed directories are excluded. All pins, holds,
 retained dependencies, active consumers, ownership, hashes, current-manifest
 checks and mutation guards still apply. No hold exception is supported.
 `--complete-artifact-aliases` permits a fully reviewed hardlink group; any
@@ -599,6 +629,10 @@ protect files; an active parent integrated job protects its finished subtests.
 Files with multiple hardlinks remain held by the single-file collector.
 
 Eligible named outputs use the bounded file batches described above. The
+configured candidate budget applies, with at most 4,096 files in one quarantine
+transaction. Minimal collection uses that bound to avoid repeating the global
+pin/consumer scan for every small test object. All complete-alias, control and
+rollback checks apply to the whole transaction. The
 collector journals every original path, hash and metadata,
 quarantines only those files, then refreshes holds, pins and consumers before
 unlinking. A failure before unlinking restores every original name; an
@@ -653,7 +687,7 @@ retirement records before estimating reclaim.
 live streams and creates compact `zllvm-native-event-audit-v1` results. The plan
 uses schema `zllvm-native-event-audit-plan-v1`; each `traces` entry contains a
 `path` and `producer`, `top_report`, and `backend_report` path/SHA-256 pairs.
-All paths are project-relative. Producer receipts must be completed
+All paths are project-relative. Checked producer receipts must be completed
 `run_checked` jobs whose `--output-root` names the report's run directory.
 
 The auditor holds the shared cleanup lease, checks every event's order and
@@ -666,6 +700,13 @@ details, event offsets, source snapshots and the auditor's Git revision.
 Successful whole-build reports also bind nested self-rebuild traces through
 their separate completed build command and `self_rebuild_invocations` list.
 Reused backend outputs and warmup/help commands cannot establish a new capture.
+Legacy direct captured-IR runs can bind their original
+`whole-compiler-diagnostic-v1` report as both producer and top report. The
+`captured-ir-diagnostic` population must record a completed backend process,
+an exact embedded invocation matching the separate backend report, and one
+terminal command binding the compiler, input and `--profile-events` destination.
+This accepts original failed compilations as failed; reused or altered captures,
+ambiguous commands and incomplete processes are rejected.
 It does not delete files or replace the collector's separate source/build,
 retired-compiler, alias, hold and pin checks. Unrecognized producer layouts
 remain explicit review cases.
@@ -674,6 +715,91 @@ Run `zig build test-native-event-audit` and the same command with
 `-Doptimize=ReleaseFast` to qualify the stream state machine and report binding.
 
 ## Accounting for the remaining tree
+
+A sharing plan can carry `sharing_holds: {manifest, paths}` with the exact
+holds-file hash and selected manual hold paths. This also requires a hash-bound
+review and reason explaining why those inputs are immutable. It permits only
+the byte-preserving sharing operation: the hold file stays unchanged and its
+retention requirements continue to apply afterward. Other holds, jobs, release
+records, retention-table entries and policy protection remain effective. A
+changed holds file aborts the current transaction.
+
+Reviewed-product plans can also list `caches` for historical private caches
+outside modern workspaces. Each entry names its cache path, run root, successful
+terminal owner receipt, retained ownership/source-review evidence, reason and
+closed consumers. This is an explicit present-day ownership review, not an
+inference from age. Only known private-cache names within validation runs are
+admitted; mixed roots, raw traces, current pins, holds and external hardlinks
+remain protected. The complete cache is snapshotted and collected together.
+This explicit review also admits legacy suite-level roots such as
+`local-state/validations/SUITE/tools-global`; automatic discovery keeps its
+existing scope. The same layout, evidence, overlap and mutation guards apply.
+
+Copied historical caches whose receipts name the original location may omit
+`owner` after an explicit present-day review. These must have the native Zig
+`h/` and `o/` directories and only its recognized top-level cache directories
+(`b/`, `c/`, `z/`, `tmp/`); mixed evidence roots are rejected. The review still
+binds exact paths, retained ownership evidence and closed consumers. This route
+does not infer a successful old run or fabricate a replacement receipt. Known
+failed owners use the diagnosis route below.
+
+A closed failed or canceled owner additionally requires a nonempty
+`failure_disposition` describing the completed diagnosis. Its original nonzero
+receipt and log remain hash-bound evidence; cache disposal does not change the
+test outcome. Successful owners need no failure disposition.
+
+A reviewed cache may list exact historical member references in `retired_pins`.
+Each target must be an unchanged file strictly inside that cache. The collector
+matches the manifest hash, reference spelling, resolved member path and member
+hash; another member with identical contents is still independently protected.
+Current manifests cannot be waived. New pins or changed cache membership stop
+the guarded whole-cache transaction.
+
+`tools/clean-storage retire-reviewed-records --review PLAN --minimal` reviews
+explicit historical detail; add `--apply` only after inspecting that review.
+The `zllvm-reviewed-records-v1` plan binds a review by hash and lists each exact
+record, its hash, producer root, reason, closed consumers and retained summaries.
+It admits nonexecutable text detail in validation storage, never source, inputs,
+ordinary binaries, caches or arbitrary directories. The transaction keeps the
+usual current manifests, holds, active consumers and complete-inode checks.
+Exact historical pin transitions retain their original manifests. A retained
+summary that changes before deletion blocks the transaction.
+Generated `.diff` files are text detail too: retain their comparison result and
+input identities, and verify regeneration when that is the reason for retirement.
+An ELF file disguised with a text extension remains ineligible.
+
+A completed raw stream can supply `audited:{path,sha256}`. This explicit closure
+requires a verified full ordered-event audit, unchanged whole-file hash and
+size, balanced function scopes, complete report/counter/failure bindings, and
+the bound input, original reports, producer diagnostics and auditor sources.
+Failed compilations remain failed. This closes the tracing-detail consumer
+without reconstructing an obsolete compiler; the existing `release-trace`
+route continues to enforce its declared replay contract. Current pins and holds
+still win. A record cannot combine audited and interrupted dispositions.
+
+An interrupted `profile.events.jsonl` needs a separate interruption proof.
+`zig build diagnose-native-events -- --trace PATH` reads and hashes the entire file,
+validates its available ordered prefix and saves the missing completion honestly.
+Its result always says `retirement_ready: false`. The reviewed retirement must
+also bind the original nonzero terminal receipt, canceled backend command,
+captured input, empty object, preserved diagnostics and accepted successor for
+the identical input. The supported successor is the cumulative behavior
+checkpoint closed by its final follow-up acceptance. All those records and the
+accepted object remain hash-checked. A prefix diagnosis alone never authorizes
+deletion and never substitutes for a successful complete-stream audit.
+Use `zig build test-native-event-diagnosis` and the same command with
+`-Doptimize=ReleaseFast` to qualify the diagnosis tool. Place build caches in the
+managed command's temporary workspace, as with the complete-stream auditor.
+
+For the older canceled whole-build layout without a backend command receipt,
+the interruption proof may bind `launcher:{path,sha256}` instead of `commands`.
+It accepts only the original three-line Bash launcher with its fixed strict
+shell preamble and single-quoted direct `zig run tools/run_whole_compiler.zig`
+invocation. The exact output root, compiler, input and profiling flag must match
+the preserved terminal receipt and invocation. Arbitrary shell code, extra
+commands, unrelated launchers and missing profiling bindings are rejected.
+This records the actual historical launch; it does not manufacture a replacement
+producer receipt.
 
 `tools/clean-storage inventory` runs a review and writes `inventory.json`. It
 observes every accessible same-filesystem entry and counts each device/inode
@@ -690,9 +816,18 @@ eligible, which takes precedence over unresolved. Concurrent changes and skipped
 foreign devices are reported; the inventory is observational, not a deletion list.
 Use `inventory --requests FILE` to account for a prepared historical batch too.
 
+Full filesystem surveys and preparatory tables are replaceable maintenance
+outputs. After verifying a current replacement, retain their decision summaries,
+original identities and retirement receipt; an old full listing need not become
+a permanent pin. Keep applied plans and directly referenced per-file proofs at
+the paths their readers require. Unreferenced aggregate views can be compacted
+losslessly with verified original/archive hashes and a path-to-archive ledger.
+Historical checksum lists describe the original observation and stay unchanged;
+record payload retirement separately.
+
 ## Current work and retention pins
 
-[storage_cleanup_policy.json](storage_cleanup_policy.json) records the five
+[storage_cleanup_policy.json](storage_cleanup_policy.json) records the
 current integrity manifests and known protected directories. Their complete
 hash checks must pass before any removal. A missing or changed required control
 blocks apply.
@@ -703,7 +838,7 @@ working directories, conservatively retaining overlapping candidates.
 Bare digest fingerprints with no named target hold their entire containing run.
 Other unknown checksum formats stop the collector for review.
 
-The two explicitly retired historical seals are recorded by exact file hash in
+Explicitly retired historical seals are recorded by exact file hash in
 `retired_manifests`. Their original files remain intact. A changed seal is not
 silently treated as retired; a current manifest cannot also be retired. Other
 historical references remain blocking until their specific retention contract

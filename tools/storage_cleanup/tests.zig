@@ -15,6 +15,7 @@ const legacy_outputs = @import("legacy.zig");
 const cache_holds = @import("cache_holds.zig");
 const held_products = @import("held_products.zig");
 const reviewed_products = @import("reviewed_products.zig");
+const reviewed_records = @import("reviewed_records.zig");
 const cache_batch = @import("cache_batch.zig");
 const p = core.p;
 const workspaces = @import("workspaces.zig");
@@ -35,6 +36,404 @@ const held_plan = output ++ "/held-products.json";
 const reviewed_plan = output ++ "/reviewed-products.json";
 const reviewed_notes = output ++ "/review.md";
 const reviewed_file = run ++ "/old-helper";
+const record_plan = output ++ "/reviewed-records.json";
+const old_detail = run ++ "/old-census.jsonl";
+const detail_summary = output ++ "/census-summary.json";
+
+test "storage cleanup: file batches honor small budgets and bound minimal quarantine" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    try f.write(reviewed_file, "\x7fELFordinary test product");
+    var e = f.engine();
+    const metadata = try e.metadata(reviewed_file);
+    for (0..4097) |i| {
+        var m = metadata;
+        m.inode += i;
+        try e.actions.append(e.c.a, .{ .path = reviewed_file, .run_root = run, .producer = reviewed_plan, .kind = .build_output, .status = .ready, .metadata = m });
+    }
+    e.config.max_candidates = 64;
+    try t.expectEqual(@as(usize, 64), (try mutation.fileBatch(&e, 0)).len);
+    e.config = p.minimal(e.config);
+    const first = try mutation.fileBatch(&e, 0);
+    try t.expectEqual(@as(usize, 4096), first.len);
+    try t.expectEqual(@as(usize, 4095), first[first.len - 1]);
+    const remaining = try mutation.fileBatch(&e, 4096);
+    try t.expectEqual(@as(usize, 1), remaining.len);
+    try t.expectEqual(@as(usize, 4096), remaining[0]);
+    const too_many = try e.c.a.alloc(usize, 4097);
+    @memset(too_many, 0);
+    try t.expectError(error.InvalidGeneratedBatch, mutation.applyFileBatch(&e, too_many));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+fn reviewedRecordFixture(f: *Fixture) !reviewed_records.Plan {
+    try f.write(old_detail, "{\"obsolete_instruction_detail\":true}\n");
+    try f.write(detail_summary, "{\"retained_summary\":true}\n");
+    try f.write(reviewed_notes, "Reviewed old census: completed investigation, preserved summary, no continuing detail consumer.");
+    var e = f.engine();
+    const plan: reviewed_records.Plan = .{
+        .reason = "Retire reviewed historical detail",
+        .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+        .records = try e.c.a.dupe(reviewed_records.Record, &.{.{
+            .path = old_detail,
+            .sha256 = try e.digest(old_detail),
+            .run_root = run,
+            .reason = "Old detailed census replaced by retained result",
+            .consumers_closed = true,
+            .retained = try e.c.a.dupe(p.Evidence, &.{.{ .path = detail_summary, .sha256 = try e.digest(detail_summary) }}),
+        }}),
+    };
+    try e.write(record_plan, plan);
+    return plan;
+}
+
+test "storage cleanup: reviewed detail preserves summary and rejects disguised compiled output" {
+    for ([_][]const u8{ old_detail, run ++ "/generated.diff" }) |detail| for ([_]bool{ false, true }) |binary| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedRecordFixture(f);
+        var e = f.engine();
+        try f.write(detail, if (binary) "\x7fELFbinary in a misleading extension" else "--- previous input\n+++ current input\n@@ -1 +1 @@\n-old\n+new\n");
+        var row = plan.records[0];
+        row.path = detail;
+        row.sha256 = try e.digest(detail);
+        plan.records = &.{row};
+        try e.write(record_plan, plan);
+        var verified = f.engine();
+        try reviewed_records.prepare(&verified, record_plan);
+        if (binary) {
+            try t.expectError(error.NotTextDetail, verified.qualify(0));
+        } else {
+            try verified.qualify(0);
+            try mutation.applyFileBatch(&verified, &.{0});
+            try t.expectEqual(.removed, verified.actions.items[0].status);
+        }
+        _ = try verified.metadata(detail_summary);
+    };
+}
+
+test "storage cleanup: reviewed records require closed owners retained evidence and separate raw proof" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedRecordFixture(f);
+        var row = plan.records[0];
+        switch (case) {
+            0 => row.consumers_closed = false,
+            1 => row.retained = &.{},
+            else => row.path = run ++ "/profile.events.jsonl",
+        }
+        plan.records = &.{row};
+        var e = f.engine();
+        try e.write(record_plan, plan);
+        try t.expectError(if (case < 2) error.InvalidReviewedRecord else error.RawTraceRequiresDispositionProof, reviewed_records.prepare(&e, record_plan));
+    }
+}
+
+test "storage cleanup: changed summary and late hold prevent reviewed detail mutation" {
+    for ([_]bool{ false, true }) |hold| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        _ = try reviewedRecordFixture(f);
+        var e = f.engine();
+        try reviewed_records.prepare(&e, record_plan);
+        try e.qualify(0);
+        if (hold) {
+            try f.write(e.config.holds_file, "{\"schema\":1,\"paths\":[\"" ++ old_detail ++ "\"]}");
+            try t.expectError(error.GeneratedBatchBecameHeld, mutation.applyFileBatch(&e, &.{0}));
+        } else {
+            try f.write(detail_summary, "changed summary");
+            try t.expectError(error.EvidenceHashMismatch, mutation.applyFileBatch(&e, &.{0}));
+        }
+        _ = try e.metadata(old_detail);
+    }
+}
+
+fn interruptedRecordFixture(f: *Fixture) !reviewed_records.Plan {
+    var plan = try reviewedRecordFixture(f);
+    const trace = run ++ "/backend/profile.events.jsonl";
+    try f.tmp.dir.createDirPath(t.io, run ++ "/backend");
+    try f.write(trace, "partial event stream\n");
+    try f.write(run ++ "/backend/input.ll", "unchanged input");
+    try f.write(run ++ "/backend/local.o", "");
+    try f.write(run ++ "/backend/backend.stderr", "interrupted diagnostic");
+    try f.write(output ++ "/core.zig", "audit source");
+    try f.write(output ++ "/driver.zig", "diagnostic source");
+    try f.write(output ++ "/successor.o", "\x7fELFaccepted successor object");
+    var e = f.engine();
+    const input_path = run ++ "/backend/input.ll";
+    const input_hash = try e.digest(input_path);
+    const trace_hash = try e.digest(trace);
+    try e.write(output ++ "/diagnosis.json", .{
+        .schema = "zllvm-event-prefix-diagnosis-v1",
+        .path = trace,
+        .sha256 = trace_hash,
+        .complete = false,
+        .retirement_ready = false,
+        .whole_stream_read = true,
+        .stream_metadata_unchanged = true,
+        .prefix_semantically_valid = true,
+        .newline_complete = true,
+        .logical_bytes_read = (try e.metadata(trace)).size,
+        .records = 1,
+        .validated_prefix_records = 1,
+        .core = p.Evidence{ .path = output ++ "/core.zig", .sha256 = try e.digest(output ++ "/core.zig") },
+        .driver = p.Evidence{ .path = output ++ "/driver.zig", .sha256 = try e.digest(output ++ "/driver.zig") },
+    });
+    try e.write(output ++ "/terminal.json", .{ .status = "failed", .outcome = "supervision_failed", .actual_returncode = -9, .started_ns = 1, .finished_ns = 2, .argv = &[_][]const u8{ "launcher", "--output-root", run } });
+    try e.write(run ++ "/backend/invocation.json", .{ .object_complete = false, .input = p.Evidence{ .path = input_path, .sha256 = input_hash } });
+    try e.write(run ++ "/backend/commands.json", .{.{
+        .argv = &[_][]const u8{ "compiler", try e.c.fmt("--profile-events={s}", .{try e.absolute(trace)}), try e.absolute(input_path) },
+        .outcome = "canceled",
+        .actual_returncode = -15,
+        .stdout = run ++ "/backend/local.o",
+        .stderr = run ++ "/backend/backend.stderr",
+    }});
+    try e.write(output ++ "/checkpoint.json", .{ .original_objects = .{.{ .input_sha256 = input_hash, .object = p.Evidence{ .path = output ++ "/successor.o", .sha256 = try e.digest(output ++ "/successor.o") } }} });
+    try e.write(output ++ "/acceptance.json", .{ .status = "passed", .final_follow_up_complete = true, .cumulative_checkpoint_sha256 = try e.digest(output ++ "/checkpoint.json") });
+    var row = plan.records[0];
+    row.path = trace;
+    row.sha256 = trace_hash;
+    row.interruption = .{
+        .diagnosis = .{ .path = output ++ "/diagnosis.json", .sha256 = try e.digest(output ++ "/diagnosis.json") },
+        .terminal = .{ .path = output ++ "/terminal.json", .sha256 = try e.digest(output ++ "/terminal.json") },
+        .commands = .{ .path = run ++ "/backend/commands.json", .sha256 = try e.digest(run ++ "/backend/commands.json") },
+        .invocation = .{ .path = run ++ "/backend/invocation.json", .sha256 = try e.digest(run ++ "/backend/invocation.json") },
+        .checkpoint = .{ .path = output ++ "/checkpoint.json", .sha256 = try e.digest(output ++ "/checkpoint.json") },
+        .acceptance = .{ .path = output ++ "/acceptance.json", .sha256 = try e.digest(output ++ "/acceptance.json") },
+    };
+    plan.records = try e.c.a.dupe(reviewed_records.Record, &.{row});
+    try e.write(record_plan, plan);
+    return plan;
+}
+
+fn auditedRecordFixture(f: *Fixture, succeeded: bool) !reviewed_records.Plan {
+    var plan = try interruptedRecordFixture(f);
+    var row = plan.records[0];
+    const proof = row.interruption.?;
+    var e = f.engine();
+    try e.write(run ++ "/report.json", .{ .status = if (succeeded) "passed" else "blocked" });
+    try e.write(run ++ "/backend/report.json", .{ .returncode = if (succeeded) @as(i32, 0) else 1, .commands = .{.{ .stderr = run ++ "/backend/backend.stderr" }} });
+    try e.write(proof.terminal.path, .{ .status = "finished", .outcome = "completed", .actual_returncode = if (succeeded) @as(i32, 0) else 1 });
+    var fresh = f.engine();
+    const audit_path = output ++ "/complete-audit.json";
+    try fresh.write(audit_path, .{
+        .schema = "zllvm-native-event-audit-v1",
+        .status = "verified",
+        .path = row.path,
+        .sha256 = row.sha256,
+        .whole_stream_read = true,
+        .whole_stream_semantically_valid = true,
+        .report_binding_verified = true,
+        .complete = true,
+        .stream_metadata_unchanged = true,
+        .recorded_hash_matches = true,
+        .newline_complete = true,
+        .original_tail_matches = true,
+        .failure_names_match = true,
+        .selection_counts_match = true,
+        .logical_bytes_read = (try fresh.metadata(row.path)).size,
+        .records = 7,
+        .function_begins = 1,
+        .function_ends = 1,
+        .succeeded = succeeded,
+        .error_record = @as(?u8, null),
+        .auditor_binary_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        .producer = p.Evidence{ .path = proof.terminal.path, .sha256 = try fresh.digest(proof.terminal.path) },
+        .top_report = p.Evidence{ .path = run ++ "/report.json", .sha256 = try fresh.digest(run ++ "/report.json") },
+        .backend_report = p.Evidence{ .path = run ++ "/backend/report.json", .sha256 = try fresh.digest(run ++ "/backend/report.json") },
+        .input = p.Evidence{ .path = run ++ "/backend/input.ll", .sha256 = try fresh.digest(run ++ "/backend/input.ll") },
+        .core_source = output ++ "/core.zig",
+        .core_sha256 = try fresh.digest(output ++ "/core.zig"),
+        .driver_source = output ++ "/driver.zig",
+        .driver_sha256 = try fresh.digest(output ++ "/driver.zig"),
+    });
+    row.interruption = null;
+    row.audited = .{ .path = audit_path, .sha256 = try fresh.digest(audit_path) };
+    plan.records = try e.c.a.dupe(reviewed_records.Record, &.{row});
+    try fresh.write(record_plan, plan);
+    return plan;
+}
+
+test "storage cleanup: reviewed audited trace preserves complete failed or successful outcomes without obsolete compiler" {
+    for ([_]bool{ false, true }) |succeeded| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        _ = try auditedRecordFixture(f, succeeded);
+        var e = f.engine();
+        try reviewed_records.prepare(&e, record_plan);
+        try e.qualify(0);
+        try mutation.applyFileBatch(&e, &.{0});
+        try t.expectEqual(.removed, e.actions.items[0].status);
+        var top = try e.load(t.allocator, run ++ "/report.json");
+        defer top.deinit();
+        try t.expectEqualStrings(if (succeeded) "passed" else "blocked", try core.str(top.value, "status"));
+        _ = try e.metadata(run ++ "/backend/input.ll");
+        _ = try e.metadata(output ++ "/complete-audit.json");
+        var diagnostic_kept = false;
+        for (e.actions.items[0].retained) |ev| {
+            if (std.mem.eql(u8, ev.path, run ++ "/backend/backend.stderr")) diagnostic_kept = true;
+        }
+        try t.expect(diagnostic_kept);
+        var repeat = f.engine();
+        try reviewed_records.prepare(&repeat, record_plan);
+        try t.expectEqual(.absent, repeat.actions.items[0].status);
+    }
+}
+
+test "storage cleanup: reviewed audited trace requires every complete stream and binding flag" {
+    for ([_][]const u8{
+        "whole_stream_read",         "whole_stream_semantically_valid", "report_binding_verified", "complete",
+        "stream_metadata_unchanged", "recorded_hash_matches",           "newline_complete",        "original_tail_matches",
+        "failure_names_match",       "selection_counts_match",
+    }) |key| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try auditedRecordFixture(f, false);
+        var row = plan.records[0];
+        var e = f.engine();
+        var audit = try e.load(t.allocator, row.audited.?.path);
+        defer audit.deinit();
+        try audit.value.object.put(audit.arena.allocator(), key, .{ .bool = false });
+        try e.write(row.audited.?.path, audit.value);
+        var fresh = f.engine();
+        row.audited.?.sha256 = try fresh.digest(row.audited.?.path);
+        plan.records = &.{row};
+        try fresh.write(record_plan, plan);
+        try t.expectError(error.IncompleteReviewedTraceAudit, reviewed_records.prepare(&fresh, record_plan));
+    }
+}
+
+test "storage cleanup: reviewed audited trace rejects wrong scope changed input and mixed dispositions" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try auditedRecordFixture(f, true);
+        var row = plan.records[0];
+        var e = f.engine();
+        switch (case) {
+            0 => row.run_root = "local-state/validations/test",
+            1 => try f.write(run ++ "/backend/input.ll", "changed input"),
+            else => row.interruption = (try interruptedRecordFixture(f)).records[0].interruption,
+        }
+        plan.records = &.{row};
+        try e.write(record_plan, plan);
+        var fresh = f.engine();
+        try t.expectError(switch (case) {
+            0 => error.ReviewedTraceAuditScopeMismatch,
+            1 => error.EvidenceHashMismatch,
+            else => error.RawTraceRequiresDispositionProof,
+        }, reviewed_records.prepare(&fresh, record_plan));
+    }
+}
+
+test "storage cleanup: interrupted trace disposition binds original failure and accepted identical input" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const plan = try interruptedRecordFixture(f);
+    var e = f.engine();
+    try reviewed_records.prepare(&e, record_plan);
+    try e.qualify(0);
+    try mutation.applyFileBatch(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    var terminal = try e.load(t.allocator, plan.records[0].interruption.?.terminal.path);
+    defer terminal.deinit();
+    try t.expectEqualStrings("failed", try core.str(terminal.value, "status"));
+    _ = try e.metadata(run ++ "/backend/input.ll");
+    _ = try e.metadata(output ++ "/diagnosis.json");
+    var repeated = f.engine();
+    try reviewed_records.prepare(&repeated, record_plan);
+    try t.expectEqual(.absent, repeated.actions.items[0].status);
+    try t.expect(!repeated.hasReady());
+}
+
+test "storage cleanup: interrupted trace cannot waive missing completion without all closure bindings" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try interruptedRecordFixture(f);
+        var row = plan.records[0];
+        var proof = row.interruption.?;
+        var e = f.engine();
+        const path = switch (case) {
+            0 => proof.diagnosis.path,
+            1 => proof.terminal.path,
+            2 => proof.commands.?.path,
+            else => proof.acceptance.path,
+        };
+        var parsed = try e.load(t.allocator, path);
+        defer parsed.deinit();
+        switch (case) {
+            0 => try parsed.value.object.put(parsed.arena.allocator(), "complete", .{ .bool = true }),
+            1 => try parsed.value.object.put(parsed.arena.allocator(), "actual_returncode", .{ .integer = 0 }),
+            2 => try parsed.value.array.items[0].object.put(parsed.arena.allocator(), "argv", .{ .array = .init(parsed.arena.allocator()) }),
+            else => try parsed.value.object.put(parsed.arena.allocator(), "final_follow_up_complete", .{ .bool = false }),
+        }
+        try e.write(path, parsed.value);
+        var changed = f.engine();
+        switch (case) {
+            0 => proof.diagnosis.sha256 = try changed.digest(path),
+            1 => proof.terminal.sha256 = try changed.digest(path),
+            2 => proof.commands.?.sha256 = try changed.digest(path),
+            else => proof.acceptance.sha256 = try changed.digest(path),
+        }
+        row.interruption = proof;
+        plan.records = &.{row};
+        try e.write(record_plan, plan);
+        var check = f.engine();
+        const expected = switch (case) {
+            0 => error.InvalidInterruptedTraceDiagnosis,
+            1 => error.InterruptedProducerNotClosed,
+            2 => error.InterruptedCommandNotBound,
+            else => error.InterruptedSuccessorNotAccepted,
+        };
+        try t.expectError(expected, reviewed_records.prepare(&check, record_plan));
+        _ = try check.metadata(row.path);
+    }
+}
+
+test "storage cleanup: interrupted trace binds a fixed legacy launcher without fabricating backend completion" {
+    for (0..5) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try interruptedRecordFixture(f);
+        var row = plan.records[0];
+        var proof = row.interruption.?;
+        var e = f.engine();
+        const launcher = output ++ "/original-launcher.sh";
+        const script = try e.c.fmt("#!/usr/bin/env bash\nset -euo pipefail\n'zig' 'run' 'tools/run_whole_compiler.zig' '--' '--output-root' '{s}' '--zllvm' '{s}/compiler' '--input-ir' '{s}/backend/input.ll' '{s}'\n{s}", .{
+            if (case == 1) "local-state/validations/wrong" else run,
+            run,
+            run,
+            if (case == 2) "--help" else "--profile-events",
+            if (case == 3) "echo additional-command\n" else "",
+        });
+        try f.write(launcher, script);
+        try e.write(proof.terminal.path, .{ .status = "finished", .outcome = "canceled", .actual_returncode = -15, .started_ns = 1, .finished_ns = 2, .argv = [_][]const u8{ "bash", if (case == 4) "unrelated.sh" else launcher } });
+        var fresh = f.engine();
+        proof.terminal.sha256 = try fresh.digest(proof.terminal.path);
+        proof.commands = null;
+        proof.launcher = .{ .path = launcher, .sha256 = try fresh.digest(launcher) };
+        row.interruption = proof;
+        plan.records = &.{row};
+        try fresh.write(record_plan, plan);
+        var check = f.engine();
+        if (case == 0) {
+            try reviewed_records.prepare(&check, record_plan);
+            try check.qualify(0);
+            try mutation.applyFileBatch(&check, &.{0});
+            try t.expectEqual(.removed, check.actions.items[0].status);
+            var terminal = try check.load(t.allocator, proof.terminal.path);
+            defer terminal.deinit();
+            try t.expectEqualStrings("canceled", try core.str(terminal.value, "outcome"));
+            _ = try check.metadata(launcher);
+        } else {
+            try t.expectError(if (case == 2 or case == 3) error.UnsupportedInterruptedLauncher else error.InterruptedProducerNotBound, reviewed_records.prepare(&check, record_plan));
+            _ = try check.metadata(row.path);
+        }
+    }
+}
+
 fn reviewedProductFixture(f: *Fixture) !reviewed_products.Plan {
     try f.write(reviewed_file, "\x7fELFordinary generated helper");
     try f.write(reviewed_notes, "Reviewed generated helper; completed consumers; no continuing use identified.");
@@ -46,6 +445,312 @@ fn reviewedProductFixture(f: *Fixture) !reviewed_products.Plan {
     };
     try e.write(reviewed_plan, plan);
     return plan;
+}
+
+test "storage cleanup: explicit historical private cache review retires whole cache and preserves owner" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    const nested = run ++ "/rows/function/zig-local-cache";
+    try f.tmp.dir.createDirPath(t.io, nested ++ "/o");
+    try f.tmp.dir.createDirPath(t.io, nested ++ "/h");
+    try f.write(nested ++ "/o/generated", "generated object");
+    try f.write(nested ++ "/h/key", "regenerable cache key");
+    try f.write(reviewed_notes, "Source audit binds the completed row runner to these exact private caches.");
+    try f.write(run ++ "/runner.sh", "original reviewed launcher");
+    var e = f.engine();
+    try e.write(report, .{ .status = "finished", .outcome = "completed", .actual_returncode = 0, .returncode = 0, .started_ns = 1, .finished_ns = 2 });
+    const plan: reviewed_products.Plan = .{
+        .reason = "Completed historical private cache owner",
+        .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+        .products = &.{},
+        .caches = &.{.{
+            .path = nested,
+            .run_root = run,
+            .reason = "Completed exact row work root",
+            .consumers_closed = true,
+            .owner = .{ .path = report, .sha256 = try e.digest(report) },
+            .retained = &.{.{ .path = run ++ "/runner.sh", .sha256 = try e.digest(run ++ "/runner.sh") }},
+        }},
+    };
+    try e.write(reviewed_plan, plan);
+    try reviewed_products.prepare(&e, reviewed_plan);
+    try e.qualify(0);
+    try mutation.apply(&e, 0);
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    _ = try e.metadata(report);
+    _ = try e.metadata(run ++ "/runner.sh");
+}
+
+test "storage cleanup: reviewed cache rejects failed owner raw evidence and mixed root names" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const nested = if (case == 2) run ++ "/mixed-evidence" else run ++ "/rows/zig-global-cache";
+        try f.tmp.dir.createDirPath(t.io, nested);
+        try f.write(try f.c.fmt("{s}/{s}", .{ nested, if (case == 1) "profile.events.jsonl" else "generated" }), "payload");
+        try f.write(reviewed_notes, "Specific owner/cache review");
+        var e = f.engine();
+        try e.write(report, .{ .status = "finished", .outcome = "completed", .actual_returncode = @as(i32, if (case == 0) 1 else 0), .returncode = @as(i32, if (case == 0) 1 else 0), .started_ns = 1, .finished_ns = 2 });
+        try e.write(reviewed_plan, reviewed_products.Plan{
+            .reason = "Specific cache review",
+            .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+            .products = &.{},
+            .caches = &.{.{
+                .path = nested,
+                .run_root = run,
+                .reason = "Owned private cache",
+                .consumers_closed = true,
+                .owner = .{ .path = report, .sha256 = try e.digest(report) },
+                .retained = &.{.{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) }},
+            }},
+        });
+        if (case == 1) {
+            try reviewed_products.prepare(&e, reviewed_plan);
+            try t.expectError(error.WorkspaceContainsRawTrace, e.qualify(0));
+        } else try t.expectError(if (case == 0) error.ReviewedCacheOwnerNotSuccessful else error.InvalidReviewedCache, reviewed_products.prepare(&e, reviewed_plan));
+        _ = try e.metadata(nested);
+    }
+}
+
+fn reviewedCacheFixture(f: *Fixture, failed: bool) !reviewed_products.Plan {
+    try f.tmp.dir.createDirPath(t.io, cache ++ "/o");
+    try f.write(cache ++ "/o/first", "same generated cache bytes");
+    try f.write(cache ++ "/o/second", "same generated cache bytes");
+    try f.write(run ++ "/run.log", "original test diagnostics and outcome");
+    try f.write(reviewed_notes, "Reviewed closed cache owner and any failed-run disposition.");
+    var e = f.engine();
+    try e.write(report, .{ .status = "finished", .outcome = "completed", .actual_returncode = @as(i32, if (failed) 1 else 0), .returncode = @as(i32, if (failed) 1 else 0), .started_ns = 1, .finished_ns = 2, .log = run ++ "/run.log" });
+    return .{
+        .reason = "Completed cache with original result retained",
+        .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+        .products = &.{},
+        .caches = try e.c.a.dupe(reviewed_products.Cache, &.{.{
+            .path = cache,
+            .run_root = run,
+            .reason = "Private scratch after all consumers closed",
+            .consumers_closed = true,
+            .owner = .{ .path = report, .sha256 = try e.digest(report) },
+            .retained = try e.c.a.dupe(p.Evidence, &.{.{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) }}),
+        }}),
+    };
+}
+
+test "storage cleanup: diagnosed failed cache retains the original failure and log" {
+    for ([_]bool{ false, true }) |diagnosed| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedCacheFixture(f, true);
+        var row = plan.caches[0];
+        row.failure_disposition = if (diagnosed) "Reviewed assertion failure; preserved diagnostics, successor acceptance closes the investigation" else " ";
+        plan.caches = &.{row};
+        var e = f.engine();
+        try e.write(reviewed_plan, plan);
+        if (!diagnosed) {
+            try t.expectError(error.ReviewedCacheOwnerNotSuccessful, reviewed_products.prepare(&e, reviewed_plan));
+            continue;
+        }
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        try mutation.apply(&e, 0);
+        try t.expectEqual(.removed, e.actions.items[0].status);
+        try t.expectEqualStrings(row.owner.?.sha256, try e.digest(report));
+        _ = try e.metadata(run ++ "/run.log");
+        var repeat = f.engine();
+        try reviewed_products.prepare(&repeat, reviewed_plan);
+        try t.expectEqual(.absent, repeat.actions.items[0].status);
+    }
+}
+
+test "storage cleanup: copied cache review requires native layout and rejects mixed evidence" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedCacheFixture(f, false);
+        try f.tmp.dir.createDirPath(t.io, cache ++ "/h");
+        try f.tmp.dir.createDirPath(t.io, cache ++ "/b");
+        try f.write(cache ++ "/b/build", "generated build executable");
+        var row = plan.caches[0];
+        row.owner = null;
+        if (case == 1) try f.write(cache ++ "/source.zig", "unique source must remain");
+        if (case == 2) try f.tmp.dir.deleteDir(t.io, cache ++ "/h");
+        if (case == 3) try f.write(cache ++ "/o/profile.events.jsonl", "misfiled raw evidence");
+        plan.caches = &.{row};
+        var e = f.engine();
+        try e.write(reviewed_plan, plan);
+        if (case == 1 or case == 2) {
+            try t.expectError(error.NotSharedZigCache, reviewed_products.prepare(&e, reviewed_plan));
+            continue;
+        }
+        try reviewed_products.prepare(&e, reviewed_plan);
+        if (case == 3) {
+            try t.expectError(error.WorkspaceContainsRawTrace, e.qualify(0));
+            continue;
+        }
+        try e.qualify(0);
+        try cache_batch.apply(&e, &.{0});
+        try t.expectEqual(.removed, e.actions.items[0].status);
+        _ = try e.metadata(reviewed_notes);
+    }
+}
+
+test "storage cleanup: suite-level caches require explicit review and preserve new holds" {
+    const shallow = "local-state/validations/test/tools-global";
+    try t.expect(!reviewed_products.cacheScope("local-state/validations/tools-global"));
+    try t.expect(!reviewed_products.cacheScope("local-state/caches/tools-global"));
+    for ([_]bool{ false, true }) |held| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedCacheFixture(f, false);
+        try f.tmp.dir.createDirPath(t.io, shallow ++ "/h");
+        try f.tmp.dir.createDirPath(t.io, shallow ++ "/o/hash");
+        try f.write(shallow ++ "/o/hash/build", "ordinary cache product");
+        var row = plan.caches[0];
+        row.path = shallow;
+        row.run_root = "local-state/validations/test";
+        row.owner = null;
+        plan.caches = &.{row};
+        var e = f.engine();
+        try t.expectError(error.InvalidCandidateScope, e.add(shallow, row.run_root, reviewed_plan, .cache, null));
+        try e.write(reviewed_plan, plan);
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        if (held) {
+            try e.write(e.config.holds_file, p.Holds{ .paths = &.{shallow} });
+            try t.expectError(error.CacheBatchBecameHeld, cache_batch.apply(&e, &.{0}));
+            _ = try e.metadata(shallow ++ "/o/hash/build");
+        } else {
+            try cache_batch.apply(&e, &.{0});
+            try t.expectEqual(.removed, e.actions.items[0].status);
+        }
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: maximum length product leaves use bounded quarantine names" {
+    for ([_]bool{ false, true }) |batch| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedProductFixture(f);
+        var e = f.engine();
+        var name: [255]u8 = @splat('a');
+        @memcpy(name[253..], ".o");
+        const path = try e.c.fmt("{s}/{s}", .{ run, name });
+        try f.write(path, "\x7fELFmaximum length product");
+        var row = plan.products[0];
+        row.path = path;
+        row.sha256 = try e.digest(path);
+        plan.products = &.{row};
+        try e.write(reviewed_plan, plan);
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        if (batch) try mutation.applyFileBatch(&e, &.{0}) else try mutation.apply(&e, 0);
+        try t.expectEqual(.removed, e.actions.items[0].status);
+        try t.expect(!u.exists(t.io, try e.absolute(path)));
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: maximum length cache leaves use bounded quarantine names" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    var plan = try reviewedCacheFixture(f, false);
+    var e = f.engine();
+    var name: [255]u8 = @splat('a');
+    @memcpy(name[0..10], "zig-local-");
+    const path = try e.c.fmt("{s}/{s}", .{ run, name });
+    try f.tmp.dir.createDirPath(t.io, try e.c.fmt("{s}/o", .{path}));
+    try f.tmp.dir.createDirPath(t.io, try e.c.fmt("{s}/h", .{path}));
+    try f.write(try e.c.fmt("{s}/o/generated", .{path}), "generated object");
+    var row = plan.caches[0];
+    row.path = path;
+    row.owner = null;
+    plan.caches = &.{row};
+    try e.write(reviewed_plan, plan);
+    try reviewed_products.prepare(&e, reviewed_plan);
+    try e.qualify(0);
+    try cache_batch.apply(&e, &.{0});
+    try t.expectEqual(.removed, e.actions.items[0].status);
+    try t.expect(!u.exists(t.io, try e.absolute(path)));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+fn reviewedCachePinFixture(f: *Fixture, other_target: bool) !reviewed_products.Plan {
+    var plan = try reviewedCacheFixture(f, false);
+    var e = f.engine();
+    const manifest = run ++ "/historical.sha256";
+    const member = cache ++ "/o/first";
+    const reference = if (other_target) cache ++ "/o/second" else member;
+    try f.write(manifest, try f.c.fmt("{s}  {s}\n", .{ try e.digest(member), reference }));
+    var row = plan.caches[0];
+    row.retired_pins = try e.c.a.dupe(p.PinTransition, &.{.{
+        .manifest = .{ .path = manifest, .sha256 = try e.digest(manifest) },
+        .reference = reference,
+        .target = .{ .path = member, .sha256 = try e.digest(member) },
+        .reason = "Reviewed exact historical cache-member reference",
+    }});
+    plan.caches = try e.c.a.dupe(reviewed_products.Cache, &.{row});
+    try e.write(reviewed_plan, plan);
+    return plan;
+}
+
+test "storage cleanup: cache transition matches the resolved member not merely its hash" {
+    for ([_]bool{ false, true }) |other_target| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const plan = try reviewedCachePinFixture(f, other_target);
+        var e = f.engine();
+        try reviewed_products.prepare(&e, reviewed_plan);
+        try e.qualify(0);
+        try e.pins();
+        const expected: @TypeOf(e.actions.items[0].status) = if (other_target) .skipped else .ready;
+        try t.expectEqual(expected, e.actions.items[0].status);
+        if (other_target) continue;
+        try mutation.apply(&e, 0);
+        try t.expectEqual(.removed, e.actions.items[0].status);
+        try t.expectEqualStrings(plan.caches[0].retired_pins[0].manifest.sha256, try e.digest(run ++ "/historical.sha256"));
+        var repeat = f.engine();
+        try reviewed_products.prepare(&repeat, reviewed_plan);
+        try t.expectEqual(.absent, repeat.actions.items[0].status);
+    }
+}
+
+test "storage cleanup: cache transitions reject current pins outside members and changed bytes" {
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedCachePinFixture(f, false);
+        var e = f.engine();
+        var row = plan.caches[0];
+        var pin = row.retired_pins[0];
+        switch (case) {
+            0 => e.config.current_manifests = &.{run ++ "/historical.sha256"},
+            1 => pin.target.path = run ++ "/run.log",
+            2 => pin.target.sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            else => try f.write(cache ++ "/o/first", "changed cache member"),
+        }
+        row.retired_pins = &.{pin};
+        plan.caches = &.{row};
+        try e.write(reviewed_plan, plan);
+        try t.expectError(switch (case) {
+            0 => error.CurrentManifestCannotBeRetired,
+            1 => error.InvalidPinTransition,
+            else => error.EvidenceHashMismatch,
+        }, reviewed_products.prepare(&e, reviewed_plan));
+        _ = try e.metadata(cache);
+    }
+}
+
+test "storage cleanup: cache member transitions retain new independent pins" {
+    const f = try Fixture.init();
+    defer f.deinit();
+    _ = try reviewedCachePinFixture(f, false);
+    var e = f.engine();
+    try reviewed_products.prepare(&e, reviewed_plan);
+    try e.qualify(0);
+    try f.write(run ++ "/independent.sha256", try f.c.fmt("{s}  {s}\n", .{ try e.digest(cache ++ "/o/second"), cache ++ "/o/second" }));
+    try t.expectError(error.CacheBatchBecameHeld, cache_batch.apply(&e, &.{0}));
+    _ = try e.metadata(cache ++ "/o/first");
+    _ = try e.metadata(cache ++ "/o/second");
 }
 
 test "storage cleanup: explicit reviewed product needs no fabricated producer receipt" {
@@ -64,6 +769,30 @@ test "storage cleanup: explicit reviewed product needs no fabricated producer re
     var repeat = f.engine();
     try reviewed_products.prepare(&repeat, reviewed_plan);
     try t.expectEqual(.absent, repeat.actions.items[0].status);
+}
+
+test "storage cleanup: reviewed products retire completed row links and named native canaries" {
+    for ([_][]const u8{
+        ".link",            ".so",               ".syscall_hello",         ".compiler_rt_i128_arithmetic",
+        ".compiler_rt_fma", ".setcc_predicates", ".aggregate_sse_returns", ".differential",
+        ".stdout",
+    }) |extension| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var plan = try reviewedProductFixture(f);
+        var row = plan.products[0];
+        var e = f.engine();
+        row.path = try e.c.fmt("{s}/closed-test{s}", .{ run, extension });
+        try f.write(row.path, "\x7fELFcompleted test link");
+        row.sha256 = try e.digest(row.path);
+        plan.products = &.{row};
+        try e.write(reviewed_plan, plan);
+        var verified = f.engine();
+        try reviewed_products.prepare(&verified, reviewed_plan);
+        try verified.qualify(0);
+        try mutation.applyFileBatch(&verified, &.{0});
+        try t.expectEqual(.removed, verified.actions.items[0].status);
+    }
 }
 
 test "storage cleanup: reviewed products reject unclosed ownership and nonproduct paths" {
@@ -90,22 +819,23 @@ test "storage cleanup: reviewed products reject unclosed ownership and nonproduc
 }
 
 test "storage cleanup: reviewed products reject changed hash and noncompiled contents" {
-    for ([_]bool{ false, true }) |bind_text| {
+    for ([_][]const u8{ reviewed_file, run ++ "/compiler.stdout" }) |path| for ([_]bool{ false, true }) |bind_text| {
         const f = try Fixture.init();
         defer f.deinit();
         var plan = try reviewedProductFixture(f);
-        try f.write(reviewed_file, "an extensionless source file is not compiled output");
         var e = f.engine();
+        var product = plan.products[0];
+        product.path = path;
+        try f.write(path, "ordinary text diagnostics are not compiled output");
         if (bind_text) {
-            var product = plan.products[0];
-            product.sha256 = try e.digest(reviewed_file);
-            plan.products = &.{product};
-            try e.write(reviewed_plan, plan);
+            product.sha256 = try e.digest(path);
         }
+        plan.products = &.{product};
+        try e.write(reviewed_plan, plan);
         try reviewed_products.prepare(&e, reviewed_plan);
         try t.expectError(if (bind_text) error.NotCompiledOutput else error.EvidenceHashMismatch, e.qualify(0));
-        _ = try e.metadata(reviewed_file);
-    }
+        _ = try e.metadata(path);
+    };
 }
 
 test "storage cleanup: changed review evidence blocks reviewed product mutation" {
@@ -284,6 +1014,44 @@ test "storage cleanup: reviewed transitions reject incomplete historical retirem
     plan.products = &.{product};
     try e.write(reviewed_plan, plan);
     try t.expectError(error.IncompletePinRetirement, reviewed_products.prepare(&e, reviewed_plan));
+}
+
+test "storage cleanup: shared retirement validation still checks every expected hash and later changes" {
+    for ([_]bool{ false, true }) |wrong_second_hash| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const manifest = "local-state/retirements/earlier/record.json";
+        var plan = try reviewedPinFixture(f, manifest);
+        try f.write(manifest, "{\"status\":\"complete\"}");
+        try f.write(run ++ "/second-helper", "\x7fELFsecond helper");
+        var e = f.engine();
+        var first = plan.products[0];
+        var first_pin = first.retired_pins[0];
+        first_pin.manifest.sha256 = try e.digest(manifest);
+        first.retired_pins = &.{first_pin};
+        var second = first;
+        second.path = run ++ "/second-helper";
+        second.sha256 = try e.digest(second.path);
+        var second_pin = first_pin;
+        second_pin.reference = second.path;
+        second_pin.target = .{ .path = second.path, .sha256 = second.sha256 };
+        if (wrong_second_hash) second_pin.manifest.sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        second.retired_pins = &.{second_pin};
+        plan.products = &.{ first, second };
+        try e.write(reviewed_plan, plan);
+        if (wrong_second_hash) {
+            try t.expectError(error.EvidenceHashMismatch, reviewed_products.prepare(&e, reviewed_plan));
+        } else {
+            try reviewed_products.prepare(&e, reviewed_plan);
+            try e.qualify(0);
+            try e.qualify(1);
+            try f.write(manifest, "{\"status\":\"pending\"}");
+            try t.expectError(error.FileChanged, mutation.applyFileBatch(&e, &.{ 0, 1 }));
+        }
+        _ = try e.metadata(reviewed_file);
+        _ = try e.metadata(second.path);
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
 }
 
 test "storage cleanup: joint traces retain both audits without raw sibling cycles" {
@@ -568,6 +1336,7 @@ test "storage cleanup: reviewed caches retain pinned bytes and reject misplaced 
         _ = try e.metadata(shared_cache ++ "/o/tool");
     }
     for ([_][]const u8{ "local-state/caches", "local-state/caches/a/child", "local-state/inputs/a", "local-state/validations/a/b/source", "../cache" }) |path| try t.expect(!held_products.cacheScope(path));
+    try t.expect(held_products.cacheScope("local-state/validations/a/b/full-zig-global-v7"));
 }
 fn receiptFixture(f: *Fixture, cwd: ?[]const u8, destination: []const u8, code: i32) !void {
     try f.tmp.dir.createDirPath(t.io, receipt_root);
@@ -706,6 +1475,42 @@ test "storage cleanup: report toolchain binds compiler stdout and selected outpu
     const selected = try command_outputs.requestSelected(&e, report, "Independently owned successful output", &.{run ++ "/subject.o"});
     try t.expectEqual(@as(usize, 1), selected.artifacts.len);
     try t.expectEqualStrings(run ++ "/subject.o", selected.artifacts[0].path);
+}
+
+test "storage cleanup: binary stdout requires an actual compiler output command and compiled bytes" {
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        const binary_stdout = run ++ "/direct-object.stdout";
+        try f.write(binary_stdout, if (case == 1) "text diagnostics" else "\x7fELFobject");
+        try f.write(run ++ "/compiler.stderr", "original diagnostics");
+        var e = f.engine();
+        try e.write(report, .{ .status = "passed", .toolchain = .{ .zllvm = "/known/compiler" } });
+        try e.write(run ++ "/commands.json", .{.{
+            .argv = [_][]const u8{ if (case == 2) "printf" else "/known/compiler", "--emit=obj", "input.ll" },
+            .outcome = "completed",
+            .actual_returncode = @as(i32, 0),
+            .returncode = @as(i32, 0),
+            .stdout = try e.absolute(binary_stdout),
+            .stderr = try e.absolute(run ++ "/compiler.stderr"),
+        }});
+        if (case == 2) {
+            try t.expectError(error.NoBoundOutputs, command_outputs.request(&e, report, "Closed binary stdout"));
+            continue;
+        }
+        try e.write(run ++ "/stdout-release.json", try command_outputs.request(&e, report, "Closed binary stdout"));
+        try e.discoverRelease(run ++ "/stdout-release.json", true);
+        try t.expectEqual(@as(usize, 1), e.actions.items.len);
+        if (case == 1) {
+            try t.expectError(error.NotCompiledOutput, e.qualify(0));
+        } else {
+            try e.qualify(0);
+            try mutation.applyFileBatch(&e, &.{0});
+            try t.expectEqual(.removed, e.actions.items[0].status);
+            _ = try e.metadata(run ++ "/compiler.stderr");
+            _ = try e.metadata(run ++ "/commands.json");
+        }
+    }
 }
 
 fn cachePairFixture(f: *Fixture, passed: bool) !void {
@@ -2637,7 +3442,7 @@ test "storage cleanup: quarantine collision preserves both names" {
     try f.build(&e);
     try e.discover();
     try e.qualify(0);
-    const q = try e.c.fmt(run ++ "/.storage-cleanup-{d}-zig-local-cache", .{std.os.linux.getpid()});
+    const q = try e.c.fmt(run ++ "/.storage-cleanup-{d}-0", .{std.os.linux.getpid()});
     try f.write(q, "other evidence");
     try t.expectError(error.PathAlreadyExists, mutation.apply(&e, 0));
     _ = try e.metadata(cache);
@@ -3140,28 +3945,67 @@ test "storage cleanup: pin resolution remains correct beyond the directory descr
 
 const GeneratedFault = enum { none, failed_assemble, wrong_output, bad_index, incomplete, wrong_source };
 fn assemblyFixture(f: *Fixture, e: *core.Engine, fault: GeneratedFault) !void {
-    try f.tmp.dir.createDirPath(t.io, assembly_dir);
-    try f.write(assembly_path, ".text\n# disposable generated assembly\n");
-    try f.write(assembly_dir ++ "/linked.zig", "pub fn main() void {}\n");
+    return assemblyFixtureAt(f, e, fault, assembly_owner);
+}
+fn assemblyFixtureAt(f: *Fixture, e: *core.Engine, fault: GeneratedFault, comptime owner: []const u8) !void {
+    const directory = owner ++ "/ReleaseFast/example";
+    const path = directory ++ "/linked-harness.s";
+    try f.tmp.dir.createDirPath(t.io, directory);
+    try f.write(path, ".text\n# disposable generated assembly\n");
+    try f.write(directory ++ "/linked.zig", "pub fn main() void {}\n");
     for ([_][]const u8{ "compile.stdout", "compile.stderr", "assemble.stdout", "assemble.stderr" }) |name|
-        try f.write(try f.c.fmt("{s}/{s}", .{ assembly_dir, name }), "original diagnostic\n");
+        try f.write(try f.c.fmt("{s}/{s}", .{ directory, name }), "original diagnostic\n");
     const emitter = "/reviewed/zig";
-    const compile = [_][]const u8{ emitter, "build-exe", try e.absolute(assembly_dir ++ "/linked.zig"), "-fno-emit-bin", try f.c.fmt("-femit-asm={s}", .{try e.absolute(if (fault == .wrong_output) assembly_dir ++ "/unrelated.s" else assembly_path)}) };
-    const assemble = [_][]const u8{ emitter, "cc", "-x", "assembler", "-c", try e.absolute(assembly_path), "-o", try e.absolute(assembly_dir ++ "/linked-harness.o") };
-    try e.write(assembly_owner ++ "/commands.json", .{
-        .{ .argv = compile, .outcome = "completed", .returncode = 0, .actual_returncode = 0, .stdout = try e.absolute(assembly_dir ++ "/compile.stdout"), .stderr = try e.absolute(assembly_dir ++ "/compile.stderr") },
-        .{ .argv = assemble, .outcome = "completed", .returncode = if (fault == .failed_assemble) @as(i32, 2) else 0, .actual_returncode = if (fault == .failed_assemble) @as(i32, 2) else 0, .stdout = try e.absolute(assembly_dir ++ "/assemble.stdout"), .stderr = try e.absolute(assembly_dir ++ "/assemble.stderr") },
+    const compile = [_][]const u8{ emitter, "build-exe", try e.absolute(directory ++ "/linked.zig"), "-fno-emit-bin", try f.c.fmt("-femit-asm={s}", .{try e.absolute(if (fault == .wrong_output) directory ++ "/unrelated.s" else path)}) };
+    const assemble = [_][]const u8{ emitter, "cc", "-x", "assembler", "-c", try e.absolute(path), "-o", try e.absolute(directory ++ "/linked-harness.o") };
+    try e.write(owner ++ "/commands.json", .{
+        .{ .argv = compile, .outcome = "completed", .returncode = 0, .actual_returncode = 0, .stdout = try e.absolute(directory ++ "/compile.stdout"), .stderr = try e.absolute(directory ++ "/compile.stderr") },
+        .{ .argv = assemble, .outcome = "completed", .returncode = if (fault == .failed_assemble) @as(i32, 2) else 0, .actual_returncode = if (fault == .failed_assemble) @as(i32, 2) else 0, .stdout = try e.absolute(directory ++ "/assemble.stdout"), .stderr = try e.absolute(directory ++ "/assemble.stderr") },
     });
-    try e.write(assembly_owner ++ "/report.json", .{
+    try e.write(owner ++ "/report.json", .{
         .schema = "execution-breadth-controls-v2",
         .status = "passed",
         .rows = .{.{ .mode = "ReleaseFast", .status = if (fault == .incomplete) "failed" else "passed", .harness = .{
-            .source = try e.absolute(if (fault == .wrong_source) assembly_dir ++ "/other.zig" else assembly_dir ++ "/linked.zig"),
-            .object = try e.absolute(assembly_dir ++ "/linked-harness.o"),
+            .source = try e.absolute(if (fault == .wrong_source) directory ++ "/other.zig" else directory ++ "/linked.zig"),
+            .object = try e.absolute(directory ++ "/linked-harness.o"),
             .producer_commands = [_]usize{ 0, if (fault == .bad_index) 99 else 1 },
             .emitter = .{ .path = emitter },
         } }},
     });
+}
+
+test "storage cleanup: generated assembly at a caller-selected root still requires bound commands" {
+    const owner = "local-state/validations/test/harness-reuse-fast";
+    const path = owner ++ "/ReleaseFast/example/linked-harness.s";
+    inline for (.{ GeneratedFault.none, GeneratedFault.wrong_output, GeneratedFault.failed_assemble }) |fault| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        try assemblyFixtureAt(f, &e, fault, owner);
+        if (fault == .wrong_output) {
+            try t.expectError(error.UnboundAssemblyProducer, generated.request(&e, path, "Closed custom-root assembly"));
+        } else if (fault == .failed_assemble) {
+            try t.expectError(error.GeneratedCommandNotSuccessful, generated.request(&e, path, "Closed custom-root assembly"));
+        } else {
+            const release = try generated.request(&e, path, "Closed custom-root assembly");
+            try t.expect(p.releaseRoot(release));
+            var unrelated = release;
+            unrelated.producer.path = report;
+            try t.expect(!p.releaseRoot(unrelated));
+            unrelated = release;
+            unrelated.artifacts = &.{.{ .path = owner ++ "/unrelated.s", .kind = .generated_assembly }};
+            try t.expect(!p.releaseRoot(unrelated));
+            unrelated.artifacts = &.{.{ .path = path, .kind = .build_output }};
+            try t.expect(!p.releaseRoot(unrelated));
+            try e.write(output ++ "/custom-assembly-release.json", release);
+            try e.discoverRelease(output ++ "/custom-assembly-release.json", true);
+            try e.qualify(0);
+            try t.expectEqual(.ready, e.actions.items[0].status);
+            try mutation.apply(&e, 0);
+            try t.expect(!u.exists(t.io, try e.absolute(path)));
+            try t.expect(u.exists(t.io, try e.absolute(owner ++ "/commands.json")));
+        }
+    }
 }
 
 test "storage cleanup: generated assembly removal keeps source, commands and diagnostics" {
@@ -3539,6 +4383,379 @@ test "storage cleanup: AIR sharing preserves cache aliases and current contracts
         try t.expectEqualStrings(sha, try e.digest(path));
     }
     try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: shared input batches roll back all inodes for a late hold" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    for ([_]bool{ false, true }) |held| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        try f.write(run ++ "/first.ll", "first retained input\n");
+        try f.write(run ++ "/second.ll", "second retained input\n");
+        {
+            const file = try f.tmp.dir.openFile(t.io, run ++ "/first.ll", .{});
+            defer file.close(t.io);
+            try file.hardLink(t.io, f.tmp.dir, run ++ "/alias.ll", .{});
+        }
+        const first = try e.metadata(run ++ "/first.ll");
+        const second = try e.metadata(run ++ "/second.ll");
+        const hash_first = try e.digest(run ++ "/first.ll");
+        const hash_second = try e.digest(run ++ "/second.ll");
+        var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+        defer store.deinit();
+        const paths = [_][]const u8{ run ++ "/first.ll", run ++ "/alias.ll", run ++ "/second.ll" };
+        for (paths, 0..) |path, index| {
+            const m = if (index == 2) second else first;
+            const hash = if (index == 2) hash_second else hash_first;
+            const file = try f.tmp.dir.openFile(t.io, path, .{});
+            defer file.close(t.io);
+            try store.publishFile(file, .{ .name = "input.ll", .sha256 = hash, .bytes = m.size });
+            try e.actions.append(f.c.a, .{ .path = path, .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = hash, .metadata = m });
+        }
+        const groups = [_]shared.Migration{
+            .{ .indexes = &.{ 0, 1 }, .metadata = first, .sha256 = hash_first },
+            .{ .indexes = &.{2}, .metadata = second, .sha256 = hash_second },
+        };
+        if (held) {
+            try e.write(e.config.holds_file, p.Holds{ .paths = &.{paths[2]} });
+            try t.expectError(error.SharedInputHeld, shared.migrateBatch(&e, &store, &groups));
+        } else try t.expectEqual(first.allocated_bytes + second.allocated_bytes, try shared.migrateBatch(&e, &store, &groups));
+        for (paths, 0..) |path, index| {
+            const old = if (index == 2) second else first;
+            const hash = if (index == 2) hash_second else hash_first;
+            const current = try e.metadata(path);
+            try t.expectEqualStrings(hash, try e.digest(path));
+            if (held) {
+                try t.expectEqual(old.inode, current.inode);
+                try t.expectEqual(old.links, current.links);
+                try t.expectEqual(old.mode, current.mode);
+            } else {
+                const stored = try store.objects.statFile(t.io, hash, .{});
+                try t.expectEqual(stored.inode, current.inode);
+                try t.expectEqual(@as(u32, 0o444), current.mode & 0o7777);
+            }
+        }
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: larger small-input batches preserve all contents and roll back a late hold" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    for ([_]bool{ false, true }) |held| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+        defer store.deinit();
+        var groups: [129]shared.Migration = undefined;
+        var indexes: [129]usize = undefined;
+        var bytes: u64 = 0;
+        for (&groups, 0..) |*group, i| {
+            const path = try f.c.fmt(run ++ "/input-{d}.ll", .{i});
+            try f.write(path, "same immutable evidence\n");
+            const metadata = try e.metadata(path);
+            const hash = try e.digest(path);
+            const file = try f.tmp.dir.openFile(t.io, path, .{});
+            defer file.close(t.io);
+            try store.publishFile(file, .{ .name = "input.ll", .sha256 = hash, .bytes = metadata.size });
+            indexes[i] = i;
+            group.* = .{ .indexes = indexes[i .. i + 1], .metadata = metadata, .sha256 = hash };
+            bytes += metadata.allocated_bytes;
+            try e.actions.append(f.c.a, .{ .path = path, .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = hash, .metadata = metadata });
+        }
+        var excessive: [shared.max_batch_inodes + 1]shared.Migration = undefined;
+        try t.expectError(error.InvalidInputBatch, shared.migrateBatch(&e, &store, &excessive));
+        if (held) {
+            try e.write(e.config.holds_file, p.Holds{ .paths = &.{e.actions.items[128].path} });
+            try t.expectError(error.SharedInputHeld, shared.migrateBatch(&e, &store, &groups));
+        } else try t.expectEqual(bytes, try shared.migrateBatch(&e, &store, &groups));
+        for (groups, e.actions.items) |group, action| {
+            const current = try e.metadata(action.path);
+            try t.expectEqualStrings(group.sha256, try e.digest(action.path));
+            if (held) {
+                try t.expectEqual(group.metadata.inode, current.inode);
+                try t.expectEqual(group.metadata.links, current.links);
+                try t.expectEqual(group.metadata.mode, current.mode);
+            } else try t.expectEqual((try store.objects.statFile(t.io, group.sha256, .{})).inode, current.inode);
+        }
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+}
+
+test "storage cleanup: input batch rejects changed later files and duplicate inodes before mutation" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const paths = [_][]const u8{ run ++ "/first.ll", run ++ "/second.ll" };
+    var groups: [2]shared.Migration = undefined;
+    for (paths, 0..) |path, index| {
+        try f.write(path, "retained input\n");
+        const m = try e.metadata(path);
+        const hash = try e.digest(path);
+        groups[index] = .{ .indexes = if (index == 0) &.{0} else &.{1}, .metadata = m, .sha256 = hash };
+        try e.actions.append(f.c.a, .{ .path = path, .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = hash, .metadata = m });
+    }
+    var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+    defer store.deinit();
+    try t.expectError(error.DuplicateInputInode, shared.migrateBatch(&e, &store, &.{ groups[0], groups[0] }));
+    try f.write(paths[1], "changed later input\n");
+    try t.expectError(error.SharedInputChanged, shared.migrateBatch(&e, &store, &groups));
+    try t.expect(groups[0].metadata.eql(try e.metadata(paths[0])));
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: batch refresh maps selected indexes and leaves unrelated files alone" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const paths = [_][]const u8{ run ++ "/first.ll", run ++ "/unselected.ll", run ++ "/last.ll" };
+    var snapshots: [3]core.fa.Metadata = undefined;
+    var hashes: [3][]const u8 = undefined;
+    var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+    defer store.deinit();
+    for (paths, 0..) |path, index| {
+        try f.write(path, "retained input\n");
+        snapshots[index] = try e.metadata(path);
+        hashes[index] = try e.digest(path);
+        const file = try f.tmp.dir.openFile(t.io, path, .{});
+        defer file.close(t.io);
+        try store.publishFile(file, .{ .name = "input.ll", .sha256 = hashes[index], .bytes = snapshots[index].size });
+        try e.actions.append(f.c.a, .{ .path = path, .run_root = run, .producer = report, .kind = .build_output, .status = .ready, .sha256 = hashes[index], .metadata = snapshots[index] });
+    }
+    try e.write(e.config.holds_file, p.Holds{ .paths = &.{paths[2]} });
+    try t.expectError(error.SharedInputHeld, shared.migrateBatch(&e, &store, &.{
+        .{ .indexes = &.{2}, .metadata = snapshots[2], .sha256 = hashes[2] },
+        .{ .indexes = &.{0}, .metadata = snapshots[0], .sha256 = hashes[0] },
+    }));
+    try t.expectEqual(@as(usize, 3), e.actions.items.len);
+    try t.expectEqual(.skipped, e.actions.items[2].status);
+    try t.expectEqual(.ready, e.actions.items[0].status);
+    try t.expectEqual(.ready, e.actions.items[1].status);
+    try t.expect(snapshots[1].eql(try e.metadata(paths[1])));
+    for (paths, 0..) |path, index| try t.expectEqual(snapshots[index].inode, (try e.metadata(path)).inode);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: immutable evidence sharing requires a bound review and preserves contracts" {
+    const shared = @import("shared_inputs.zig");
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const paths = [_][]const u8{ run ++ "/old/object-contract.json", run ++ "/audited/object-contract.json" };
+        for (paths) |path| {
+            try f.tmp.dir.createDirPath(t.io, std.fs.path.dirname(path).?);
+            try f.write(path, "{\"verified_object_contract\":true}\n");
+        }
+        const before = try e.metadata(paths[0]);
+        const sha = try e.digest(paths[0]);
+        const review = output ++ "/sharing-review.md";
+        try f.write(review, "Completed immutable reports; retain both original names and exact contents.\n");
+        const review_hash = try e.digest(review);
+        const plan_path = output ++ "/sharing.json";
+        const plan: shared.Plan = .{
+            .schema = if (case == 3) "zllvm-shared-inputs-v1" else "zllvm-shared-evidence-v1",
+            .inputs = &.{.{ .sha256 = sha, .paths = &paths }},
+            .review = if (case == 1) null else .{ .path = review, .sha256 = review_hash },
+            .reason = "Completed duplicate reports with immutable consumers",
+        };
+        try e.write(plan_path, plan);
+        if (case == 2) try f.write(review, "Changed decision\n");
+        const manifest = output ++ "/current.sha256";
+        try f.write(manifest, try f.c.fmt("{s}  {s}\n{s}  {s}\n", .{ sha, paths[0], sha, paths[1] }));
+        e.config.current_manifests = &.{manifest};
+        if (case != 0) {
+            try t.expectError(switch (case) {
+                1 => error.MissingEvidenceSharingReview,
+                2 => error.EvidenceHashMismatch,
+                else => error.InvalidSharedInputPlan,
+            }, shared.run(&e, plan_path, true));
+            try t.expect(before.eql(try e.metadata(paths[0])));
+        } else {
+            try shared.run(&e, plan_path, true);
+            const stored = try e.metadata(try f.c.fmt("local-state/artifacts/objects/{s}", .{sha}));
+            for (paths) |path| {
+                try t.expectEqual(stored.inode, (try e.metadata(path)).inode);
+                try t.expectEqualStrings(sha, try e.digest(path));
+            }
+        }
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
+    for ([_][]const u8{ "src/main.zig", "local-state/worktrees/copy/main.zig", run ++ "/local.o", run ++ "/backend/profile.events.jsonl", "local-state/retirements/../source.json" }) |path| try t.expect(!shared.evidenceScope(path));
+}
+
+test "storage cleanup: evidence sharing rejects captured binaries even without executable permissions" {
+    const shared = @import("shared_inputs.zig");
+    for ([_][]const u8{ "\x7fELFcaptured object", "!<arch>\ncaptured archive" }) |bytes| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const paths = [_][]const u8{ run ++ "/compile.stdout", run ++ "/misnamed.json" };
+        for (paths) |path| try f.write(path, bytes);
+        const before = try e.metadata(paths[0]);
+        const sha = try e.digest(paths[0]);
+        const review = output ++ "/review.md";
+        try f.write(review, "A description cannot turn compiled bytes into text evidence.\n");
+        const plan = output ++ "/sharing.json";
+        try e.write(plan, shared.Plan{
+            .schema = "zllvm-shared-evidence-v1",
+            .review = .{ .path = review, .sha256 = try e.digest(review) },
+            .reason = "Review duplicate captures",
+            .inputs = &.{.{ .sha256 = sha, .paths = &paths }},
+        });
+        try t.expectError(error.CompiledEvidenceNotShareable, shared.run(&e, plan, true));
+        try t.expect(before.eql(try e.metadata(paths[0])));
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+        try t.expect(!u.exists(t.io, try e.absolute(try e.c.fmt("local-state/artifacts/objects/{s}", .{sha}))));
+    }
+}
+
+test "storage cleanup: evidence sharing preserves parsed control observations and their aliases" {
+    const shared = @import("shared_inputs.zig");
+    const storage = @import("../zllvm_artifact_store/store.zig");
+    for ([_]bool{ false, true }) |already_shared| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const paths = [_][]const u8{ run ++ "/parsed.json", run ++ "/duplicate.json" };
+        for (paths) |path| try f.write(path, "{\"parsed_control\":true}\n");
+        const sha = try e.digest(paths[0]);
+        if (already_shared) {
+            var store = try storage.Store.open(f.c.a, t.io, try e.absolute("local-state/artifacts"), true);
+            defer store.deinit();
+            const source = try f.tmp.dir.openFile(t.io, paths[0], .{});
+            defer source.close(t.io);
+            try store.publishFile(source, .{ .name = "input.ll", .sha256 = sha, .bytes = (try e.metadata(paths[0])).size });
+            try f.tmp.dir.deleteFile(t.io, paths[0]);
+            try store.linkInput(sha, try e.absolute(paths[0]));
+        }
+        const first = try e.metadata(paths[0]);
+        const second = try e.metadata(paths[1]);
+        var parsed = try e.load(t.allocator, paths[0]);
+        defer parsed.deinit();
+        try e.addControl(paths[0]);
+        try f.write(reviewed_notes, "Share immutable evidence while preserving active collector control observations.");
+        const plan_path = output ++ "/control-sharing.json";
+        try e.write(plan_path, shared.Plan{
+            .schema = "zllvm-shared-evidence-v1",
+            .inputs = &.{.{ .sha256 = sha, .paths = &paths }},
+            .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+            .reason = "Reviewed equal records",
+        });
+        try shared.run(&e, plan_path, true);
+        const current = try e.metadata(paths[0]);
+        try t.expectEqual(current.inode, (try e.metadata(paths[1])).inode);
+        if (already_shared) try t.expectEqual(first.inode, current.inode) else try t.expect(first.inode != current.inode);
+        try t.expect(second.inode != current.inode);
+        try t.expectEqualStrings(sha, try e.digest(paths[0]));
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+        var result = try e.load(t.allocator, output ++ "/shared-input-review.json");
+        defer result.deinit();
+        try t.expectEqualStrings("shared", try core.str((try core.get(result.value, "groups")).array.items[1], "status"));
+        try t.expect(try core.integer(result.value, "removed_allocated_file_bytes") > 0);
+    }
+}
+
+test "storage cleanup: sharing never rebinds an unrelated changed control" {
+    const shared = @import("shared_inputs.zig");
+    const f = try Fixture.init();
+    defer f.deinit();
+    var e = f.engine();
+    const paths = [_][]const u8{ run ++ "/one.json", run ++ "/two.json" };
+    for (paths) |path| try f.write(path, "{\"immutable_result\":true}\n");
+    const first = try e.metadata(paths[0]);
+    const second = try e.metadata(paths[1]);
+    const control = output ++ "/independent-control.json";
+    try f.write(control, "{\"independent_control\":1}\n");
+    var observed = try e.load(t.allocator, control);
+    defer observed.deinit();
+    try e.addControl(control);
+    try f.write(reviewed_notes, "Closed immutable records; preserve independent controls.");
+    const plan_path = output ++ "/changed-control-sharing.json";
+    try e.write(plan_path, shared.Plan{
+        .schema = "zllvm-shared-evidence-v1",
+        .inputs = &.{.{ .sha256 = try e.digest(paths[0]), .paths = &paths }},
+        .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+        .reason = "Reviewed records",
+    });
+    try f.write(control, "{\"independent_control\":2}\n");
+    try t.expectError(error.FileChanged, shared.run(&e, plan_path, true));
+    try t.expectEqual(first.inode, (try e.metadata(paths[0])).inode);
+    try t.expectEqual(second.inode, (try e.metadata(paths[1])).inode);
+    try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+}
+
+test "storage cleanup: reviewed immutable sharing preserves manual holds and independent protection" {
+    const shared = @import("shared_inputs.zig");
+    for (0..3) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const input = run ++ "/held-input.ll";
+        try f.write(input, "immutable captured input\n");
+        const before = try e.metadata(input);
+        const sha = try e.digest(input);
+        try f.write(reviewed_notes, "The held input remains required; sharing only changes its immutable backing inode.");
+        try e.write(e.config.holds_file, p.Holds{ .paths = if (case == 1) &.{ run, input } else &.{run} });
+        const holds_hash = try e.digest(e.config.holds_file);
+        const plan: shared.Plan = .{
+            .inputs = &.{.{ .sha256 = sha, .paths = &.{input} }},
+            .review = .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+            .reason = "Preserve frozen input bytes and hold while consolidating storage",
+            .sharing_holds = .{ .manifest = .{ .path = e.config.holds_file, .sha256 = holds_hash }, .paths = &.{run} },
+        };
+        try e.write(output ++ "/shared-held.json", plan);
+        if (case == 2) e.config.protected_paths = &.{run};
+        try shared.run(&e, output ++ "/shared-held.json", true);
+        try t.expectEqualStrings(holds_hash, try e.digest(e.config.holds_file));
+        try t.expectEqualStrings(sha, try e.digest(input));
+        if (case == 0) {
+            try t.expect(before.inode != (try e.metadata(input)).inode);
+            var fresh = f.engine();
+            const index = try fresh.add(input, run, report, .build_output, sha);
+            try fresh.loadHolds();
+            try t.expectEqual(.skipped, fresh.actions.items[index].status);
+        } else {
+            try t.expectEqual(.skipped, e.actions.items[0].status);
+            try t.expect(before.eql(try e.metadata(input)));
+        }
+    }
+}
+
+test "storage cleanup: sharing hold exception needs unchanged review exact hold and matching input" {
+    const shared = @import("shared_inputs.zig");
+    for (0..4) |case| {
+        const f = try Fixture.init();
+        defer f.deinit();
+        var e = f.engine();
+        const input = run ++ "/held-input.ll";
+        try f.write(input, "immutable captured input\n");
+        const before = try e.metadata(input);
+        try f.write(reviewed_notes, "Explicit immutable sharing review");
+        try e.write(e.config.holds_file, p.Holds{ .paths = &.{ run, released } });
+        const plan: shared.Plan = .{
+            .inputs = &.{.{ .sha256 = try e.digest(input), .paths = &.{input} }},
+            .review = if (case == 0) null else .{ .path = reviewed_notes, .sha256 = try e.digest(reviewed_notes) },
+            .reason = "Share a reviewed immutable held input",
+            .sharing_holds = .{ .manifest = .{ .path = e.config.holds_file, .sha256 = try e.digest(e.config.holds_file) }, .paths = if (case == 2) &.{input} else if (case == 3) &.{released} else &.{run} },
+        };
+        try e.write(output ++ "/shared-held.json", plan);
+        if (case == 1) try e.write(e.config.holds_file, p.Holds{ .paths = &.{ run, input, released } });
+        try t.expectError(switch (case) {
+            0 => error.MissingEvidenceSharingReview,
+            1 => error.EvidenceHashMismatch,
+            else => error.InvalidSharingHoldReview,
+        }, shared.run(&e, output ++ "/shared-held.json", true));
+        try t.expect(before.eql(try e.metadata(input)));
+        try t.expect(!u.exists(t.io, try e.absolute(mutation.pending_path)));
+    }
 }
 
 test "storage cleanup: input sharing honors manual generic and specific policy holds" {

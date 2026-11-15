@@ -89,7 +89,7 @@ pub fn apply(e: *core.Engine, indexes: []const usize) !void {
         defer parent.close(e.c.io);
         const mode = (try parent.stat(e.c.io)).permissions.toMode();
         if (mode & 0o200 == 0) return error.FrozenCacheParent;
-        try entries.append(e.c.gpa, .{ .index = index, .path = a.path, .quarantine = try e.c.fmt("{s}/.storage-cleanup-{d}-{d}-{s}", .{ std.fs.path.dirname(a.path).?, std.os.linux.getpid(), index, std.fs.path.basename(a.path) }), .metadata = metadata, .parent_mode = mode, .before = before });
+        try entries.append(e.c.gpa, .{ .index = index, .path = a.path, .quarantine = try e.c.fmt("{s}/.storage-cleanup-{d}-{d}", .{ std.fs.path.dirname(a.path).?, std.os.linux.getpid(), index }), .metadata = metadata, .parent_mode = mode, .before = before });
     }
     const Pending = struct { action_index: usize, action: core.Action, quarantine: []const u8, parent_mode: u32 };
     var pending: std.ArrayList(Pending) = .empty;

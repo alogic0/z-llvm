@@ -83,16 +83,21 @@ pub fn releaseRoot(r: Release) bool {
     if (candidate(r.run_root)) return true;
     if (!validationRun(r.run_root)) return false;
     if (r.command_outputs != null or r.compiler_observation != null) return true;
-    // Older real-program runs have no batch component. Admit only their exact
-    // capture helper here; generated.verify still requires a passed comparison
-    // and the runner's recorded binary hash before collection.
+    // Older generated-output runs have no batch component. Admit only the
+    // exact helper/assembly layout; generated.verify still checks the passed
+    // producer and the runner identity or exact compile/assemble commands.
     if (r.state != .disposable or r.artifacts.len != 1) return false;
     const artifact = r.artifacts[0];
+    if (!std.mem.eql(u8, std.fs.path.basename(r.producer.path), "report.json") or
+        !std.mem.eql(u8, std.fs.path.dirname(r.producer.path) orelse "", r.run_root)) return false;
+    if (artifact.kind == .generated_assembly and std.mem.eql(u8, std.fs.path.basename(artifact.path), "linked-harness.s")) {
+        const directory = std.fs.path.dirname(artifact.path) orelse return false;
+        const mode_directory = std.fs.path.dirname(directory) orelse return false;
+        return std.mem.eql(u8, std.fs.path.dirname(mode_directory) orelse "", r.run_root);
+    }
     return artifact.kind == .build_output and
         std.mem.eql(u8, std.fs.path.basename(artifact.path), "capture-zllvm") and
-        std.mem.eql(u8, std.fs.path.dirname(artifact.path) orelse "", r.run_root) and
-        std.mem.eql(u8, std.fs.path.basename(r.producer.path), "report.json") and
-        std.mem.eql(u8, std.fs.path.dirname(r.producer.path) orelse "", r.run_root);
+        std.mem.eql(u8, std.fs.path.dirname(artifact.path) orelse "", r.run_root);
 }
 pub fn hash(s: []const u8) bool {
     if (s.len != 64) return false;
@@ -141,7 +146,8 @@ pub fn artifactName(a: Artifact) bool {
 /// collector additionally requires ELF/archive bytes before any removal.
 pub fn commandOutputName(a: Artifact) bool {
     return a.kind == .build_output and validationOutput(a.path) and hash(a.sha256) and
-        (artifactName(a) or std.mem.indexOfScalar(u8, std.fs.path.basename(a.path), '.') == null);
+        (artifactName(a) or std.mem.indexOfScalar(u8, std.fs.path.basename(a.path), '.') == null or
+            std.mem.endsWith(u8, a.path, ".stdout"));
 }
 pub fn validate(c: Config) !void {
     if (c.schema != 1 or c.max_candidates == 0 or c.max_candidates > 16_384 or c.max_candidate_entries == 0 or c.max_candidate_entries > 1_000_000 or c.max_reclaim_bytes == 0 or !relative(c.holds_file)) return error.InvalidPolicy;

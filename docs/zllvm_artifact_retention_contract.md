@@ -100,3 +100,13 @@ Source snapshots already reachable through ordinary Git refs are listed in
 byte count. The two `retained-*-minimal` manifests supersede the initial retention
 manifests and pin only payloads that still need object storage. No supplemental
 Git repository or duplicate archive is involved.
+
+The reviewed 2026-11-14 retained-validations manifest replaces its 2026-09-10
+predecessor. It removes 1,825 entries for private baseline/controller Zig caches
+accidentally included in the old archive. The 1,037 retained entries preserve
+the adopted inputs, comparison results, reproductions and other maintained
+evidence. The original manifest is retained in Git and in the cleanup evidence;
+its local pin was withdrawn only after the replacement manifest verified.
+Native collection removed 1,158 newly unreferenced objects, reclaiming
+91,496,448 allocated bytes. The review and native receipts are under
+`local-state/storage-cleanup/resolve-all-20261114/`.

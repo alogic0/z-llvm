@@ -1,120 +1,97 @@
-# Resolve remaining storage consumers and duplicated inputs
+# Resolve the remaining local storage
 
-Status: completed reviewed pass; the remaining cases below need further review.
+Status: completed on November 15. The continuation reduced observed physical
+allocation from **72.770 GiB to 34.619 GiB**, reclaiming **40,964,743,168 bytes
+(38.151 GiB)** after accounting for its own retained audit data.
+The [final result](../evidence/resolved_storage_cleanup_20261115.json) binds the
+receipts and integrity checks. The [retained-purpose ledger](../evidence/local_state_purpose_20261114.md)
+records consumers and release conditions for the remaining file families.
+A historical pin or an unexplained protection rule remains an investigation
+item, not a reason to stop without resolving its meaning.
 
-The starting inventory contains 78.286 GiB, with 56.361 GiB still unresolved.
-Investigate concrete consumers and historical retention decisions rather than
-using the unresolved label as a deletion rule.
+The preceding completed pass is recorded in
+[remaining_storage_cleanup_20261114.json](../evidence/remaining_storage_cleanup_20261114.json).
+Its final inventory is this continuation's baseline: **78,136,582,144 allocated
+bytes (72.770 GiB)**, including **54,594,428,928 unresolved bytes**. Do not count
+the preceding pass's 5,953,155,072-byte saving again.
 
-1. Review the largest copied inputs and their aliases. Share identical immutable
-   inputs while preserving their names and bytes; retain active holds and verify
-   every current checksum contract before and after migration.
-2. Review historical pins on ordinary completed build products. Transition only
-   individually identified references whose binary consumers are closed. Preserve
-   the original records and exclude current contracts and exact replay inputs.
-3. Investigate the remaining large traces, records and temporary workspaces.
-   Record their actual consumer or the precise missing proof for retirement.
-4. Apply qualified changes, verify retained contracts, record actual space saved,
-   close task scratch, inventory again and commit the code and result.
+## Ownership and closure
 
-Evidence root: `local-state/storage-cleanup/remaining-storage-20261114/`.
-Any qualification uses managed commands in an isolated owner under
-`local-state/tmp/remaining-storage-build/owner/`. The launcher places compilers,
-test products and private caches in that owner's temporary workspaces. Keep the
-terminal reports and diagnostics in the evidence root, then remove task-owned
-scratch after qualification and installation. Native cleanup transaction records
-remain under `local-state/retirements/automatic-storage-cleanup/`.
+Evidence root: `local-state/storage-cleanup/resolve-all-20261114/`.
+Temporary qualification owner: `local-state/tmp/resolve-all-build/owner/`.
+Managed commands record terminal results and source identities. Promote their
+maintained reports with byte comparison, release their workspaces, then remove
+the task-owned bootstrap. Close this task's own storage before reporting completion.
 
-Retained exceptions: current manifests, independent holds, unique inputs and
-raw traces without verified semantic audits. These need a named consumer or a
-separate reviewed transition; age or a historical reference alone is not a
-permanent-retention decision.
+Use the qualified native collector for supported mutations. Explicit administrative
+transitions retain their exact review, old and new identities, current-contract
+verification, hold/consumer checks and durable mutation record. Never infer that
+missing evidence alone authorizes deletion.
 
-## Findings and implementation
+## Decisions already established
 
-- The largest copied inputs were three AIR exports. The collector now supports
-  explicitly listed `.air`/`.ll` inputs in validation, input and cache storage,
-  including shallow legacy paths. Sharing preserves all names and bytes and
-  excludes only generic policy-root protection. Independent holds and consumers
-  still block changes. Seven old inode groups were shared, preserving ten paths
-  and reclaiming **3,925,946,368 net allocated bytes**; 17 held groups and their
-  182 paths remain unchanged.
-- Historical cleanup sibling lists pinned completed binaries after their use
-  ended. The reviewed-product format now accepts exact manifest/reference/target
-  transitions. Original manifests remain, current contracts cannot be waived,
-  and unfinished records or changed evidence fail closed. The first reviewed
-  group removed **33 files / 123,703,296 bytes**. A separate Fibonacci review
-  removed **five files / 435,032,064 bytes**, including three old compilers;
-  the accepted arithmetic-slice compiler remains.
-- The two self-rebuild captures have terminal producer evidence under the
-  original report's `self_rebuild_invocations`, which the auditor previously
-  ignored. It now binds their separate build command and exact captures,
-  rejecting reused outputs and warmup/help commands. Both streams pass full
-  semantic validation: **135,024 and 4,763,096 event records**.
-- Preparing separate retirement requests for these streams created a cycle:
-  each retained the other's raw stream as a sibling. Compatible requests now
-  become one release retaining both audits. Retained identities preserve all
-  their roles, including a receipt that supplies both source and build evidence.
-  Different producer/proof identities remain separate; every raw artifact still
-  needs its own qualification and all independent retention guards.
-  The resulting collection removed both traces, reclaiming **1,468,473,344
-  bytes**. Twelve exact historical references were transitioned; the original
-  manifests, audits and source/build/input evidence remain unchanged.
-- All **3,599 unaliased object-store files / 678,174,720 bytes** are referenced
-  by committed artifact manifests. They are archived inputs/results/diagnostics,
-  not object-store orphans. The old 326,066,176-byte instruction census has no
-  current code consumer found, but its original acceptance seal still pins it.
-  The 1,263,316,992-byte `v854` trace belongs to an interrupted run with return
-  code -9 and no terminal backend report; it needs a diagnostic disposition.
+- Ordinary obsolete compilers, objects, generated assembly and private caches
+  are temporary products. The user permits their retirement without a new
+  source/configuration archive. Preserve existing outcomes and identities.
+- Independent source drafts, exact replay dependencies and adopted inputs have
+  separate consumers. Keep the specific dependency; close obsolete broad holds.
+- Share byte-identical immutable inputs and completed evidence while preserving
+  every pathname and byte. Keep registered source worktrees writable and intact.
+- Retire full event streams after semantic audit. Interrupted prefixes require
+  a diagnosis tied to the original failed/canceled outcome, not a fabricated
+  successful audit. Keep intentional positive/negative trace fixtures.
+- Current manifests require verified successors before changing their lifetime.
+  Exact obsolete historical references can expire through reviewed transitions;
+  original manifests remain evidence of what the earlier run contained.
+- Expanded diagnostics and unreferenced aggregate views can use verified lossless
+  archives. Keep referenced per-file retirement proofs and source/build chains.
 
-`remaining-purpose-review.md` under the evidence root records these consumers
-and release conditions, the remaining seven throughput workspaces, and a
-breakdown of historical cleanup records. It does not classify all leftovers as
-necessary. Failed initial test/audit/preparation attempts and their diagnoses
-remain in `qualification-disposition.md`.
+## Work completed in this continuation
 
-## Result and qualification
+The receipts under the evidence root record immutable input/evidence sharing,
+closure of 498 obsolete run holds, exact current-contract transitions, removal
+of fully audited streams and diagnosed interrupted prefixes, retirement of the
+superseded instruction census, ordinary compiled outputs and private caches.
+The six current contracts remain verified; 17 independent holds remain scoped
+to their actual dependencies.
 
-The collection reclaimed **5,953,155,072 bytes (5.544 GiB)** of existing payload:
-ten input paths retain shared immutable contents, and 38 obsolete compiled
-products plus two audited raw traces are gone. The final inventory contains
-**78,136,582,144 bytes (72.770 GiB)**, down from 78.286 GiB. The observed net
-reduction is 5,922,713,600 bytes; new audit records and other allocation changes
-account for the difference from payload savings.
+Collector fixes cover exact historical member references, failed/copied private
+cache ownership, captured binary stdout, complete alias groups, bounded mutation
+journals, sharing observation rebinding and direct trace producer binding.
+The diagnosis tool has explicit build/test targets. Caller-selected assembly
+output roots now qualify through their exact successful compiler/assembler
+commands. Small immutable files use larger bounded sharing batches while keeping
+fresh consumer checks and complete rollback.
 
-All 196 cleanup tests and 17 event-auditor tests pass in Debug and ReleaseFast.
-Reviewed-product CLI checks passed in both modes, and the general CLI suite
-passed. The installed ReleaseFast tools match the qualified sources. Formatting
-and diff checks pass. The final integrity check verifies all six current
-manifests, 512 retained identities, ten shared inputs and four accepted external
-artifacts. All 517 manual holds and the policy are unchanged.
+## Completed review
 
-Seven qualification workspaces and the isolated owner's bootstrap were removed
-after their evidence was promoted with byte comparison. Their 851,050,496 bytes
-were created by this task and are excluded from existing-payload savings. There
-is no remaining task scratch or pending cleanup transaction.
+- Completed the prepared product, historical-pin, generated-assembly and cache
+  closures, including the remaining aliases and individually reviewed partial
+  products. Missing old receipts were recorded honestly.
+- Removed 687 ignored worktree products while preserving the source worktree
+  states, original results and independent canonical object fixtures.
+- Completed all 18 small-evidence sharing plans: 285,274 paths preserved,
+  282,199 shared, and 3,075 retained under their specific source/input or audit
+  holds. This group alone reclaimed 3,098,243,072 allocated bytes.
+- Recorded a fresh native inventory and a compressed per-path metadata index.
+  Six superseded full surveys were retired; their compact original records and
+  historical checksum lists remain. The native inventory's remaining unresolved
+  category includes historical evidence explained by the separate purpose ledger;
+  it was not relabeled as currently required.
+- Compacted 120 additional aggregate views and preparatory tables losslessly.
+  Applied plans, archive indexes and referenced per-file proofs keep their paths.
+  All 50 qualification workspaces and the task-owned bootstrap were collected.
 
-[The tracked result](../evidence/remaining_storage_cleanup_20261114.json) records
-the exact inventories, collection receipts, plans, original evidence hashes,
-test logs, installation identities and integrity check.
+The final collector passed 230 tests in both Debug and ReleaseFast, then both
+full CLI suites on the installed ReleaseFast binary. The event auditor passed
+18 tests per mode and the interrupted-stream diagnosis tool passed 13 per mode.
+Documentation, formatting and diff checks passed. Final storage verification
+checked all 8,256 canonical object hashes, all 282,199 shared aliases, six current
+contracts, 12 unchanged original manifests and 17 independent manual holds.
+All 34 managed jobs are finished; no pending transaction or quarantine remains.
 
-## Remaining decisions
-
-The final inventory still labels **54,594,428,928 bytes (50.845 GiB)** unresolved;
-that is not a finding that all those bytes are needed. The strongest concrete
-follow-ups are:
-
-1. Give the interrupted `v854` trace a diagnostic disposition, preserving its
-   failed outcome and useful failure evidence rather than claiming a successful
-   semantic audit.
-2. Review the 17 independently held duplicate input groups and their consumers
-   before sharing them. Review exact replay consumers for the seven remaining
-   throughput workspaces separately.
-3. Transition the historical instruction census and archive object manifests
-   only after checking their accepted summaries and unique diagnostic inputs.
-4. Compact repeated cleanup reports and inventories while preserving referenced
-   per-file and source/compiler proof records.
-
-The native final review has no eligible automatic deletions. Future cleanup
-must resolve these particular contracts rather than broadly ignoring historical
-pins or treating an unsuccessful search for consumers as deletion authority.
+The seven remaining throughput workspaces have current audit/replay consumers:
+three compiler workspaces and four object workspaces. Their explicit release
+condition is an accepted replacement followed by workspace release. Further
+reduction of original inputs/results requires a reviewed change to their evidence
+or reader contract; this pass does not claim an irreducible storage minimum.

@@ -56,6 +56,53 @@ fn buildArgs(args: []const []const u8) ![]const []const u8 {
     return command;
 }
 
+// Direct captured-IR runs record the terminal backend command inside their
+// report, even when an outer checked command ran a shell script or used a
+// different checkout root. Bind that original command rather than synthesizing
+// a successful outer receipt. Intentionally mutated reuse fixtures fail this
+// comparison and must retain their negative-control disposition.
+fn validateDirectCapture(e: *storage.Engine, entry: Entry, top: u.Value) !i64 {
+    if (!storage.eq(top, "route", "llvm-postopt-to-zllvm-object") or
+        (!storage.eq(top, "status", "passed") and !storage.eq(top, "status", "blocked"))) return error.ProducerNotTerminal;
+    const invocation = try storage.get(top, "invocation");
+    if (!try storage.boolean(invocation, "process_completed")) return error.ProducerNotTerminal;
+    if (invocation.object.get("backend_executed")) |executed| {
+        if (executed != .bool or !executed.bool) return error.ReusedCaptureIsNotProducer;
+    }
+    var backend = try e.load(e.c.gpa, entry.backend_report.path);
+    defer backend.deinit();
+    const embedded = try std.json.Stringify.valueAlloc(e.c.a, invocation, .{});
+    const actual = try std.json.Stringify.valueAlloc(e.c.a, backend.value, .{});
+    if (!std.mem.eql(u8, embedded, actual)) return error.UnboundProducer;
+    const raw = try storage.get(invocation, "profile_events");
+    if (!std.mem.eql(u8, entry.path, try e.relative(try storage.str(raw, "path")))) return error.UnboundProducer;
+    const input = try storage.get(invocation, "input");
+    const input_path = try e.relative(try storage.str(input, "path"));
+    const compiler = try e.relative(try storage.str(try storage.get(top, "backend"), "path"));
+    const commands = try storage.get(invocation, "commands");
+    if (commands != .array or commands.array.items.len != 1) return error.UnboundProducer;
+    const command = commands.array.items[0];
+    const rc = try storage.integer(invocation, "returncode");
+    if (!storage.eq(command, "outcome", "completed") or
+        try storage.integer(command, "actual_returncode") != rc or
+        try storage.integer(command, "returncode") != rc) return error.ProducerNotTerminal;
+    const argv = try buildArgs(try u.stringSlice(e.c.a, try storage.get(command, "argv")));
+    if (argv.len < 4 or !std.mem.eql(u8, compiler, try e.relative(argv[0])) or !u.contains(argv, "--emit=obj")) return error.UnboundProducer;
+    var trace_bound: usize = 0;
+    var input_bound: usize = 0;
+    for (argv[1..]) |arg| {
+        if (std.mem.startsWith(u8, arg, "--profile-events=")) {
+            if (!std.mem.eql(u8, entry.path, try e.relative(arg["--profile-events=".len..]))) return error.UnboundProducer;
+            trace_bound += 1;
+        } else if (!std.mem.startsWith(u8, arg, "-")) {
+            if (!std.mem.eql(u8, input_path, try e.relative(arg))) return error.UnboundProducer;
+            input_bound += 1;
+        }
+    }
+    if (trace_bound != 1 or input_bound != 1) return error.UnboundProducer;
+    return rc;
+}
+
 fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !i64 {
     if (!p.relative(entry.path) or !p.candidate(entry.path) or !std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.InvalidTracePath;
     const run = std.fs.path.dirname(entry.top_report.path) orelse return error.InvalidTraceScope;
@@ -65,6 +112,8 @@ fn validateEntry(e: *storage.Engine, entry: Entry, producer: u.Value) !i64 {
     // successful build prefix and the exact embedded capture, never synthesize
     // a replacement producer receipt.
     if (std.mem.eql(u8, entry.producer.path, entry.top_report.path)) {
+        if (storage.eq(producer, "schema", "whole-compiler-diagnostic-v1") and storage.eq(producer, "population", "captured-ir-diagnostic"))
+            return validateDirectCapture(e, entry, producer);
         if (!storage.eq(producer, "schema", "whole-compiler-diagnostic-v1") or !storage.eq(producer, "status", "passed") or
             !try storage.boolean(producer, "build_completed") or try storage.integer(producer, "build_returncode") != 0 or
             !try storage.boolean(producer, "all_hook_objects_complete") or !try storage.boolean(producer, "source_and_backend_verified")) return error.ProducerNotTerminal;
@@ -496,6 +545,59 @@ test "native event audit: self-rebuild requires its own command and bound captur
             try t.expectError(error.ProducerNotTerminal, validateEntry(&e, entry, parsed.value))
         else
             try t.expectError(error.UnboundProducer, validateEntry(&e, entry, parsed.value));
+    }
+}
+
+test "native event audit: direct captured input binds actual terminal command and preserves failed status" {
+    const t = std.testing;
+    const run = "local-state/validations/audit/test/run";
+    for (0..10) |case| {
+        var tmp = t.tmpDir(.{ .iterate = true });
+        defer tmp.cleanup();
+        var arena = std.heap.ArenaAllocator.init(t.allocator);
+        defer arena.deinit();
+        const a = arena.allocator();
+        var c: u.Context = .{ .a = a, .gpa = t.allocator, .io = t.io, .root = try tmp.dir.realPathFileAlloc(t.io, ".", a), .env = try t.environ.createMap(a), .quiet = true };
+        try tmp.dir.createDirPath(t.io, run ++ "/backend");
+        var e = storage.Engine.init(&c, .{}, run, "zigrep");
+        const raw: p.Evidence = .{ .path = run ++ "/backend/profile.events.jsonl", .sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+        const input: p.Evidence = .{ .path = run ++ "/backend/input.ll", .sha256 = raw.sha256 };
+        const invocation = .{
+            .backend_executed = case != 2,
+            .process_completed = case != 1,
+            .returncode = @as(i32, 1),
+            .input = input,
+            .profile_events = raw,
+            .commands = .{.{
+                .argv = [_][]const u8{ if (case == 3) "unrelated" else run ++ "/z_llvm", if (case == 4) "--help" else "--emit=obj", if (case == 5) "--profile-events=unrelated" else "--profile-events=" ++ run ++ "/backend/profile.events.jsonl", if (case == 6) "wrong.ll" else input.path },
+                .outcome = if (case == 7) "canceled" else "completed",
+                .actual_returncode = @as(i32, if (case == 8) 0 else 1),
+                .returncode = @as(i32, 1),
+            }},
+        };
+        try e.write(run ++ "/backend/report.json", invocation);
+        try e.write(run ++ "/report.json", .{
+            .schema = "whole-compiler-diagnostic-v1",
+            .population = "captured-ir-diagnostic",
+            .route = "llvm-postopt-to-zllvm-object",
+            .status = "blocked",
+            .backend = .{ .path = run ++ "/z_llvm" },
+            .invocation = invocation,
+        });
+        if (case == 9) try e.write(run ++ "/backend/report.json", .{ .unexpected_mutation = true });
+        const top: p.Evidence = .{ .path = run ++ "/report.json", .sha256 = try e.digest(run ++ "/report.json") };
+        const entry: Entry = .{ .path = raw.path, .producer = top, .top_report = top, .backend_report = .{ .path = run ++ "/backend/report.json", .sha256 = try e.digest(run ++ "/backend/report.json") } };
+        var parsed = try e.load(t.allocator, top.path);
+        defer parsed.deinit();
+        if (case == 0) {
+            try t.expectEqual(@as(i64, 1), try validateEntry(&e, entry, parsed.value));
+        } else {
+            try t.expectError(switch (case) {
+                1, 7, 8 => error.ProducerNotTerminal,
+                2 => error.ReusedCaptureIsNotProducer,
+                else => error.UnboundProducer,
+            }, validateEntry(&e, entry, parsed.value));
+        }
     }
 }
 

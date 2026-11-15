@@ -433,6 +433,25 @@ pub fn build(b: *std.Build) void {
     const event_audit_test_run = b.addRunArtifact(event_audit_tests);
     event_audit_test_run.has_side_effects = true;
     b.step("test-native-event-audit", "Check event-stream semantics, report bindings and changed inputs").dependOn(&event_audit_test_run.step);
+    const event_diagnosis = b.addExecutable(.{ .name = "diagnose-native-events", .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/diagnose_native_events.zig"),
+        .target = b.graph.host,
+        .optimize = .ReleaseFast,
+    }) });
+    event_diagnosis.step.dependOn(&verify_file_audit.step);
+    const event_diagnosis_run = b.addRunArtifact(event_diagnosis);
+    event_diagnosis_run.addPassthruArgs();
+    event_diagnosis_run.has_side_effects = true;
+    b.step("diagnose-native-events", "Diagnose an interrupted native-event prefix without authorizing deletion").dependOn(&event_diagnosis_run.step);
+    const event_diagnosis_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tools/diagnose_native_events.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    }) });
+    event_diagnosis_tests.step.dependOn(&verify_file_audit.step);
+    const event_diagnosis_test_run = b.addRunArtifact(event_diagnosis_tests);
+    event_diagnosis_test_run.has_side_effects = true;
+    b.step("test-native-event-diagnosis", "Check complete, interrupted, corrupt and unterminated trace diagnoses").dependOn(&event_diagnosis_test_run.step);
     const inbox206_descriptor_identity_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/zllvm_inbox206_materialize.zig"),

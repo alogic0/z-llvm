@@ -4,6 +4,7 @@ const u = @import("../validation/common.zig");
 const fa = core.fa;
 const D = std.Io.Dir;
 pub const pending_path = "local-state/storage-cleanup/pending.json";
+pub const max_file_batch_entries = 4096;
 
 pub fn generatedAction(a: core.Action) bool {
     return a.kind == .generated_assembly or (a.kind == .build_output and std.mem.eql(u8, std.fs.path.basename(a.path), "capture-zllvm"));
@@ -12,10 +13,11 @@ pub fn fileAction(a: core.Action) bool {
     return a.snapshot == null and a.kind != .cache and a.kind != .temporary_workspace;
 }
 /// Keep complete inode groups together within the configured candidate budget.
-/// The existing hard cap is 1024; minimal collection can use one admitted set.
+/// Bound quarantine size while amortizing fresh global checks across small
+/// test products. The ordinary configured candidate budget still applies.
 pub fn fileBatch(e: *core.Engine, start: usize) ![]const usize {
     var indexes: std.ArrayList(usize) = .empty;
-    const limit = @min(e.config.max_candidates, 1024);
+    const limit = @min(e.config.max_candidates, max_file_batch_entries);
     for (e.actions.items[start..], start..) |a, index| {
         if (a.status != .ready or !fileAction(a)) continue;
         if (std.mem.indexOfScalar(usize, indexes.items, index) != null) continue;
@@ -71,7 +73,7 @@ fn moveGenerated(e: *core.Engine, entry: GeneratedMove, restore: bool, did_move:
 /// Before the first unlink any failure restores all names. An interruption or
 /// partial unlink leaves the durable batch journal for explicit recovery.
 pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
-    if (indexes.len < 2 or indexes.len > 1024) return error.InvalidGeneratedBatch;
+    if (indexes.len < 2 or indexes.len > max_file_batch_entries) return error.InvalidGeneratedBatch;
     for (indexes) |index| if (index >= e.actions.items.len) return error.InvalidGeneratedBatch;
     const scope = @import("generated.zig").consumerRoot(e.actions.items[indexes[0]].run_root);
     const first = e.actions.items[indexes[0]].metadata orelse return error.InvalidGeneratedBatch;
@@ -86,7 +88,7 @@ pub fn applyGeneratedBatch(e: *core.Engine, indexes: []const usize) !void {
 /// A bounded set of fully qualified files, possibly from independent closed
 /// runs. Every hardlink must be present and qualified within this transaction.
 pub fn applyFileBatch(e: *core.Engine, indexes: []const usize) !void {
-    if (indexes.len == 0 or indexes.len > 1024) return error.InvalidGeneratedBatch;
+    if (indexes.len == 0 or indexes.len > max_file_batch_entries) return error.InvalidGeneratedBatch;
     for (indexes) |index| if (index >= e.actions.items.len) return error.InvalidGeneratedBatch;
     var entries: std.ArrayList(GeneratedMove) = .empty;
     try e.verifyBatchEvidence(indexes);
@@ -112,7 +114,7 @@ pub fn applyFileBatch(e: *core.Engine, indexes: []const usize) !void {
         var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
         defer parent.close(e.c.io);
         try unchangedGenerated(e, parent, std.fs.path.basename(absolute), observed, a.sha256.?);
-        try entries.append(e.c.a, .{ .action_index = index, .path = a.path, .quarantine = try e.c.fmt("{s}/.storage-cleanup-{d}-{d}-{s}", .{ std.fs.path.dirname(a.path).?, std.os.linux.getpid(), index, std.fs.path.basename(a.path) }), .metadata = observed, .sha256 = a.sha256.?, .parent_mode = (try parent.stat(e.c.io)).permissions.toMode() });
+        try entries.append(e.c.a, .{ .action_index = index, .path = a.path, .quarantine = try e.c.fmt("{s}/.storage-cleanup-{d}-{d}", .{ std.fs.path.dirname(a.path).?, std.os.linux.getpid(), index }), .metadata = observed, .sha256 = a.sha256.?, .parent_mode = (try parent.stat(e.c.io)).permissions.toMode() });
     }
     // Reject an invalid accounting/order plan before moving or unlinking any
     // name, including callers that reorder a previously guarded alias group.
@@ -233,7 +235,7 @@ pub fn apply(e: *core.Engine, index: usize) !void {
     var parent = try fa.metadata.openRoot(e.c.io, std.fs.path.dirname(absolute).?);
     defer parent.close(e.c.io);
     const name = std.fs.path.basename(absolute);
-    const qname = try e.c.fmt(".storage-cleanup-{d}-{s}", .{ std.os.linux.getpid(), name });
+    const qname = try e.c.fmt(".storage-cleanup-{d}-{d}", .{ std.os.linux.getpid(), index });
     const quarantine = try e.c.fmt("{s}/{s}", .{ std.fs.path.dirname(a.path).?, qname });
     const mode = (try parent.stat(e.c.io)).permissions;
     const readonly = mode.toMode() & 0o200 == 0;
