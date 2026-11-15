@@ -35,20 +35,25 @@ LLVM IR construction, bitcode parsing, target setup and declared providers remai
 This work is separate from the completed compiler/self-rebuild plan. Baseline
 admission and Debug/ReleaseFast runner qualification passed. The refreshed normal
 reference preserves all 2,097 ordered outcomes under the current libc/loader.
-The third real attempt delivers the complete 921-definition compiler-runtime
-object and captures the test module. Qualified repairs cover proxy path binding, extended fneg
+The fifth complete attempt delivers the complete 921-definition compiler-runtime
+and 7,716-definition test objects and matches all 2,097 ordered reference outcomes.
+Qualified repairs cover proxy path binding, extended fneg
 serialization, constant inline memset and scalar operand/immediate handling.
 Qualified repairs advance the independent runtime census from 769 to
 all 921 selections without loss. Full units, readiness, structural smoke and the
-fixed runtime object/native replay pass. Independent runtime object and both
-ordered-event audits pass; test emission selects 7,707 of 7,716 definitions and
-fails on nine, with no test object or behavior outcomes. The next focused repair
-selects all 7,716 definitions and passes native checks, full units, readiness,
-structural smoke and fixed runtime replay. Build its committed canonical
-candidate, then resume complete local capture until one unchanged final run closes all inventories,
-audits and 2,097 outcomes. New native populations remain separate from the accepted
-225. Runtime object proof is scoped to the third attempt; final inventory and
-preopt acceptance remain open.
+fixed runtime object/native replay pass. Both independent object/ownership/ELF
+audits and ordered-event audits pass. Separate stage-E reconciliation accounts
+for every optimizer/emitter invocation, complete runtime/test inventories and
+all 2,097 outcomes. The real optimizer failure control stops before emission.
+The floating cancellation repair passes focused/full units, calibrated native
+checks, readiness and structural validation. Its complete serial Tier 3 run
+passes all 17 gates, including the full 230-population native suite, with the
+same frozen source and Fast executable. Preserve this candidate and finish
+original-population preservation, committed-source verification and storage
+closure. Two earlier canceled integration attempts keep their original SIGTERM
+outcomes and grant no aggregate acceptance. New native
+populations remain separate from the accepted 225. Preopt milestone acceptance
+remains open.
 The [implementation checkpoint](evidence/release_safe_preopt_checkpoint_20261115.md)
 records the qualified tooling, repairs, source bridge and current limits.
 

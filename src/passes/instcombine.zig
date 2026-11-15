@@ -5,6 +5,7 @@ const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const inst_simplify = @import("inst_simplify.zig");
 const integer_semantics = @import("../analysis/integer_semantics.zig");
+const fp_semantics = @import("../analysis/fp_semantics.zig");
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "instcombine",
@@ -35,8 +36,13 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
         defer inserted_vectors.deinit();
         var shuffled_vectors = std.StringHashMap(ShuffleRecord).init(module.allocator);
         defer shuffled_vectors.deinit();
+        var floating_binaries = std.StringHashMap(ir.BinaryInst).init(module.allocator);
+        defer floating_binaries.deinit();
 
         for (function.blocks.items, 0..) |*block, block_index| {
+            // Only combine already visited operations in this block. This
+            // supplies dominance without inferring facts across CFG edges.
+            floating_binaries.clearRetainingCapacity();
             for (block.instructions.items, 0..) |*instruction, instruction_index| {
                 salvageDebugMetadata(instruction, debug_aliases);
                 instruction.mapOperands(aliases);
@@ -45,7 +51,7 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
                 if (try rewriteWithContext(module.allocator, function, instruction, inserted_vectors, shuffled_vectors)) changed = true;
 
-                if (@import("constant_string_length.zig").fold(module.*, instruction.*) orelse foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
+                if (@import("constant_string_length.zig").fold(module.*, instruction.*) orelse foldFloatingCancellation(instruction.*, floating_binaries) orelse foldWithContext(instruction.*, inserted_vectors) orelse fold(instruction.*)) |replacement| {
                     instruction.removed = true;
                     instruction.replacement = replacement;
                     const result = instruction.result orelse return error.InstructionWithoutResult;
@@ -70,6 +76,13 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                             .shuffle = instruction.kind.shufflevector,
                         });
                     }
+                }
+                if (!instruction.removed and instruction.result != null and instruction.kind == .binary) {
+                    const binary = instruction.kind.binary;
+                    if ((binary.op == .fadd or binary.op == .fsub) and
+                        (binary.ty == .float or binary.ty == .double) and
+                        allowsFloatingCancellation(binary.fp_flags))
+                        try floating_binaries.put(instruction.result.?, binary);
                 }
             }
 
@@ -254,6 +267,51 @@ const AliasResolver = struct {
 
 fn fold(instruction: ir.Instruction) ?ir.Value {
     return inst_simplify.simplify(instruction);
+}
+
+fn allowsFloatingCancellation(flags: ir.FastMathFlags) bool {
+    return flags.fast or (flags.reassoc and flags.nsz and flags.nnan and flags.ninf);
+}
+
+fn finiteFloatingConstant(ty: ir.Type, value: ir.Value) ?u128 {
+    if (value != .fp) return null;
+    const exponent: u128 = switch (ty) {
+        .float => 0x7f800000,
+        .double => 0x7ff0000000000000,
+        else => return null,
+    };
+    const bits = fp_semantics.scalarLiteralBits(ty, value.fp) catch return null;
+    return if (bits & exponent == exponent) null else bits;
+}
+
+/// Reassociate (x + C) - C and (x - C) + C only with matching typed
+/// finite constants and the requisite promises on both operations. The
+/// producer remains live if it has another use; ordinary DCE owns its removal.
+fn foldFloatingCancellation(instruction: ir.Instruction, producers: std.StringHashMap(ir.BinaryInst)) ?ir.Value {
+    if (instruction.removed or instruction.kind != .binary) return null;
+    const binary = instruction.kind.binary;
+    if ((binary.ty != .float and binary.ty != .double) or
+        !allowsFloatingCancellation(binary.fp_flags)) return null;
+    var source = binary.lhs;
+    var constant = binary.rhs;
+    if (binary.op == .fadd and constant == .named and source == .fp) {
+        source = binary.rhs;
+        constant = binary.lhs;
+    }
+    if (source != .named) return null;
+    const bits = finiteFloatingConstant(binary.ty, constant) orelse return null;
+    const producer = producers.get(source.named) orelse return null;
+    if (!binary.ty.eql(producer.ty) or !allowsFloatingCancellation(producer.fp_flags)) return null;
+    if (!((binary.op == .fsub and producer.op == .fadd) or
+        (binary.op == .fadd and producer.op == .fsub))) return null;
+    var value = producer.lhs;
+    var previous_constant = producer.rhs;
+    if (producer.op == .fadd and value == .fp and previous_constant == .named) {
+        value = producer.rhs;
+        previous_constant = producer.lhs;
+    }
+    if (value != .named or bits != (finiteFloatingConstant(producer.ty, previous_constant) orelse return null)) return null;
+    return value;
 }
 
 fn rewriteWithContext(

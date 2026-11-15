@@ -1,19 +1,24 @@
 # ReleaseSafe preopt implementation checkpoint
 
-This is an intermediate C/D checkpoint for the
+This records implementation through stage E of the
 [active plan](../plans/2026-11-14-release-safe-preopt-behavior.md), not preopt
-milestone acceptance. The qualified repair selects **all 921 captured runtime
-definitions**, up from 769, with no previously selected definition lost.
-Promoted source passes full units, readiness and fixed runtime replay. The third
-real preopt attempt delivered its complete runtime object and captured the test
-module. Independent audits verify the runtime object and both ordered event
-streams. Test emission selected 7,707 of 7,716 definitions and failed on nine;
-no test object or behavior outcomes were delivered. Discovery remains provisional
-until one complete unchanged run closes inventory, audits, all 2,097 outcomes
-and preservation/integration. The next focused repair selects all 7,716 test
-definitions and all 921 runtime definitions without loss. Native checks, full
-units, readiness, structural smoke and fixed runtime replay pass. A fresh
-frontend-driven complete run remains required.
+milestone acceptance. The fifth complete preopt attempt matches **all 2,097
+ordered reference outcomes: 2,065 passes and 32 skips**. It delivers both complete
+local objects, selecting **921/921 runtime and 7,716/7,716 test definitions**.
+Independent inventories, ownership/ELF checks and both full ordered event
+streams pass. Separate reconciliation accounts for every optimizer/emitter
+invocation and both runtime/test populations. The real optimizer failure control
+stops compilation with zero emitter invocations and no fallback credit.
+
+A conservative typed floating cancellation rule repairs the fourth attempt's
+sole optimized-float-mode failure. Debug/ReleaseFast units, calibrated native
+optimizer checks, full readiness and structural validation pass. Complete serial
+Tier 3 passes all 17 gates, including the full 230-population native suite, on
+the same frozen source and Fast executable. Two earlier attempts were canceled
+by SIGTERM; their original results remain canceled. The signal attribution
+control preserves normal cancellation behavior; no signal was received by the
+successful supervisor. The committed-Git source bridge, preservation and storage
+closure remain required before milestone acceptance.
 
 The maintained runner now selects `--local-pipeline preopt` explicitly, binds
 the selected reference hash and providers, exports the Safe hook policy, and
@@ -87,6 +92,26 @@ release modes and both local routes pass 107,520 local observations against
 53,760 references and all 54 injected faults. This brings the registry to 230;
 the original 225 populations and 6,724 required faults remain separate.
 
+The float-mode failure contains `(x + C) - C` with `fast` on both operations;
+its strict neighbor must retain two-step rounding. InstCombine now cancels
+matching finite scalar float/double constants only with complete conservative
+permissions on both operations, using the existing typed literal decoder and
+replacement authority. It requires a prior producer in the same block and
+preserves other uses of that producer. Strict, incompletely licensed,
+nonfinite, unequal, dynamic and cross-block cases decline. This follows the
+common rewrite permissions described by the
+[LLVM 22 fast-math contract](https://releases.llvm.org/22.1.0/docs/LangRef.html#fast-math-flags).
+No frontend, selector, ABI or frame-layout change is involved.
+
+The separate optimizer regression checks nine functions and 5,120 independent
+C bit/rounding observations per execution. Four local pipelines pass against
+the LLVM reference, and all 20 injected faults are detected. Cold and cached
+helper runs have identical outputs. The original backend fails the independent
+golden. An initial faulty partial-flags oracle failed in the LLVM reference
+before local execution; its original receipt, exact fixture and diagnosis are
+preserved, and it receives no validation credit. These controls are separate
+from the native registry and its original 6,724 required faults.
+
 Evidence lives under
 `local-state/validations/release-safe-preopt-20261115/batch-01/`:
 
@@ -111,6 +136,19 @@ Evidence lives under
 | `test-frontier-native/` | Complete test census selects 7,716/7,716; runtime selects 921/921. The new native population and all 54 fault controls pass with exact production-source and fixture binding. |
 | `test-frontier-fingerprint/` | Existing source-guard API derives the reviewed pair OR/widening body hashes. Only those two model rows change; full current guard and mutation tests pass in the broader gate. |
 | `test-frontier-promoted-r3/` | All 2,384 ReleaseFast units, Debug readiness including all 60 ABI comparisons, 66 structural tests and six selected integrity manifests pass. The fixed 455-definition runtime object/native replay passes 21,792 local and reference observations plus 14 controls. New rollback tests cover current RCX inputs, spilled counts, both preservation flags, accumulator aliases and pair pressure. Earlier new-fixture setup failures retain their receipts, patches and diagnoses. |
+| `capture-04/` | Both local objects delivered and all 2,097 tests executed; the sole optimized-float-mode failure remains an original failed result. |
+| `inventory-capture-04/` | Complete separate runtime/test inventories, full censuses and both object/ownership/ELF audits pass. Full streams verify 425,500 runtime and 3,085,054 test events; compilation succeeds even though behavior execution fails. |
+| `fastmath-units/` | Three actual new tests pass in Debug/ReleaseFast, covering both scalar widths, flag combinations, shared uses, rejection boundaries and idempotence. |
+| `fastmath-real-input/` | The exact retained captured helper pair reproduces the old two fast operations; the repaired optimizer removes them, preserves both strict operations and passes LLVM verify-only before/after. |
+| `fastmath-before-r2/`, `fastmath-native-r2/` | The old backend fails the independent golden; the corrected candidate passes all existing optimizer cases, four added pipelines, 20 faults and the identical-output cold/cached pair. |
+| `fastmath-reference-diagnosis/` | Preserved original reference-oracle failure and emitted LLVM function excerpts; the corrected executable boundary explicitly omits reassociation permission. |
+| `fastmath-promoted/` | All 2,387 ReleaseFast units, nine readiness procedures, 60 ABI comparisons, 6,528 scalar observations, 66 structural tests and all six selected integrity manifests pass, with exact source/fixture/backend verification before and after. |
+| `capture-05/` | One unchanged complete local preopt run matches all 2,097 outcomes, delivers both complete objects and verifies source, frontend, backend and all 25 providers before and after. Its actual precommit head and complete dirty-source snapshot remain recorded. |
+| `inventory-capture-05/` | Complete runtime/test inventories, 921/921 and 7,716/7,716 independent censuses and both object/ownership/ELF audits pass. Full streams verify 425,500 runtime and 3,085,054 test events against the original real producer. |
+| `route-control/`, `reconcile-capture-05/` | A real local optimizer failure produces one failed optimizer invocation, zero emitters and a failed compile. Separate stage-E reconciliation accounts for both module pairs, every invocation, all outcomes and independent audits. Stages F/G remain open. |
+| `fastmath-tier3/`, `fastmath-tier3-r2/`, `signal-trace-control/` | Canceled full-gate attempts retain their SIGTERM outcomes and receive no aggregate acceptance. A controlled cancellation verifies signal sender attribution while preserving normal cancellation behavior; frontend/backend binaries are unchanged. |
+| `fastmath-tier3-r3/` | All 17 serial gates pass; each real-row mode lowers/emits/links 100 functions and passes all 12 execution witnesses. The full native suite passes on the exact `f04acdbb` compiler; source, fixtures, providers and six integrity manifests verify before/after. Original precommit source head and dirty snapshot remain unchanged. The serial runner records 4,078,999 ms and a minimum 207,939,821,568 free bytes, above the 20,000,000,000-byte admission floor. |
+| `native-archive-build-r2/`, `native-archive-projector/`, `native-archive-controls-r2/` | Debug/Fast archive and source-identity tests pass. Separate historical self comparisons each preserve 8,204 outcomes and 3,399 artifact hashes from the exact accepted manifest. Controls reject 33 actual historical cross-build object differences, a changed manifest and a changed command outcome. Each new build must compare directly to its corresponding historical build, hashing new artifacts live; those final comparisons remain pending. |
 
 The first two new native populations (`inline_memset`, `preopt_scalar_ops`) are
 separate from the accepted 225 and the original 6,724 required faults. Existing
@@ -143,9 +181,14 @@ promoted into a new retention pin.
 The prior `fe2d88b4` runtime trace now has a complete verified audit of 182,330
 events and 455 functions under
 `local-state/retirements/native-event-audit/1794755248284530338-4147305/`.
-Guarded retirement rejects its managed compiler symlink as `NotRegularFile`;
-the original 53 MB raw stream and 44 MB compiler pipeline remain explicitly
-retained for an alias-aware original-build retirement proof. Original receipts
-and symlink identities were not rewritten. Exact reconstruction binds changed
-sources to checkpoint Git blobs and two saved files matching the original build
-hashes. Details and the retained exception are under `retire-fe2-trace/`.
+The ordinary `release-trace` route rejects its managed compiler symlink as
+`NotRegularFile`; its original failed receipts and symlink identities remain
+unchanged under `retire-fe2-trace/`. The supported reviewed-records audited
+route separately closes tracing detail from complete audit/input/producer/report
+bindings and copied auditor sources, without reconstructing an obsolete
+compiler. Seven verified streams are queued for this explicit review after
+Tier 3 and the committed-source bridge; raw bytes and compiler pipelines remain
+retained until their actual consumers close and the native collector qualifies
+retirement. The older C2 stream has no retained inner-producer receipt and is
+excluded, with its provenance limitation recorded. No successful retirement is
+claimed from preparing this route.

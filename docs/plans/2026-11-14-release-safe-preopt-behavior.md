@@ -9,13 +9,17 @@ and qualified proxy path, extended negative-zero serialization, inline memset
 and scalar operand/immediate repairs. The captured runtime census selects
 all 921 definitions without losing a previously selected definition. Promoted
 source passes full units, readiness, structural smoke and fixed runtime
-object/native replay. The third actual attempt delivers and independently audits
-the runtime object; it captures 7,716 test definitions, selecting 7,707 and failing
-on nine. Both full ordered event streams verify, preserving the test failure.
-The next repair selects all 7,716 test definitions and passes native checks,
-full units, readiness, structural smoke and fixed runtime replay. Build the
-committed candidate and resume fresh capture. Inventory remains provisional. No
-preopt acceptance is claimed until stages E/F/G close.
+object/native replay. The fifth complete attempt matches all 2,097 ordered
+reference outcomes, delivers both 921-definition runtime and 7,716-definition
+test objects, and passes independent inventory, object/ownership/ELF and full
+event audits. The real optimizer failure control stops before emission. Separate
+stage-E reconciliation accounts for every invocation and both populations.
+The floating cancellation repair passes focused/full units, calibrated native
+checks, readiness and structural validation. Complete serial Tier 3 passes all
+17 gates on the unchanged candidate, including the 230-population native suite.
+Preservation, the committed-source bridge and storage closure remain pending;
+earlier canceled integration attempts receive no aggregate acceptance. No preopt milestone
+acceptance is claimed until the remaining F/G requirements close.
 The [implementation checkpoint](../evidence/release_safe_preopt_checkpoint_20261115.md)
 records the qualified A/B tooling, first C/D repairs and exact validation limits.
 
@@ -227,6 +231,23 @@ population; record additions separately. Apply `docs/validation_tiers.md`,
 including immediate Tier 3 for its wrong-code/ABI/verifier triggers. Changed
 gate/cache infrastructure requires its fresh/cache comparison. Reuse unchanged
 valid evidence rather than repeating broad runs without a relevant change.
+
+The completed storage transition already retired ordinary historical native
+outputs. Their original accepted checksum manifest remains intact at
+`local-state/validations/compiler-throughput-20261114/batch-01/accepted-artifacts.sha256`,
+SHA-256 `184a43fc349af600d3beda1c086ee26c1f99c85903da696675835642f987e0de`,
+bound by the throughput acceptance. Qualify an explicit historical-hash provider
+for that exact manifest while hashing every new candidate artifact live.
+Missing historical identities or new bytes must fail. Preserve original command
+outcomes, timeout contracts, fixtures, counters and registry entries, and verify
+each normalized source path against its original fixture hash. Compare each new
+Debug/Fast build directly against its corresponding historical build: the two
+historical builds themselves have 33 differing object hashes, so they cannot
+supply a transitive artifact-equality bridge. Retain that rejection, positive
+historical self comparisons, and changed-manifest/outcome controls. This changes
+the availability of old bytes, not the required 8,204 outcomes and 3,399 artifact
+identities per comparison. Keep the qualified helper pipelines through these
+consumers, then release their ordinary source copies, executables and caches.
 
 ## Space admission and maintained evidence
 
