@@ -1,7 +1,7 @@
 # ReleaseSafe behavior through the local preopt pipeline
 
 Date: 2026-11-14
-Updated: 2026-11-15 after implementation and storage review with agent
+Updated: 2026-11-15 after revised implementation and storage planning with agent
 `01a1c2b0-45c7-7560-9ad0-050e8f6970f8`.
 Status: negotiated successor proposal; implementation has not started.
 
@@ -57,8 +57,9 @@ Its retained root is
   baseline, pinned source library directory and normal resource settings.
 
 Both agents reverified the frontend and reference hashes during planning.
-Reverify the complete dependency binding at execution admission. Reuse this
-accepted pair; build another reference only if a relevant dependency changes,
+Reverify the current bytes and complete dependency binding at execution admission.
+Reuse this retained accepted pair in place; do not clone or rebuild another
+baseline for admission. Run another reference only if a relevant dependency changes,
 then account explicitly for any difference from the frozen outcome population.
 Historical references using a different frontend remain ancestry, not substitutes
 for this selected compiler identity.
@@ -90,13 +91,22 @@ second preopt workload or claim that every module's frontend used Safe settings.
 3. Capture each complete real preopt module as encountered, before repairing its
    failure. Record its hash, bytes, definitions, declarations, aliases and globals.
    An early runtime/optimizer failure may prevent later hook invocations: mark
-   those populations blocked or not yet observed and keep discovery provisional.
+   those populations not yet captured, citing the blocking attempt. If their
+   identities or number are unknown, record that uncertainty rather than inventing
+   module rows or counts. Keep discovery provisional.
    Steps 3 and 4 may interleave to expose the remaining inputs. A failed run,
    historical postopt counts or an assumed module count never closes inventory.
-   Closure requires a complete unchanged local preopt compile and reconciliation
-   of every optimizer/emitter invocation with the final accepted run, including
-   separate runtime/test inventories. No reference-assisted discovery route is
-   required for the first batch.
+   Keep an append-only attempt ledger with frontend/backend/source identities,
+   each observed module's role and its evidence, capture identity, stage statuses
+   and blocking diagnostic. Distinguish input capture, optimizer completion,
+   object delivery and audit completion, with failure/interruption states recorded
+   separately. A partial optimizer output is a failed-stage diagnostic, not a
+   complete optimized module.
+   Closure requires one complete unchanged local preopt run on the frozen final
+   candidate, using clean private frontend caches and reconciling every actual
+   optimizer/emitter invocation and delivered object, separate runtime/test
+   inventories, independent audits and all 2,097 outcomes. No reference-assisted
+   discovery route is required for the first batch.
    Derive each stage's explicit input limit independently from its verified
    captured file size plus one, with checked arithmetic for the EOF probe.
    Record replacement of the hook's 64 MiB argument in effective argv; optimized
@@ -105,23 +115,37 @@ second preopt workload or claim that every module's frontend used Safe settings.
 4. Diagnose failures in the shared parser, verifier, optimizer or selector that
    owns them. For each adopted repair, retain a minimal real-input reproduction,
    an independent LLVM/native comparison and adjacent rejection/negative controls.
+   Preserve the original failed receipt; compare newly observed inputs with prior
+   captures and explain identity changes rather than overwriting earlier records.
+   Release diagnosed scratch after its reproduction and diagnostic consumers close.
    Keep LLVM verification as a validation reference, separate from the accepted
    compilation route. Do not stub, omit, substitute or silently fall back.
-5. Complete the unchanged ReleaseSafe suite through preopt. Require all named
-   outcomes to match the reference, complete optimizer inputs/outputs to verify,
-   and every delivered local object to pass census, ownership, ELF and ordered
-   event audits. Reconcile the complete input inventory and account for runtime
-   modules as separate populations. Repeat the route failure control with the
-   final tools; qualify only actual local optimizer and emitter executions.
+5. Complete the unchanged ReleaseSafe suite through preopt in one run on the
+   frozen final candidate, with fresh private frontend local/global caches.
+   Do not stitch successful stages from different attempts into an accepted run.
+   Verify the complete optimizer inputs/outputs, match every named reference
+   outcome and require census, ownership, ELF and ordered-event audits for every
+   delivered local object. Reconcile the complete input inventory and account
+   for runtime modules as separate populations. Repeat the route failure control
+   with the final tools; qualify only actual local optimizer and emitter executions.
+   No blocked or unexplained missing population may remain. Declared provider
+   inputs remain dependencies and receive no local compilation credit.
 6. Prove route ownership with retained commands and a negative control that
    forces the local optimizer to fail before object delivery. Require a failed
-   compile and no successful object/fallback credit. Bind any frontend ownership
-   instrumentation to a separate source/build identity, preserving the pinned
-   reference checkout and binary.
+   compile and no successful object/fallback credit. Distinguish constructing LLVM
+   target/analysis/pass-manager objects from executing LLVM optimizer or object
+   passes; only the former remains on the accepted route. Bind any frontend
+   ownership instrumentation to a separate source/build identity, preserving
+   the pinned reference checkout and binary.
 7. Apply docs/validation_tiers.md. Run required focused checks for each changed
    subsystem and cumulative Tier 3 before acceptance. Preserve prior native
    command outcomes/artifacts, fixed original objects and postopt behavior.
    Publish the new source/input identities and exact remaining LLVM dependencies.
+
+An optional later reference-assisted diagnostic route must use a separate root
+and explicit classification. LLVM-assisted completion is not capture-only or
+accepted local compilation. Its commands/products earn no acceptance credit and
+cannot replace the frozen normal reference or any stage of the accepted run.
 
 ## Execution and collection boundaries
 
@@ -144,6 +168,8 @@ initially absent output directory inside the stage's evidence root.
 Temporary products use the corresponding generated layout under
 `local-state/tmp/validations/release-safe-preopt-20261115/batch-01/RUN/.workspaces/KEY/`.
 Keep frontend, input and provider dependencies under their existing owners.
+Execute A/B before real capture, then alternate C/D as dependencies unblock.
+Proceed to E/F/G only with their complete final-run and preservation requirements.
 
 | Stage | Required result | Temporary lifetime and collection boundary |
 | --- | --- | --- |
@@ -151,7 +177,7 @@ Keep frontend, input and provider dependencies under their existing owners.
 | B. Tooling and route qualification | Mode/stage contracts, reference binding, headroom controls, focused tests and tool identities | Collect private build/test caches after their checks. Publish only required completed executables into a small managed pipeline; keep their paths stable through later audits. |
 | C. Initial capture and provisional inventory | Complete encountered inputs, inventories and explicit blocked populations | Keep one active capture attempt. Preserve its real input and required diagnostics, diagnose the failure, then release scratch that has no remaining consumer. |
 | D. Focused repair batches | Minimal reproductions, independent comparisons, rejection controls and required checks | C/D may interleave. Keep one current candidate generation and only a predecessor still needed for a comparison; release superseded products after the last consumer. |
-| E. Final local preopt behavior and immediate audits | All 2,097 ordered outcomes, complete stage/inventory reconciliation, object/event audits and route control | The nested behavior runner uses its own `--retain-products`. Retain objects, backend executable and raw events through their final audit/comparison/fault consumer, then release and collect promptly. |
+| E. Final local preopt behavior and immediate audits | One complete frozen-candidate run with clean private frontend caches; all 2,097 ordered outcomes, every stage chain, reconciled runtime/test inventory, object/event audits and route control | The nested behavior runner uses its own `--retain-products`. Retain objects, backend executable and raw events through their final audit/comparison/fault consumer, then release and collect promptly. |
 | F. Preservation and integration | Prior native populations, fixed postopt objects/behavior, faults, Tier 3 and terminal source verification | Run heavy stages serially in separate managed commands. Release each completed subpipeline; the candidate/tool pipeline closes after its last required consumer. |
 | G. Closure | Accepted proof, selected maintained-file manifest, remaining LLVM dependencies and storage disposition | Close only this milestone's holds/pipelines, collect, retry deferrals at idle and record remaining roots with specific consumers. |
 
@@ -234,7 +260,9 @@ files. Close the milestone's own queued holds and completed pipelines, and
 record the collector receipt and any remaining dependencies at handoff.
 
 - One complete ReleaseSafe behavior result matching all 2,097 frozen ordered
-  reference outcomes, including skips, with the exact baseline bindings above.
+  reference outcomes, including skips, with the exact baseline bindings above,
+  clean private frontend caches and one frozen candidate. Its complete stage
+  chains and runtime/test inventories reconcile without unexplained omissions.
 - Every optimizer and object invocation in the accepted run completes with
   actual exit zero; all newly captured modules have complete inventories and
   object audits.
