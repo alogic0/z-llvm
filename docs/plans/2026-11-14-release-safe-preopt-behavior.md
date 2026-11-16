@@ -17,7 +17,8 @@ stage-E reconciliation accounts for every invocation and both populations.
 The floating cancellation repair passes focused/full units, calibrated native
 checks, readiness and structural validation. Complete serial Tier 3 passes all
 17 gates on the unchanged candidate, including the 230-population native suite.
-Preservation, the committed-source bridge and storage closure remain pending;
+The committed-source bridge and full Debug native suite have also passed.
+Preservation and storage closure remain pending;
 earlier canceled integration attempts receive no aggregate acceptance. No preopt milestone
 acceptance is claimed until the remaining F/G requirements close.
 The [implementation checkpoint](../evidence/release_safe_preopt_checkpoint_20261115.md)
@@ -246,7 +247,21 @@ historical builds themselves have 33 differing object hashes, so they cannot
 supply a transitive artifact-equality bridge. Retain that rejection, positive
 historical self comparisons, and changed-manifest/outcome controls. This changes
 the availability of old bytes, not the required 8,204 outcomes and 3,399 artifact
-identities per comparison. Keep the qualified helper pipelines through these
+comparisons per build. The first complete comparison exposed 18 exact differences:
+nine C artifacts from the source path embedded by `__FILE__`, six optimizer
+texts from D1's required extended negative-zero spelling, and three copies of a
+runtime object with a two-byte commutative operand exchange. The
+[preservation diagnosis](../evidence/release_safe_preopt_preservation_diagnosis_20261115.md)
+records bounded same-input replays, complete-byte transformations, historical
+LLVM rejection and current native payload proof. Preserve the original strict
+failures. A separately qualified transition auditor must bind every exact
+command key and old/current hash to those proofs, reject missing/changed/extra
+transitions, and require the remaining 3,381 artifacts to be byte-identical.
+Runtime transition qualification additionally requires both complete fixed-runtime
+audits/native/fault runs. No unrelated artifact difference is admitted. This
+accounts explicitly for necessary repair/provider changes without silently
+replacing the accepted historical identities or any integrity contract.
+Keep the qualified helper pipelines through these
 consumers, then release their ordinary source copies, executables and caches.
 
 ## Space admission and maintained evidence
