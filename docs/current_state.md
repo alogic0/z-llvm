@@ -128,8 +128,18 @@ separate limits. All 2,417 Fast units, 244 selected Debug/Fast checks, 74
 structural checks and 17 integration gates pass, including the complete
 233-population native suite. All cycle compiler and source-worktree pipelines
 are closed, with two diagnosed ordinary-product admission exceptions recorded
-separately from required evidence. The scheduler experiment is measured and
-deferred; its final decision and stop-state documentation follow separately.
+separately from required evidence. The accepted implementation source is
+`bce0fdcb`.
+
+The [fifth stage](evidence/compiler_generalization_stage5_20261116.md) is measured
+and deferred under the plan's conditional benefit requirement. Both warmups and
+all five alternating unprofiled pairs preserve object and owner bytes. Median
+elapsed time changes from 101.63 to 101.58 seconds, median RSS rises 0.7033%, and
+one pair is slower. Fewer scans and lower logical allocation traffic do not
+establish the required elapsed-time or RSS benefit. The prototype was never
+promoted, and production scheduling is unchanged. Final documentation and
+guarded collection close this authorized sequence; the three proposed follow-up
+abstractions need a separately authorized scope.
 
 ## Fixed compiler-core execution cohort
 

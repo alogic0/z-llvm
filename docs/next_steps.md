@@ -39,34 +39,34 @@ Original failed or canceled aggregates remain unchanged; actual completed
 subcommand reuse is explicit. LLVM construction, setup and declared providers
 remain dependencies.
 
-The current action, authorized by the user on 2026-11-16, is to implement the
+The user-authorized
 [compiler generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md)
-after committing Safe acceptance. Follow its five ordered stages: shared use
-queries and atomic rewrite admission; typed constant-table descriptions and a
-bounded extension; one structural fixture-handler migration; compact value-use
-identities; and selective legalization only if measured benefit justifies it.
-The three proposed follow-up abstractions are outside this implementation.
-Stages [1](evidence/compiler_generalization_stage1_20261116.md) and
-[2](evidence/compiler_generalization_stage2_20261116.md) are accepted, each with
-all 17 integration gates passing. Typed table descriptions preserve the four
-original layouts and admit bounded power-of-two i16 counts; the complete
-231-population native suite passes. Stage
-[3](evidence/compiler_generalization_stage3_20261116.md) is also accepted: obsolete
-optional-pointer load/return handlers are removed, and computed scalar homes are
-established before CFG forks. Exact wrong-code replay, all 17 integration gates
-and the complete 232-population native suite pass. Stage
-[4](evidence/compiler_generalization_stage4_20261116.md) is also accepted:
-compact scoped identities preserve byte equality and lexical ordering, with
-atomic insertion and stale-handle rejection. Long scalar parameters execute
-without private renaming. All 17 gates and all 233 native populations pass.
-The isolated scheduler's idle measurements did not meet its declared benefit
-criteria, so it remains unpromoted. Finish its decision report, README/current
-state and final storage disposition, then close this authorized sequence.
-All cycle compiler and source-worktree pipelines have completed their consumers.
-Preserve historical model/guard transitions, other holds and the two explicit
-ordinary-product admission exceptions; do not start the proposed abstractions.
+is complete. Stages [1](evidence/compiler_generalization_stage1_20261116.md),
+[2](evidence/compiler_generalization_stage2_20261116.md),
+[3](evidence/compiler_generalization_stage3_20261116.md) and
+[4](evidence/compiler_generalization_stage4_20261116.md) are accepted: shared use
+queries with atomic vector admission; typed constant-table descriptions with
+bounded power-of-two i16 lengths; removal of obsolete optional-pointer handlers
+and computed-scalar fork preservation; and compact scoped value-use identities.
+The final production source `bce0fdcb` passes all 17 integration gates and the
+complete 233-population native suite. Byte-exact name equality, long-name
+capability, rollback and stale-handle boundaries remain explicit in the evidence.
 
-Further work starts from the accepted baseline:
+Stage [5](evidence/compiler_generalization_stage5_20261116.md) is measured and
+deferred under the plan's conditional benefit requirement. All twelve unprofiled
+executions preserve object and owner bytes. Across five alternating pairs,
+median elapsed time changes from 101.63 to 101.58 seconds, median RSS rises
+0.7033%, and one pair is slower. The declared performance gate fails; production
+scheduling is unchanged and the qualified prototype patch remains evidence.
+
+No implementation action remains in this sequence. The three proposed follow-up
+abstractions require a separately authorized scope. All cycle compiler and
+source-worktree pipelines have closed through their named consumers. Guarded
+collection preserves the seven current contracts and seventeen independent
+holds. Two diagnosed ordinary-product admission exceptions remain explicit;
+they have no validation consumer and are not required acceptance data.
+
+For a separately authorized successor, preserve these boundaries:
 
 1. Preserve the fixed inputs, generation identities, capture reports and sealed
    evidence. Keep the original five-milestone acceptance and fixed compiler-core
@@ -90,7 +90,7 @@ matrix remains open in the completed plan.
 Every new cycle follows the [development storage contract](development_storage.md):
 declare temporary products and retained consumers before execution, use managed
 launchers for scripts and tools, and close temporary pipelines with a recorded
-storage disposition. The active successor includes this requirement.
+storage disposition. Any successor includes this requirement.
 
 ## Previous checkpoints
 

@@ -1,10 +1,11 @@
 # Generalize compiler mechanisms
 
 Date: 2026-11-16
-Status: stages 1 through 4 accepted after ReleaseSafe acceptance commit `338b8972`.
-Stage 5 is measured and deferred; final documentation closure remains. Stage 2
-qualifies its mechanical description migration separately from the power-of-two
-length extension.
+Status: complete. Stages 1 through 4 are accepted after ReleaseSafe acceptance
+commit `338b8972`; stage 5 is measured and deferred under its conditional benefit
+requirement. Stage 2 qualifies its mechanical description migration separately
+from the power-of-two length extension. No further implementation is authorized
+by this sequence.
 Review baseline: repository HEAD `97b6eced`, with compiler changes through `ae9d359f`.
 Review reconciliation: 2026-11-16; operand mutation, proof semantics, identity
 namespaces, effective scheduling order and storage boundaries clarified.
@@ -20,18 +21,19 @@ layout helpers and transactional lowering. The main problem is uneven use of
 those mechanisms, alongside legacy handlers tied to particular workloads.
 Build on the completed [bounded architecture refactors](../roadmap/architecture_refactor_plan.md).
 
-This document records a plan requested after a source review. No project code,
-tests, builds or profiling were executed for that review or this document.
-The findings describe maintenance and generality risks; they do not establish
-new runtime failures.
+The initial source review executed no project tests, builds or profiling.
+Its findings described maintenance and generality risks, without establishing
+new runtime failures. The subsequent implementation results below separately
+record preservation, capability changes and diagnosed correctness repairs.
 
 ## Relationship to current work
 
 Finish the [ReleaseSafe preopt acceptance work](2026-11-14-release-safe-preopt-behavior.md)
 before changing its frozen compiler candidate. That prerequisite completed in
 `338b8972`, including final storage disposition. The user's subsequent instruction
-authorizes this implementation; [next steps](../next_steps.md) records it as the
-current action. The Safe acceptance conditions and frozen results remain unchanged.
+authorized this implementation; [next steps](../next_steps.md) now records its
+completion and stop state. The Safe acceptance conditions and frozen results
+remain unchanged.
 
 At implementation admission, read the latest accepted state and record the exact
 source, toolchain, target, pipelines and comparison inputs. The review baseline
@@ -54,6 +56,16 @@ An unexpected behavior change needs a diagnosis and its own validation scope.
 Each stage produces a separately reviewable change. Closing one stage does not
 establish acceptance of the remaining stages or of a broader LLVM replacement.
 
+The completed sequence has these source and evidence bindings:
+
+| Stage | Disposition | Source and evidence |
+| --- | --- | --- |
+| 1 | Accepted | `1905a579` — [shared use queries](../evidence/compiler_generalization_stage1_20261116.md) |
+| 2 | Accepted | `1032e124` — [typed tables and bounded lengths](../evidence/compiler_generalization_stage2_20261116.md) |
+| 3 | Accepted | `6be85e91` — [optional-pointer cleanup and fork preservation](../evidence/compiler_generalization_stage3_20261116.md) |
+| 4 | Accepted | `bce0fdcb` — [compact scoped identities](../evidence/compiler_generalization_stage4_20261116.md) |
+| 5 | Measured and deferred | [Qualified, unmerged scheduling experiment](../evidence/compiler_generalization_stage5_20261116.md); production remains `bce0fdcb` |
+
 ## 1. Consolidate operand and use queries
 
 Starting points:
@@ -64,10 +76,11 @@ Starting points:
 - [Induction-variable queries](../../src/passes/indvars.zig).
 - [Backend memory-use queries](../../src/codegen/x86_64/generic_cfg/composed_selector_memory.zig).
 
-Vector-combine, induction-variable handling and backend memory-use queries contain
-separate instruction switches for finding, counting or replacing uses. Their
-coverage differs for allocation counts, vector operands, indirect callees and
-other forms. Inventory which differences can occur in valid admitted IR before
+At the review baseline, vector-combine, induction-variable handling and backend
+memory-use queries contained separate instruction switches for finding, counting
+or replacing uses. Their coverage differed for allocation counts, vector operands,
+indirect callees and other forms. Inventory which differences can occur in valid
+admitted IR before
 treating them as defects; the alloca divergence alone is not demonstrated wrong code.
 
 `analysis/def_use.zig` already delegates instruction add/remove and terminator
@@ -234,9 +247,10 @@ Starting points:
 - [Existing identifier equality contract](../../src/ir/identifiers.zig).
 - [Selector rename-and-retry path](../../src/codegen/x86_64/generic_cfg_selector.zig).
 
-Value-use identities currently own a fixed 512-byte name buffer. An overflow
-can cause the selector to construct a privately renamed function and retry.
-Current `value_use.Identity.eql` and `PreparedIdentity.eql` compare bytes exactly.
+At the review baseline, value-use identities owned a fixed 512-byte name buffer.
+An overflow could cause the selector to construct a privately renamed function
+and retry. The former `value_use.Identity.eql` and `PreparedIdentity.eql`
+compared bytes exactly.
 The `ir.identifiers` contract can equate quoted/escaped spellings, so adopting
 that equivalence can change behavior independently of how identities are stored.
 
@@ -322,14 +336,27 @@ Work:
 
 Acceptance:
 
-- [ ] Interacting-rule cases preserve the five prioritized stages, remaining
+The first four checks below qualify only the isolated prototype. They do not
+promote it or reuse stage-4 integration as acceptance for changed scheduler code.
+The final measured decision satisfies the plan's explicit deferral condition.
+
+- [x] Interacting-rule cases preserve the five prioritized stages, remaining
   effective order, retry semantics and label lifetimes.
-- [ ] Boundary cases verify rewrite-budget consumption and exhaustion, including
+- [x] Boundary cases verify rewrite-budget consumption and exhaustion, including
   skipped checks and successful original-form retries.
-- [ ] Relevant fixed outputs, ownership and behavior match the chosen baseline.
-- [ ] Measurements distinguish fewer scans from actual wall-time or memory gains.
-- [ ] Any performance claim includes unprofiled comparisons with matching inputs,
+- [x] Relevant fixed outputs, ownership and behavior match the chosen baseline.
+- [x] Measurements distinguish fewer scans from actual wall-time or memory gains.
+- [x] Any performance claim includes unprofiled comparisons with matching inputs,
   settings and outputs. If the benefit is not demonstrated, defer this stage.
+
+The [stage-5 evidence](../evidence/compiler_generalization_stage5_20261116.md)
+records both warmups and all five alternating unprofiled pairs, with exact object
+and owner equality throughout. Median elapsed time changes from 101.63 to 101.58
+seconds, median RSS rises 0.7033%, and one pair is slower. The predeclared benefit
+criteria fail despite fewer attempts and lower logical allocation traffic.
+The qualified five-file patch and full measurements remain evidence; production
+scheduling is unchanged. Its source and compiler pipelines are closed, and the
+conditional production/profile-event/integration route was never opened.
 
 ## Proposed follow-up abstractions
 
@@ -480,3 +507,12 @@ For each completed stage, publish its source revision, exact migrated consumers,
 removed special cases, preservation result, newly admitted inputs, rejection
 boundaries and any measured performance result. Update architecture and current
 state only after the corresponding implementation and evidence are accepted.
+
+Stages 1 through 4 have those bindings above and pass their applicable gates.
+The final production source passes all 17 integration gates and all 233 native
+populations. Stage 5 closes through the measured deferral explicitly permitted
+by this plan. All cycle compiler and source-worktree pipelines are closed;
+guarded collection and the two diagnosed ordinary-product admission exceptions
+are recorded in the stage evidence. The seven current contracts and seventeen
+independent holds remain effective. The three proposed abstractions remain
+separate candidates for a future authorized scope.

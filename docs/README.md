@@ -21,7 +21,14 @@ for the verified hardware-sampling setup, recording commands and evidence checks
 The [measured throughput follow-up](evidence/compiler_throughput_20261114.md)
 records a 4.1% median reduction for the fixed Debug behavior emission workload.
 The [ReleaseSafe preopt behavior plan](plans/2026-11-14-release-safe-preopt-behavior.md)
-proposes the next bounded LLVM-optimization removal milestone.
+is complete: its [acceptance](evidence/release_safe_preopt_acceptance_20261116.md)
+matches all 2,097 ordered reference outcomes with complete audited runtime and
+test objects. The completed
+[compiler generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md)
+accepts four mechanism stages, ending with all 17 integration gates and all 233
+native populations passing. Its
+[scheduler experiment](evidence/compiler_generalization_stage5_20261116.md) is
+measured and deferred because the declared benefit was not demonstrated.
 
 The [validation and compiler performance improvement plan](plans/2026-11-09-validation-performance-improvement.md)
 records the toolchain, profiling, and validation-reuse work. See

@@ -41,8 +41,19 @@ matches all 2,097 reference outcomes in one unchanged local run, with audited
 and a passing optimizer-failure control. All 17 integration gates, native
 preservation, four-mode postopt preservation and storage disposition pass.
 LLVM construction, setup and declared providers remain dependencies.
-The authorized successor is the
-[compiler generalization plan](docs/plans/2026-11-16-generalize-compiler-mechanisms.md).
+The completed
+[compiler generalization plan](docs/plans/2026-11-16-generalize-compiler-mechanisms.md)
+adds shared use queries, typed constant-table descriptions, optional-pointer
+cleanup with scalar preservation across branches, and compact scoped value-use
+identities. The final implementation passes all 17 integration gates and the
+complete 233-population native suite. Table lengths and remaining name limits
+retain explicit boundaries in the stage evidence.
+
+Selective legalization was prototyped and measured, then deferred under the
+plan's benefit requirement. Five unprofiled pairs did not demonstrate the
+required time or memory gain; production scheduling is unchanged. The
+[experiment](docs/evidence/compiler_generalization_stage5_20261116.md) retains
+all measurements and the qualified patch.
 
 See the [final acceptance](docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json),
 [completed plan](docs/plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),
