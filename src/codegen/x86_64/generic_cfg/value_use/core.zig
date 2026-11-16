@@ -234,7 +234,8 @@ const CoreSnapshot = struct {
 };
 
 fn core_begin(comptime Transaction: type, selector: *ComposedBlockSelector) !Transaction {
-    return .{ .selector = selector, .snapshot = try CoreSnapshot.init(selector) };
+    const namespace = try @import("scoped_names.zig").freshNamespace();
+    return .{ .selector = selector, .identity_namespace = namespace, .snapshot = try CoreSnapshot.init(selector) };
 }
 fn core_deinit(comptime Authority: type, transaction: anytype) void {
     if (transaction.lifecycle == .active) Authority.rollbackInternal(Authority, transaction);
@@ -246,7 +247,7 @@ fn core_register(comptime Authority: type, transaction: anytype, request: Reques
     if (transaction.call_action != null) return error.ValueUseLateRegistration;
     if (request.prepared_action) |action| try Authority.validateActionRegistration(Authority, transaction, action);
     const stored = StoredRequest{
-        .source = try Source.from(request.source),
+        .source = try Source.from(&transaction.selector.value_use_names, transaction.selector.allocator, request.source),
         .expected = request.expected,
         .form = request.form,
         .destination = request.destination,
@@ -510,6 +511,8 @@ fn core_failedRequestIs(
 ) bool {
     const failed = transaction.failed_request orelse return false;
     return failed.authority == @intFromPtr(transaction) and
+        failed.namespace == transaction.identity_namespace and
+        failed.namespace == handle.namespace and
         failed.authority == handle.authority and
         failed.index == handle.index and
         failed.generation == handle.generation;
@@ -621,12 +624,13 @@ fn core_rollbackInternal(comptime Authority: type, transaction: anytype) void {
 fn core_handleFor(comptime _: type, transaction: anytype, index: u8) RequestHandle {
     return .{
         .authority = @intFromPtr(transaction),
+        .namespace = transaction.identity_namespace,
         .index = index,
         .generation = transaction.view_generation,
     };
 }
 fn core_validateHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
-    if (handle.authority != @intFromPtr(transaction) or handle.generation != transaction.view_generation)
+    if (handle.authority != @intFromPtr(transaction) or handle.namespace != transaction.identity_namespace or handle.generation != transaction.view_generation)
         return error.ValueUsePreparedViewStale;
     if (handle.index >= transaction.request_count) return error.ValueUsePreparedViewMissing;
     return handle.index;
@@ -801,7 +805,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
     }
 }
 fn core_validateRegisteredOperandHandle(comptime _: type, transaction: anytype, handle: RequestHandle) !u8 {
-    if (handle.authority != @intFromPtr(transaction) or handle.generation != transaction.view_generation or
+    if (handle.authority != @intFromPtr(transaction) or handle.namespace != transaction.identity_namespace or handle.generation != transaction.view_generation or
         handle.index >= transaction.request_count)
     {
         return error.ValueUseActionOperandNotRegistered;
@@ -894,7 +898,7 @@ fn core_validateConsumedOperandAfter(comptime Authority: type, transaction: anyt
 fn core_validateConsumedOperandAfterUnchecked(comptime Authority: type, transaction: anytype, index: u8) !void {
     const request = &transaction.requests[index];
     const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return,
     };
     if (transaction.lifetime_context.forward_snapshots[index] != null) {
@@ -941,7 +945,7 @@ fn executePreparedActionInternal(
     switch (action) {
         .validate_shape => |expected_shape| try materialization_module.validatePreparedShape(view, expected_shape),
         .emit_copy_to => |destination| {
-            const current = try materialization_module.preparedViewLoc(view);
+            const current = try materialization_module.preparedViewLoc(&transaction.selector.value_use_names, view);
             const target = destination.asDestination();
             switch (request.form) {
                 .gpr32 => try materialization_module.materializeScalar32(transaction.selector, current, target),

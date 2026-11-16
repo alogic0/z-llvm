@@ -122,6 +122,7 @@ pub fn beginAccumulatorSession(
     openAccumulatorSession(transaction);
     return .{
         .authority = @intFromPtr(transaction),
+        .namespace = transaction.identity_namespace,
         .generation = transaction.view_generation,
     };
 }
@@ -238,6 +239,7 @@ fn validateAccumulatorSession(
 ) !*AccumulatorDefinitionSession {
     try Authority.requireActive(Authority, transaction);
     if (handle.authority != @intFromPtr(transaction) or
+        handle.namespace != transaction.identity_namespace or
         handle.generation != transaction.view_generation)
     {
         return error.ValueUseAccumulatorSessionStale;
@@ -264,7 +266,7 @@ pub fn ownRegisteredOperandName(
 ) ![]const u8 {
     const index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
     const source = switch (transaction.requests[index].source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => {
             Authority.recordRequestFailure(Authority, transaction, index);
             return error.ValueUseActionOperandNotNamed;

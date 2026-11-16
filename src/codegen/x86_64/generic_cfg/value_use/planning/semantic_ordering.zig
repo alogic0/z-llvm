@@ -148,7 +148,7 @@ pub fn planEarlyMaterializations(comptime Authority: type, transaction: anytype,
     var source_counts: [max_requests]u8 = @splat(0);
     var source_nodes: [physical_node_count]bool = @splat(false);
     for (mappings) |mapping| {
-        if (mapping.source) |source| source_nodes[@intFromEnum(source)] = true;
+        if (mapping.source) |source| source_nodes[@backingInt(source)] = true;
         if (mapping.source_request_index) |mapped_index| {
             for (transaction.requests[0..transaction.request_count], 0..) |*request, request_index| {
                 if (!request.source.eql(&transaction.requests[mapped_index].source)) continue;
@@ -267,7 +267,7 @@ fn appendOrderedOperand(
         if (mapping.source == mapping.destination) {
             operand_phase = .no_op;
         } else if (source_counts[request_index] == 1 and
-            !source_nodes[@intFromEnum(mapping.destination)] and
+            !source_nodes[@backingInt(mapping.destination)] and
             Authority.planning.argRegForNode(mapping.destination) != null and
             selector_state.scratchRegIsProvenFree(
                 transaction.selector,
@@ -313,15 +313,15 @@ fn sortSemanticRoots(
     for (1..roots.len) |index| {
         const current = roots[index];
         var insertion = index;
-        while (insertion > 0 and semanticRootLessThan(Authority, transaction, current, roots[insertion - 1], mappings)) {
+        while (insertion > 0 and try semanticRootLessThan(Authority, transaction, current, roots[insertion - 1], mappings)) {
             roots[insertion] = roots[insertion - 1];
             insertion -= 1;
         }
         roots[insertion] = current;
     }
     for (roots[1..], roots[0 .. roots.len - 1]) |current, previous| {
-        if (!semanticRootLessThan(Authority, transaction, previous, current, mappings) and
-            !semanticRootLessThan(Authority, transaction, current, previous, mappings))
+        if (!try semanticRootLessThan(Authority, transaction, previous, current, mappings) and
+            !try semanticRootLessThan(Authority, transaction, current, previous, mappings))
         {
             return error.ValueUseEarlyOrderingConflict;
         }
@@ -333,14 +333,14 @@ fn semanticRootLessThan(
     lhs: u8,
     rhs: u8,
     mappings: []const Mapping,
-) bool {
+) !bool {
     const lhs_node = firstStructuralDestination(Authority, transaction, lhs, mappings);
     const rhs_node = firstStructuralDestination(Authority, transaction, rhs, mappings);
-    if (@intFromEnum(lhs_node) != @intFromEnum(rhs_node))
-        return @intFromEnum(lhs_node) < @intFromEnum(rhs_node);
+    if (@backingInt(lhs_node) != @backingInt(rhs_node))
+        return @backingInt(lhs_node) < @backingInt(rhs_node);
     const lhs_source = &transaction.requests[lhs].source;
     const rhs_source = &transaction.requests[rhs].source;
-    return sourceStructuralOrder(lhs_source, rhs_source) == .lt;
+    return (try sourceStructuralOrder(&transaction.selector.value_use_names, lhs_source, rhs_source)) == .lt;
 }
 fn firstStructuralDestination(
     comptime _: type,
@@ -352,10 +352,10 @@ fn firstStructuralDestination(
     return switch (transaction.requests[request_index].destination) {
         .gpr32, .gpr64 => |reg| PhysicalNode.fromArgReg(reg),
         .eax, .rax => .accumulator,
-        .pair => |pair| @enumFromInt(@min(
-            @intFromEnum(PhysicalNode.fromArgReg(pair.lo)),
-            @intFromEnum(PhysicalNode.fromArgReg(pair.hi)),
-        )),
+        .pair => |pair| @fromBackingInt(@intCast(@min(
+            @backingInt(PhysicalNode.fromArgReg(pair.lo)),
+            @backingInt(PhysicalNode.fromArgReg(pair.hi)),
+        ))),
         .prepared_source, .prepared_view, .stack_argument, .new_pair => .accumulator,
     };
 }
@@ -386,7 +386,7 @@ fn validateEarlyHomeUnchecked(comptime Authority: type, transaction: anytype, in
 fn requestSourceBinding(transaction: anytype, index: u8) ?selector_types.ValueBinding {
     const request = &transaction.requests[index];
     const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| identity.slice(&transaction.selector.value_use_names) catch return null,
         .int, .null_value, .unsupported => return null,
     };
     if (transaction.selector.values.get(name)) |binding| return binding;
@@ -493,21 +493,22 @@ fn firstMappingDestination(request_index: u8, mappings: []const Mapping) ?Types.
     var result: ?Types.PhysicalNode = null;
     for (mappings) |mapping| {
         if (mapping.source_request_index != request_index) continue;
-        if (result == null or @intFromEnum(mapping.destination) < @intFromEnum(result.?))
+        if (result == null or @backingInt(mapping.destination) < @backingInt(result.?))
             result = mapping.destination;
     }
     return result;
 }
 fn sourceStructuralOrder(
+    pool: anytype,
     lhs: *const Types.Source,
     rhs: *const Types.Source,
-) std.math.Order {
+) !std.math.Order {
     const lhs_tag = std.meta.activeTag(lhs.*);
     const rhs_tag = std.meta.activeTag(rhs.*);
-    if (@intFromEnum(lhs_tag) < @intFromEnum(rhs_tag)) return .lt;
-    if (@intFromEnum(lhs_tag) > @intFromEnum(rhs_tag)) return .gt;
+    if (@backingInt(lhs_tag) < @backingInt(rhs_tag)) return .lt;
+    if (@backingInt(lhs_tag) > @backingInt(rhs_tag)) return .gt;
     return switch (lhs.*) {
-        .named => |*name| std.mem.order(u8, name.slice(), rhs.named.slice()),
+        .named => |*name| std.mem.order(u8, try name.slice(pool), try rhs.named.slice(pool)),
         .int => |integer| std.math.order(integer, rhs.int),
         .null_value, .unsupported => .eq,
     };

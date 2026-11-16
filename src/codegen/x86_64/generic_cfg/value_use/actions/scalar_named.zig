@@ -34,7 +34,7 @@ pub fn isNamedScalarBinary(binary: ir.BinaryInst, exact_ei: bool) bool {
         .operation = binary.op,
         .integer_ty = binary.ty,
         .exact_ei = exact_ei,
-        .rhs = .{ .authority = 0, .index = 0, .generation = 0 },
+        .rhs = .{ .authority = 0, .namespace = 0, .index = 0, .generation = 0 },
     };
     return classifyNamedScalar(&action) != error.ValueUseNamedScalarFormUnsupported and
         classifyNamedScalar(&action) != error.ValueUseNamedScalarWidthUnsupported and
@@ -227,8 +227,8 @@ fn executeGeneralNamedBinary(
     if (locIsAccumulator(lhs) and locIsAccumulator(rhs)) {
         const session = try beginNamedAccumulatorSession(Authority, transaction);
         try Authority.availabilityForConsumption(Authority, transaction, rhs_index);
-        const lhs_name = sourceNameUnchecked(transaction, lhs_index);
-        const rhs_name = sourceNameUnchecked(transaction, rhs_index);
+        const lhs_name = try sourceNameUnchecked(transaction, lhs_index);
+        const rhs_name = try sourceNameUnchecked(transaction, rhs_index);
         if (std.mem.eql(u8, lhs_name, rhs_name)) {
             try selector_state.emitValueIntoScratch(
                 transaction.selector,
@@ -434,9 +434,9 @@ fn directDisplacement(
     transaction: anytype,
     index: u8,
     fallback: selector_state.AccumulatorDisplacementPolicy,
-) selector_state.AccumulatorDisplacementPolicy {
+) !selector_state.AccumulatorDisplacementPolicy {
     return switch (transaction.prepared_views[index].canonical_source_loc) {
-        .eax, .rax => .{ .reuse_source = sourceNameUnchecked(transaction, index) },
+        .eax, .rax => .{ .reuse_source = try sourceNameUnchecked(transaction, index) },
         else => fallback,
     };
 }
@@ -449,7 +449,7 @@ fn livenessDisplacement(
 ) !selector_state.AccumulatorDisplacementPolicy {
     return switch (transaction.prepared_views[index].canonical_source_loc) {
         .eax, .rax => if (!try Authority.mustSurviveInstruction(Authority, transaction, index))
-            .{ .reuse_source = sourceNameUnchecked(transaction, index) }
+            .{ .reuse_source = try sourceNameUnchecked(transaction, index) }
         else
             fallback,
         else => fallback,
@@ -501,7 +501,7 @@ fn materializeNamedAccumulator(
         return err;
     };
     session.materialize(
-        .{ .named = sourceNameUnchecked(transaction, source_index) },
+        .{ .named = try sourceNameUnchecked(transaction, source_index) },
         accumulatorDefinition(bits),
     ) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, source_index, err);
@@ -522,7 +522,7 @@ fn stageNamedSource(
     };
     selector_state.emitValueIntoScratch(
         transaction.selector,
-        .{ .named = sourceNameUnchecked(transaction, index) },
+        .{ .named = try sourceNameUnchecked(transaction, index) },
         reg,
         bits,
     ) catch |err| {
@@ -605,7 +605,7 @@ fn validateNamedSource(
 
 fn namedSource(comptime Authority: type, transaction: anytype, index: u8) ![]const u8 {
     return switch (transaction.requests[index].source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         else => {
             Authority.recordRequestFailure(Authority, transaction, index);
             return error.ValueUseUnsupportedSource;
@@ -613,8 +613,8 @@ fn namedSource(comptime Authority: type, transaction: anytype, index: u8) ![]con
     };
 }
 
-fn sourceNameUnchecked(transaction: anytype, index: u8) []const u8 {
-    return transaction.requests[index].source.named.slice();
+fn sourceNameUnchecked(transaction: anytype, index: u8) ![]const u8 {
+    return try transaction.requests[index].source.named.slice(&transaction.selector.value_use_names);
 }
 
 fn instructionForPlan(

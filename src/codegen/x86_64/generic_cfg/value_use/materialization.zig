@@ -305,7 +305,7 @@ fn materializeEarlyPlan(comptime Authority: type, transaction: anytype, index: u
         .named => {},
         .int, .null_value, .unsupported => return error.ValueUseEarlySourceNotNamed,
     }
-    const binding = requestSourceBinding(transaction, index) orelse
+    const binding = (try requestSourceBinding(transaction, index)) orelse
         return if (transaction.lifetime_context.forward_snapshots[index] != null)
             error.ValueUseForwardPlanStale
         else
@@ -368,9 +368,9 @@ fn materializeRequestUnchecked(comptime Authority: type, transaction: anytype, r
     const current = switch (request.source) {
         .named => |*name| blk: {
             // Deliberately resolve after all preparation/spill mutations.
-            const binding = transaction.selector.values.get(name.slice()) orelse return error.ValueUseUnresolvedSource;
-            try selector_state.validateAddressDependenciesForUse(transaction.selector, name.slice());
-            const current = try resolveNamedCurrent(Authority, transaction, name.slice());
+            const binding = transaction.selector.values.get(try name.slice(&transaction.selector.value_use_names)) orelse return error.ValueUseUnresolvedSource;
+            try selector_state.validateAddressDependenciesForUse(transaction.selector, try name.slice(&transaction.selector.value_use_names));
+            const current = try resolveNamedCurrent(Authority, transaction, try name.slice(&transaction.selector.value_use_names));
             try validateBindingCompatibility(binding, request, current);
             break :blk current;
         },
@@ -423,10 +423,10 @@ pub fn resolveNamedCurrent(comptime _: type, transaction: anytype, name: []const
         error.ValueUseUnresolvedSource;
 }
 
-fn requestSourceBinding(transaction: anytype, index: u8) ?ValueBinding {
+fn requestSourceBinding(transaction: anytype, index: u8) !?ValueBinding {
     const request = &transaction.requests[index];
     const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return null,
     };
     if (transaction.selector.values.get(name)) |binding| return binding;
@@ -493,7 +493,7 @@ fn buildPreparedRecordUnchecked(comptime Authority: type, transaction: anytype, 
         if (pin.call_final_use != null)
             _ = try Authority.validateRequestAt(Authority, transaction, index);
     }
-    const binding = requestSourceBinding(transaction, index) orelse
+    const binding = (try requestSourceBinding(transaction, index)) orelse
         return if (transaction.lifetime_context.forward_snapshots[index] != null)
             error.ValueUseForwardPlanStale
         else
@@ -622,7 +622,7 @@ pub fn preparedPointerView(
                 .reg => |reg| .{ .register = reg },
                 .spill => |frame_index| .{ .spill = frame_index },
             },
-            .symbol = try Types.PreparedIdentity.init(ptr.symbol),
+            .symbol = try Types.PreparedIdentity.init(&transaction.selector.value_use_names, transaction.selector.allocator, ptr.symbol),
             .shape = ptr.shape,
             .offset = ptr.offset,
         } },
@@ -644,7 +644,7 @@ fn preparedAddressDescriptor(
     ptr: selector_types.StackPtrLoc,
 ) !Types.PreparedAddressDescriptor {
     const owner_name = switch (request.source) {
-        .named => |*name| name.slice(),
+        .named => |*name| try name.slice(&transaction.selector.value_use_names),
         else => return error.ValueUsePreparedViewUnsupported,
     };
     var result = Types.PreparedAddressDescriptor{ .disp = ptr.disp };
@@ -679,7 +679,7 @@ fn preparedAddressComponent(
     const current = try resolveNamedCurrent(Authority, transaction, name);
     const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
     return .{
-        .identity = try Types.PreparedIdentity.init(name),
+        .identity = try Types.PreparedIdentity.init(&transaction.selector.value_use_names, transaction.selector.allocator, name),
         .role = role,
         .home = try preparedScalarHome(current),
         .vreg = binding.vreg,
@@ -748,7 +748,7 @@ pub fn validatePreparedShape(
     };
     if (!matches) return error.ValueUsePreparedShapeMismatch;
 }
-pub fn preparedViewLoc(view: *const Types.PreparedView) !ValueLoc {
+pub fn preparedViewLoc(pool: *const @import("scoped_names.zig").Pool, view: *const Types.PreparedView) !ValueLoc {
     return switch (view.*) {
         .register => |value| switch (value.register) {
             .gpr32 => |reg| .{ .scratch32 = reg },
@@ -766,8 +766,8 @@ pub fn preparedViewLoc(view: *const Types.PreparedView) !ValueLoc {
             .disp = address.disp,
             .index = if (address.index) |*index| .{
                 .reg = .rcx,
-                .name = index.identity.slice(),
-                .addend_name = if (address.addend) |*addend| addend.identity.slice() else null,
+                .name = try index.identity.slice(pool),
+                .addend_name = if (address.addend) |*addend| try addend.identity.slice(pool) else null,
             } else null,
         } },
         .stack_f32_pair_address => |address| .{ .stack_f32_pair_ptr = .{
@@ -779,7 +779,7 @@ pub fn preparedViewLoc(view: *const Types.PreparedView) !ValueLoc {
                 .register => |reg| .{ .reg = reg },
                 .spill => |frame_index| .{ .spill = frame_index },
             },
-            .symbol = table.symbol.slice(),
+            .symbol = try table.symbol.slice(pool),
             .shape = table.shape,
             .offset = table.offset,
         } },

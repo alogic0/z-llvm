@@ -317,7 +317,7 @@ fn scalarCastNamedSource(
     source_index: u8,
 ) ![]const u8 {
     return switch (transaction.requests[source_index].source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => {
             Authority.recordRequestFailure(Authority, transaction, source_index);
             return error.ValueUseUnsupportedSource;
@@ -332,7 +332,7 @@ fn scalarCastSourceValue(
     action: *const Types.AccumulatorScalarCastAction,
 ) !ir.Value {
     return switch (transaction.requests[source_index].source) {
-        .named => |*identity| .{ .named = identity.slice() },
+        .named => |*identity| .{ .named = try identity.slice(&transaction.selector.value_use_names) },
         .int => |value| {
             if (action.immediate == null or action.immediate.? != value) {
                 Authority.recordRequestFailure(Authority, transaction, source_index);
@@ -359,7 +359,7 @@ fn scalarCastDisplacement(
         // register. Preparation must not discard the operand before reading it.
         if (transaction.requests[source_index].source == .named) switch (transaction.prepared_views[source_index].canonical_source_loc) {
             .eax, .rax => if (!try Authority.mustSurviveInstruction(Authority, transaction, source_index))
-                return .{ .reuse_source = transaction.requests[source_index].source.named.slice() },
+                return .{ .reuse_source = try transaction.requests[source_index].source.named.slice(&transaction.selector.value_use_names) },
             else => {},
         };
         return if (transaction.selector.stack_frame_bytes != 0) .spill_live else .scratch_preferred;
@@ -375,7 +375,7 @@ fn scalarCastSourceDisplacement(
     return switch (transaction.requests[source_index].source) {
         .int => .spill_live,
         .named => |*identity| switch (transaction.prepared_views[source_index].canonical_source_loc) {
-            .eax, .rax => .{ .reuse_source = identity.slice() },
+            .eax, .rax => .{ .reuse_source = try identity.slice(&transaction.selector.value_use_names) },
             else => .scratch_preferred,
         },
         .null_value, .unsupported => {

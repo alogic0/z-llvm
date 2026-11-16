@@ -253,6 +253,7 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
     }
 
     const root = "src/codegen/x86_64/generic_cfg/value_use/";
+    const is_scoped_names = std.mem.eql(u8, path, root ++ "scoped_names.zig");
     const is_model = std.mem.eql(u8, path, root ++ "model.zig");
     const is_core = std.mem.eql(u8, path, root ++ "core.zig");
     const is_planning = std.mem.eql(u8, path, root ++ "planning.zig");
@@ -274,7 +275,9 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
     if (!is_scalar_named and !is_scalar_arithmetic)
         try validateNoFunctionFamilyPredicate(source, error.ValueUseFunctionPredicateForbidden);
 
-    const public_names: []const []const u8 = if (is_model)
+    const public_names: []const []const u8 = if (is_scoped_names)
+        &.{ "freshNamespace", "Identity", "Pool" }
+    else if (is_model)
         &value_use_model_pub_names
     else if (is_core)
         &value_use_core_pub_names
@@ -348,7 +351,13 @@ pub fn validateValueUseLeaf(path: []const u8, source: [:0]const u8) !void {
         return error.ValueUseProductionInstantiationMismatch;
     }
 
-    if (is_model) {
+    if (is_scoped_names) {
+        // The selector owns this data-only leaf. It cannot import lowering or
+        // any transaction authority, including through an inline import.
+        if (countPattern(source, "@import(") != 1 or
+            countPattern(source, "const std = @import(\"std\");") != 1)
+            return error.ValueUseImportDagMismatch;
+    } else if (is_model) {
         try validateValueUseFacadeSurfaceManifest(source);
         if (std.mem.indexOf(u8, source, "@import(\"core.zig\")") != null or
             std.mem.indexOf(u8, source, "@import(\"planning.zig\")") != null or

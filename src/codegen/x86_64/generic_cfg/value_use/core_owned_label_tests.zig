@@ -84,12 +84,12 @@ const expectTableLoadFailure = support.expectTableLoadFailure;
 const I128PairRollbackBoundary = support.I128PairRollbackBoundary;
 const expectI128PairRollbackExact = support.expectI128PairRollbackExact;
 
-test "value-use long owned identities preserve shared prefixes and reject beyond bound" {
+test "value-use unmigrated action identities retain their explicit owned name bound" {
     const model = @import("model.zig");
     var names: [2][model.max_identity_bytes + 1]u8 = @splat(@splat('x'));
     names[0][model.max_identity_bytes - 1] = 'a';
     names[1][model.max_identity_bytes - 1] = 'b';
-    inline for (.{ model.ActionIdentity, model.PreparedIdentity, model.Identity }) |IdentityType| {
+    inline for (.{model.ActionIdentity}) |IdentityType| {
         const first = try IdentityType.init(names[0][0..model.max_identity_bytes]);
         const second = try IdentityType.init(names[1][0..model.max_identity_bytes]);
         try std.testing.expectEqual(@as(u16, 512), first.len);
@@ -110,9 +110,9 @@ test "value-use long source identity registration has exact rollback and no pref
     defer machine.deinit(std.testing.allocator);
     var plan = SelectorAllocationPlan.init(std.testing.allocator);
     defer plan.deinit();
-    var names: [2][406]u8 = @splat(@splat('p'));
-    names[0][405] = 'a';
-    names[1][405] = 'b';
+    var names: [2][4096]u8 = @splat(@splat('p'));
+    names[0][4095] = 'a';
+    names[1][4095] = 'b';
     for (&names) |*name| try addLive(&plan, name);
     var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
     defer selector.deinit();
@@ -124,8 +124,7 @@ test "value-use long source identity registration has exact rollback and no pref
     const first = try transaction.register(preparedRequest(&names[0], .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } }));
     const second = try transaction.register(preparedRequest(&names[1], .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rsi } }));
     try std.testing.expect(first.index != second.index);
-    const oversized: [513]u8 = @splat('q');
-    try std.testing.expectError(error.ValueUseIdentityTooLong, transaction.register(preparedRequest(&oversized, .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } })));
+    try std.testing.expectError(error.ValueUseEmptyIdentity, transaction.register(preparedRequest("", .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } })));
     try std.testing.expectEqual(@as(u8, 2), transaction.request_count);
     try transaction.seal();
     try transaction.prepare();
@@ -140,6 +139,104 @@ test "value-use long source identity registration has exact rollback and no pref
     try std.testing.expect(selector.values.get(&names[0]).?.loc == .arg64);
     try std.testing.expectEqual(.rdi, selector.values.get(&names[0]).?.loc.arg64);
     try std.testing.expectEqual(.rsi, selector.values.get(&names[1]).?.loc.arg64);
+}
+
+test "value-use scoped names survive rollback without aliasing and registration OOM is atomic" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    const allocator = failing.allocator();
+    var machine = MachineFunction.init("identity-rollback", .{ .int = 64 });
+    defer machine.deinit(allocator);
+    var selector = ComposedBlockSelector.init(allocator, &machine);
+    defer selector.deinit();
+    var first_identity: @import("model.zig").Identity = undefined;
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try transaction.register(request("first", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rdi }));
+        first_identity = transaction.requests[0].source.named;
+        const count = selector.value_use_names.names.count();
+        failing.fail_index = failing.alloc_index;
+        try std.testing.expectError(error.OutOfMemory, transaction.register(request("different", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi })));
+        try std.testing.expectEqual(count, selector.value_use_names.names.count());
+        try std.testing.expectEqual(@as(u8, 1), transaction.request_count);
+        try std.testing.expect(first_identity.eql(&transaction.requests[0].source.named));
+        failing.fail_index = std.math.maxInt(usize);
+        try transaction.rollback();
+    }
+    {
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        _ = try transaction.register(request("different", .{ .int = 64 }, .gpr64, .gpr64, .{ .gpr64 = .rsi }));
+        try std.testing.expect(!first_identity.eql(&transaction.requests[0].source.named));
+        try std.testing.expectEqualStrings("first", try first_identity.slice(&selector.value_use_names));
+        try std.testing.expectEqualStrings("different", try transaction.requests[0].source.named.slice(&selector.value_use_names));
+        try transaction.rollback();
+    }
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+}
+
+test "value-use request and accumulator handles reject a new transaction at the same address" {
+    var machine = MachineFunction.init("same-address-identities", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "source");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+    var transaction: Transaction = undefined;
+    var old_request: Transaction.RequestHandle = undefined;
+    var old_session: Transaction.AccumulatorSessionHandle = undefined;
+    {
+        transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        old_request = try transaction.register(preparedRequest("source", .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } }));
+        try transaction.seal();
+        old_session = try transaction.beginAccumulatorSession();
+    }
+    {
+        transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        const current = try transaction.register(preparedRequest("source", .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } }));
+        try std.testing.expectEqual(old_request.authority, current.authority);
+        try std.testing.expectEqual(old_request.index, current.index);
+        try std.testing.expectEqual(old_request.generation, current.generation);
+        try std.testing.expect(old_request.namespace != current.namespace);
+        try transaction.seal();
+        _ = try transaction.beginAccumulatorSession();
+        try std.testing.expectError(error.ValueUseAccumulatorSessionStale, transaction.commitAccumulatorSession(old_session));
+        try transaction.prepare();
+        try transaction.materializeAll();
+        try std.testing.expectError(error.ValueUsePreparedViewStale, transaction.preparedView(old_request));
+    }
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+}
+
+test "value-use foreign source identity rejects before selector writes" {
+    var machine = MachineFunction.init("foreign-identity", .{ .int = 64 });
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    try addLive(&plan, "source");
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "source", .{ .arg64 = .rdi });
+    var foreign: @import("scoped_names.zig").Pool = .{};
+    defer foreign.deinit(std.testing.allocator);
+    const foreign_name = try foreign.intern(std.testing.allocator, "source");
+    var transaction = try Transaction.begin(&selector);
+    defer transaction.deinit();
+    _ = try transaction.register(preparedRequest("source", .{ .int = 64 }, .gpr64, .gpr64, .{ .validate_shape = .{ .register_gpr64 = .rdi } }));
+    try std.testing.expectEqual(foreign_name.slot, transaction.requests[0].source.named.slot);
+    transaction.requests[0].source.named = foreign_name;
+    try std.testing.expectError(error.ValueUseIdentityStale, transaction.seal());
+    try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+    try std.testing.expectEqual(.rdi, selector.values.get("source").?.loc.arg64);
 }
 
 test "value-use rollback releases speculative owned labels after instructions and commit retains them" {

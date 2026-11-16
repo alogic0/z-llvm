@@ -57,7 +57,7 @@ pub fn validateRequest(
         },
         .named => {
             try Authority.availabilityForConsumption(Authority, transaction, index);
-            const binding = sourceBinding(transaction, index) orelse
+            const binding = (try sourceBinding(transaction, index)) orelse
                 return error.ValueUseForwardPlanStale;
             const current = try resolveRequestCurrent(Authority, transaction, index);
             try compatibility.validateBindingCompatibility(binding, request, current);
@@ -305,7 +305,7 @@ pub fn core_availabilityForConsumption(
         .unsupported => return,
     };
     const existing_pin = transaction.lifetime_context.pins[index];
-    const binding = transaction.selector.values.get(identity.slice()) orelse {
+    const binding = transaction.selector.values.get(try identity.slice(&transaction.selector.value_use_names)) orelse {
         if (existing_pin) |pin| {
             if (pin.call_final_use != null)
                 return error.ValueUseSourceGenerationChanged;
@@ -331,14 +331,14 @@ pub fn core_availabilityForConsumption(
             return error.ValueUseSourceGenerationChanged;
         return error.ValueUseSourcePlanMissing;
     };
-    const interval_end = plan.intervalEnd(identity.slice()) orelse {
+    const interval_end = plan.intervalEnd(try identity.slice(&transaction.selector.value_use_names)) orelse {
         if (existing_pin != null and existing_pin.?.call_final_use != null)
             return error.ValueUseSourceGenerationChanged;
         return error.ValueUseSourceIntervalMissing;
     };
     try selector_state.validateAddressDependenciesForUse(
         transaction.selector,
-        identity.slice(),
+        try identity.slice(&transaction.selector.value_use_names),
     );
     if (existing_pin) |pin| {
         if (pin.call_final_use) |final_use| {
@@ -355,7 +355,7 @@ pub fn core_availabilityForConsumption(
     }
     if (!try selector_state.valueIsLiveAtOrAfterCurrent(
         transaction.selector,
-        identity.slice(),
+        try identity.slice(&transaction.selector.value_use_names),
     )) {
         if (existing_pin == null and transaction.request_phase == .registering and
             try admitCallFinalUse(transaction, index, identity, &binding, plan, interval_end))
@@ -450,6 +450,7 @@ fn callFinalUseClaim(transaction: anytype, index: u8) ?CallFinalUseClaim {
 
 fn handleClaimsRequest(transaction: anytype, handle: Types.RequestHandle, index: u8) bool {
     return handle.authority == @intFromPtr(transaction) and
+        handle.namespace == transaction.identity_namespace and
         handle.generation == transaction.view_generation and
         handle.index == index and
         index < transaction.request_count;
@@ -499,10 +500,10 @@ fn validateCallFinalUseRequest(
 
 /// Returns a transient binding for validation only. Forward admission never
 /// inserts it into selector.values and never exposes its resolved home.
-fn sourceBinding(transaction: anytype, index: u8) ?ValueBinding {
+fn sourceBinding(transaction: anytype, index: u8) !?ValueBinding {
     const request = &transaction.requests[index];
     const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return null,
     };
     if (transaction.selector.values.get(name)) |binding| return binding;
@@ -524,7 +525,7 @@ fn sourceBinding(transaction: anytype, index: u8) ?ValueBinding {
 fn resolveRequestCurrent(comptime Authority: type, transaction: anytype, index: u8) !ValueLoc {
     const request = &transaction.requests[index];
     const name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
     };
     if (transaction.selector.values.get(name)) |_|
@@ -551,11 +552,11 @@ fn captureForwardAdmissionSnapshot(
     };
     const plan = transaction.selector.allocation_plan orelse
         return error.ValueUseForwardPlanMissing;
-    const forward = plan.forwardValue(identity.slice()) orelse
+    const forward = plan.forwardValue(try identity.slice(&transaction.selector.value_use_names)) orelse
         return error.ValueUseForwardPlanMissing;
     if (transaction.selector.current_position >= forward.definition_position)
         return error.ValueUseForwardPlanMalformed;
-    const interval_end = plan.intervalEnd(identity.slice()) orelse
+    const interval_end = plan.intervalEnd(try identity.slice(&transaction.selector.value_use_names)) orelse
         return error.ValueUseForwardPlanMissing;
     if (interval_end < transaction.selector.current_position)
         return error.ValueUseForwardIntervalExpired;
@@ -568,7 +569,7 @@ fn captureForwardAdmissionSnapshot(
         return error.ValueUseForwardTypeMismatch;
     }
 
-    const assignment = switch (plan.assignment(identity.slice()) orelse
+    const assignment = switch (plan.assignment(try identity.slice(&transaction.selector.value_use_names)) orelse
         return error.ValueUseForwardAssignmentMissing) {
         .gpr32 => |reg| if (forward.metadata.class == .gpr32)
             Types.ForwardAssignmentSnapshot{ .gpr32 = reg }
@@ -593,11 +594,11 @@ fn captureForwardAdmissionSnapshot(
     };
     _ = selector_state.resolveForwardValueForUse(
         transaction.selector,
-        identity.slice(),
+        try identity.slice(&transaction.selector.value_use_names),
     ) catch return error.ValueUseForwardPlanMalformed;
     selector_state.validateAddressDependenciesForUse(
         transaction.selector,
-        identity.slice(),
+        try identity.slice(&transaction.selector.value_use_names),
     ) catch return error.ValueUseForwardPlanMalformed;
 
     return .{
@@ -638,7 +639,7 @@ fn captureForwardDependencySnapshot(transaction: anytype) !Types.ForwardDependen
         const owner = selector.address_dependencies.ownerAt(owner_index) orelse
             return error.ValueUseForwardPlanMalformed;
         var owner_snapshot = Types.ForwardDependencyOwnerSnapshot{
-            .identity = try Types.Identity.init(owner.name),
+            .identity = try Types.Identity.init(&selector.value_use_names, selector.allocator, owner.name),
             .identity_type = owner.identity_type,
             .interval_end = plan.intervalEnd(owner.name) orelse
                 return error.ValueUseForwardPlanMalformed,
@@ -647,7 +648,7 @@ fn captureForwardDependencySnapshot(transaction: anytype) !Types.ForwardDependen
         };
         for (owner.dependencySlice(), 0..) |dependency, dependency_index| {
             owner_snapshot.dependencies[dependency_index] = .{
-                .identity = try Types.Identity.init(dependency.name),
+                .identity = try Types.Identity.init(&selector.value_use_names, selector.allocator, dependency.name),
                 .identity_type = dependency.identity_type,
                 .role = dependency.role,
                 .interval_end = plan.intervalEnd(dependency.name),
@@ -669,9 +670,9 @@ fn captureForwardDependencyBinding(
         .stack_i32_ptr => |stack_ptr| {
             snapshot.is_stack_i32_ptr = true;
             if (stack_ptr.index) |stack_index| {
-                snapshot.address_index = try Types.Identity.init(stack_index.name);
+                snapshot.address_index = try Types.Identity.init(&selector.value_use_names, selector.allocator, stack_index.name);
                 if (stack_index.addend_name) |addend|
-                    snapshot.address_addend = try Types.Identity.init(addend);
+                    snapshot.address_addend = try Types.Identity.init(&selector.value_use_names, selector.allocator, addend);
             }
         },
         else => {},
@@ -685,7 +686,7 @@ pub fn core_mustSurviveInstruction(
 ) !bool {
     try core_availabilityForConsumption(Authority, transaction, index);
     const identity = switch (transaction.requests[index].source) {
-        .named => |*name| name.slice(),
+        .named => |*name| try name.slice(&transaction.selector.value_use_names),
         .int, .null_value => return false,
         .unsupported => return error.ValueUseUnsupportedSource,
     };
@@ -698,7 +699,7 @@ pub fn core_occupantNeedsPreservation(
     source_index: u8,
 ) !?[]const u8 {
     const source_name = switch (transaction.requests[source_index].source) {
-        .named => |*name| name.slice(),
+        .named => |*name| try name.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => null,
     };
     const plan = transaction.selector.allocation_plan orelse

@@ -217,6 +217,15 @@ test "value-use call rollback guard enforces exactly one outer automatic rollbac
         ),
     );
 }
+test "value-use scoped name leaf admits only its std-only data and identity surface" {
+    const names = @embedFile("../value_use/scoped_names.zig");
+    const path = "src/codegen/x86_64/generic_cfg/value_use/scoped_names.zig";
+    try validateValueUseLeaf(path, names);
+    try std.testing.expectError(error.ValueUseImportDagMismatch, validateValueUseLeaf(path, names ++ "\nconst authority = @import(\"core.zig\");\n"));
+    try std.testing.expectError(error.ValueUseImportDagMismatch, validateValueUseLeaf(path, names ++ "\nfn hidden() void { _ = @import(\"actions/calls.zig\"); }\n"));
+    try std.testing.expectError(error.ValueUseTechnicalPubBudgetMismatch, validateValueUseLeaf(path, names ++ "\npub const RawSource = usize;\n"));
+}
+
 test "value-use split guard rejects runtime dispatch type-name coupling and extra instantiations" {
     try std.testing.expectError(
         error.ValueUseRuntimeDispatchForbidden,

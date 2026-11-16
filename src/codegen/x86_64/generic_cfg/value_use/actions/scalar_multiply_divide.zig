@@ -156,7 +156,7 @@ pub fn executeUnsignedQuotient(
     if (rhs_is_accumulator) {
         // Staging RAX into RCX can destroy a final-use dividend already in
         // RCX. Preserve that registered input before its physical home changes.
-        const lhs_name = sourceName(transaction, lhs_index);
+        const lhs_name = try sourceName(transaction, lhs_index);
         const lhs_binding = transaction.selector.values.get(lhs_name) orelse return error.ValueUseUnresolvedSource;
         if (@import("../../composed_helpers.zig").locContainsReg(lhs_binding.loc, .rcx))
             try selector_state.spillValueOrError(transaction.selector, lhs_name);
@@ -168,7 +168,7 @@ pub fn executeUnsignedQuotient(
             transaction,
             lhs_index,
             session,
-            quotientDisplacement(transaction, lhs_index),
+            try quotientDisplacement(transaction, lhs_index),
         );
         try failQuotientForTest(transaction, .after_accumulator_preparation);
         try refreshQuotientSource(Authority, transaction, lhs_index);
@@ -180,7 +180,7 @@ pub fn executeUnsignedQuotient(
             transaction,
             lhs_index,
             session,
-            quotientDisplacement(transaction, lhs_index),
+            try quotientDisplacement(transaction, lhs_index),
         );
         try failQuotientForTest(transaction, .after_accumulator_preparation);
         try refreshQuotientSource(Authority, transaction, lhs_index);
@@ -237,7 +237,7 @@ fn selectPlan(
             .{ .m64_destination = reg }
         else if (selector_state.reusableScratch64RegForInPlace(
             transaction.selector,
-            .{ .named = sourceName(transaction, lhs_index) },
+            .{ .named = try sourceName(transaction, lhs_index) },
         )) |reusable|
             .{ .m64_destination = reusable }
         else if (plannedResultScratch(transaction, &action.result)) |planned|
@@ -246,7 +246,7 @@ fn selectPlan(
             .{ .m64_destination = free }
         else if (selector_state.spillScratch64SourceForInPlace(
             transaction.selector,
-            .{ .named = sourceName(transaction, lhs_index) },
+            .{ .named = try sourceName(transaction, lhs_index) },
         )) |source| blk: {
             if (try selector_state.spillValue(transaction.selector, source.name)) |diagnostic| {
                 transaction.action_diagnostic = diagnostic;
@@ -450,7 +450,7 @@ fn sessionMaterialize(
         return err;
     };
     session.materialize(
-        .{ .named = sourceName(transaction, index) },
+        .{ .named = try sourceName(transaction, index) },
         .fullRax(),
     ) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, index, err);
@@ -470,7 +470,7 @@ fn stageSource(
     };
     selector_state.emitValueIntoScratch(
         transaction.selector,
-        .{ .named = sourceName(transaction, index) },
+        .{ .named = try sourceName(transaction, index) },
         reg,
         64,
     ) catch |err| {
@@ -527,7 +527,7 @@ fn validateSource(
 
 fn namedSource(comptime Authority: type, transaction: anytype, index: u8) ![]const u8 {
     return switch (transaction.requests[index].source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         else => {
             Authority.recordRequestFailure(Authority, transaction, index);
             return error.ValueUseUnsupportedSource;
@@ -535,8 +535,8 @@ fn namedSource(comptime Authority: type, transaction: anytype, index: u8) ![]con
     };
 }
 
-fn sourceName(transaction: anytype, index: u8) []const u8 {
-    return transaction.requests[index].source.named.slice();
+fn sourceName(transaction: anytype, index: u8) ![]const u8 {
+    return try transaction.requests[index].source.named.slice(&transaction.selector.value_use_names);
 }
 
 fn emitWrite(transaction: anytype, instruction: machine_module.Instruction) !void {
@@ -546,9 +546,9 @@ fn emitWrite(transaction: anytype, instruction: machine_module.Instruction) !voi
 fn quotientDisplacement(
     transaction: anytype,
     lhs_index: u8,
-) selector_state.AccumulatorDisplacementPolicy {
+) !selector_state.AccumulatorDisplacementPolicy {
     return switch (transaction.prepared_views[lhs_index].canonical_source_loc) {
-        .eax, .rax => .{ .reuse_source = sourceName(transaction, lhs_index) },
+        .eax, .rax => .{ .reuse_source = try sourceName(transaction, lhs_index) },
         else => .spill_live,
     };
 }
@@ -581,7 +581,7 @@ fn materializeQuotientLhs(
         return err;
     };
     session.materialize(
-        .{ .named = sourceName(transaction, lhs_index) },
+        .{ .named = try sourceName(transaction, lhs_index) },
         plan.definition(),
     ) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, lhs_index, err);
@@ -602,7 +602,7 @@ fn stageQuotientSource(
     };
     selector_state.emitValueIntoScratch(
         transaction.selector,
-        .{ .named = sourceName(transaction, index) },
+        .{ .named = try sourceName(transaction, index) },
         reg,
         plan.bits(),
     ) catch |err| {

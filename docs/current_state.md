@@ -80,9 +80,10 @@ input qualifications and four-mode postopt preservation pass. The
 committed-source bridge, exact artifact transitions and final storage disposition.
 Final collection reclaims 2,095,722,496 allocated file bytes. Eight diagnosed
 families retain their specific recovery or admission investigations; seventeen
-independent holds remain unchanged. Two qualified backend pipelines transfer
-temporarily to the authorized
+independent holds remain unchanged. Two qualified backend pipelines transferred
+to the authorized
 [compiler generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md).
+Their comparison consumers have now closed.
 LLVM IR construction, target/analysis setup and declared providers remain
 explicit dependencies.
 
@@ -115,6 +116,20 @@ integration gates pass, including the complete 232-population native suite.
 The fixed Debug module also preserves object and owner bytes. Two main-function
 legacy shapers remain outside this slice. Storage closure preserves all seven
 contracts and seventeen independent holds.
+
+The [fourth stage](evidence/compiler_generalization_stage4_20261116.md) replaces
+the two selected 512-byte value-use name buffers with scoped namespace/slot IDs
+and selector-owned exact bytes. Long scalar parameters execute without private
+renaming; byte equality, lexical ordering, external names and relocations remain
+unchanged.
+Allocation failure, rollback, stale pools and same-address transaction reuse
+have explicit checks. Action names and address dependencies retain their
+separate limits. All 2,417 Fast units, 244 selected Debug/Fast checks, 74
+structural checks and 17 integration gates pass, including the complete
+233-population native suite. All cycle compiler and source-worktree pipelines
+are closed, with two diagnosed ordinary-product admission exceptions recorded
+separately from required evidence. The scheduler experiment is measured and
+deferred; its final decision and stop-state documentation follow separately.
 
 ## Fixed compiler-core execution cohort
 

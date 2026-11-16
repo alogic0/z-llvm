@@ -54,13 +54,17 @@ original layouts and admit bounded power-of-two i16 counts; the complete
 [3](evidence/compiler_generalization_stage3_20261116.md) is also accepted: obsolete
 optional-pointer load/return handlers are removed, and computed scalar homes are
 established before CFG forks. Exact wrong-code replay, all 17 integration gates
-and the complete 232-population native suite pass. Implement stage 4 next:
-compact scoped identities with unchanged byte-equality contracts, atomic
-insertion and stale-handle rejection. Qualify long names without relying on
-private renaming for the selected path. Use separate evidence and managed
-workspaces, then measure the isolated scheduler only at an idle boundary.
-The Safe, stage-1, table and CFG comparison compiler pipelines have completed
-their consumers. Preserve historical model/guard transitions and other holds.
+and the complete 232-population native suite pass. Stage
+[4](evidence/compiler_generalization_stage4_20261116.md) is also accepted:
+compact scoped identities preserve byte equality and lexical ordering, with
+atomic insertion and stale-handle rejection. Long scalar parameters execute
+without private renaming. All 17 gates and all 233 native populations pass.
+The isolated scheduler's idle measurements did not meet its declared benefit
+criteria, so it remains unpromoted. Finish its decision report, README/current
+state and final storage disposition, then close this authorized sequence.
+All cycle compiler and source-worktree pipelines have completed their consumers.
+Preserve historical model/guard transitions, other holds and the two explicit
+ordinary-product admission exceptions; do not start the proposed abstractions.
 
 Further work starts from the accepted baseline:
 

@@ -13706,6 +13706,14 @@
       "functions": ["runtime_optional_pointer_main.optionalPtrValue", "optional_phi_adjust", "renamed_optional_read", "optional_live_pressure"],
       "observations": 1056,
       "stdout": "optional-composition observations=1056 renamed=cfg-variants=pressure=guards=preserved\n"
+    },
+    {
+      "population": "identity_names",
+      "fixture": "identity_names",
+      "prefix": "identity-names",
+      "functions": ["identity_sum", "identity_difference", "identity_mix", "identity_call"],
+      "observations": 1056,
+      "stdout": "identity-names observations=1056 long=quoted=distinct=relocations=preserved\n"
     }
   ]
 }

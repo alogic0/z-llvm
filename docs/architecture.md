@@ -390,6 +390,15 @@ do not establish a runtime speedup.
   load/return handlers. Ordinary comparisons, branches, loads, PHIs and returns
   use composed selection. Two main-function legacy shapers and their call-name
   predicate retain their existing callers.
+- [Scoped value-use names](../src/codegen/x86_64/generic_cfg/value_use/scoped_names.zig)
+  keep exact textual bytes once per selector/function rewrite attempt. Compact
+  namespace/slot IDs replace the two selected 512-byte name buffers; resolved
+  bytes retain lexical ordering and caller equality. Pools never rebind slots
+  across rollback, and fresh transaction namespaces reject same-address handle
+  reuse. External names and relocations retain their original spelling. The
+  [identity qualification](evidence/compiler_generalization_stage4_20261116.md)
+  covers long parameters without private renaming. Action names and the separate
+  address-dependency domain retain their existing limits and retry path.
 - Operand traversal reports opaque values, attributes, metadata, and call text
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers

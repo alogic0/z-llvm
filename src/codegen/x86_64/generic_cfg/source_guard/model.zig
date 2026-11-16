@@ -41,6 +41,7 @@ pub const classified_sources = [_]ClassifiedSource{
 };
 
 pub const value_use_leaf_paths = [_][]const u8{
+    "src/codegen/x86_64/generic_cfg/value_use/scoped_names.zig",
     "src/codegen/x86_64/generic_cfg/value_use/model.zig",
     "src/codegen/x86_64/generic_cfg/value_use/core.zig",
     "src/codegen/x86_64/generic_cfg/value_use/planning.zig",

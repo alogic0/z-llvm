@@ -273,6 +273,7 @@ fn noteCallAttachmentHandleError(
     err: anyerror,
 ) void {
     if (handle.authority != @intFromPtr(transaction) or
+        handle.namespace != transaction.identity_namespace or
         handle.generation != transaction.view_generation or
         handle.index >= transaction.request_count)
     {
@@ -311,7 +312,7 @@ fn executeDirectCall(
     transaction: anytype,
     action: *const Types.DirectCallAction,
 ) !void {
-    mutateCallSourceForTest(transaction, .mutate_after_prepared_construction, null);
+    try mutateCallSourceForTest(transaction, .mutate_after_prepared_construction, null);
     var next_eflags = transaction.selector.eflags;
     try next_eflags.apply(.clobber);
     const preservation_eflags = transaction.selector.eflags.snapshot();
@@ -328,7 +329,7 @@ fn executeDirectCall(
         return error.ValueUseActionDiagnostic;
     }
     try refreshCallArguments(Authority, transaction, action.arguments[0..action.argument_count]);
-    mutateCallSourceForTest(transaction, .mutate_after_refresh, null);
+    try mutateCallSourceForTest(transaction, .mutate_after_refresh, null);
     if (builtin.is_test and
         transaction.call_test_failure == @backingInt(CallTestFailure.after_preservation))
         try transaction.selector.eflags.validateSnapshot(preservation_eflags);
@@ -339,7 +340,7 @@ fn executeDirectCall(
         action.argument_types[0..action.argument_count],
         0..,
     ) |handle, declared_type, argument_index| {
-        mutateCallSourceForTest(transaction, .mutate_before_argument, @intCast(argument_index));
+        try mutateCallSourceForTest(transaction, .mutate_before_argument, @intCast(argument_index));
         const target = ArgReg.fromIndex(argument_index) catch
             return error.ValueUseCallArgumentCountUnsupported;
         try stageDirectCallArgument(Authority, transaction, handle, declared_type, target);
@@ -600,7 +601,7 @@ fn mutateCallSourceForTest(
     transaction: anytype,
     boundary: CallTestFailure,
     argument_index: ?u8,
-) void {
+) !void {
     if (!builtin.is_test) return;
     const configured = transaction.call_test_failure orelse return;
     if (configured != @backingInt(boundary)) return;
@@ -608,7 +609,7 @@ fn mutateCallSourceForTest(
         if (transaction.call_test_argument_index != index) return;
     }
     const request_index = transaction.call_test_argument_index;
-    const name = transaction.requests[request_index].source.named.slice();
+    const name = try transaction.requests[request_index].source.named.slice(&transaction.selector.value_use_names);
     transaction.selector.values.getPtr(name).?.vreg.index += 1;
 }
 
@@ -708,7 +709,7 @@ fn preserveMemcpyOperandBeforeStaging(comptime Authority: type, transaction: any
     };
     const reg = source_reg orelse return;
     if (reg != .rdi and !(is_length and reg == .rsi)) return;
-    const name = transaction.requests[index].source.named.slice();
+    const name = try transaction.requests[index].source.named.slice(&transaction.selector.value_use_names);
     if (try selector_state.spillValue(transaction.selector, name)) |diagnostic| {
         transaction.action_diagnostic = diagnostic;
         return error.ValueUseActionDiagnostic;

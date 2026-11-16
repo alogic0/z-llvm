@@ -501,7 +501,7 @@ pub fn executeStoreScalar(
 ) !void {
     var staged: Types.PreparedView = undefined;
     const before = try Authority.registeredOperandView(Authority, transaction, action.pointer);
-    const staged_address = (try materialization.preparedViewLoc(before)) == .rax;
+    const staged_address = (try materialization.preparedViewLoc(&transaction.selector.value_use_names, before)) == .rax;
     if (staged_address) {
         staged = before.*;
         try stageAccumulatorPointer(Authority, transaction, &staged);
@@ -520,7 +520,7 @@ pub fn executeStoreImmediate(
     action: Types.StoreImmediateAction,
 ) !void {
     var staged_pointer: Types.PreparedView = undefined;
-    const actual_pointer = if ((try materialization.preparedViewLoc(pointer_view)) == .rax) blk: {
+    const actual_pointer = if ((try materialization.preparedViewLoc(&transaction.selector.value_use_names, pointer_view)) == .rax) blk: {
         staged_pointer = pointer_view.*;
         try stageAccumulatorPointer(Authority, transaction, &staged_pointer);
         break :blk &staged_pointer;
@@ -539,7 +539,7 @@ pub fn executeStoreImmediate(
 }
 
 fn stageAccumulatorPointer(comptime Authority: type, transaction: anytype, view: *Types.PreparedView) !void {
-    const pointer = try materialization.preparedViewLoc(view);
+    const pointer = try materialization.preparedViewLoc(&transaction.selector.value_use_names, view);
     if (pointer != .rax) return;
     // The plan owns this RAX -> RCX transfer. Stage the address before the
     // accumulator is reused; retain the original canonical ownership.
@@ -553,7 +553,7 @@ pub fn executeStoreI64(
     pointer_view: *const Types.PreparedView,
     action: Types.StoreI64Action,
 ) !void {
-    var pointer = try materialization.preparedViewLoc(pointer_view);
+    var pointer = try materialization.preparedViewLoc(&transaction.selector.value_use_names, pointer_view);
     if (transaction.store_address_registers[request_index]) |address| {
         try materializeActionPointer(Authority, transaction, pointer, address);
         pointer = .{ .scratch64 = address };
@@ -650,7 +650,7 @@ fn executeStoreEaxToPointer(
     pointer_view: *const Types.PreparedView,
     bits: u8,
 ) !void {
-    const pointer = try materialization.preparedViewLoc(pointer_view);
+    const pointer = try materialization.preparedViewLoc(&transaction.selector.value_use_names, pointer_view);
     switch (pointer) {
         .stack_scalar => |stack| {
             if (bits == 64) {
@@ -759,7 +759,7 @@ fn materializeActionScalar32(
     view: *const Types.PreparedView,
     destination: Types.PhysicalNode,
 ) !void {
-    const current = try materialization.preparedViewLoc(view);
+    const current = try materialization.preparedViewLoc(&transaction.selector.value_use_names, view);
     try clobberActionDestination(Authority, transaction, current, destination);
     try materialization.materializeScalar32(transaction.selector, current, .eax);
 }
@@ -769,7 +769,7 @@ fn materializeActionScalar64(
     view: *const Types.PreparedView,
     destination: Types.PhysicalNode,
 ) !void {
-    const current = try materialization.preparedViewLoc(view);
+    const current = try materialization.preparedViewLoc(&transaction.selector.value_use_names, view);
     try clobberActionDestination(Authority, transaction, current, destination);
     try materialization.materializeScalar64(transaction.selector, current, .rax);
 }
@@ -897,7 +897,7 @@ pub fn executeByteAddress(
                 },
                 else => {
                     const dest_reg = byteAddressDestination(transaction.selector, result_name);
-                    try materialization.materializeByteAddressPointer(transaction.selector, try materialization.preparedViewLoc(base_view), dest_reg);
+                    try materialization.materializeByteAddressPointer(transaction.selector, try materialization.preparedViewLoc(&transaction.selector.value_use_names, base_view), dest_reg);
                     if (offset != 0) try selector_state.emitEflagsInstruction(
                         transaction.selector,
                         .{ .add_arg64_imm32 = .{ .reg = dest_reg, .imm = offset } },
@@ -909,8 +909,8 @@ pub fn executeByteAddress(
         },
         .request => |offset_handle| {
             const offset_view = try Authority.registeredOperandView(Authority, transaction, offset_handle);
-            try materialization.materializeByteAddressPointer(transaction.selector, try materialization.preparedViewLoc(base_view), .r8);
-            const offset_loc = materialization.preparedViewLoc(offset_view) catch |err| {
+            try materialization.materializeByteAddressPointer(transaction.selector, try materialization.preparedViewLoc(&transaction.selector.value_use_names, base_view), .r8);
+            const offset_loc = materialization.preparedViewLoc(&transaction.selector.value_use_names, offset_view) catch |err| {
                 Authority.noteRegisteredOperandBoundaryError(Authority, transaction, offset_handle, err);
                 return err;
             };
@@ -961,7 +961,7 @@ pub fn executeScaledAddress(
                 .request => |index_handle| {
                     const index_name = try composition.ownRegisteredOperandName(Authority, transaction, index_handle);
                     const index_view = try Authority.registeredOperandView(Authority, transaction, index_handle);
-                    const index_loc = materialization.preparedViewLoc(index_view) catch |err| {
+                    const index_loc = materialization.preparedViewLoc(&transaction.selector.value_use_names, index_view) catch |err| {
                         Authority.noteRegisteredOperandBoundaryError(Authority, transaction, index_handle, err);
                         return err;
                     };
@@ -1006,7 +1006,7 @@ pub fn executeScaledAddress(
         else => {
             if (action.expected_stack_array_len != null)
                 return error.ValueUseAddressDescriptorLengthMismatch;
-            try materialization.materializePointer(transaction.selector, try materialization.preparedViewLoc(base_view), .{ .gpr64 = .rcx });
+            try materialization.materializePointer(transaction.selector, try materialization.preparedViewLoc(&transaction.selector.value_use_names, base_view), .{ .gpr64 = .rcx });
             switch (action.index) {
                 .constant => |constant_index| {
                     const offset = try scaledOffset(constant_index, action.scale);
@@ -1018,7 +1018,7 @@ pub fn executeScaledAddress(
                 },
                 .request => |index_handle| {
                     const index_view = try Authority.registeredOperandView(Authority, transaction, index_handle);
-                    const index_loc = materialization.preparedViewLoc(index_view) catch |err| {
+                    const index_loc = materialization.preparedViewLoc(&transaction.selector.value_use_names, index_view) catch |err| {
                         Authority.noteRegisteredOperandBoundaryError(Authority, transaction, index_handle, err);
                         return err;
                     };
@@ -1044,7 +1044,7 @@ pub fn executeReadOnlyTableAddress(
     if (!action.shape.valid()) return error.ValueUseAddressScaleInvalid;
     const result_name = try composition.ownActionIdentity(Authority, transaction, &action.result);
     const symbol = try composition.ownActionIdentity(Authority, transaction, &action.symbol);
-    try materialization.materializeScalar64(transaction.selector, try materialization.preparedViewLoc(index_view), .{ .gpr64 = .r8 });
+    try materialization.materializeScalar64(transaction.selector, try materialization.preparedViewLoc(&transaction.selector.value_use_names, index_view), .{ .gpr64 = .r8 });
     try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
         .lea_global_arg64 = .{ .reg = .rcx, .symbol = symbol },
     });

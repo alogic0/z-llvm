@@ -1,9 +1,10 @@
 # Generalize compiler mechanisms
 
 Date: 2026-11-16
-Status: stages 1 through 3 accepted after ReleaseSafe acceptance commit `338b8972`;
-implementing stage 4. Stage 2 qualifies its mechanical description migration
-separately from the power-of-two length extension.
+Status: stages 1 through 4 accepted after ReleaseSafe acceptance commit `338b8972`.
+Stage 5 is measured and deferred; final documentation closure remains. Stage 2
+qualifies its mechanical description migration separately from the power-of-two
+length extension.
 Review baseline: repository HEAD `97b6eced`, with compiler changes through `ae9d359f`.
 Review reconciliation: 2026-11-16; operand mutation, proof semantics, identity
 namespaces, effective scheduling order and storage boundaries clarified.
@@ -266,17 +267,26 @@ Work:
 
 Acceptance:
 
-- [ ] Distinct long names, including names sharing long prefixes, remain distinct.
-- [ ] The caller audit identifies byte-exact and IR-equivalence contracts.
+- [x] Distinct long names, including names sharing long prefixes, remain distinct.
+- [x] The caller audit identifies byte-exact and IR-equivalence contracts.
   Quoted/escaped spellings and numbered-slot versus quoted-name cases follow
   the selected contract. Any newly unified spelling behavior is explicitly
   classified and separately validated.
-- [ ] Cross-function and stale-generation handles reject even when their numeric
+- [x] Cross-function and stale-generation handles reject even when their numeric
   slots match. Failed allocation and rollback do not alias an old handle to a
   different value or publish incomplete identity state.
-- [ ] The selected path handles long names without private renaming solely to
+- [x] The selected path handles long names without private renaming solely to
   fit its identity storage.
-- [ ] External names, relocations, diagnostics and accepted output contracts are preserved.
+- [x] External names, relocations, diagnostics and accepted output contracts are preserved.
+
+The [stage-4 evidence](../evidence/compiler_generalization_stage4_20261116.md)
+records compact namespace/slot identities with selector-owned exact name bytes,
+atomic insertion and rollback, stale-pool and same-address transaction rejection,
+and strict long-parameter execution without private renaming. All 2,417 Fast
+units, 244 selected Debug/Fast checks, 74 structural checks and 17 integration
+gates pass, including all 233 native populations. Action-name and separate
+address-dependency limits remain explicit. All cycle compiler and source
+pipelines are closed; the seven contracts and seventeen holds are preserved.
 
 ## 5. Make legalization scheduling selective
 

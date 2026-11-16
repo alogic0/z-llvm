@@ -99,7 +99,7 @@ fn expectCallRollbackStorageCleared(transaction: *const Transaction) !void {
     try std.testing.expect(!transaction.call_action_executed);
     for (transaction.lifetime_context.pins) |pin| try std.testing.expect(pin == null);
 }
-const CallAttachmentErrorCase = enum { unclaimed, inverted, foreign, stale, non_prepared, independently_owned };
+const CallAttachmentErrorCase = enum { unclaimed, inverted, foreign, stale, stale_namespace, non_prepared, independently_owned };
 fn expectCallAttachmentError(case: CallAttachmentErrorCase) !void {
     var machine = MachineFunction.init(@tagName(case), .void);
     defer machine.deinit(std.testing.allocator);
@@ -118,6 +118,8 @@ fn expectCallAttachmentError(case: CallAttachmentErrorCase) !void {
     const foreign = try foreign_transaction.register(callRequest("foreign", .{ .int = 32 }));
     var stale = first;
     stale.generation += 1;
+    var stale_namespace = first;
+    stale_namespace.namespace = foreign.namespace;
     var handles = [_]Transaction.RequestHandle{ first, second };
     const types = [_]ir.Type{ .{ .int = 32 }, .{ .int = 32 } };
     var count: usize = 1;
@@ -126,12 +128,13 @@ fn expectCallAttachmentError(case: CallAttachmentErrorCase) !void {
         .inverted => handles = .{ second, first },
         .foreign => handles[0] = foreign,
         .stale => handles[0] = stale,
+        .stale_namespace => handles[0] = stale_namespace,
     }
     if (case == .inverted) count = 2;
     const expected_error = switch (case) {
         .unclaimed => error.ValueUseCallRequestUnclaimed,
         .inverted => error.ValueUseCallArgumentSourceOrder,
-        .foreign, .stale => error.ValueUseActionOperandNotRegistered,
+        .foreign, .stale, .stale_namespace => error.ValueUseActionOperandNotRegistered,
         .non_prepared => error.ValueUseActionOperandNotPreparedSource,
         .independently_owned => error.ValueUsePreparedActionUnexpected,
     };

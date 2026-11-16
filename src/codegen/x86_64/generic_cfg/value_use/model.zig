@@ -149,6 +149,7 @@ pub const Destination = union(enum) {
 /// is invalid outside the authority that returned it.
 pub const RequestHandle = struct {
     authority: usize,
+    namespace: u64,
     index: u8,
     generation: u32,
 };
@@ -157,6 +158,7 @@ pub const RequestHandle = struct {
 /// session owned by this instruction authority.
 pub const AccumulatorSessionHandle = struct {
     authority: usize,
+    namespace: u64,
     generation: u32,
 };
 
@@ -858,27 +860,7 @@ pub const CopyDestination = union(enum) {
     }
 };
 
-pub const PreparedIdentity = struct {
-    bytes: [max_identity_bytes]u8 = undefined,
-    len: u16 = 0,
-
-    pub fn init(name: []const u8) !PreparedIdentity {
-        if (name.len == 0) return error.ValueUseEmptyIdentity;
-        if (name.len > max_identity_bytes) return error.ValueUseIdentityTooLong;
-        var identity: PreparedIdentity = .{};
-        @memcpy(identity.bytes[0..name.len], name);
-        identity.len = @intCast(name.len);
-        return identity;
-    }
-
-    pub fn slice(identity: *const PreparedIdentity) []const u8 {
-        return identity.bytes[0..identity.len];
-    }
-
-    pub fn eql(identity: *const PreparedIdentity, other: *const PreparedIdentity) bool {
-        return std.mem.eql(u8, identity.slice(), other.slice());
-    }
-};
+pub const PreparedIdentity = @import("scoped_names.zig").Identity;
 
 pub const PreparedRegister = union(enum) {
     gpr32: ArgReg,
@@ -1018,27 +1000,7 @@ pub const RequestPhase = enum {
 
 pub const Lifecycle = enum { active, committed, rolled_back };
 
-pub const Identity = struct {
-    bytes: [max_identity_bytes]u8 = undefined,
-    len: u16 = 0,
-
-    pub fn init(name: []const u8) !Identity {
-        if (name.len == 0) return error.ValueUseEmptyIdentity;
-        if (name.len > max_identity_bytes) return error.ValueUseIdentityTooLong;
-        var identity: Identity = .{};
-        @memcpy(identity.bytes[0..name.len], name);
-        identity.len = @intCast(name.len);
-        return identity;
-    }
-
-    pub fn slice(identity: *const Identity) []const u8 {
-        return identity.bytes[0..identity.len];
-    }
-
-    pub fn eql(identity: *const Identity, other: *const Identity) bool {
-        return std.mem.eql(u8, identity.slice(), other.slice());
-    }
-};
+pub const Identity = @import("scoped_names.zig").Identity;
 
 pub const max_forward_dependency_owners = 4;
 
@@ -1204,9 +1166,9 @@ pub const Source = union(enum) {
     null_value,
     unsupported,
 
-    pub fn from(input: ir.Value) !Source {
+    pub fn from(pool: *@import("scoped_names.zig").Pool, allocator: std.mem.Allocator, input: ir.Value) !Source {
         return switch (input) {
-            .named => |name| .{ .named = try Identity.init(name) },
+            .named => |name| .{ .named = try Identity.init(pool, allocator, name) },
             .int => |integer| .{ .int = integer },
             .null_value => .null_value,
             .fp, .undef, .poison, .zero_initializer, .vector, .constant_expr => .unsupported,
@@ -1222,9 +1184,9 @@ pub const Source = union(enum) {
         };
     }
 
-    fn value(source: *const Source) ir.Value {
+    fn value(source: *const Source, pool: *const @import("scoped_names.zig").Pool) !ir.Value {
         return switch (source.*) {
-            .named => |*name| .{ .named = name.slice() },
+            .named => |*name| .{ .named = try name.slice(pool) },
             .int => |integer| .{ .int = integer },
             .null_value => .null_value,
             .unsupported => .undef,
@@ -1436,6 +1398,7 @@ pub fn Transaction(comptime Impl: type) type {
         const max_mappings = Model.max_mappings;
 
         selector: *ComposedBlockSelector,
+        identity_namespace: u64,
         snapshot: Impl.Snapshot,
         requests: [Self.max_requests]Self.StoredRequest = undefined,
         request_count: u8 = 0,

@@ -67,6 +67,9 @@ pub const ComposedBlockSelector = struct {
     value_snapshot_buffers: selector_types.ValueSnapshotBuffers = .{},
     physical_binding_facts: selector_types.PhysicalBindingFacts = .{},
     address_dependencies: AddressDependencyDomain = .{},
+    // One namespace per function/rewrite selector instance; never reset while
+    // transactions or their snapshots can observe an identity.
+    value_use_names: @import("value_use/scoped_names.zig").Pool = .{},
 
     pub fn init(allocator: std.mem.Allocator, machine: *MachineFunction) ComposedBlockSelector {
         return .{
@@ -87,6 +90,7 @@ pub const ComposedBlockSelector = struct {
     }
 
     pub fn deinit(selector: *ComposedBlockSelector) void {
+        selector.value_use_names.deinit(selector.allocator);
         selector.eflags_semantics.deinit(selector.allocator);
         selector.overflow_results.deinit();
         for (selector.owned_spill_slot_keys.keys()) |owned_key| selector.allocator.free(owned_key);

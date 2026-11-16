@@ -195,7 +195,7 @@ pub fn executeImmediateLhsScalar(
     try validateImmediateScalarSource(Authority, transaction, source_index, bits);
     try selector_state.emitValueIntoScratch(
         transaction.selector,
-        immediateScalarSourceValue(transaction, source_index),
+        try immediateScalarSourceValue(transaction, source_index),
         .rcx,
         bits,
     );
@@ -920,7 +920,7 @@ fn materializeImmediateAccumulator(
         return err;
     };
     session.materialize(
-        immediateScalarSourceValue(transaction, source_index),
+        try immediateScalarSourceValue(transaction, source_index),
         immediateAccumulatorDefinition(bits),
     ) catch |err| {
         Authority.noteRequestBoundaryError(Authority, transaction, source_index, err);
@@ -996,7 +996,7 @@ fn immediateScalarNamedSource(
     source_index: u8,
 ) ![]const u8 {
     return switch (transaction.requests[source_index].source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => {
             Authority.recordRequestFailure(Authority, transaction, source_index);
             return error.ValueUseUnsupportedSource;
@@ -1004,9 +1004,9 @@ fn immediateScalarNamedSource(
     };
 }
 
-fn immediateScalarSourceValue(transaction: anytype, source_index: u8) ir.Value {
+fn immediateScalarSourceValue(transaction: anytype, source_index: u8) !ir.Value {
     return switch (transaction.requests[source_index].source) {
-        .named => |*identity| .{ .named = identity.slice() },
+        .named => |*identity| .{ .named = try identity.slice(&transaction.selector.value_use_names) },
         .int => |value| .{ .int = value },
         .null_value => .null_value,
         .unsupported => .undef,
@@ -1113,7 +1113,7 @@ fn immediateSourceDisplacement(
     fallback: AccumulatorDisplacementPolicy,
 ) !AccumulatorDisplacementPolicy {
     const identity = switch (transaction.requests[source_index].source) {
-        .named => |*name| name.slice(),
+        .named => |*name| try name.slice(&transaction.selector.value_use_names),
         else => return fallback,
     };
     const current = transaction.prepared_views[source_index].canonical_source_loc;
@@ -1153,11 +1153,11 @@ fn immediateScratch64Destination(
         if (immediateScratchAvailable(transaction.selector, reg)) return reg;
     if (selector_state.reusableScratch64RegForInPlace(
         transaction.selector,
-        immediateScalarSourceValue(transaction, source_index),
+        try immediateScalarSourceValue(transaction, source_index),
     )) |reg| return reg;
     if (selector_state.spillScratch64SourceForInPlace(
         transaction.selector,
-        immediateScalarSourceValue(transaction, source_index),
+        try immediateScalarSourceValue(transaction, source_index),
     )) |source| {
         if (try selector_state.spillValue(transaction.selector, source.name)) |diagnostic| {
             transaction.action_diagnostic = diagnostic;

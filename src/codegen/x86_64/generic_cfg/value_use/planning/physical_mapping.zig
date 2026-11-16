@@ -514,7 +514,7 @@ fn immediateScratch64PlanningDestination(
         else => {},
     }
     const source_value: ir.Value = switch (source.*) {
-        .named => |*identity| .{ .named = identity.slice() },
+        .named => |*identity| .{ .named = identity.slice(&selector.value_use_names) catch return null },
         else => return null,
     };
     if (selector_state.spillScratch64SourceForInPlace(selector, source_value)) |spill_source|

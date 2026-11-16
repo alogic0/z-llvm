@@ -513,7 +513,7 @@ fn preserveScratchCompareOverlappingRhs(
     };
     const rhs_index = try Authority.validateRegisteredOperandHandle(Authority, transaction, handle);
     const name = switch (transaction.requests[rhs_index].source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         else => return error.ValueUseUnsupportedSource,
     };
     const binding = transaction.selector.values.get(name) orelse return error.ValueUseUnresolvedSource;
@@ -581,7 +581,7 @@ fn stageScratchCompareOperandUnchecked(
     destination: ArgReg,
     bits: u16,
 ) !void {
-    const current = try materialization.preparedViewLoc(view);
+    const current = try materialization.preparedViewLoc(&transaction.selector.value_use_names, view);
     const already_in_place = switch (current) {
         .arg32, .scratch32, .arg64, .scratch64 => |reg| reg == destination,
         else => false,
@@ -622,7 +622,7 @@ pub fn executeCurrentHomeEqZero(
 
     const request = &transaction.requests[source_index];
     const source_name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
     };
     const binding = transaction.selector.values.get(source_name) orelse
@@ -825,7 +825,7 @@ pub fn executeSetccEaxCompare(
 
     const request = &transaction.requests[source_index];
     const source_name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
     };
     const binding = transaction.selector.values.get(source_name) orelse
@@ -974,7 +974,7 @@ pub fn executeCurrentHomeSignBit(
     transaction.prepared_view_valid[source_index] = true;
     const request = &transaction.requests[source_index];
     const source_name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => return error.ValueUseUnsupportedSource,
     };
     const binding = transaction.selector.values.get(source_name) orelse {
@@ -1264,7 +1264,7 @@ fn refreshAndValidateI128PairSource(
     transaction.prepared_view_valid[source_index] = true;
     const request = &transaction.requests[source_index];
     const source_name = switch (request.source) {
-        .named => |*identity| identity.slice(),
+        .named => |*identity| try identity.slice(&transaction.selector.value_use_names),
         .int, .null_value, .unsupported => {
             Authority.recordRequestFailure(Authority, transaction, source_index);
             return error.ValueUseUnsupportedSource;
