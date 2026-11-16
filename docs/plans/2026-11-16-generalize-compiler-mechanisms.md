@@ -1,8 +1,9 @@
 # Generalize compiler mechanisms
 
 Date: 2026-11-16
-Status: approved by the user for implementation after ReleaseSafe acceptance
-and commit; implementation has not started.
+Status: stage 1 accepted after ReleaseSafe acceptance commit `338b8972`;
+implementing stage 2. Its mechanical description migration is qualified
+separately from the power-of-two length extension.
 Review baseline: repository HEAD `97b6eced`, with compiler changes through `ae9d359f`.
 Review reconciliation: 2026-11-16; operand mutation, proof semantics, identity
 namespaces, effective scheduling order and storage boundaries clarified.
@@ -26,9 +27,10 @@ new runtime failures.
 ## Relationship to current work
 
 Finish the [ReleaseSafe preopt acceptance work](2026-11-14-release-safe-preopt-behavior.md)
-before changing its frozen compiler candidate. This plan does not change the
-active milestone, its acceptance conditions or the current-action entry in
-[next steps](../next_steps.md).
+before changing its frozen compiler candidate. That prerequisite completed in
+`338b8972`, including final storage disposition. The user's subsequent instruction
+authorizes this implementation; [next steps](../next_steps.md) records it as the
+current action. The Safe acceptance conditions and frozen results remain unchanged.
 
 At implementation admission, read the latest accepted state and record the exact
 source, toolchain, target, pipelines and comparison inputs. The review baseline
@@ -101,18 +103,18 @@ Work:
 
 Acceptance:
 
-- [ ] The migrated consumers use shared traversal and have explicit coverage policies.
-- [ ] Focused cases exercise allocation counts, indirect calls, vector operands,
+- [x] The migrated consumers use shared traversal and have explicit coverage policies.
+- [x] Focused cases exercise allocation counts, indirect calls, vector operands,
   PHIs, removed instructions and opaque references relevant to those callers.
-- [ ] An unknown-reference refusal case asserts that the complete IR and its
+- [x] An unknown-reference refusal case asserts that the complete IR and its
   bookkeeping remain unchanged, including operands, instruction lists,
   `removed` and `replacement` fields. Rejection after partial mutation cannot pass.
-- [ ] Repeated operands, multiple users and PHI edges verify each query's declared
+- [x] Repeated operands, multiple users and PHI edges verify each query's declared
   counting and dominance policy.
-- [ ] Replacement and deletion preserve IR validity and native behavior.
-- [ ] Any intentional eligibility change has its own diagnosis and validation
+- [x] Replacement and deletion preserve IR validity and native behavior.
+- [x] Any intentional eligibility change has its own diagnosis and validation
   scope; it is not reported as behavior-preserving mechanical migration.
-- [ ] The duplicated walkers for those consumers are removed.
+- [x] The duplicated walkers for those consumers are removed.
 
 ## 2. Generalize constant-table descriptions and proofs
 
@@ -402,6 +404,16 @@ Separate three kinds of result:
 - Capability: additional inputs work through the shared mechanism and receive
   separate semantic and boundary validation.
 - Performance: measured changes in compiler time or memory on named workloads.
+
+Stage 1 is recorded in the
+[implementation evidence](../evidence/compiler_generalization_stage1_20261116.md).
+Its two selected consumers are vector-combine and the backend cyclic byte-vector
+memory query. Mechanical consolidation, conservative opaque-reference refusal
+and the current-insert correctness repair are separate changes. Focused checks,
+both 2,395-unit builds, bounded native comparison, mutation control, full
+readiness and 66 structural tests pass. All 17 cumulative integration gates pass
+on that unchanged source, including the complete 230-population native suite.
+Authenticated frontend AIR is reused; backend and executable results run afresh.
 
 Keep ABI limits, floating-point promises, poison/undef rules, memory bounds,
 target constraints and transaction guarantees explicit. Their correctness

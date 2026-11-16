@@ -173,6 +173,61 @@ pub fn mapInstruction(inst: *ir.Instruction, aliases: std.StringHashMap(ir.Value
     return instruction(inst, AliasMapper{ .aliases = aliases }) catch unreachable;
 }
 
+/// Exact named structured uses. Repeated operands and PHI incoming edges each
+/// contribute one occurrence; an instruction/terminator contributes at most one
+/// user. Incomplete coverage never proves absence, even when occurrences is zero.
+pub const Uses = struct {
+    occurrences: usize = 0,
+    users: usize = 0,
+    types_match: bool = true,
+    coverage: Coverage = .{},
+
+    fn merge(uses: *Uses, other: Uses) void {
+        uses.occurrences += other.occurrences;
+        uses.users += other.users;
+        uses.types_match = uses.types_match and other.types_match;
+        uses.coverage.merge(other.coverage);
+    }
+};
+
+const UseCounter = struct {
+    pub const Error = error{};
+    name: []const u8,
+    expected_type: ?ir.Type,
+    uses: *Uses,
+
+    pub fn visit(counter: UseCounter, value: *const ir.Value, ty: ir.Type) Error!void {
+        if (value.* != .named or !std.mem.eql(u8, value.named, counter.name)) return;
+        counter.uses.occurrences += 1;
+        if (counter.expected_type) |expected| counter.uses.types_match = counter.uses.types_match and expected.eql(ty);
+    }
+};
+
+/// Removed instructions and their bookkeeping are outside the live-use view.
+pub fn instructionUses(inst: *const ir.Instruction, name: []const u8, expected_type: ?ir.Type) Uses {
+    var uses: Uses = .{};
+    if (inst.removed) return uses;
+    uses.coverage = instruction(inst, UseCounter{ .name = name, .expected_type = expected_type, .uses = &uses }) catch unreachable;
+    uses.users = @intFromBool(uses.occurrences != 0);
+    return uses;
+}
+
+pub fn terminatorUses(term: *const ir.Terminator, name: []const u8, expected_type: ?ir.Type) Uses {
+    var uses: Uses = .{};
+    uses.coverage = terminator(term, UseCounter{ .name = name, .expected_type = expected_type, .uses = &uses }) catch unreachable;
+    uses.users = @intFromBool(uses.occurrences != 0);
+    return uses;
+}
+
+pub fn functionUses(function: *const ir.Function, name: []const u8, expected_type: ?ir.Type) Uses {
+    var uses: Uses = .{};
+    for (function.blocks.items) |*block| {
+        for (block.instructions.items) |*inst| uses.merge(instructionUses(inst, name, expected_type));
+        if (block.terminator) |*term| uses.merge(terminatorUses(term, name, expected_type));
+    }
+    return uses;
+}
+
 pub const ReplacementResult = struct {
     replaced: usize = 0,
     coverage: Coverage = .{},

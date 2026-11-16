@@ -411,124 +411,6 @@ fn byteTransfersAreAcyclic(selector: *ComposedBlockSelector) !bool {
     return end == function.blocks.items.len;
 }
 
-fn valueUsesName(value: ir.Value, name: []const u8) bool {
-    return switch (value) {
-        .named => |n| std.mem.eql(u8, n, name),
-        else => false,
-    };
-}
-
-fn countInstructionUsesOfName(instruction: ir.Instruction, name: []const u8) usize {
-    if (instruction.removed) return 0;
-    var count: usize = 0;
-    switch (instruction.kind) {
-        .binary => |b| {
-            if (valueUsesName(b.lhs, name)) count += 1;
-            if (valueUsesName(b.rhs, name)) count += 1;
-        },
-        .cast => |c| {
-            if (valueUsesName(c.value, name)) count += 1;
-        },
-        .icmp => |i| {
-            if (valueUsesName(i.lhs, name)) count += 1;
-            if (valueUsesName(i.rhs, name)) count += 1;
-        },
-        .fcmp => |f| {
-            if (valueUsesName(f.lhs, name)) count += 1;
-            if (valueUsesName(f.rhs, name)) count += 1;
-        },
-        .select => |s| {
-            if (valueUsesName(s.cond, name)) count += 1;
-            if (valueUsesName(s.true_value, name)) count += 1;
-            if (valueUsesName(s.false_value, name)) count += 1;
-        },
-        .load => |l| {
-            if (valueUsesName(l.ptr, name)) count += 1;
-        },
-        .store => |s| {
-            if (valueUsesName(s.ptr, name)) count += 1;
-            if (valueUsesName(s.value, name)) count += 1;
-        },
-        .gep => |g| {
-            if (valueUsesName(g.ptr, name)) count += 1;
-            for (g.indices.items) |idx| {
-                if (valueUsesName(idx.value, name)) count += 1;
-            }
-        },
-        .call => |c| {
-            for (c.args.items) |arg| {
-                if (valueUsesName(arg.value, name)) count += 1;
-            }
-        },
-        .phi => |p| {
-            for (p.incoming.items) |inc| {
-                if (valueUsesName(inc.value, name)) count += 1;
-            }
-        },
-        .freeze => |f| {
-            if (valueUsesName(f.value, name)) count += 1;
-        },
-        .extractelement => |e| {
-            if (valueUsesName(e.vector, name)) count += 1;
-            if (valueUsesName(e.index, name)) count += 1;
-        },
-        .insertelement => |i| {
-            if (valueUsesName(i.vector, name)) count += 1;
-            if (valueUsesName(i.value, name)) count += 1;
-            if (valueUsesName(i.index, name)) count += 1;
-        },
-        .shufflevector => |s| {
-            if (valueUsesName(s.lhs, name)) count += 1;
-            if (valueUsesName(s.rhs, name)) count += 1;
-        },
-        .extractvalue => |e| {
-            if (valueUsesName(e.aggregate, name)) count += 1;
-        },
-        .insertvalue => |i| {
-            if (valueUsesName(i.aggregate, name)) count += 1;
-            if (valueUsesName(i.value, name)) count += 1;
-        },
-        .alloca, .atomicrmw, .cmpxchg, .fence => {},
-    }
-    return count;
-}
-
-fn countTerminatorUsesOfName(terminator: ir.Terminator, name: []const u8) usize {
-    var count: usize = 0;
-    switch (terminator) {
-        .ret => |r| if (r.value) |v| if (valueUsesName(v, name)) {
-            count += 1;
-        },
-        .condbr => |c| if (valueUsesName(c.cond, name)) {
-            count += 1;
-        },
-        .@"switch" => |s| {
-            if (valueUsesName(s.cond, name)) count += 1;
-            for (s.cases.items) |case| if (valueUsesName(case.value, name)) {
-                count += 1;
-            };
-        },
-        .indirectbr => |i| if (valueUsesName(i.addr, name)) {
-            count += 1;
-        },
-        .br, .@"unreachable" => {},
-    }
-    return count;
-}
-
-fn countFunctionUsesOfName(function: ir.Function, name: []const u8) usize {
-    var count: usize = 0;
-    for (function.blocks.items) |block| {
-        for (block.instructions.items) |inst| {
-            count += countInstructionUsesOfName(inst, name);
-        }
-        if (block.terminator) |term| {
-            count += countTerminatorUsesOfName(term, name);
-        }
-    }
-    return count;
-}
-
 fn isOtherXmmType(ty: ir.Type) bool {
     if (inspection.isByteVector128(ty)) return false;
     return switch (ty) {
@@ -578,7 +460,8 @@ fn cyclicByteVectorTransfersAreSafe(selector: *ComposedBlockSelector) bool {
             if (inst.removed) continue;
             if (inst.kind == .load and inspection.isByteVector128(inst.kind.load.ty)) {
                 const def_name = inst.result orelse return false;
-                if (countFunctionUsesOfName(function.*, def_name) != 1) return false;
+                const uses = ir.operands.functionUses(function, def_name, inst.kind.load.ty);
+                if (uses.coverage.has_opaque_references or !uses.types_match or uses.occurrences != 1) return false;
 
                 var store_found = false;
                 for (block.instructions.items[inst_idx + 1 ..]) |later_inst| {

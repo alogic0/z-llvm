@@ -240,3 +240,50 @@ test "operand traversal: use counts propagate allocation failures without leaks"
     defer module.deinit();
     try std.testing.checkAllAllocationFailures(std.testing.allocator, collectWithAllocator, .{module.functions.items[0]});
 }
+
+test "operand use queries: occurrences, distinct users, PHI edges and removed bookkeeping" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i32 @counts(i32 %x, i1 %condition) {
+        \\entry:
+        \\ %twice = add i32 %x, %x
+        \\ %memory = alloca i8, i32 %x
+        \\ br i1 %condition, label %other, label %merge
+        \\other:
+        \\ br label %merge
+        \\merge:
+        \\ %p = phi i32 [ %x, %entry ], [ %x, %other ]
+        \\ ret i32 %x
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    const function = &module.functions.items[0];
+    var uses = ir.operands.functionUses(function, "x", .{ .int = 32 });
+    try std.testing.expectEqual(@as(usize, 6), uses.occurrences);
+    try std.testing.expectEqual(@as(usize, 4), uses.users);
+    try std.testing.expect(uses.types_match and !uses.coverage.has_opaque_references);
+    try std.testing.expect(!ir.operands.functionUses(function, "x", .ptr).types_match);
+    function.blocks.items[0].instructions.items[0].removed = true;
+    function.blocks.items[0].instructions.items[0].replacement = .{ .named = "x" };
+    uses = ir.operands.functionUses(function, "x", null);
+    try std.testing.expectEqual(@as(usize, 4), uses.occurrences);
+    try std.testing.expectEqual(@as(usize, 3), uses.users);
+    function.blocks.items[0].instructions.items[1].metadata = "!annotation !0";
+    uses = ir.operands.functionUses(function, "absent", null);
+    try std.testing.expectEqual(@as(usize, 0), uses.occurrences);
+    try std.testing.expect(uses.coverage.has_opaque_references);
+}
+
+test "operand use queries: indirect callees, vector masks and atomic operands" {
+    var module = try ir.Module.parse(std.testing.allocator, all_instructions);
+    defer module.deinit();
+    const function = &module.functions.items[0];
+    try std.testing.expectEqual(@as(usize, 1), ir.operands.functionUses(function, "fn", .ptr).occurrences);
+    try std.testing.expectEqual(@as(usize, 3), ir.operands.functionUses(function, "v", .{ .vector = .{ .len = 2, .elem_ty = .{ .int = 32 } } }).occurrences);
+    const insts = function.blocks.items[1].instructions.items;
+    try std.testing.expectEqual(@as(usize, 1), ir.operands.instructionUses(&insts[10], "x", .{ .int = 32 }).occurrences);
+    try std.testing.expectEqual(@as(usize, 1), ir.operands.instructionUses(&insts[11], "p", .ptr).occurrences);
+    var shuffle = insts[15];
+    shuffle.kind.shufflevector.mask = .{ .named = "mask" };
+    try std.testing.expectEqual(@as(usize, 1), ir.operands.instructionUses(&shuffle, "mask", shuffle.kind.shufflevector.mask_ty).occurrences);
+}

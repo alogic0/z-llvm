@@ -46,9 +46,13 @@ queries and atomic rewrite admission; typed constant-table descriptions and a
 bounded extension; one structural fixture-handler migration; compact value-use
 identities; and selective legalization only if measured benefit justifies it.
 The three proposed follow-up abstractions are outside this implementation.
-Use separate stage evidence and managed workspaces. The qualified Fast/Debug
-Safe binaries remain temporary comparison baselines until their final stage-1
-consumer closes; preserve historical model/guard transitions and other holds.
+Stage 1 is [accepted](evidence/compiler_generalization_stage1_20261116.md), with
+all 17 integration gates passing. Implement stage 2 next: preserve the four
+existing table layouts through a typed description, then qualify additional
+power-of-two integer lengths separately. Use separate evidence and managed
+workspaces. The Fast/Debug Safe comparison binaries have been released; the
+stage-1 Fast candidate remains only through the declared stage-2 comparison.
+Preserve historical model/guard transitions and other holds.
 
 Further work starts from the accepted baseline:
 

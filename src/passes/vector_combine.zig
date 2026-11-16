@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../ir.zig");
 const pass_manager = @import("../pass_manager.zig");
 const integer_semantics = @import("../analysis/integer_semantics.zig");
+const Dominators = @import("../analysis/dominator.zig").Dominators;
 
 pub const pass: pass_manager.ModulePass = .{
     .name = "vector-combine",
@@ -11,33 +12,91 @@ pub const pass: pass_manager.ModulePass = .{
     .run = run,
 };
 
-const InsertRecord = struct {
-    block_index: usize,
-    instruction_index: usize,
-    insert: ir.InsertElementInst,
+const Position = struct { block: usize, instruction: usize };
+
+// Only instruction locations are cached. Earlier substitutions may change an
+// insert's operands. CFG topology is unchanged throughout this function pass.
+const Dominance = struct {
+    allocator: std.mem.Allocator,
+    function: *const ir.Function,
+    tree: ?Dominators = null,
+
+    fn deinit(dom: *Dominance) void {
+        if (dom.tree) |*tree| tree.deinit();
+    }
+
+    fn before(dom: *Dominance, definition: Position, use: Position) !bool {
+        if (definition.block == use.block) return definition.instruction < use.instruction;
+        if (dom.tree == null) dom.tree = try Dominators.build(dom.allocator, dom.function.*);
+        return dom.tree.?.dominates(definition.block, use.block);
+    }
+
+    fn valueAvailable(dom: *Dominance, value: ir.Value, ty: ir.Type, use: Position) !bool {
+        const name = switch (value) {
+            .named => |name| name,
+            .vector, .constant_expr => return false,
+            else => return true, // The original typed instruction was verified.
+        };
+        if (std.mem.startsWith(u8, name, "@")) return ty == .ptr;
+        for (dom.function.params.items) |param| {
+            if (std.mem.eql(u8, param.name, name)) return param.ty.eql(ty);
+        }
+        for (dom.function.blocks.items, 0..) |block, bi| {
+            for (block.instructions.items, 0..) |inst, ii| {
+                const result = inst.result orelse continue;
+                if (!std.mem.eql(u8, result, name)) continue;
+                if (inst.removed) return false;
+                if (!(inst.resultType() orelse return false).eql(ty)) return false;
+                return dom.before(.{ .block = bi, .instruction = ii }, use);
+            }
+        }
+        return false;
+    }
+
+    fn dominatesUses(dom: *Dominance, definition: Position, name: []const u8) !bool {
+        for (dom.function.blocks.items, 0..) |block, bi| {
+            for (block.instructions.items, 0..) |*inst, ii| {
+                if (ir.operands.instructionUses(inst, name, null).occurrences == 0) continue;
+                if (inst.kind == .phi) {
+                    // PHI operands are used at the end of the incoming block.
+                    for (inst.kind.phi.incoming.items) |incoming| {
+                        if (incoming.value != .named or !std.mem.eql(u8, incoming.value.named, name)) continue;
+                        const pred = for (dom.function.blocks.items, 0..) |candidate, index| {
+                            if (std.mem.eql(u8, candidate.name, incoming.block)) break index;
+                        } else return false;
+                        if (!try dom.before(definition, .{ .block = pred, .instruction = dom.function.blocks.items[pred].instructions.items.len })) return false;
+                    }
+                } else if (!try dom.before(definition, .{ .block = bi, .instruction = ii })) return false;
+            }
+            if (block.terminator) |*term| {
+                if (ir.operands.terminatorUses(term, name, null).occurrences != 0 and
+                    !try dom.before(definition, .{ .block = bi, .instruction = block.instructions.items.len })) return false;
+            }
+        }
+        return true;
+    }
 };
 
 fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
     var changed = false;
     for (module.functions.items) |*function| {
-        var inserted_vectors = std.StringHashMap(InsertRecord).init(module.allocator);
+        var inserted_vectors = std.StringHashMap(Position).init(module.allocator);
         defer inserted_vectors.deinit();
+        var dom: Dominance = .{ .allocator = module.allocator, .function = function };
+        defer dom.deinit();
 
-        for (function.blocks.items, 0..) |*block, block_index| {
-            for (block.instructions.items, 0..) |*instruction, instruction_index| {
-                if (instruction.removed) continue;
-                switch (instruction.kind) {
-                    .insertelement => |insert| if (instruction.result) |result| {
-                        try inserted_vectors.put(result, .{
-                            .block_index = block_index,
-                            .instruction_index = instruction_index,
-                            .insert = insert,
-                        });
+        for (function.blocks.items, 0..) |*block, bi| {
+            for (block.instructions.items, 0..) |*inst, ii| {
+                if (inst.removed) continue;
+                const position: Position = .{ .block = bi, .instruction = ii };
+                switch (inst.kind) {
+                    .insertelement => if (inst.result) |result| {
+                        try inserted_vectors.put(result, position);
                     },
                     .extractelement => |*extract| {
-                        if (try foldExtractAfterInsert(function, instruction, extract, inserted_vectors)) changed = true;
+                        if (try foldExtractAfterInsert(function, position, inst, extract, inserted_vectors, &dom)) changed = true;
                     },
-                    .binary, .cast, .freeze, .icmp, .fcmp, .select, .phi, .alloca, .load, .store, .atomicrmw, .cmpxchg, .fence, .shufflevector, .extractvalue, .insertvalue, .gep, .call => {},
+                    else => {},
                 }
             }
         }
@@ -47,225 +106,49 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
 
 fn foldExtractAfterInsert(
     function: *ir.Function,
-    instruction: *ir.Instruction,
+    position: Position,
+    inst: *ir.Instruction,
     extract: *ir.ExtractElementInst,
-    inserted_vectors: std.StringHashMap(InsertRecord),
+    inserted_vectors: std.StringHashMap(Position),
+    dom: *Dominance,
 ) !bool {
     if (extract.vector != .named) return false;
     const record = inserted_vectors.get(extract.vector.named) orelse return false;
-    const insert = record.insert;
+    const producer = &function.blocks.items[record.block].instructions.items[record.instruction];
+    if (producer.removed or producer.kind != .insertelement) return false;
+    const insert = producer.kind.insertelement;
     const extract_lane = integer_semantics.vectorLane(extract.vector_ty, extract.index_ty, extract.index) orelse return false;
     const insert_lane = integer_semantics.vectorLane(insert.vector_ty, insert.index_ty, insert.index) orelse return false;
     if (!extract.vector_ty.eql(insert.vector_ty)) return false;
-    const vector_ty = switch (extract.vector_ty) {
-        .vector => |vector_ty| vector_ty,
-        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .aggregate => return false,
+    const element_ty = switch (extract.vector_ty) {
+        .vector => |vector_ty| vector_ty.elem_ty.toType(),
+        else => return false,
     };
-    if (!vector_ty.elem_ty.toType().eql(insert.value_ty)) return false;
+    if (!element_ty.eql(insert.value_ty)) return false;
+    const producer_name = producer.result orelse return false;
+    const producer_uses = ir.operands.functionUses(function, producer_name, insert.vector_ty);
+    if (producer_uses.coverage.has_opaque_references or !producer_uses.types_match) return false;
+    if (!try dom.before(record, position)) return false;
 
     if (extract_lane == insert_lane) {
-        instruction.removed = true;
-        instruction.replacement = insert.value;
-        const result = instruction.result orelse return error.InstructionWithoutResult;
-        replaceValue(function, result, insert.value);
+        const result = inst.result orelse return false;
+        const uses = ir.operands.functionUses(function, result, element_ty);
+        if (uses.coverage.has_opaque_references or !uses.types_match) return false;
+        if (!try dom.valueAvailable(insert.value, element_ty, position)) return false;
+        if (!try dom.dominatesUses(position, result)) return false;
+        // All proofs and allocations precede the first write. Replacement is
+        // allocation-free, including list-backed operands and PHI edges.
+        _ = ir.operands.replaceAllUses(function, result, insert.value);
+        inst.removed = true;
+        inst.replacement = insert.value;
     } else {
+        if (!try dom.valueAvailable(insert.vector, insert.vector_ty, position)) return false;
         extract.vector = insert.vector;
         extract.index_ty = .{ .int = 64 };
         extract.index = .{ .int = extract_lane };
     }
 
-    removeInsertIfDead(function, record);
+    const remaining = ir.operands.functionUses(function, producer_name, null);
+    if (remaining.occurrences == 0 and !remaining.coverage.has_opaque_references) producer.removed = true;
     return true;
-}
-
-fn removeInsertIfDead(function: *ir.Function, record: InsertRecord) void {
-    const result = function.blocks.items[record.block_index].instructions.items[record.instruction_index].result orelse return;
-    if (hasUse(function.*, result)) return;
-    function.blocks.items[record.block_index].instructions.items[record.instruction_index].removed = true;
-}
-
-fn hasUse(function: ir.Function, name: []const u8) bool {
-    for (function.blocks.items) |block| {
-        for (block.instructions.items) |instruction| {
-            if (instruction.removed) continue;
-            if (instructionUsesValue(instruction, name)) return true;
-        }
-        if (block.terminator) |terminator| {
-            if (terminatorUsesValue(terminator, name)) return true;
-        }
-    }
-    return false;
-}
-
-fn replaceValue(function: *ir.Function, name: []const u8, replacement: ir.Value) void {
-    for (function.blocks.items) |*block| {
-        for (block.instructions.items) |*instruction| {
-            if (instruction.removed) continue;
-            replaceInstructionOperand(instruction, name, replacement);
-        }
-        if (block.terminator) |*terminator| replaceTerminatorOperand(terminator, name, replacement);
-    }
-}
-
-fn replaceInstructionOperand(instruction: *ir.Instruction, name: []const u8, replacement: ir.Value) void {
-    switch (instruction.kind) {
-        .binary => |*binary| {
-            binary.lhs = replaceOperand(binary.lhs, name, replacement);
-            binary.rhs = replaceOperand(binary.rhs, name, replacement);
-        },
-        .cast => |*cast| cast.value = replaceOperand(cast.value, name, replacement),
-        .freeze => |*freeze| freeze.value = replaceOperand(freeze.value, name, replacement),
-        .icmp => |*icmp| {
-            icmp.lhs = replaceOperand(icmp.lhs, name, replacement);
-            icmp.rhs = replaceOperand(icmp.rhs, name, replacement);
-        },
-        .fcmp => |*fcmp| {
-            fcmp.lhs = replaceOperand(fcmp.lhs, name, replacement);
-            fcmp.rhs = replaceOperand(fcmp.rhs, name, replacement);
-        },
-        .select => |*select| {
-            select.cond = replaceOperand(select.cond, name, replacement);
-            select.true_value = replaceOperand(select.true_value, name, replacement);
-            select.false_value = replaceOperand(select.false_value, name, replacement);
-        },
-        .phi => |*phi| for (phi.incoming.items) |*incoming| {
-            incoming.value = replaceOperand(incoming.value, name, replacement);
-        },
-        .alloca => |*alloca| if (alloca.count) |*count| {
-            count.value = replaceOperand(count.value, name, replacement);
-        },
-        .load => |*load| load.ptr = replaceOperand(load.ptr, name, replacement),
-        .store => |*store| {
-            store.value = replaceOperand(store.value, name, replacement);
-            store.ptr = replaceOperand(store.ptr, name, replacement);
-        },
-        .atomicrmw => |*atomicrmw| {
-            atomicrmw.ptr = replaceOperand(atomicrmw.ptr, name, replacement);
-            atomicrmw.value = replaceOperand(atomicrmw.value, name, replacement);
-        },
-        .cmpxchg => |*cmpxchg| {
-            cmpxchg.ptr = replaceOperand(cmpxchg.ptr, name, replacement);
-            cmpxchg.expected = replaceOperand(cmpxchg.expected, name, replacement);
-            cmpxchg.replacement = replaceOperand(cmpxchg.replacement, name, replacement);
-        },
-        .fence => {},
-        .extractelement => |*extract| {
-            extract.vector = replaceOperand(extract.vector, name, replacement);
-            extract.index = replaceOperand(extract.index, name, replacement);
-        },
-        .insertelement => |*insert| {
-            insert.vector = replaceOperand(insert.vector, name, replacement);
-            insert.value = replaceOperand(insert.value, name, replacement);
-            insert.index = replaceOperand(insert.index, name, replacement);
-        },
-        .shufflevector => |*shuffle| {
-            shuffle.lhs = replaceOperand(shuffle.lhs, name, replacement);
-            shuffle.rhs = replaceOperand(shuffle.rhs, name, replacement);
-            shuffle.mask = replaceOperand(shuffle.mask, name, replacement);
-        },
-        .extractvalue => |*extract| extract.aggregate = replaceOperand(extract.aggregate, name, replacement),
-        .insertvalue => |*insert| {
-            insert.aggregate = replaceOperand(insert.aggregate, name, replacement);
-            insert.value = replaceOperand(insert.value, name, replacement);
-        },
-        .gep => |*gep| {
-            gep.ptr = replaceOperand(gep.ptr, name, replacement);
-            for (gep.indices.items) |*index| {
-                index.value = replaceOperand(index.value, name, replacement);
-            }
-        },
-        .call => |*call| {
-            if (call.callee_value) |value| call.callee_value = replaceOperand(value, name, replacement);
-            for (call.args.items) |*arg| {
-                arg.value = replaceOperand(arg.value, name, replacement);
-            }
-        },
-    }
-}
-
-fn replaceTerminatorOperand(terminator: *ir.Terminator, name: []const u8, replacement: ir.Value) void {
-    switch (terminator.*) {
-        .ret => |*ret| {
-            if (ret.value) |value| ret.value = replaceOperand(value, name, replacement);
-        },
-        .condbr => |*condbr| condbr.cond = replaceOperand(condbr.cond, name, replacement),
-        .@"switch" => |*switch_term| {
-            switch_term.cond = replaceOperand(switch_term.cond, name, replacement);
-            for (switch_term.cases.items) |*case| {
-                case.value = replaceOperand(case.value, name, replacement);
-            }
-        },
-        .indirectbr => |*indirectbr| indirectbr.addr = replaceOperand(indirectbr.addr, name, replacement),
-        .br, .@"unreachable" => {},
-    }
-}
-
-fn replaceOperand(value: ir.Value, name: []const u8, replacement: ir.Value) ir.Value {
-    return switch (value) {
-        .named => |candidate| if (std.mem.eql(u8, candidate, name)) replacement else value,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => value,
-    };
-}
-
-fn instructionUsesValue(instruction: ir.Instruction, name: []const u8) bool {
-    return switch (instruction.kind) {
-        .binary => |binary| valueIsName(binary.lhs, name) or valueIsName(binary.rhs, name),
-        .cast => |cast| valueIsName(cast.value, name),
-        .freeze => |freeze| valueIsName(freeze.value, name),
-        .icmp => |icmp| valueIsName(icmp.lhs, name) or valueIsName(icmp.rhs, name),
-        .fcmp => |fcmp| valueIsName(fcmp.lhs, name) or valueIsName(fcmp.rhs, name),
-        .select => |select| valueIsName(select.cond, name) or valueIsName(select.true_value, name) or valueIsName(select.false_value, name),
-        .phi => |phi| for (phi.incoming.items) |incoming| {
-            if (valueIsName(incoming.value, name)) break true;
-        } else false,
-        .alloca, .fence => false,
-        .load => |load| valueIsName(load.ptr, name),
-        .store => |store| valueIsName(store.value, name) or valueIsName(store.ptr, name),
-        .atomicrmw => |atomicrmw| valueIsName(atomicrmw.ptr, name) or valueIsName(atomicrmw.value, name),
-        .cmpxchg => |cmpxchg| valueIsName(cmpxchg.ptr, name) or valueIsName(cmpxchg.expected, name) or valueIsName(cmpxchg.replacement, name),
-        .extractelement => |extract| valueIsName(extract.vector, name) or valueIsName(extract.index, name),
-        .insertelement => |insert| valueIsName(insert.vector, name) or valueIsName(insert.value, name) or valueIsName(insert.index, name),
-        .shufflevector => |shuffle| valueIsName(shuffle.lhs, name) or valueIsName(shuffle.rhs, name) or valueIsName(shuffle.mask, name),
-        .extractvalue => |extract| valueIsName(extract.aggregate, name),
-        .insertvalue => |insert| valueIsName(insert.aggregate, name) or valueIsName(insert.value, name),
-        .gep => |gep| blk: {
-            if (valueIsName(gep.ptr, name)) break :blk true;
-            for (gep.indices.items) |index| {
-                if (valueIsName(index.value, name)) break :blk true;
-            }
-            break :blk false;
-        },
-        .call => |call| blk: {
-            if (call.callee_value) |callee_value| {
-                if (valueIsName(callee_value, name)) break :blk true;
-            }
-            for (call.args.items) |arg| {
-                if (valueIsName(arg.value, name)) break :blk true;
-            }
-            break :blk false;
-        },
-    };
-}
-
-fn terminatorUsesValue(terminator: ir.Terminator, name: []const u8) bool {
-    return switch (terminator) {
-        .ret => |ret| if (ret.value) |value| valueIsName(value, name) else false,
-        .condbr => |condbr| valueIsName(condbr.cond, name),
-        .@"switch" => |switch_term| blk: {
-            if (valueIsName(switch_term.cond, name)) break :blk true;
-            for (switch_term.cases.items) |case| {
-                if (valueIsName(case.value, name)) break :blk true;
-            }
-            break :blk false;
-        },
-        .indirectbr => |indirectbr| valueIsName(indirectbr.addr, name),
-        .br, .@"unreachable" => false,
-    };
-}
-
-fn valueIsName(value: ir.Value, name: []const u8) bool {
-    return switch (value) {
-        .named => |candidate| std.mem.eql(u8, candidate, name),
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => false,
-    };
 }

@@ -86,6 +86,18 @@ temporarily to the authorized
 LLVM IR construction, target/analysis setup and declared providers remain
 explicit dependencies.
 
+The first stage of the
+[compiler generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md)
+is accepted: shared use queries serve vector-combine and cyclic byte-vector
+memory admission. Coverage, types and dominance precede vector mutation, and
+the insert index observes earlier replacements. The separately diagnosed
+current-insert repair passes 65,543 native comparisons and a fault control.
+Both 2,395-unit builds, readiness, 66 structural checks and all 17 integration
+gates pass, including the complete 230-population native suite. The
+[evidence](evidence/compiler_generalization_stage1_20261116.md) records admission
+restrictions, failed attempts and storage disposition. Typed tables are next;
+later stages receive no acceptance credit from this result.
+
 ## Fixed compiler-core execution cohort
 
 [accepted_status.json](accepted_status.json) records the separate fixed

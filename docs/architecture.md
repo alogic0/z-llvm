@@ -367,6 +367,12 @@ do not establish a runtime speedup.
   and function-wide replacement. `Instruction.mapOperands`, use counting,
   GlobalOpt replacement, and ADCE liveness share those walks. CFG-update helpers
   handle labels separately. Other passes still have independent replacement/reference scans.
+  Shared queries distinguish operand occurrences from distinct users and carry
+  type and coverage results. Vector-combine preflights coverage and dominance,
+  including PHI edges, before replacement; its insert index reads current
+  instruction operands. Cyclic byte-vector memory admission uses the same
+  queries. Their [qualification](evidence/compiler_generalization_stage1_20261116.md)
+  distinguishes consolidation, opaque-reference refusal and the stale-insert repair.
 - Operand traversal reports opaque values, attributes, metadata, and call text
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers
