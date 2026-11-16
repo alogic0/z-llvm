@@ -13698,6 +13698,14 @@
       "functions": ["length_table_64_value", "length_table_64_copy", "length_table_256_value", "length_table_256_copy"],
       "observations": 2080,
       "stdout": "table-lengths observations=2080 protected-page-stores=guards=preserved\n"
+    },
+    {
+      "population": "optional_composition",
+      "fixture": "optional_composition",
+      "prefix": "optional-composition",
+      "functions": ["runtime_optional_pointer_main.optionalPtrValue", "optional_phi_adjust", "renamed_optional_read", "optional_live_pressure"],
+      "observations": 1056,
+      "stdout": "optional-composition observations=1056 renamed=cfg-variants=pressure=guards=preserved\n"
     }
   ]
 }

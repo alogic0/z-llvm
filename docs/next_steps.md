@@ -50,13 +50,17 @@ Stages [1](evidence/compiler_generalization_stage1_20261116.md) and
 [2](evidence/compiler_generalization_stage2_20261116.md) are accepted, each with
 all 17 integration gates passing. Typed table descriptions preserve the four
 original layouts and admit bounded power-of-two i16 counts; the complete
-231-population native suite passes. Implement stage 3 next: replace the selected
-optional-pointer load/return family through composed operations and qualify
-renamed, reordered and pressure cases. A diagnosed CFG preservation repair
-requires its own full integration gate. Use separate evidence and managed
-workspaces. The Safe, stage-1 and table comparison compiler pipelines have
-completed their consumers. Preserve historical model/guard transitions and
-other holds.
+231-population native suite passes. Stage
+[3](evidence/compiler_generalization_stage3_20261116.md) is also accepted: obsolete
+optional-pointer load/return handlers are removed, and computed scalar homes are
+established before CFG forks. Exact wrong-code replay, all 17 integration gates
+and the complete 232-population native suite pass. Implement stage 4 next:
+compact scoped identities with unchanged byte-equality contracts, atomic
+insertion and stale-handle rejection. Qualify long names without relying on
+private renaming for the selected path. Use separate evidence and managed
+workspaces, then measure the isolated scheduler only at an idle boundary.
+The Safe, stage-1, table and CFG comparison compiler pipelines have completed
+their consumers. Preserve historical model/guard transitions and other holds.
 
 Further work starts from the accepted baseline:
 

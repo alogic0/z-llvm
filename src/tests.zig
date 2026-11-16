@@ -1,6 +1,7 @@
 const std = @import("std");
 comptime {
     _ = @import("tests/vector_combine_uses.zig");
+    _ = @import("tests/optional_pointer_composition.zig");
 }
 comptime {
     _ = @import("codegen/x86_64/vector_facts.zig");

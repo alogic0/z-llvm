@@ -585,8 +585,29 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
 
     var cfg_liveness = try buildStageTwoLivenessWithGraph(allocator, function, graph);
     defer cfg_liveness.deinit();
+    var fork_preservation_values = NameSet.init(allocator);
+    defer fork_preservation_values.deinit();
+    var fork_preservation_slots: usize = 0;
     for (cfg_liveness.blocks.items, 0..) |block, block_index| {
         try recordSelectorIntervalUses(intervals.items, interval_indexes, block.live_out, terminator_positions.items[block_index]);
+        const forks = if (function.blocks.items[block_index].terminator) |term| switch (term) {
+            .condbr, .@"switch", .indirectbr => true,
+            else => false,
+        } else false;
+        if (!forks) continue;
+        var slots: usize = 0;
+        var live = block.live_out.keyIterator();
+        while (live.next()) |name| {
+            const index = interval_indexes.get(name.*) orelse continue;
+            const interval = intervals.items[index];
+            // ABI inputs already have stable incoming homes. A computed
+            // scalar may still live in the accumulator; moving it lazily in
+            // one successor cannot establish its home in another successor.
+            if (interval.start == 0 or (interval.class != .gpr32 and interval.class != .gpr64)) continue;
+            slots += selectorSpillSlotCount(interval);
+            try fork_preservation_values.put(interval.name, {});
+        }
+        fork_preservation_slots = @max(fork_preservation_slots, slots);
     }
 
     var forward_values = std.StringHashMap(ForwardValuePlan).init(allocator);
@@ -632,6 +653,12 @@ pub fn buildSelectorAllocationPlanObserved(allocator: std.mem.Allocator, functio
     // Stores also use RAX, so every instruction-produced scalar that survives
     // a store may need preservation even below peak register pressure.
     try recordPreservationDemands(&plan, intervals.items, store_positions.items, .store);
+    // Let existing frame setup and CFG-boundary spilling establish persistent
+    // homes before the fork. This fact is independent of operand spelling,
+    // instruction order and which successor happens to be emitted first.
+    plan.preservation_spill_slots = @max(plan.preservation_spill_slots, fork_preservation_slots);
+    var fork_values = fork_preservation_values.keyIterator();
+    while (fork_values.next()) |name| try plan.preservation_values.put(name.*, {});
     plan.block_indexes = graph.block_indexes;
     graph.block_indexes = .empty;
     return plan;

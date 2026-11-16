@@ -880,9 +880,6 @@ pub fn lowerFunctionWithOptions(
         if (try air_patterns_cfg.lowerErrorSwitchReturn(allocator, &machine, function)) {
             return try finishStructuralFallback(&machine);
         }
-        if (try air_patterns_optional_pointer.lowerOptionalPointerLoadReturn(allocator, &machine, function)) {
-            return try finishStructuralFallback(&machine);
-        }
     }
 
     if (function.blocks.items.len == 4) {

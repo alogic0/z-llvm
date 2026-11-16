@@ -106,6 +106,16 @@ Fast units, 74 structural checks and all 17 integration gates pass, including
 the complete 231-population native suite. The original initializer regression
 and its correction remain documented. Later stages have separate acceptance.
 
+The [third stage](evidence/compiler_generalization_stage3_20261116.md) removes
+the obsolete optional-pointer load/return handlers while preserving the original
+raw objects and their composed ownership. A separate wrong-code repair gives
+computed GPR scalars persistent homes before CFG forks; the exact optimized
+failure now matches LLVM. All 2,409 Fast units, 74 structural checks and 17
+integration gates pass, including the complete 232-population native suite.
+The fixed Debug module also preserves object and owner bytes. Two main-function
+legacy shapers remain outside this slice. Storage closure preserves all seven
+contracts and seventeen independent holds.
+
 ## Fixed compiler-core execution cohort
 
 [accepted_status.json](accepted_status.json) records the separate fixed

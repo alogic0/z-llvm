@@ -1,8 +1,8 @@
 # Generalize compiler mechanisms
 
 Date: 2026-11-16
-Status: stages 1 and 2 accepted after ReleaseSafe acceptance commit `338b8972`;
-implementing stage 3. Stage 2 qualifies its mechanical description migration
+Status: stages 1 through 3 accepted after ReleaseSafe acceptance commit `338b8972`;
+implementing stage 4. Stage 2 qualifies its mechanical description migration
 separately from the power-of-two length extension.
 Review baseline: repository HEAD `97b6eced`, with compiler changes through `ae9d359f`.
 Review reconciliation: 2026-11-16; operand mutation, proof semantics, identity
@@ -124,7 +124,8 @@ Starting points:
 - [Index proofs](../../src/codegen/x86_64/constant_table_index.zig).
 - [Table-load lowering](../../src/codegen/x86_64/generic_cfg/composed_selector_memory.zig).
 
-The current table shape enum describes four specific layouts, including
+At the review baseline, the table shape enum described four specific layouts,
+including
 `[128 x i16]`, `[16 x double]` and `[512 x double]`. Load admission contains
 corresponding masks and paired-access restrictions.
 
@@ -182,7 +183,7 @@ Starting points:
 - [Composed selector entry](../../src/codegen/x86_64/generic_cfg_selector.zig).
 - [Selection ownership](../architecture.md).
 
-Legacy paths recognize names such as
+At the review baseline, legacy paths recognized names such as
 `runtime_optional_pointer_main.optionalPtrValue`. Other handlers combine exact
 function names, instruction counts and constants to emit a particular sequence.
 These examples do not describe every backend route.
@@ -207,14 +208,22 @@ Work:
 
 Acceptance:
 
-- [ ] The original family passes through composed lowering, with ownership checked.
-- [ ] Equivalent cases pass after permissible internal renaming, harmless
+- [x] The original family passes through composed lowering, with ownership checked.
+- [x] Equivalent cases pass after permissible internal renaming, harmless
   instruction rearrangement and insertion of independent instructions.
-- [ ] Additional uses, register pressure and branch variations exercise the
+- [x] Additional uses, register pressure and branch variations exercise the
   mechanism beyond the original whole-function shape.
-- [ ] Unsupported or semantically different neighbors still reject safely.
-- [ ] The replaced name-specific handler is removed or its remaining dependency
+- [x] Unsupported or semantically different neighbors still reject safely.
+- [x] The replaced name-specific handler is removed or its remaining dependency
   is precisely documented; generic counters alone do not close the stage.
+
+The [stage-3 evidence](../evidence/compiler_generalization_stage3_20261116.md)
+records removal of the obsolete load/return and named-helper handlers. Original
+raw objects retain their already-composed ownership. A separate confirmed
+computed-scalar fork-preservation repair passes exact optimized-failure replay,
+native comparisons and all 17 integration gates, including all 232 native
+populations. Two main-function legacy shapers remain outside this slice; no
+unproven call substitution is introduced.
 
 ## 4. Separate internal identity from textual names
 

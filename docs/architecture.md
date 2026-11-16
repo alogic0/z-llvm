@@ -382,6 +382,14 @@ do not establish a runtime speedup.
   Floating layouts and unsupported initializer syntax retain explicit limits.
   The [table qualification](evidence/compiler_generalization_stage2_20261116.md)
   records preservation separately from the bounded capability extension.
+- On x86-64, computed 32/64-bit GPR values live across conditional, switch or
+  indirect forks receive persistent homes through the existing frame and spill
+  authority before branching. ABI inputs and linear edges keep their existing
+  rules. The [CFG qualification](evidence/compiler_generalization_stage3_20261116.md)
+  separates this wrong-code repair from removal of obsolete optional-pointer
+  load/return handlers. Ordinary comparisons, branches, loads, PHIs and returns
+  use composed selection. Two main-function legacy shapers and their call-name
+  predicate retain their existing callers.
 - Operand traversal reports opaque values, attributes, metadata, and call text
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers
