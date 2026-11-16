@@ -95,8 +95,16 @@ current-insert repair passes 65,543 native comparisons and a fault control.
 Both 2,395-unit builds, readiness, 66 structural checks and all 17 integration
 gates pass, including the complete 230-population native suite. The
 [evidence](evidence/compiler_generalization_stage1_20261116.md) records admission
-restrictions, failed attempts and storage disposition. Typed tables are next;
-later stages receive no acceptance credit from this result.
+restrictions, failed attempts and storage disposition.
+
+The [second stage](evidence/compiler_generalization_stage2_20261116.md) is also
+accepted. Typed descriptions preserve the four original constant-table layouts
+and extend literal i16 tables to power-of-two counts 2 through 65,536. The mask
+proof remains an allowed-bit contract, including parity; arbitrary lengths are
+not admitted. Independent access/guard checks at counts 64 and 256, all 2,406
+Fast units, 74 structural checks and all 17 integration gates pass, including
+the complete 231-population native suite. The original initializer regression
+and its correction remain documented. Later stages have separate acceptance.
 
 ## Fixed compiler-core execution cohort
 

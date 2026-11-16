@@ -1,3 +1,4 @@
+const table_descriptions = @import("../../../constant_table.zig").Description;
 const support = @import("../test_support.zig");
 
 const std = support.std;
@@ -342,21 +343,21 @@ test "value-use readonly load rejects source provenance only after resolution" {
 }
 test "value-use table load precedence preserves offset staging and type order" {
     try expectTableLoadFailure(
-        .i16_128,
+        table_descriptions.i16_128,
         8,
         null,
         error.ValueUseLoadReadonlyTableOffset,
         true,
     );
     try expectTableLoadFailure(
-        .f64_16,
+        table_descriptions.f64_16,
         0,
         null,
         error.ValueUseLoadReadonlyTableType,
         false,
     );
     try expectTableLoadFailure(
-        .f64_16,
+        table_descriptions.f64_16,
         0,
         .after_pointer_staging,
         error.ValueUseLoadReadonlyTableSpill,
@@ -458,12 +459,12 @@ test "value-use dormant pair and table load actions retain existing non-accumula
     try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
         .storage = .{ .spill = .slot3 },
         .symbol = "@table",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
     } });
     try selector_state.bindValueLoc(&selector, "table-reg", .{ .readonly_table_ptr = .{
         .storage = .{ .reg = .rsi },
         .symbol = "@table-reg",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
     } });
 
     var pair = try Transaction.begin(&selector);
@@ -530,7 +531,7 @@ test "value-use dormant stack i128 load is alias-only and table double remains f
     try selector_state.bindValueLoc(&selector, "double-table", .{ .readonly_table_ptr = .{
         .storage = .{ .reg = .rdi },
         .symbol = "@double-table",
-        .shape = .f64_16,
+        .shape = table_descriptions.f64_16,
     } });
 
     var alias = try Transaction.begin(&selector);
@@ -577,7 +578,7 @@ test "value-use load rollback restores pointer staging preservation partial load
         try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
             .storage = .{ .spill = .slot2 },
             .symbol = "@table",
-            .shape = .i16_128,
+            .shape = table_descriptions.i16_128,
         } });
         const saved_pointer = selector.values.get("pointer").?;
         const saved_accumulator = selector.values.get("live-accumulator").?;

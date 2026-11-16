@@ -373,6 +373,15 @@ do not establish a runtime speedup.
   instruction operands. Cyclic byte-vector memory admission uses the same
   queries. Their [qualification](evidence/compiler_generalization_stage1_20261116.md)
   distinguishes consolidation, opaque-reference refusal and the stale-insert repair.
+- [Constant tables](../src/codegen/x86_64/constant_table.zig) use validated typed
+  descriptions for element family, count, stride, alignment, extent, access
+  widths and index bits. The four original layouts retain their boundaries;
+  literal i16 arrays additionally admit power-of-two counts 2 through 65,536.
+  Checked access arithmetic and read-only/alias proofs precede emission.
+  Index masks prove allowed bits and paired-access parity, not arbitrary ranges.
+  Floating layouts and unsupported initializer syntax retain explicit limits.
+  The [table qualification](evidence/compiler_generalization_stage2_20261116.md)
+  records preservation separately from the bounded capability extension.
 - Operand traversal reports opaque values, attributes, metadata, and call text
   as an incomplete reference boundary. It does not parse or rewrite that text
   or enumerate direct call symbols. Existing use-count and mapping wrappers

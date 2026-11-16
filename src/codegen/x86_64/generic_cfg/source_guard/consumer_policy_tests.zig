@@ -196,7 +196,7 @@ test "value-use call action wiring is function scoped and registration precedes 
 test "composed selector source guard admits only the complete ordinary readonly-pointer and table-i16 load action sets" {
     const table_fixture =
         "fn lowerReadOnlyTableLoad() void { " ++
-        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
+        "if (ptr.shape.element == .i16 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
         "return lowerReadOnlyTableI16Transactional(selector, result_name, load); } " ++
         "_ = selector_state.materializeLocIntoLoc(selector, source, destination); " ++
         "if (load.ty != .double) return; _ = selector_state.clobberXmmReg(selector, .xmm0); } " ++
@@ -241,7 +241,7 @@ test "composed selector source guard admits only the complete ordinary readonly-
         "_ = .load_readonly_pair; _ = ValueUseTransaction.begin(selector); " ++
         "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } " ++
         "fn lowerReadOnlyTableLoad() void { " ++
-        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
+        "if (ptr.shape.element == .i16 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
         "_ = selector_state.materializeLocIntoLoc(selector, source, destination); " ++
         "return lowerReadOnlyTableI16Transactional(selector, result_name, load); } " ++
         "if (load.ty != .double) return; _ = selector_state.clobberXmmReg(selector, .xmm0); } " ++
@@ -267,7 +267,7 @@ test "composed selector source guard permits the sole readonly dispatch resolve 
         "_ = transaction.executePreparedAction(lease); _ = transaction.commit(); } ";
     const table_fixture =
         "fn lowerReadOnlyTableLoad() void { " ++
-        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
+        "if (ptr.shape.element == .i16 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) { " ++
         "return lowerReadOnlyTableI16Transactional(selector, result_name, load); } " ++
         "_ = selector_state.materializeLocIntoLoc(selector, source, destination); " ++
         "if (load.ty != .double) return; _ = selector_state.clobberXmmReg(selector, .xmm0); } " ++

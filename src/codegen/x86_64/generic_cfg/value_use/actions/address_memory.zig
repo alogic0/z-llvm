@@ -474,7 +474,7 @@ pub fn executeReadOnlyTableI16Load(
             break :blk .rcx;
         },
     };
-    if (table.shape != .i16_128 or table.offset != 0)
+    if (!table.shape.allowsAccess(table.offset, 2) or table.offset != 0)
         return error.ValueUseLoadReadonlyTableType;
     try selector_state.clobberArgReg(transaction.selector, .r8);
     try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{
@@ -1041,6 +1041,7 @@ pub fn executeReadOnlyTableAddress(
     action: Types.ReadOnlyTableAddressAction,
 ) !void {
     _ = index_request;
+    if (!action.shape.valid()) return error.ValueUseAddressScaleInvalid;
     const result_name = try composition.ownActionIdentity(Authority, transaction, &action.result);
     const symbol = try composition.ownActionIdentity(Authority, transaction, &action.symbol);
     try materialization.materializeScalar64(transaction.selector, try materialization.preparedViewLoc(index_view), .{ .gpr64 = .r8 });

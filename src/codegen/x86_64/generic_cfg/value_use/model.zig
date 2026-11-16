@@ -230,7 +230,7 @@ pub const ScaledAddressAction = struct {
 pub const ReadOnlyTableAddressAction = struct {
     result: ActionIdentity,
     symbol: ActionIdentity,
-    shape: constant_table.Shape,
+    shape: constant_table.Description,
     scale: u8,
 };
 
@@ -919,7 +919,7 @@ pub const PreparedStackF32PairAddress = struct {
 pub const PreparedTablePointer = struct {
     storage: union(enum) { register: ArgReg, spill: FrameIndex },
     symbol: PreparedIdentity,
-    shape: constant_table.Shape,
+    shape: constant_table.Description,
     offset: u8,
 };
 

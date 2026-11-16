@@ -65,7 +65,7 @@ pub const SseAggregateLeaf = struct {
 pub const ReadOnlyTablePtrLoc = struct {
     storage: Storage,
     symbol: []const u8,
-    shape: constant_table.Shape,
+    shape: constant_table.Description,
     offset: u8 = 0,
 
     pub const Storage = union(enum) {

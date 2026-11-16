@@ -867,7 +867,7 @@ fn preparedTablePointerEql(
     rhs: *const Types.PreparedTablePointer,
 ) bool {
     return std.meta.eql(lhs.storage, rhs.storage) and lhs.symbol.eql(&rhs.symbol) and
-        lhs.shape == rhs.shape and lhs.offset == rhs.offset;
+        lhs.shape.eql(rhs.shape) and lhs.offset == rhs.offset;
 }
 pub fn clobberPhysicalNode(selector: *ComposedBlockSelector, node: Types.PhysicalNode) !void {
     if (node.argReg()) |reg| {

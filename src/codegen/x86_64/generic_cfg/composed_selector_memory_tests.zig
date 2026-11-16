@@ -1,3 +1,4 @@
+const table_descriptions = @import("../constant_table.zig").Description;
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
@@ -400,7 +401,7 @@ test "migrated readonly table i16 load retains register spill and R8 result form
         try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
             .storage = case.storage,
             .symbol = "@table",
-            .shape = .i16_128,
+            .shape = table_descriptions.i16_128,
         } });
         const saved_accumulator = selector.accumulator_domain;
         const saved_eflags = selector.eflags.snapshot();
@@ -430,7 +431,7 @@ test "readonly table double load remains on the direct O3 path instruction-ident
     try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
         .storage = .{ .spill = .slot2 },
         .symbol = "@table",
-        .shape = .f64_pair_128,
+        .shape = table_descriptions.f64_pair_128,
         .offset = 8,
     } });
 
@@ -462,7 +463,7 @@ test "readonly table i16 rejected type preserves spill-before-type diagnostic pr
     try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
         .storage = .{ .spill = .slot2 },
         .symbol = "@table",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
     } });
 
     const diagnostic = (try selector_memory.lowerLoad(&selector, "loaded", .{
@@ -1174,6 +1175,128 @@ test "constant table shapes execute first interior and last probes" {
     inline for (.{ "table_i16", "table_f64_16", "table_f64_512", "table_pair", ".rela.text" }) |needle| {
         try std.testing.expect(std.mem.indexOf(u8, object, needle) != null);
     }
+}
+
+test "constant table integer lengths execute exact-width reads at a protected page end" {
+    if (@import("builtin").os.tag != .linux or @import("builtin").cpu.arch != .x86_64) return error.SkipZigTest;
+    const page = std.heap.page_size_min;
+    for ([_]usize{ 64, 256 }) |count| {
+        const expression = try std.fmt.allocPrint(std.testing.allocator, "%bounded = and i64 %index, {d}", .{count - 1});
+        defer std.testing.allocator.free(expression);
+        const text = try integerLengthModule(std.testing.allocator, count, expression, 2, false, "%value = load volatile i16, ptr %address, align 2\n %wide = zext i16 %value to i32\n ret i32 %wide");
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const context: x86_64_machine.ReadOnlyModuleContext = .{
+            .globals = module.globals.items,
+            .named_types = module.named_types.items,
+            .target_datalayout = module.target_datalayout,
+        };
+        const function = module.functions.items[0];
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfgWithContext(std.testing.allocator, &machine, function, &context));
+        try x86_64_verify.verifyFunction(machine);
+        const code = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(code);
+        var decoded = (try constant_table.decodeSymbol(std.testing.allocator, context, "length_table")).?;
+        defer decoded.deinit(std.testing.allocator);
+        try std.testing.expectEqual(count * 2, decoded.bytes.len);
+        const mapping = try std.posix.mmap(null, 3 * page, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memset(mapping, 0xa5);
+        @memcpy(mapping[0..code.len], code);
+        const table_offset = 2 * page - decoded.bytes.len;
+        try std.testing.expect(code.len < table_offset);
+        @memcpy(mapping[table_offset..][0..decoded.bytes.len], decoded.bytes);
+        const relocation = findLeaPc32Offset(mapping[0..code.len]) orelse return error.TestUnexpectedResult;
+        std.mem.writeInt(i32, mapping[relocation..][0..4], @intCast(table_offset - relocation - 4), .little);
+        try std.testing.expectEqual(@as(usize, 0), std.os.linux.mprotect(mapping.ptr + 2 * page, page, .{}));
+        const run: *const fn (u64) callconv(.c) u32 = @ptrCast(mapping.ptr);
+        for (0..count) |index| {
+            const expected: u32 = @intCast((index * 257 + 0x9e37) & 65535);
+            try std.testing.expectEqual(expected, run(index));
+            try std.testing.expectEqual(expected, run(@as(u64, @intCast(index)) | 0xffff_ffff_0000_0000));
+        }
+        try std.testing.expectEqual(@as(u32, @intCast(((count - 1) * 257 + 0x9e37) & 65535)), run(std.math.maxInt(u64)));
+        try std.testing.expectEqual(@as(u8, 0xa5), mapping[table_offset - 1]);
+    }
+}
+
+test "constant table integer lengths retain proof width storage and escape boundaries" {
+    for ([_]struct { count: usize = 64, expression: []const u8 = "%bounded = and i64 %index, 63", stride: u8 = 2, writable: bool = false, access: []const u8 = "%value = load i16, ptr %address, align 2\n %wide = zext i16 %value to i32\n ret i32 %wide" }{
+        .{ .count = 63 },
+        .{ .count = 192 },
+        .{ .expression = "%bounded = and i64 %index, 127" },
+        .{ .expression = "%bounded = add i64 %index, 0" },
+        .{ .expression = "%bounded = add i64 -1, 0" },
+        .{ .stride = 8 },
+        .{ .writable = true },
+        .{ .access = "%value = load i32, ptr %address, align 2\n ret i32 %value" },
+        .{ .access = "call void @escape(ptr %address)\n %value = load i16, ptr %address, align 2\n %wide = zext i16 %value to i32\n ret i32 %wide" },
+    }) |case| {
+        const text = try integerLengthModule(std.testing.allocator, case.count, case.expression, case.stride, case.writable, case.access);
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const context: x86_64_machine.ReadOnlyModuleContext = .{
+            .globals = module.globals.items,
+            .named_types = module.named_types.items,
+            .target_datalayout = module.target_datalayout,
+            .declarations = module.declarations.items,
+        };
+        const function = module.functions.items[0];
+        var machine = MachineFunction.init(function.name, function.ret_ty);
+        defer machine.deinit(std.testing.allocator);
+        switch (try impl.tryLowerComposedCfgWithContext(std.testing.allocator, &machine, function, &context)) {
+            .unsupported => {},
+            .selected => {
+                std.debug.print("unexpected table admission: {s}\n", .{text});
+                return error.TestUnexpectedResult;
+            },
+        }
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+    }
+}
+
+fn integerLengthModule(allocator: std.mem.Allocator, count: usize, expression: []const u8, stride: u8, writable: bool, access: []const u8) ![]u8 {
+    var text: std.ArrayList(u8) = .empty;
+    errdefer text.deinit(allocator);
+    try appendFmt(&text, allocator, "target datalayout = \"e-m:e-i64:64-n8:16:32:64-S128\"\n@length_table = private {s} [{d} x i16] [", .{ if (writable) "global" else "constant", count });
+    for (0..count) |index| {
+        if (index != 0) try text.appendSlice(allocator, ", ");
+        try appendFmt(&text, allocator, "i16 {d}", .{(index * 257 + 0x9e37) & 65535});
+    }
+    try appendFmt(&text, allocator, "], align 2\ndeclare void @escape(ptr)\ndefine i32 @length_probe(i64 %index) {{\nentry:\n {s}\n %address = getelementptr [{d} x i8], ptr @length_table, i64 %bounded\n {s}\n}}\n", .{ expression, stride, access });
+    return text.toOwnedSlice(allocator);
+}
+
+test "constant table unsupported new payloads preserve unrelated object emission" {
+    const source =
+        \\target datalayout = "e-m:e-i64:64-n8:16:32:64-S128"
+        \\@unused_words = internal constant [8 x i16] zeroinitializer, align 2
+        \\@other_words = internal constant [16 x i16] zeroinitializer, align 2
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, source);
+    defer module.deinit();
+    try module.verify();
+    const context: x86_64_machine.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+    };
+    var machine = MachineFunction.init("unrelated_function", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try machine.instructions.appendSlice(std.testing.allocator, &.{ .{ .mov_imm_eax = 0 }, .ret });
+    const object = try elf.buildObjectWithModuleContext(std.testing.allocator, &.{machine}, &.{}, context);
+    defer std.testing.allocator.free(object);
+    var empty = context;
+    empty.globals = &.{};
+    const baseline = try elf.buildObjectWithModuleContext(std.testing.allocator, &.{machine}, &.{}, empty);
+    defer std.testing.allocator.free(baseline);
+    try std.testing.expectEqualSlices(u8, baseline, object);
 }
 
 test "constant table admission rejects unproved indexes and writable globals" {

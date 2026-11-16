@@ -13690,6 +13690,14 @@
       "functions": ["frontier_identity96_core", "frontier_not96_core", "frontier_not65_core", "frontier_identity96", "frontier_not96", "frontier_not65", "frontier_word_mask", "frontier_shift4", "frontier_shift9", "frontier_shift16", "frontier_vector_lane", "frontier_vector_snapshot"],
       "observations": 17920,
       "stdout": "preopt-test-frontier observations=17920 independent-c-bit-goldens=logical-wide-masks=narrow-shifts=overflow=live-calls=fp-lanes=unaligned-page-edge-snapshots=preserved\n"
+    },
+    {
+      "population": "table_lengths",
+      "fixture": "table_lengths",
+      "prefix": "table-lengths",
+      "functions": ["length_table_64_value", "length_table_64_copy", "length_table_256_value", "length_table_256_copy"],
+      "observations": 2080,
+      "stdout": "table-lengths observations=2080 protected-page-stores=guards=preserved\n"
     }
   ]
 }

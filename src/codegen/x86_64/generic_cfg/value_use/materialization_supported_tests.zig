@@ -1,3 +1,4 @@
+const table_descriptions = @import("../../constant_table.zig").Description;
 const support = @import("test_support.zig");
 
 const std = support.std;
@@ -166,12 +167,12 @@ test "value-use transaction supports register and spill table pointers and read-
     try selector_state.bindValueLoc(&selector, "table-reg", .{ .readonly_table_ptr = .{
         .storage = .{ .reg = .rdi },
         .symbol = "@table",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
     } });
     try selector_state.bindValueLoc(&selector, "table-spill", .{ .readonly_table_ptr = .{
         .storage = .{ .spill = .slot0 },
         .symbol = "@table",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
     } });
     try selector_state.bindValueLoc(&selector, "pair-a", .{ .arg128 = .{ .lo = .rcx, .hi = .rdx } });
     try selector_state.bindValueLoc(&selector, "pair-spill", .{ .spill128 = .{ .lo = .slot1, .hi = .slot2 } });

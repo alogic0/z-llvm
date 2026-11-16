@@ -190,7 +190,7 @@ fn supported(access: anytype) bool {
 // Retaining a typed table load grants no address or range admission. The
 // existing table GEP and load owners still prove those facts. This avoids
 // erasing their double/XMM route during the last-resort pointer rewrite.
-fn scalarTableShape(a: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, pointer: ir.Value, depth: u8) anyerror!?@import("../constant_table.zig").Shape {
+fn scalarTableShape(a: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, pointer: ir.Value, depth: u8) anyerror!?@import("../constant_table.zig").Description {
     const ctx = context orelse return null;
     if (depth >= 16 or pointer != .named) return null;
     const tables = @import("../constant_table.zig");
@@ -206,7 +206,7 @@ fn scalarTableShape(a: std.mem.Allocator, function: ir.Function, context: ?*cons
                 return null;
             }) orelse return null;
             defer decoded.deinit(a);
-            return if (decoded.shape != .i16_128 and tables.sourceStrideMatches(gep.source_ty, decoded.shape)) decoded.shape else null;
+            return if (decoded.shape.element != .i16 and tables.sourceStrideMatches(gep.source_ty, decoded.shape)) decoded.shape else null;
         }
         const index = gep.indices.items[0].value;
         if (!gep.source_ty.eql(.{ .int = 8 }) or index != .int or index.int < 0 or index.int > 8) return null;

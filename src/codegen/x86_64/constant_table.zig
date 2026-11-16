@@ -86,48 +86,102 @@ pub const ReadOnlyModuleContext = struct {
     }
 };
 
-pub const Shape = enum {
-    i16_128,
-    f64_16,
-    f64_512_pairs,
-    f64_pair_128,
+/// Facts for the admitted x86-64 read-only data layouts. Allowed index bits are
+/// a bit envelope, including parity for paired scalar accesses, not a range.
+pub const Description = struct {
+    pub const Element = enum { i16, f64, f64_pair };
+    element: Element,
+    element_count: usize,
+    stride_bytes: u8,
+    alignment_bytes: u32,
+    serialized_extent: usize,
+    access_widths: u16,
+    allowed_index_bits: u64,
+    paired_scalar_indices: bool,
 
-    pub fn stride(shape: Shape) u8 {
-        return switch (shape) {
-            .i16_128 => 2,
-            .f64_16, .f64_512_pairs => 8,
-            .f64_pair_128 => 16,
+    // Compatibility constants for existing callers. The integer family also
+    // admits other power-of-two lengths through the same description.
+    pub const max_i16_elements: usize = 65536;
+    pub const i16_128 = init(.i16, 128, false).?;
+    pub const f64_16 = init(.f64, 16, false).?;
+    pub const f64_512_pairs = init(.f64, 512, true).?;
+    pub const f64_pair_128 = init(.f64_pair, 128, false).?;
+
+    pub fn init(element: Element, elements: usize, paired: bool) ?Description {
+        if (elements == 0 or !std.math.isPowerOfTwo(elements)) return null;
+        const step: u8 = switch (element) {
+            .i16 => 2,
+            .f64 => 8,
+            .f64_pair => 16,
+        };
+        const extent = std.math.mul(usize, elements, step) catch return null;
+        // Keep every derived displacement and serialized object span within
+        // the existing signed x86 displacement envelope.
+        if (extent > std.math.maxInt(i32)) return null;
+        if (paired) {
+            if (element != .f64 or elements != 512) return null;
+        } else switch (element) {
+            .i16 => if (elements < 2 or elements > max_i16_elements) return null,
+            .f64_pair => if (elements != 128) return null,
+            .f64 => if (elements != 16) return null,
+        }
+        const width: u8 = if (element == .i16) 2 else 8;
+        return .{
+            .element = element,
+            .element_count = elements,
+            .stride_bytes = step,
+            .alignment_bytes = width,
+            .serialized_extent = extent,
+            .access_widths = @as(u16, 1) << @as(u4, @intCast(width)),
+            .allowed_index_bits = @intCast(elements - @as(usize, if (paired) 2 else 1)),
+            .paired_scalar_indices = paired,
         };
     }
 
-    pub fn count(shape: Shape) usize {
-        return switch (shape) {
-            .i16_128, .f64_pair_128 => 128,
-            .f64_16 => 16,
-            .f64_512_pairs => 512,
-        };
+    pub fn eql(description: Description, other: Description) bool {
+        return std.meta.eql(description, other);
     }
 
-    pub fn alignment(shape: Shape) u32 {
-        return switch (shape) {
-            .i16_128 => 2,
-            .f64_16, .f64_512_pairs, .f64_pair_128 => 8,
-        };
+    /// Internal intents/snapshots may carry descriptions by value. A forged
+    /// derived field never grants additional access or address capability.
+    pub fn valid(description: Description) bool {
+        const canonical = init(description.element, description.element_count, description.paired_scalar_indices) orelse return false;
+        return description.eql(canonical);
     }
 
-    pub fn allowsOffset(shape: Shape, offset: u8) bool {
-        return switch (shape) {
-            .i16_128, .f64_16 => offset == 0,
-            .f64_512_pairs, .f64_pair_128 => offset == 0 or offset == 8,
-        };
+    pub fn stride(description: Description) u8 {
+        return description.stride_bytes;
+    }
+    pub fn count(description: Description) usize {
+        return description.element_count;
+    }
+    pub fn alignment(description: Description) u32 {
+        return description.alignment_bytes;
+    }
+
+    pub fn allowsOffset(description: Description, offset: u8) bool {
+        return description.valid() and (offset == 0 or
+            (offset == 8 and (description.paired_scalar_indices or description.element == .f64_pair)));
+    }
+
+    /// Check the final byte of every admitted index, not just a table tag.
+    pub fn allowsAccess(description: Description, offset: u8, width: u8) bool {
+        if (!description.allowsOffset(offset) or width >= 16 or
+            description.access_widths & (@as(u16, 1) << @as(u4, @intCast(width))) == 0) return false;
+        const base = std.math.mul(u64, description.allowed_index_bits, description.stride_bytes) catch return false;
+        const field = std.math.add(u64, base, offset) catch return false;
+        const end = std.math.add(u64, field, width) catch return false;
+        return end <= description.serialized_extent and end <= std.math.maxInt(i32);
     }
 };
 
-pub fn sourceStrideMatches(source_ty: ir.Type, shape: Shape) bool {
-    const expected = switch (shape) {
-        .i16_128 => "[2 x i8]",
-        .f64_16, .f64_512_pairs => "[8 x i8]",
-        .f64_pair_128 => "[16 x i8]",
+pub fn sourceStrideMatches(source_ty: ir.Type, shape: Description) bool {
+    if (!shape.valid()) return false;
+    const expected = switch (shape.stride()) {
+        2 => "[2 x i8]",
+        8 => "[8 x i8]",
+        16 => "[16 x i8]",
+        else => return false,
     };
     return source_ty == .aggregate and std.mem.eql(u8, std.mem.trim(u8, source_ty.aggregate, " \t"), expected);
 }
@@ -135,7 +189,7 @@ pub fn sourceStrideMatches(source_ty: ir.Type, shape: Shape) bool {
 pub const Decoded = struct {
     symbol: []const u8,
     linkage: ir.FunctionLinkage,
-    shape: Shape,
+    shape: Description,
     element_count: usize,
     serialized_size: usize,
     alignment: u32,
@@ -171,12 +225,19 @@ pub fn decodeGlobal(
     const declared_alignment = parseAlignment(global.attrs) orelse return null;
     if (declared_alignment < classified.shape.alignment() or !std.math.isPowerOfTwo(declared_alignment)) return null;
 
+    // Newly considered integer counts are an optional specialization of the
+    // existing global emitter. Do not claim unsupported payloads and turn a
+    // previously harmless unused global into an object-emission failure.
+    // The original four layouts keep their closed codec/error boundaries.
+    if (classified.shape.element == .i16 and !classified.shape.eql(Description.i16_128) and
+        !hasLiteralI16Payload(global.initializer, classified.shape.count())) return null;
+
     var bytes: std.ArrayList(u8) = .empty;
     errdefer bytes.deinit(allocator);
-    switch (classified.shape) {
-        .i16_128 => try appendI16Array(&bytes, allocator, global.initializer, classified.shape.count()),
-        .f64_16, .f64_512_pairs => try appendF64Array(&bytes, allocator, global.initializer, classified.shape.count()),
-        .f64_pair_128 => try appendF64PairArray(
+    switch (classified.shape.element) {
+        .i16 => try appendI16Array(&bytes, allocator, global.initializer, classified.shape.count()),
+        .f64 => try appendF64Array(&bytes, allocator, global.initializer, classified.shape.count()),
+        .f64_pair => try appendF64PairArray(
             &bytes,
             allocator,
             global.initializer,
@@ -184,6 +245,7 @@ pub fn decodeGlobal(
             classified.shape.count(),
         ),
     }
+    if (bytes.items.len != classified.shape.serialized_extent) return error.TableExtentMismatch;
     const owned = try bytes.toOwnedSlice(allocator);
     return .{
         .symbol = global.name,
@@ -197,7 +259,7 @@ pub fn decodeGlobal(
 }
 
 const Classified = struct {
-    shape: Shape,
+    shape: Description,
     element_type: []const u8,
 };
 
@@ -206,24 +268,30 @@ fn classify(context: ReadOnlyModuleContext, ty: ir.Type) ?Classified {
         .aggregate => |aggregate| std.mem.trim(u8, aggregate, " \t"),
         else => return null,
     };
-    if (std.mem.eql(u8, text, "[128 x i16]")) return .{ .shape = .i16_128, .element_type = "i16" };
-    if (std.mem.eql(u8, text, "[16 x double]")) return .{ .shape = .f64_16, .element_type = "double" };
-    if (std.mem.eql(u8, text, "[512 x double]")) return .{ .shape = .f64_512_pairs, .element_type = "double" };
+    if (std.mem.eql(u8, text, "[16 x double]")) return .{ .shape = Description.f64_16, .element_type = "double" };
+    if (std.mem.eql(u8, text, "[512 x double]")) return .{ .shape = Description.f64_512_pairs, .element_type = "double" };
 
-    const element_type = parseExactArrayElement(text, 128) orelse return null;
+    const array = parseArray(text) orelse return null;
+    const element_type = array.element;
+    if (std.mem.eql(u8, element_type, "i16")) return .{
+        .shape = Description.init(.i16, array.count, false) orelse return null,
+        .element_type = element_type,
+    };
+    if (array.count != 128) return null;
     if (!std.mem.startsWith(u8, element_type, "%")) return null;
     const named_type = context.findNamedType(element_type) orelse return null;
     if (!std.mem.eql(u8, std.mem.trim(u8, named_type.body, " \t"), "{ double, double }")) return null;
-    return .{ .shape = .f64_pair_128, .element_type = element_type };
+    return .{ .shape = Description.f64_pair_128, .element_type = element_type };
 }
 
-fn parseExactArrayElement(text: []const u8, expected_count: usize) ?[]const u8 {
+const Array = struct { count: usize, element: []const u8 };
+
+fn parseArray(text: []const u8) ?Array {
     if (text.len < 5 or text[0] != '[' or text[text.len - 1] != ']') return null;
     const body = std.mem.trim(u8, text[1 .. text.len - 1], " \t");
     const separator = std.mem.indexOf(u8, body, " x ") orelse return null;
     const count = std.fmt.parseUnsigned(usize, std.mem.trim(u8, body[0..separator], " \t"), 10) catch return null;
-    if (count != expected_count) return null;
-    return std.mem.trim(u8, body[separator + 3 ..], " \t");
+    return .{ .count = count, .element = std.mem.trim(u8, body[separator + 3 ..], " \t") };
 }
 
 fn supportsCapturedDataLayout(datalayout: ?[]const u8) bool {
@@ -238,6 +306,18 @@ fn parseAlignment(attrs: ?[]const u8) ?u32 {
         return std.fmt.parseUnsigned(u32, tokens.next() orelse return null, 10) catch null;
     }
     return null;
+}
+
+fn hasLiteralI16Payload(initializer: ir.GlobalInitializer, count: usize) bool {
+    const array = switch (initializer) {
+        .array => |array| array,
+        else => return false,
+    };
+    if (!array.elem_ty.eql(.{ .int = 16 }) or array.values.items.len != count) return false;
+    for (array.values.items) |value| {
+        if (value != .int or value.int < std.math.minInt(i16) or value.int > std.math.maxInt(u16)) return false;
+    }
+    return true;
 }
 
 fn appendI16Array(
@@ -413,4 +493,123 @@ fn appendU16(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u16
 
 fn appendU64(bytes: *std.ArrayList(u8), allocator: std.mem.Allocator, value: u64) !void {
     inline for (0..8) |index| try bytes.append(allocator, @truncate(value >> (index * 8)));
+}
+
+test "constant table description preserves four original access envelopes" {
+    const cases = [_]struct { description: Description, extent: usize, mask: u64, width: u8, tail: bool }{
+        .{ .description = Description.i16_128, .extent = 256, .mask = 127, .width = 2, .tail = false },
+        .{ .description = Description.f64_16, .extent = 128, .mask = 15, .width = 8, .tail = false },
+        .{ .description = Description.f64_512_pairs, .extent = 4096, .mask = 510, .width = 8, .tail = true },
+        .{ .description = Description.f64_pair_128, .extent = 2048, .mask = 127, .width = 8, .tail = true },
+    };
+    for (cases) |case| {
+        const description = case.description;
+        try std.testing.expect(description.valid());
+        try std.testing.expectEqual(case.extent, description.serialized_extent);
+        try std.testing.expectEqual(case.mask, description.allowed_index_bits);
+        try std.testing.expect(description.allowsAccess(0, case.width));
+        try std.testing.expectEqual(case.tail, description.allowsAccess(8, case.width));
+        try std.testing.expect(!description.allowsAccess(1, case.width));
+        try std.testing.expect(!description.allowsAccess(16, case.width));
+        try std.testing.expect(!description.allowsAccess(0, 16));
+        try std.testing.expect(!description.allowsAccess(0, if (case.width == 2) 8 else 2));
+    }
+    // 510 admits the final even pair base, but excludes odd in-range values.
+    const bits = Description.f64_512_pairs.allowed_index_bits;
+    try std.testing.expect(510 & ~bits == 0);
+    try std.testing.expect(509 & ~bits != 0);
+    try std.testing.expect(511 & ~bits != 0);
+}
+
+test "constant table description rejects altered derived facts before access" {
+    inline for (.{ "element_count", "stride_bytes", "alignment_bytes", "serialized_extent", "access_widths", "allowed_index_bits" }) |field| {
+        var description = Description.i16_128;
+        @field(description, field) += 1;
+        try std.testing.expect(!description.valid());
+        try std.testing.expect(!description.allowsAccess(0, 2));
+        try std.testing.expect(!sourceStrideMatches(.{ .aggregate = "[2 x i8]" }, description));
+    }
+    var description = Description.i16_128;
+    description.paired_scalar_indices = true;
+    try std.testing.expect(!description.valid());
+    description = Description.i16_128;
+    description.element = .f64;
+    try std.testing.expect(!description.valid());
+}
+
+test "constant table description rejects unsupported counts and checked extent overflow" {
+    try std.testing.expect(Description.init(.i16, 0, false) == null);
+    try std.testing.expect(Description.init(.i16, 1, false) == null);
+    try std.testing.expect(Description.init(.i16, 63, false) == null);
+    try std.testing.expect(Description.init(.i16, 192, false) == null);
+    try std.testing.expect(Description.init(.i16, 131072, false) == null);
+    try std.testing.expect(Description.init(.f64, 128, false) == null);
+    try std.testing.expect(Description.init(.f64, 512, false) == null);
+    try std.testing.expect(Description.init(.f64_pair, 128, true) == null);
+    try std.testing.expect(Description.init(.i16, std.math.maxInt(usize) / 2 + 1, false) == null);
+    try std.testing.expect(Description.init(.i16, 1 << 30, false) == null);
+}
+
+test "constant table integer descriptions derive every admitted power-of-two envelope" {
+    for (1..17) |shift| {
+        const count = @as(usize, 1) << @intCast(shift);
+        const description = Description.init(.i16, count, false).?;
+        try std.testing.expect(description.valid());
+        try std.testing.expectEqual(count * 2, description.serialized_extent);
+        try std.testing.expectEqual(count - 1, description.allowed_index_bits);
+        try std.testing.expect(description.allowsAccess(0, 2));
+        try std.testing.expect(!description.allowsAccess(1, 2));
+        try std.testing.expect(!description.allowsAccess(0, 4));
+        try std.testing.expect(!description.allowsAccess(8, 2));
+        try std.testing.expect(!description.allowsAccess(0, 255));
+    }
+}
+
+test "constant table new integer counts decline unsupported payloads without allocation" {
+    for ([_]usize{ 8, 16, 64, 256 }) |count| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "target datalayout = \"e-m:e-i64:64-n8:16:32:64-S128\"\n@unused_words = internal constant [{d} x i16] zeroinitializer, align 2\n", .{count});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const context: ReadOnlyModuleContext = .{
+            .globals = module.globals.items,
+            .named_types = module.named_types.items,
+            .target_datalayout = module.target_datalayout,
+        };
+        try std.testing.expect(try decodeSymbol(std.testing.failing_allocator, context, "unused_words") == null);
+    }
+    var text: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer text.deinit();
+    try text.writer.writeAll("target datalayout = \"e-m:e-i64:64-n8:16:32:64-S128\"\n@partial_words = internal constant [64 x i16] [");
+    for (0..64) |index| {
+        if (index != 0) try text.writer.writeAll(", ");
+        try text.writer.writeAll(if (index == 63) "i16 undef" else "i16 7");
+    }
+    try text.writer.writeAll("], align 2\n");
+    var module = try ir.Module.parse(std.testing.allocator, text.written());
+    defer module.deinit();
+    try module.verify();
+    const context: ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+    };
+    try std.testing.expect(try decodeSymbol(std.testing.failing_allocator, context, "partial_words") == null);
+}
+
+test "constant table original layouts retain unsupported initializer errors" {
+    for ([_][]const u8{ "[128 x i16]", "[16 x double]", "[512 x double]", "[128 x %pair]" }) |ty| {
+        const text = try std.fmt.allocPrint(std.testing.allocator, "target datalayout = \"e-m:e-i64:64-n8:16:32:64-S128\"\n%pair = type {{ double, double }}\n@original_table = internal constant {s} zeroinitializer, align 8\n", .{ty});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const context: ReadOnlyModuleContext = .{
+            .globals = module.globals.items,
+            .named_types = module.named_types.items,
+            .target_datalayout = module.target_datalayout,
+        };
+        try std.testing.expectError(error.UnsupportedGlobalVariable, decodeSymbol(std.testing.allocator, context, "original_table"));
+    }
 }

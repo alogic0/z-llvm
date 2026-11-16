@@ -290,6 +290,24 @@ test "readonly table index proofs retain typed bitcasts wide masks and scaled bo
     try std.testing.expect(!try proves(std.testing.allocator, null, module.functions.items[0], "carry", 127));
 }
 
+test "readonly table index mask 510 proves both envelope and even parity" {
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\define i64 @parity(i64 %input) {
+        \\entry:
+        \\ %even = and i64 %input, 510
+        \\ %odd = or i64 %even, 1
+        \\ %odd_in_range = and i64 %input, 509
+        \\ %unpaired = and i64 %input, 511
+        \\ ret i64 %even
+        \\}
+    );
+    defer module.deinit();
+    try module.verify();
+    try std.testing.expect(try proves(std.testing.allocator, null, module.functions.items[0], "even", 510));
+    for ([_][]const u8{ "odd", "odd_in_range", "unpaired" }) |name|
+        try std.testing.expect(!try proves(std.testing.allocator, null, module.functions.items[0], name, 510));
+}
+
 test "readonly table index proofs require bounded reaching stores and a private scalar slot" {
     for ([_]struct { before: []const u8 = "", right: []const u8, access: []const u8 = "load", pointer: []const u8 = "slot", accepted: bool }{
         .{ .right = "store i64 %masked,ptr %slot", .accepted = true },

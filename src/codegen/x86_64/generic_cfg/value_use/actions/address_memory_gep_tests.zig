@@ -1,3 +1,4 @@
+const table_descriptions = @import("../../../constant_table.zig").Description;
 const support = @import("../test_support.zig");
 
 test "large frame address authority requires the entire array to fit its allocated frame" {
@@ -410,7 +411,7 @@ test "value-use readonly-table address action owns semantic symbol and committed
         .{ .form_readonly_table_address = .{
             .result = try actionIdentity("table-result"),
             .symbol = try actionIdentity("@readonly-table"),
-            .shape = .i16_128,
+            .shape = table_descriptions.i16_128,
             .scale = 2,
         } },
     ));
@@ -421,10 +422,45 @@ test "value-use readonly-table address action owns semantic symbol and committed
     const table = selector.values.get("table-result").?.loc.readonly_table_ptr;
     try std.testing.expectEqual(selector_types.ArgReg.rcx, table.storage.reg);
     try std.testing.expect(std.mem.eql(u8, "@readonly-table", table.symbol));
-    try std.testing.expect(table.shape == .i16_128);
+    try std.testing.expect(table.shape.eql(table_descriptions.i16_128));
     try transaction.commit();
     try std.testing.expectEqual(@as(usize, 2), machine.owned_labels.items.len);
     try std.testing.expect(machine.instructions.items.len >= 4);
+}
+
+test "value-use table descriptions reject forged bounds before publishing an action" {
+    var machine = MachineFunction.init("forged-table-description", .ptr);
+    defer machine.deinit(std.testing.allocator);
+    var plan = SelectorAllocationPlan.init(std.testing.allocator);
+    defer plan.deinit();
+    inline for (&.{ "index", "table-result" }) |name| try addLive(&plan, name);
+    var selector = ComposedBlockSelector.init(std.testing.allocator, &machine);
+    defer selector.deinit();
+    selector.allocation_plan = &plan;
+    try selector_state.bindValueLoc(&selector, "index", .{ .arg64 = .rdi });
+    const original = selector.values.get("index").?;
+    inline for (.{ "element_count", "stride_bytes", "alignment_bytes", "serialized_extent", "access_widths", "allowed_index_bits" }) |field| {
+        var description = table_descriptions.init(.i16, 64, false).?;
+        @field(description, field) += 1;
+        var transaction = try Transaction.begin(&selector);
+        defer transaction.deinit();
+        try std.testing.expectError(error.ValueUseAddressScaleInvalid, transaction.register(preparedRequest(
+            "index",
+            .{ .int = 64 },
+            .gpr64,
+            .gpr64,
+            .{ .form_readonly_table_address = .{
+                .result = try actionIdentity("table-result"),
+                .symbol = try actionIdentity("@readonly-table"),
+                .shape = description,
+                .scale = 2,
+            } },
+        )));
+        try std.testing.expectEqual(@as(usize, 0), machine.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), machine.owned_labels.items.len);
+        try std.testing.expect(!selector.values.contains("table-result"));
+        try std.testing.expect(std.meta.eql(original, selector.values.get("index").?));
+    }
 }
 test "value-use f32-pair byte-address action preserves exact bounded descriptor arithmetic" {
     var machine = MachineFunction.init("value-use-f32-pair-byte-bounds", .ptr);
@@ -681,7 +717,7 @@ test "value-use GEP actions preserve accepted descriptor preconditions" {
     try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
         .storage = .{ .reg = .rdx },
         .symbol = "@table",
-        .shape = .f64_512_pairs,
+        .shape = table_descriptions.f64_512_pairs,
     } });
 
     var array_len = try Transaction.begin(&selector);

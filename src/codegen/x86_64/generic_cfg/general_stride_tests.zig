@@ -1,3 +1,4 @@
+const table_descriptions = @import("../constant_table.zig").Description;
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const machine = @import("../machine.zig");
@@ -84,7 +85,7 @@ test "general array strides preserve descriptor and readonly table restrictions 
     try std.testing.expectError(error.ValueUseAddressScaleInvalid, transaction.register(support.preparedRequest("index", .{ .int = 64 }, .gpr64, .gpr64, .{ .form_readonly_table_address = .{
         .result = try support.actionIdentity("result"),
         .symbol = try support.actionIdentity("table"),
-        .shape = .f64_16,
+        .shape = table_descriptions.f64_16,
         .scale = 3,
     } })));
     try std.testing.expectEqual(@as(usize, 0), output.instructions.items.len);

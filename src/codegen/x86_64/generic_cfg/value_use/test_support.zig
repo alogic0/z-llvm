@@ -722,7 +722,7 @@ pub fn expectReadOnlyScalarLoadFailure(
     try selector.eflags.validateSnapshot(saved_eflags);
 }
 pub fn expectTableLoadFailure(
-    shape: constant_table.Shape,
+    shape: constant_table.Description,
     offset: u8,
     failure: ?Transaction.LoadTestFailure,
     expected_error: Transaction.LoadRequestError,

@@ -1,3 +1,4 @@
+const table_descriptions = @import("../../constant_table.zig").Description;
 const support = @import("test_support.zig");
 
 const std = support.std;
@@ -78,13 +79,13 @@ test "value-use transaction exposes every restricted prepared-view member and bo
     try selector_state.bindValueLoc(&selector, "table", .{ .readonly_table_ptr = .{
         .storage = .{ .spill = .slot2 },
         .symbol = "@prepared-table",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
         .offset = 3,
     } });
     try selector_state.bindValueLoc(&selector, "table-reg", .{ .readonly_table_ptr = .{
         .storage = .{ .reg = .r9 },
         .symbol = "@prepared-table-reg",
-        .shape = .i16_128,
+        .shape = table_descriptions.i16_128,
     } });
     try selector_state.bindValueLoc(&selector, "pair-lo", .{ .arg128 = .{ .lo = .rcx, .hi = .rdx } });
     try selector_state.bindValueLoc(&selector, "pair-hi", .{ .spill128 = .{ .lo = .slot3, .hi = .slot4 } });

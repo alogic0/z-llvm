@@ -46,13 +46,17 @@ queries and atomic rewrite admission; typed constant-table descriptions and a
 bounded extension; one structural fixture-handler migration; compact value-use
 identities; and selective legalization only if measured benefit justifies it.
 The three proposed follow-up abstractions are outside this implementation.
-Stage 1 is [accepted](evidence/compiler_generalization_stage1_20261116.md), with
-all 17 integration gates passing. Implement stage 2 next: preserve the four
-existing table layouts through a typed description, then qualify additional
-power-of-two integer lengths separately. Use separate evidence and managed
-workspaces. The Fast/Debug Safe comparison binaries have been released; the
-stage-1 Fast candidate remains only through the declared stage-2 comparison.
-Preserve historical model/guard transitions and other holds.
+Stages [1](evidence/compiler_generalization_stage1_20261116.md) and
+[2](evidence/compiler_generalization_stage2_20261116.md) are accepted, each with
+all 17 integration gates passing. Typed table descriptions preserve the four
+original layouts and admit bounded power-of-two i16 counts; the complete
+231-population native suite passes. Implement stage 3 next: replace the selected
+optional-pointer load/return family through composed operations and qualify
+renamed, reordered and pressure cases. A diagnosed CFG preservation repair
+requires its own full integration gate. Use separate evidence and managed
+workspaces. The Safe, stage-1 and table comparison compiler pipelines have
+completed their consumers. Preserve historical model/guard transitions and
+other holds.
 
 Further work starts from the accepted baseline:
 

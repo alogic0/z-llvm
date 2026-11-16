@@ -704,6 +704,7 @@ fn core_validateActionRegistration(comptime Authority: type, transaction: anytyp
         .form_readonly_table_address => |address| {
             try address.result.validate();
             try address.symbol.validate();
+            if (!address.shape.valid()) return error.ValueUseAddressScaleInvalid;
             _ = try scaleShift(address.scale);
             if (address.scale != address.shape.stride()) return error.ValueUseAddressScaleMismatch;
         },

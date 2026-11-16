@@ -99,7 +99,7 @@ pub fn valueLocEql(lhs: ValueLoc, rhs: ValueLoc) bool {
         .stack_f32_pair_ptr => |ptr| ptr.object_base_disp == rhs.stack_f32_pair_ptr.object_base_disp and ptr.disp == rhs.stack_f32_pair_ptr.disp,
         .readonly_table_ptr => |ptr| blk: {
             const other = rhs.readonly_table_ptr;
-            if (!std.mem.eql(u8, ptr.symbol, other.symbol) or ptr.shape != other.shape or ptr.offset != other.offset or std.meta.activeTag(ptr.storage) != std.meta.activeTag(other.storage)) break :blk false;
+            if (!std.mem.eql(u8, ptr.symbol, other.symbol) or !ptr.shape.eql(other.shape) or ptr.offset != other.offset or std.meta.activeTag(ptr.storage) != std.meta.activeTag(other.storage)) break :blk false;
             break :blk switch (ptr.storage) {
                 .reg => |reg| reg == other.storage.reg,
                 .spill => |frame_index| frame_index.eql(other.storage.spill),

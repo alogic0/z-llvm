@@ -1764,7 +1764,7 @@ pub fn validateDormantLoadActionProductionSites(source_name: []const u8, source:
     const table_dispatch_source = source[table_dispatch_body.start..table_dispatch_body.end];
     const table_i16_source = source[table_i16_body.start..table_i16_body.end];
     const table_branch =
-        "if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 }))";
+        "if (ptr.shape.element == .i16 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 }))";
     const table_branch_index = std.mem.indexOf(u8, table_dispatch_source, table_branch) orelse
         return error.ValueUseLoadActionNotWired;
     const table_call_index = std.mem.indexOf(

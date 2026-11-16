@@ -1304,7 +1304,8 @@ fn lowerReadOnlyTableLoad(
 ) !?Diagnostic {
     if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-readonly-table-addrspace" };
     if (!ptr.shape.allowsOffset(ptr.offset)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
-    if (ptr.shape == .i16_128 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) {
+    if (ptr.shape.element == .i16 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) {
+        if (!ptr.shape.allowsAccess(ptr.offset, 2)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
         return lowerReadOnlyTableI16Transactional(selector, result_name, load);
     }
 
@@ -1317,7 +1318,7 @@ fn lowerReadOnlyTableLoad(
             break :blk .rcx;
         },
     };
-    if (ptr.shape == .i16_128) {
+    if (ptr.shape.element == .i16) {
         return .{ .no_emitter = "composed-block-load-readonly-table-type" };
     }
     if (load.ty != .double) {
@@ -1325,6 +1326,7 @@ fn lowerReadOnlyTableLoad(
         try selector_state.observeRejectedInstruction(selector, .{ .result = result_name, .kind = .{ .load = load } }, diagnostic);
         return diagnostic;
     }
+    if (!ptr.shape.allowsAccess(ptr.offset, 8)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
     try selector_state.clobberXmmReg(selector, .xmm0);
     try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = base, .dst = .xmm0, .offset = ptr.offset } });
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
@@ -1377,31 +1379,24 @@ fn readOnlyTableLoadValueUseDiagnostic(
     };
 }
 
-fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Shape) bool {
+fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Description) bool {
     return constant_table.sourceStrideMatches(source_ty, shape);
 }
 
-fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Shape) !bool {
+fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Description) !bool {
+    if (!shape.valid()) return false;
     const function = selector.function orelse return false;
-    const allowed: u64 = switch (shape) {
-        .i16_128, .f64_pair_128 => 127,
-        .f64_16 => 15,
-        .f64_512_pairs => 510,
-    };
+    const allowed = shape.allowed_index_bits;
     if (maskedIndex(function.*, .{ .named = name }, allowed, 0)) return true;
     if (try @import("../constant_table_index.zig").proves(selector.allocator, selector.module_context, function.*, name, allowed)) return true;
     const source_name = stripZext(function.*, name) orelse name;
-    const mask: i128 = switch (shape) {
-        .i16_128, .f64_pair_128 => 127,
-        .f64_16 => 15,
-        .f64_512_pairs => 510,
-    };
+    const mask: i128 = allowed;
     const binary = findInstruction(function.*, source_name) orelse return false;
     const and_inst = switch (binary.kind) {
         .binary => |value| if (value.op == .@"and" and intOperand(value.lhs, value.rhs, mask)) value else return false,
         else => return false,
     };
-    if (shape != .f64_512_pairs) return true;
+    if (!shape.paired_scalar_indices) return true;
     const shifted = namedNonIntOperand(and_inst.lhs, and_inst.rhs) orelse return false;
     const shift_inst = findInstruction(function.*, shifted) orelse return false;
     return switch (shift_inst.kind) {

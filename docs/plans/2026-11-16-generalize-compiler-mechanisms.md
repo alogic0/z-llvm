@@ -1,8 +1,8 @@
 # Generalize compiler mechanisms
 
 Date: 2026-11-16
-Status: stage 1 accepted after ReleaseSafe acceptance commit `338b8972`;
-implementing stage 2. Its mechanical description migration is qualified
+Status: stages 1 and 2 accepted after ReleaseSafe acceptance commit `338b8972`;
+implementing stage 3. Stage 2 qualifies its mechanical description migration
 separately from the power-of-two length extension.
 Review baseline: repository HEAD `97b6eced`, with compiler changes through `ae9d359f`.
 Review reconciliation: 2026-11-16; operand mutation, proof semantics, identity
@@ -156,15 +156,22 @@ Work:
 
 Acceptance:
 
-- [ ] All four original layouts retain their behavior and rejection boundaries.
-- [ ] At least two additional power-of-two lengths in the selected family work
+- [x] All four original layouts retain their behavior and rejection boundaries.
+- [x] At least two additional power-of-two lengths in the selected family work
   through the same implementation without adding shape enum variants; the
   result does not claim arbitrary-length support.
-- [ ] Boundary, out-of-range, wrong-parity, escaped-pointer, incomplete-proof and
+- [x] Boundary, out-of-range, wrong-parity, escaped-pointer, incomplete-proof and
   checked extent/address-overflow cases are covered as applicable.
-- [ ] Mask proofs retain their bit contract, including the envelope-plus-parity
+- [x] Mask proofs retain their bit contract, including the envelope-plus-parity
   meaning of `510`. Any introduced range proof has a separate contract and tests.
-- [ ] Independent native comparisons verify actual accesses and adjacent guards.
+- [x] Independent native comparisons verify actual accesses and adjacent guards.
+
+The [stage-2 evidence](../evidence/compiler_generalization_stage2_20261116.md)
+records the four-layout preservation proof, i16 counts 64/256, initializer
+regression and correction, checked boundaries and storage disposition. All 17
+cumulative integration gates and the complete 231-population native suite pass.
+The admitted integer family is limited to power-of-two counts 2 through 65,536;
+arbitrary lengths and broader floating layouts remain outside this stage.
 
 ## 3. Replace one fixture-specific lowering family
 
