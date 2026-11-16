@@ -33,14 +33,16 @@ fixed Debug behavior input falls from 114.39 to 109.66 seconds (4.1%), with
 byte-identical objects and ownership. This measures one postopt module;
 whole-compiler throughput and generated-program performance are separate scopes.
 
-The active [ReleaseSafe preopt plan](docs/plans/2026-11-14-release-safe-preopt-behavior.md)
+The completed [ReleaseSafe preopt plan](docs/plans/2026-11-14-release-safe-preopt-behavior.md)
 adds local optimization before local object emission. Its
-[implementation checkpoint](docs/evidence/release_safe_preopt_checkpoint_20261115.md)
-records a complete local run matching all 2,097 reference outcomes, independently
-audited objects with all 921 runtime and 7,716 test functions, reconciled stage
-chains and a passing optimizer-failure control. All 17 integration gates also
-pass. Preservation, committed-source verification and storage closure remain
-in progress.
+[acceptance](docs/evidence/release_safe_preopt_acceptance_20261116.md)
+matches all 2,097 reference outcomes in one unchanged local run, with audited
+921-function runtime and 7,716-function test objects, reconciled stage chains
+and a passing optimizer-failure control. All 17 integration gates, native
+preservation, four-mode postopt preservation and storage disposition pass.
+LLVM construction, setup and declared providers remain dependencies.
+The authorized successor is the
+[compiler generalization plan](docs/plans/2026-11-16-generalize-compiler-mechanisms.md).
 
 See the [final acceptance](docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json),
 [completed plan](docs/plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),

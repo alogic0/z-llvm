@@ -3,7 +3,7 @@
 Date: 2026-11-14
 Updated: 2026-11-15 after revised implementation and storage planning with agent
 `01a1c2b0-45c7-7560-9ad0-050e8f6970f8`.
-Status: implementing, authorized by the user on 2026-11-15. Baseline admission
+Status: complete on 2026-11-16; authorized by the user on 2026-11-15. Baseline admission
 and Debug/ReleaseFast runner qualification passed. Progressive capture exposed
 and qualified proxy path, extended negative-zero serialization, inline memset
 and scalar operand/immediate repairs. The captured runtime census selects
@@ -18,9 +18,11 @@ The floating cancellation repair passes focused/full units, calibrated native
 checks, readiness and structural validation. Complete serial Tier 3 passes all
 17 gates on the unchanged candidate, including the 230-population native suite.
 The committed-source bridge and full Debug native suite have also passed.
-Preservation and storage closure remain pending;
-earlier canceled integration attempts receive no aggregate acceptance. No preopt milestone
-acceptance is claimed until the remaining F/G requirements close.
+Fixed-input qualification, native and four-mode postopt preservation, final
+verification and storage disposition pass. The
+[final acceptance](../evidence/release_safe_preopt_acceptance_20261116.md)
+binds the completed A–G sequence. Earlier failed or canceled aggregates keep
+their original outcomes; actual completed subcommand reuse is separately qualified.
 The [implementation checkpoint](../evidence/release_safe_preopt_checkpoint_20261115.md)
 records the qualified A/B tooling, first C/D repairs and exact validation limits.
 
@@ -264,6 +266,55 @@ replacing the accepted historical identities or any integrity contract.
 Keep the qualified helper pipelines through these
 consumers, then release their ordinary source copies, executables and caches.
 
+Fixed-input preservation exposed three additional strict hash failures after
+complete emission and independent audits. Keep those original failures intact;
+they are separate from the eighteen native artifact transitions per host build.
+Qualify only these exact object pairs:
+
+- Compiler `d10d0545` to `16666f10`: one changed function,
+  `codegen.sparc64.CodeGen.structFieldPtr`, with both complete body hashes bound.
+  Require identical complete text outside the body, unchanged data and headers,
+  exact normalized symbols/relocations, paired old/current/reference field-pointer
+  outputs in all three release modes, guarded native unused/error paths and an
+  actual short-copy failure injection. The name identifies code in an x86-64
+  compiler program; this establishes no new z_llvm target support.
+- Small runtime `5e1b10b5` to `3ce07e71`: exactly offsets 325120 and 325122 in
+  `__sqrth` exchange the sources of the same commutative multiply sequence.
+  Require every other file byte, all symbols and all relocations to be equal.
+- Fixed Debug behavior `4ea9c9b3` to `92825c8e`: only the vector-float helper
+  and wrapped-squaring test bodies may differ. Bind their complete hashes and
+  ranges, all remaining text/data bytes, alignment padding, headers and exact
+  normalized symbols/relocations. Compare all 2,097 ordered outcomes of both
+  actual fixed objects, with an actual changed-test failure injection. The extra
+  historical-object execution exposes one unchanged vector-exp failure; retain
+  it explicitly, require the candidate's identical outcome and grant no normal
+  LLVM acceptance credit for that fixed-input execution. Both changed tests must
+  pass. The separate fresh postopt Debug suite still requires every original
+  normal LLVM outcome, as do the other three postopt modes and Safe preopt.
+
+Each transition requires the original input identity and owners, full census,
+object/ELF and ordered-event audits, completed semantic commands and actual
+rejection controls for changed/missing objects or incomplete evidence. Missing,
+extra or unrelated differences fail. These scoped preservation qualifications
+do not replace the accepted generation-1 frontend, original object identities,
+reference outcomes or any existing integrity contract. Release diagnosed failed
+and paired-compiler scratch after these consumers close. The complete unchanged
+four-mode postopt matrix remains required independently before F/G acceptance.
+
+The Fast postopt compiler/execution child subsequently completes all 2,097
+normal reference outcomes, but its outer supervisor disappears before publishing
+a terminal receipt. Keep that original running receipt and active layout intact;
+signal origin is unknown. Require a separate managed verification of the actual
+terminal inner producer, the complete single-run report, exact source/provider
+identities and all ordered outcomes, followed by the normal independent audits.
+This reuses completed work without inventing an outer exit or rerunning the
+suite. The outer workspace keeps its unfinished-producer guard and receives an
+explicit measured owner-recovery disposition. The original job hold also blocks
+release of the successful nested workspace and audited raw streams; preserve
+that scope and the actual rejected release receipt until supported recovery.
+Do not narrow or remove the unfinished job hold to bypass it. No outcome or
+audit requirement changes.
+
 ## Space admission and maintained evidence
 
 The shared serial policy remains 20,000,000,000 free bytes at admission:
@@ -335,7 +386,22 @@ record the collector receipt and any remaining dependencies at handoff.
   preopt route; IR construction and provider dependencies stay explicit.
 - Required preservation checks, negative controls and cumulative integration pass.
 
-Stop after this single-mode acceptance. Other modes, complete compiler preopt
+The single-mode acceptance is complete. Other modes, complete compiler preopt
 build/self-rebuild, LLVM IR-builder replacement and provider-library removal are
 separate milestones. Update the active handoff from measured results before
 selecting the next one.
+
+The user's later 2026-11-16 instruction authorizes the compiler-mechanism
+generalization plan after this acceptance and commit. Keep the qualified Fast
+and Debug backend pipelines as temporary stage-1 comparison baselines, with
+their exact bindings and release after the successor's final baseline consumer.
+Close the superseded predecessor. This replaces the earlier three-tool release
+expectation with one release and two explicit consumer handoffs; ordinary
+compiler bytes do not become accepted retention pins. No generalization source
+change starts before the Safe candidate is accepted and committed. The final
+collector receipt is
+`local-state/retirements/automatic-storage-cleanup/1794833237221762778-1839971/report.json`:
+eleven trees released, 2,095,722,496 allocated file bytes reclaimed. Eight
+diagnosed families retain their specific investigations; the original seventeen
+manual holds and six contracts remain unchanged. A seventh contract selects
+maintained proof and inputs without pinning ordinary products or live controls.

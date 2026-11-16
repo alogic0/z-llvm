@@ -1,0 +1,524 @@
+{
+  "schema": "release-safe-preopt-acceptance-v1",
+  "status": "passed",
+  "date": "2026-11-16",
+  "scope": "One complete unchanged generation-1 upstream behavior suite through the local ReleaseSafe preopt optimizer and object emitter on x86_64-linux-gnu",
+  "code_revision": "ae9d359f0f6f3087347f65720fd7f4544773ea2e",
+  "source_and_binary_bridge": {
+    "schema": "release-safe-preopt-exact-source-binary-bridge-v1",
+    "status": "passed",
+    "precommit_source_head": "9caa97fd40bc6834da0253ab79a37f6d4794b74a",
+    "committed_source_head": "ae9d359f0f6f3087347f65720fd7f4544773ea2e",
+    "compiler_sha256": "f04acdbb44561594b908d4cad473c41419232ae61ce85ed0d865259696a28414",
+    "canonical_fast_compiler": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/tools-fastmath/ReleaseFast/bin/z_llvm",
+    "core_sources": 666,
+    "complete_core_membership_and_hashes_equal": true,
+    "all_committed_git_blobs_verified": true,
+    "exact_binary_equal": true,
+    "binary_equality_scope": "one unchanged Fast executable retained in place from focused checks and Tier3; no replacement executable substituted",
+    "build_configuration_equal": true,
+    "pinned_zig_and_library_equal": true,
+    "debug": "separate fresh committed-source build with identical complete source map, target configuration and pinned Zig/library",
+    "proof_reused": "fastmath-tier3-r3/checks.json and exact native child products; original dirty-source build head and receipt remain unchanged"
+  },
+  "frontend": {
+    "sha256": "972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b",
+    "source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+    "suite_sha256": "3ef0e65cb6a9bb8a112549d0d8a52ded81cf4b154bd1f059c4dd878e38098af6",
+    "unchanged": true
+  },
+  "reference": {
+    "original_generation1_safe_sha256": "8725f82704a5df72e40afaccf0c8f39ca20913c5cae7dcddaf877142b7909305",
+    "current_provider_safe_sha256": "eb95b922e6103f495aef5937a0196cad1cef901f3da9036dd286aa39fc99d0c5",
+    "all_2097_ordered_outcomes_frozen": true,
+    "provider_transition": "Only the refreshed system libc and loader differ from the original provider set; all 25 providers are bound and verified before and after each accepted run."
+  },
+  "behavior": {
+    "mode": "ReleaseSafe",
+    "route": "local",
+    "pipeline": "preopt",
+    "hook_mode": "ReleaseSafe",
+    "hook_passes": "zig-release-safe-accepted",
+    "compiler_rt_frontend_mode": "ReleaseFast",
+    "tests": 2097,
+    "ok": 2065,
+    "skip": 32,
+    "ordered_outcomes_match": true,
+    "clean_private_frontend_caches": true,
+    "one_unchanged_complete_local_run": true,
+    "optimizer_invocations": 2,
+    "emitter_invocations": 2,
+    "objects": [
+      {
+        "stage": "emit",
+        "directory": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/539894",
+        "input": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/539894/input.ll",
+          "bytes": 7455455,
+          "sha256": "0570e95d6ddfe33e7618f31e61b83ffd89a1c1945bac26da978e81d32c5554de"
+        },
+        "object": {
+          "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/release-safe-preopt-20261115/batch-01/capture-05/run/.workspaces/validation/captures/539894/local.o",
+          "bytes": 2878192,
+          "sha256": "7533e0ae13aec468c88d79cbd6f3162d4b5aee64ae46b97d58105f96e40a18f4"
+        },
+        "selection": {
+          "selection_completed": true,
+          "dependency_coverage": "conservative",
+          "counts": {
+            "selected": 921,
+            "selected_successfully": 921,
+            "failed": 0
+          },
+          "failures": [],
+          "groups": []
+        }
+      },
+      {
+        "stage": "emit",
+        "directory": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/540298",
+        "input": {
+          "path": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/540298/input.ll",
+          "bytes": 42045876,
+          "sha256": "7039bc1e59121febe3e78b533fe64df383412b1f4ecc617822db0f40cbccb981"
+        },
+        "object": {
+          "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/release-safe-preopt-20261115/batch-01/capture-05/run/.workspaces/validation/captures/540298/local.o",
+          "bytes": 22451296,
+          "sha256": "148f1e139736f22924c42e7c0f6df91007a55c073f6f227511b47ecd6c20d0f0"
+        },
+        "selection": {
+          "selection_completed": true,
+          "dependency_coverage": "conservative",
+          "counts": {
+            "selected": 7716,
+            "selected_successfully": 7716,
+            "failed": 0
+          },
+          "failures": [],
+          "groups": []
+        }
+      }
+    ],
+    "reconciled_inventory": {
+      "schema": "release-safe-preopt-reconciled-inventory-v1",
+      "status": "passed",
+      "scope": "Stage E only; F preservation and G closure remain required",
+      "one_unchanged_complete_local_run": true,
+      "ordered_outcomes": 2097,
+      "reference_outcomes_match": true,
+      "optimizer_invocations": 2,
+      "emitter_invocations": 2,
+      "runtime_modules": 1,
+      "test_modules": 1,
+      "all_observed_directories_reconciled": true,
+      "unexplained_population_count": 0,
+      "all_objects_and_streams_audited": true,
+      "native_audit_summary": "local-state/retirements/native-event-audit/1794779660712343652-551303/summary.json",
+      "final_tool_route_failure_control": true,
+      "backend_sha256": "f04acdbb44561594b908d4cad473c41419232ae61ce85ed0d865259696a28414",
+      "modules": [
+        {
+          "source_filename": "compiler_rt",
+          "definitions": 921,
+          "declarations": 48,
+          "globals": 145,
+          "aliases": 462,
+          "optimizer": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/539885",
+          "emitter": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/539894",
+          "raw_input_sha256": "e320ade0b177e5704fc163a7d81cff43b06503dddc18245c658acb724ed8434e",
+          "raw_input_bytes": 9067653,
+          "optimized_input_sha256": "0570e95d6ddfe33e7618f31e61b83ffd89a1c1945bac26da978e81d32c5554de",
+          "optimized_input_bytes": 7455455,
+          "raw_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/inventory-capture-05/module-539885.json",
+          "optimized_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/inventory-capture-05/module-539894.json",
+          "all_function_declaration_global_alias_identities_preserved": true,
+          "local_verification": true,
+          "llvm_verify_only": true,
+          "object_ownership_elf_audited": true
+        },
+        {
+          "source_filename": "test",
+          "definitions": 7716,
+          "declarations": 655,
+          "globals": 5369,
+          "aliases": 46,
+          "optimizer": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/540211",
+          "emitter": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/capture-05/run/captures/540298",
+          "raw_input_sha256": "3d8de591dd67864fab3c6de091b61bda3c4259c7a53a98cbbd2128ebae42ba54",
+          "raw_input_bytes": 51462960,
+          "optimized_input_sha256": "7039bc1e59121febe3e78b533fe64df383412b1f4ecc617822db0f40cbccb981",
+          "optimized_input_bytes": 42045876,
+          "raw_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/inventory-capture-05/module-540211.json",
+          "optimized_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/inventory-capture-05/module-540298.json",
+          "all_function_declaration_global_alias_identities_preserved": true,
+          "local_verification": true,
+          "llvm_verify_only": true,
+          "object_ownership_elf_audited": true
+        }
+      ]
+    }
+  },
+  "execution_route": {
+    "proof": "Unchanged pinned frontend branch review, actual local optimizer/emitter commands and exact output/input chains, plus a real optimizer failure control",
+    "llvm_optimizer_and_object_passes_execute": false,
+    "llvm_fallback_delivery": false,
+    "optimizer_failure_control": {
+      "actual_failed_optimizer_invocations": 1,
+      "emitters": 0,
+      "objects": 0,
+      "behavior_execution": false
+    },
+    "llvm_setup_constructed": true,
+    "instrumentation_added_to_frontend": false
+  },
+  "preservation": {
+    "native_builds": 2,
+    "native_populations_per_build": 230,
+    "original_native_populations": 225,
+    "original_command_outcomes_per_build": 8204,
+    "artifact_comparisons_per_build": 3399,
+    "identical_artifact_hashes_per_build": 3381,
+    "exact_qualified_artifact_transitions_per_build": 18,
+    "original_native_faults_per_build": 3348,
+    "exact_fault_executable_hash_records_per_build": 3321,
+    "qualified_fault_executable_records_per_build": 27,
+    "runtime_faults_per_build": 14,
+    "original_faults_total": 6724,
+    "addition_faults_total": 414,
+    "artifact_rejection_controls": 9,
+    "fault_projection_rejection_controls": 8,
+    "original_strict_failures_preserved": true,
+    "postopt_orchestration_handoff": {
+      "schema": "postopt-orchestration-handoff-v1",
+      "reason": "Replace transparent orchestration after successful Debug execution and complete independent audits; use the same already-built native storage publisher between unchanged managed test/audit commands",
+      "original_parent_pid": 1604509,
+      "original_unmanaged_sequence_signal": 15,
+      "compiler_or_test_commands_canceled": 0,
+      "debug_checks_returncode": 0,
+      "debug_inventory_returncode": 0,
+      "remaining_modes": [
+        "ReleaseFast",
+        "ReleaseSafe",
+        "ReleaseSmall"
+      ],
+      "reference_replays": 0,
+      "debug_replays": 0
+    },
+    "postopt_fast_completed_child_verification": {
+      "schema": "postopt-completed-child-verification-v1",
+      "status": "passed",
+      "mode": "ReleaseFast",
+      "completed_inner_receipt": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/producer/behavior.json",
+        "sha256": "adf215a0359806625f600bd11a50cfa0f0379a4af206b48e2052b426f1b94f63"
+      },
+      "complete_suite_report": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/run/report.json",
+        "sha256": "71e5003ab4f9e30cdf0cdee687262dc212c2524c4540cc7362352078c1bb795d"
+      },
+      "ordered_outcomes": 2097,
+      "actual_child_returncode": 0,
+      "source_and_providers_reverified": true,
+      "actual_recompilations": 0,
+      "actual_test_reexecutions": 0,
+      "original_outer_receipt_unchanged": true,
+      "original_outer_terminal_status_known": false,
+      "signal_origin": "unknown",
+      "original_outer_workspace_disposition": "Retain WorkspaceProducerNotClosed pending supported owner recovery; not an accepted proof-retention claim"
+    },
+    "fixed_populations": [
+      {
+        "name": "compiler",
+        "definitions": 8928,
+        "object_relation": "Exact single-function transition, all remaining text/data and normalized metadata verified",
+        "transition": {
+          "schema": "exact-fixed-object-transition-v1",
+          "status": "passed",
+          "acceptance_credit": false,
+          "scope": "Fixed-input preservation only; original strict failure remains failed",
+          "family": "compiler",
+          "old_sha256": "d10d05451b6e553a3bbdd364f5709097df2fdfac208f25fb47a27974723cfeef",
+          "new_sha256": "16666f100bdee37301d726ccff6d35657e11bd259266a09ea38d3c3c26f8257b",
+          "source_input_unchanged": true,
+          "owners_and_independent_audits_verified": true,
+          "original_strict_returncode": 1,
+          "qualified_changed_function": "codegen.sparc64.CodeGen.structFieldPtr",
+          "other_text_and_data_exact": true,
+          "symbols_verified": 46189,
+          "outside_relocations_verified": 219162,
+          "inside_relocation_targets_and_addends_verified": 24,
+          "compiler_text_reduction": 106,
+          "compiler_frame_reduction": 208,
+          "small_runtime_changed_bytes": 0
+        },
+        "native_observations": 135166,
+        "target_compilations_reused": 10,
+        "actual_native_mutations_detected": 1
+      },
+      {
+        "name": "runtime",
+        "definitions": 455,
+        "host_builds": 2,
+        "object_relation": "Exact qualified two-byte commutative operand exchange; sections and owners unchanged",
+        "local_observations_per_build": 21792,
+        "reference_observations_per_build": 21792
+      },
+      {
+        "name": "Small runtime",
+        "definitions": 503,
+        "object_relation": "Exactly two commutative multiply source bytes; every other file byte unchanged",
+        "transition": {
+          "schema": "exact-fixed-object-transition-v1",
+          "status": "passed",
+          "acceptance_credit": false,
+          "scope": "Fixed-input preservation only; original strict failure remains failed",
+          "family": "runtime-Small",
+          "old_sha256": "5e1b10b5797907231dcec3a3fb904b98bd913bfa412b14c81768cedc8a51aae8",
+          "new_sha256": "3ce07e7123617d48335105cde3211fd7bb6815240b72d3ca298d171736531828",
+          "source_input_unchanged": true,
+          "owners_and_independent_audits_verified": true,
+          "original_strict_returncode": 1,
+          "qualified_changed_function": "__sqrth",
+          "other_text_and_data_exact": true,
+          "symbols_verified": 0,
+          "outside_relocations_verified": 0,
+          "inside_relocation_targets_and_addends_verified": 0,
+          "compiler_text_reduction": 0,
+          "compiler_frame_reduction": 0,
+          "small_runtime_changed_bytes": 2
+        }
+      },
+      {
+        "name": "Debug behavior",
+        "definitions": 7874,
+        "object_relation": "Exactly two function bodies plus bounded layout changes; all 2097 old/current local outcomes preserved",
+        "transition": {
+          "schema": "exact-fixed-debug-transition-v1",
+          "status": "passed",
+          "acceptance_credit": false,
+          "original_strict_returncode": 1,
+          "old_sha256": "4ea9c9b39f5ab18be66f1e6f1293652ce2e9ba68fe93edbf0aad00324954eb2e",
+          "new_sha256": "92825c8e7821e8c2becc774942f149aacfd14a99167247199b1ee44c4d4d81c1",
+          "input_sha256": "d8b983f4686a19acdf9f5bcc84c084b6fbc68e104e1671032509f7180c9aa02b",
+          "definitions": 7874,
+          "identical_function_bodies": 7934,
+          "changed_function_bodies": 2,
+          "qualified_functions": [
+            "behavior.vector.test.vector float operators.S.doTheTest__func_1347",
+            "behavior.math.test.umax wrapped squaring"
+          ],
+          "vector_body_growth": 1820,
+          "squaring_body_reduction": 1222,
+          "alignment_padding_reduction": 598,
+          "all_other_text_and_data_exact": true,
+          "symbols_verified": 13754,
+          "relocations_verified_by_group": [
+            66809,
+            12,
+            20
+          ],
+          "ordered_outcomes_old": 2097,
+          "ordered_outcomes_new": 2097,
+          "inherited_reference_differences": 1,
+          "inherited_failure": "behavior.floatop.test.@exp with vectors",
+          "normal_reference_acceptance_credit": false,
+          "actual_mutations_detected": 1
+        },
+        "normal_reference_acceptance_credit": false,
+        "inherited_failure": "behavior.floatop.test.@exp with vectors"
+      }
+    ],
+    "postopt_modes": [
+      "Debug",
+      "ReleaseFast",
+      "ReleaseSafe",
+      "ReleaseSmall"
+    ],
+    "ordered_postopt_outcomes_per_mode": 2097,
+    "all_objects_and_complete_event_streams_independently_audited": true,
+    "complete_serial_tier3_gates": 17,
+    "authenticated_existing_air_reused": true,
+    "backend_and_native_test_execution_rerun": true
+  },
+  "evidence": {
+    "final_proof": "local-state/validations/release-safe-preopt-20261115/batch-01/final-proof/report.json",
+    "final_proof_sha256": "7b1e8189fe688f0bc2031fa83bde423ce4d4e52142952a307f500a30f029de20",
+    "selected_maintained_manifest": "local-state/validations/release-safe-preopt-20261115/batch-01/maintained-preopt-proof-20261116.sha256",
+    "selected_maintained_manifest_sha256": "5e02012de589fc1f2640a9864ffb77e89138c75651dcb44f3fa477a1490f964a",
+    "original_six_integrity_contracts": [
+      "local-state/validations/compiler-selection-completion-20261108/batch-30/maintained-artifacts-inputs-results-20261114.sha256",
+      "local-state/validations/release-safe-preopt-20261115/batch-01/contract-transition/frozen-contracts-v4.sha256",
+      "local-state/validations/compiler-selection-completion-20261108/batch-05/scratch.sha256",
+      "local-state/validations/compiler-selection-completion-20261108/batch-12/air-pins-v12.sha256",
+      "local-state/validations/compiler-object-completion-20261111/batch-01/pinned-upstream-providers-v7.sha256",
+      "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-minimal-20261114.sha256"
+    ],
+    "original_six_contracts_unchanged": true,
+    "ordinary_compilers_objects_executables_caches_and_raw_traces_pinned": false,
+    "original_failed_results_unchanged": true
+  },
+  "storage": {
+    "final_collection": {
+      "schema": "release-safe-preopt-final-storage-v1",
+      "status": "passed",
+      "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1794833237221762778-1839971/report.json",
+      "reclaimed_allocated_file_bytes": 2095722496,
+      "closed_compiler_pipelines": 1,
+      "handed_off_baseline_pipelines": 2,
+      "baseline_handoff": "local-state/validations/release-safe-preopt-20261115/batch-01/final-proof/generalization-baseline-handoff.json",
+      "closed_fixed_investigation_layouts": 10,
+      "independent_holds_unchanged": true,
+      "remaining_dispositions": "See dispositions.json for unfinished-producer/job families, unbound C2 stream and legacy ABI roots. The user-authorized next stage temporarily owns the two qualified baseline pipelines; adopted and bootstrap dependencies retain their contracts."
+    },
+    "remaining_dispositions": {
+      "schema": "release-safe-preopt-storage-dispositions-v1",
+      "status": "recorded",
+      "inventory_status": "provisional-inventory",
+      "measurement": "Per-root du allocation, without deduplication across roots; no removal performed",
+      "roots": [
+        {
+          "path": "tmp/inbox66_abi_diff/run-307824",
+          "allocated_file_bytes": 45981696,
+          "kind": "legacy-abi-scratch",
+          "maintained_proof": "local-state/validations/release-safe-preopt-20261115/batch-01/legacy-abi/run-307824",
+          "abi_consumers_closed": true,
+          "supported_automatic_workspace": false,
+          "disposition": "Owned ordinary scratch; compact proof preserved. Await scoped supported collection review; no fabricated modern layout and no accepted-proof retention claim."
+        },
+        {
+          "path": "tmp/inbox66_abi_diff/run-185809",
+          "allocated_file_bytes": 45981696,
+          "kind": "legacy-abi-scratch",
+          "maintained_proof": "local-state/validations/release-safe-preopt-20261115/batch-01/legacy-abi/run-185809",
+          "abi_consumers_closed": true,
+          "supported_automatic_workspace": false,
+          "disposition": "Owned ordinary scratch; compact proof preserved. Await scoped supported collection review; no fabricated modern layout and no accepted-proof retention claim."
+        },
+        {
+          "path": "tmp/inbox66_abi_diff/run-4166770",
+          "allocated_file_bytes": 45981696,
+          "kind": "legacy-abi-scratch",
+          "maintained_proof": "local-state/validations/release-safe-preopt-20261115/batch-01/legacy-abi/run-4166770",
+          "abi_consumers_closed": true,
+          "supported_automatic_workspace": false,
+          "disposition": "Owned ordinary scratch; compact proof preserved. Await scoped supported collection review; no fabricated modern layout and no accepted-proof retention claim."
+        },
+        {
+          "path": "tmp/inbox66_abi_diff/run-4014986",
+          "allocated_file_bytes": 45977600,
+          "kind": "legacy-abi-scratch",
+          "maintained_proof": "local-state/validations/release-safe-preopt-20261115/batch-01/legacy-abi/run-4014986",
+          "abi_consumers_closed": true,
+          "supported_automatic_workspace": false,
+          "disposition": "Owned ordinary scratch; compact proof preserved. Await scoped supported collection review; no fabricated modern layout and no accepted-proof retention claim."
+        },
+        {
+          "path": "tmp/inbox66_abi_diff/run-3974309",
+          "allocated_file_bytes": 45981696,
+          "kind": "legacy-abi-scratch",
+          "maintained_proof": "local-state/validations/release-safe-preopt-20261115/batch-01/legacy-abi/run-3974309",
+          "abi_consumers_closed": true,
+          "supported_automatic_workspace": false,
+          "disposition": "Owned ordinary scratch; compact proof preserved. Await scoped supported collection review; no fabricated modern layout and no accepted-proof retention claim."
+        },
+        {
+          "path": "local-state/tmp/validations/release-safe-preopt-20261115/batch-01/fastmath-tier3-r2/integrated/.workspaces/validation",
+          "allocated_file_bytes": 235429888,
+          "exists": true,
+          "kind": "canceled-integrated-workspace",
+          "original_layout": "local-state/validations/release-safe-preopt-20261115/batch-01/fastmath-tier3-r2/integrated/validation.storage-layout.json",
+          "original_layout_state": "active",
+          "original_result": null,
+          "disposition": "Preserve the original unfinished child layout. The parent cancellation does not manufacture child completion. Supported owner-recovery is still needed; this is not required accepted proof."
+        },
+        {
+          "path": "local-state/validations/release-safe-preopt-20261115/batch-01/capture-02/run/captures/3639553/profile.events.jsonl",
+          "logical_bytes": 131292782,
+          "allocated_file_bytes": 131297280,
+          "kind": "complete-failed-stream-with-unbound-producer",
+          "disposition": "Retain the original stream/input/script/results for provenance-closure review. The strict auditor cannot bind the multi-command outer Bash receipt as an inner producer. No audited-retirement or acceptance credit is claimed."
+        },
+        {
+          "schema": "postopt-supervisor-loss-storage-disposition-v1",
+          "status": "recorded",
+          "path": "local-state/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast",
+          "roots": [
+            {
+              "path": "local-state/tmp/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/.workspaces/checks",
+              "kind": "job-held-workspace",
+              "allocated_bytes": 67948544
+            },
+            {
+              "path": "local-state/tmp/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/run/.workspaces/validation",
+              "kind": "job-held-workspace",
+              "allocated_bytes": 119717888
+            },
+            {
+              "path": "local-state/tmp/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/producer/.workspaces/behavior",
+              "kind": "job-held-workspace",
+              "allocated_bytes": 4096
+            },
+            {
+              "path": "local-state/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/run/captures/1682464/profile.events.jsonl",
+              "kind": "job-held-completely-audited-raw-stream",
+              "sha256": "98b1d4a770c737e5fe4d556a49266869cfae58f95e48bcfd5044f20279305796",
+              "allocated_bytes": 54509568,
+              "retirement_blocked_by_job_hold": true
+            },
+            {
+              "path": "local-state/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/run/captures/1682888/profile.events.jsonl",
+              "kind": "job-held-completely-audited-raw-stream",
+              "sha256": "7b85302a54deeda765bb8262d9aeff344d1fe38b869caa172472d64e3987d304",
+              "allocated_bytes": 136744960,
+              "retirement_blocked_by_job_hold": true
+            }
+          ],
+          "allocated_bytes": 378925056,
+          "measurement": "Sum of per-root du allocated bytes including directory blocks; no cross-root deduplication",
+          "kind": "postopt-outer-supervisor-lost",
+          "original_layout": "local-state/validations/release-safe-preopt-20261115/batch-01/preserve-postopt-ReleaseFast/checks.storage-layout.json",
+          "original_job": "local-state/storage-cleanup/jobs/1794826276255858175-1677352.json",
+          "original_layout_state": "active",
+          "original_outer_result": null,
+          "actual_completed_child_passed": true,
+          "actual_child_outcomes": 2097,
+          "independent_audit_passed": true,
+          "signal_source": "unknown",
+          "accepted_proof_retention_claimed": false,
+          "owner": "Primary ReleaseSafe storage owner",
+          "resolution_condition": "Recover original producer termination through supported owner recovery before release. The original running job holds the full Fast namespace, including nested workspaces and both audited raw streams. Preserve that scope; do not infer an outer exit, narrow the job hold or bypass it. All behavior/object/event byte consumers have closed."
+        }
+      ],
+      "owner": "Primary ReleaseSafe preopt cycle owner; follow-up storage infrastructure investigation",
+      "resolution_conditions": [
+        {
+          "kind": "legacy-abi-scratch",
+          "condition": "Admit only these five closed owned roots through a supported scoped collector; keep compact reports and provenance. No fabricated modern layout or other ABI-root deletion."
+        },
+        {
+          "kind": "canceled-integrated-workspace",
+          "condition": "Recover actual child termination evidence through supported owner recovery; preserve WorkspaceProducerNotClosed while the original layout has no terminal result."
+        },
+        {
+          "kind": "complete-failed-stream-with-unbound-producer",
+          "condition": "Resolve original producer provenance without inventing an inner receipt. Keep exact raw/input/script/results until qualified retirement; do not replay only to reclaim the stream."
+        }
+      ],
+      "accepted_proof_retention_claimed": false,
+      "adopted_dependencies": "Generation-1 frontend and original references, provider/source/worktree and throughput dependencies remain under existing contracts.",
+      "bootstrap_caches": "Maintained launcher and collector caches keep their existing owners and build locks."
+    },
+    "own_native_hold_closed": true,
+    "original_independent_holds": 17,
+    "audited_raw_trace_retirement": "Retired streams retain whole-stream hashes, semantics, original bindings, copied auditor sources and successful retirement receipts. Fast retains two completely audited raw streams and three workspaces because its unfinished outer job hold blocks release; no new raw or ordinary payload pin is created."
+  },
+  "limits": [
+    "Acceptance is restricted to ReleaseSafe preopt behavior on x86_64-linux-gnu.",
+    "Compiler-runtime frontend mode remains Fast under the global Safe hook policy.",
+    "LLVM IR construction, bitcode parsing, target/analysis/pass-manager setup and declared link/runtime providers remain dependencies.",
+    "Other preopt modes, complete compiler preopt build/self-rebuild, LLVM IR-builder replacement and provider removal remain separate milestones.",
+    "Original failed and canceled aggregates retain their original outcomes; completed subcommand reuse is explicit and separately qualified.",
+    "The complete previous compiler-generation matrix and self-rebuild acceptance remain separate; they are not rerun or expanded by this milestone."
+  ]
+}

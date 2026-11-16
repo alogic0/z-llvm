@@ -1,5 +1,10 @@
 # ReleaseSafe preopt implementation checkpoint
 
+Historical stage-E checkpoint. The
+[2026-11-16 acceptance](release_safe_preopt_acceptance_20261116.md) supersedes
+the remaining-work statements below and closes stages F/G, including fixed-input
+qualification, four-mode postopt preservation and storage disposition.
+
 This records implementation through stage E of the
 [active plan](../plans/2026-11-14-release-safe-preopt-behavior.md), not preopt
 milestone acceptance. The fifth complete preopt attempt matches **all 2,097
@@ -17,8 +22,8 @@ Tier 3 passes all 17 gates, including the full 230-population native suite, on
 the same frozen source and Fast executable. Two earlier attempts were canceled
 by SIGTERM; their original results remain canceled. The signal attribution
 control preserves normal cancellation behavior; no signal was received by the
-successful supervisor. The committed-Git source bridge, preservation and storage
-closure remain required before milestone acceptance.
+successful supervisor. At this checkpoint, the committed-Git source bridge,
+preservation and storage closure remained required before milestone acceptance.
 
 The maintained runner now selects `--local-pipeline preopt` explicitly, binds
 the selected reference hash and providers, exports the Safe hook policy, and

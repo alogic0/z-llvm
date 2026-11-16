@@ -11,7 +11,8 @@
     "local-state/validations/compiler-selection-completion-20261108/batch-05/scratch.sha256",
     "local-state/validations/compiler-selection-completion-20261108/batch-12/air-pins-v12.sha256",
     "local-state/validations/compiler-object-completion-20261111/batch-01/pinned-upstream-providers-v7.sha256",
-    "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-minimal-20261114.sha256"
+    "local-state/validations/compiler-throughput-20261114/batch-01/maintained-artifacts-minimal-20261114.sha256",
+    "local-state/validations/release-safe-preopt-20261115/batch-01/maintained-preopt-proof-20261116.sha256"
   ],
   "protected_paths": [
     "local-state/caches",

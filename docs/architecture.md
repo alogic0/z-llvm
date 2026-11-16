@@ -77,6 +77,15 @@ development pipelines. The structured helper explicitly disables per-pass
 verification; callers and tests must not assume the pass manager's default
 verification setting applies to every route.
 
+The [ReleaseSafe preopt acceptance](evidence/release_safe_preopt_acceptance_20261116.md)
+proves one complete unchanged behavior suite through the local optimizer and
+object emitter, with all 2,097 ordered reference outcomes and independent audits.
+The global hook mode is Safe; compiler-runtime frontend mode remains Fast.
+LLVM construction, bitcode parsing and target/analysis/pass-manager setup still
+occur, and declared providers remain. The selected route executes no LLVM
+optimizer or object-emission pass; a real optimizer-failure control proves that
+failed local optimization cannot fall back to object delivery.
+
 The shared contract is implemented by [compilation.zig](../src/compilation.zig)
 and [compilation_artifact.zig](../src/compilation_artifact.zig). Codegen pass
 traces and timing go to stderr so they cannot corrupt object bytes. For an

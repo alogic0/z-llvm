@@ -70,10 +70,21 @@ outcomes and 3,399 backend artifacts per build. All 6,724 required fault control
 pass. The [acceptance record](evidence/compiler_throughput_20261114.json) binds the
 source, binaries, terminal receipts and artifact seal.
 
-The proposed [ReleaseSafe preopt milestone](plans/2026-11-14-release-safe-preopt-behavior.md)
-will audit local optimization and object emission separately for one complete
-unchanged behavior suite. It is not implemented; LLVM IR construction, target
-setup and declared providers remain explicit dependencies.
+The completed [ReleaseSafe preopt milestone](plans/2026-11-14-release-safe-preopt-behavior.md)
+matches all 2,097 ordered reference outcomes in one unchanged local run. Its
+separate runtime/test inputs, both complete objects and full event streams pass
+independent audits; the real optimizer failure control stops before emission.
+All 17 integration gates, both qualified native preservation checks, the fixed
+input qualifications and four-mode postopt preservation pass. The
+[acceptance](evidence/release_safe_preopt_acceptance_20261116.md) records the
+committed-source bridge, exact artifact transitions and final storage disposition.
+Final collection reclaims 2,095,722,496 allocated file bytes. Eight diagnosed
+families retain their specific recovery or admission investigations; seventeen
+independent holds remain unchanged. Two qualified backend pipelines transfer
+temporarily to the authorized
+[compiler generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md).
+LLVM IR construction, target/analysis setup and declared providers remain
+explicit dependencies.
 
 ## Fixed compiler-core execution cohort
 

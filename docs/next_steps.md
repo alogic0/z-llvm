@@ -26,36 +26,29 @@ identical object and owner bytes. Both complete native suites, all 17 integratio
 gates, all 6,724 required faults and final source verification pass; the
 [acceptance record](evidence/compiler_throughput_20261114.json) binds the proof.
 
-The active, user-authorized successor is the
-[ReleaseSafe preopt behavior milestone](plans/2026-11-14-release-safe-preopt-behavior.md).
-It runs the unchanged complete suite through local optimization and object
-emission, matches every named reference outcome including skips, and proves no
-LLVM optimization/object pass or fallback delivered the accepted objects.
-LLVM IR construction, bitcode parsing, target setup and declared providers remain.
-This work is separate from the completed compiler/self-rebuild plan. Baseline
-admission and Debug/ReleaseFast runner qualification passed. The refreshed normal
-reference preserves all 2,097 ordered outcomes under the current libc/loader.
-The fifth complete attempt delivers the complete 921-definition compiler-runtime
-and 7,716-definition test objects and matches all 2,097 ordered reference outcomes.
-Qualified repairs cover proxy path binding, extended fneg
-serialization, constant inline memset and scalar operand/immediate handling.
-Qualified repairs advance the independent runtime census from 769 to
-all 921 selections without loss. Full units, readiness, structural smoke and the
-fixed runtime object/native replay pass. Both independent object/ownership/ELF
-audits and ordered-event audits pass. Separate stage-E reconciliation accounts
-for every optimizer/emitter invocation, complete runtime/test inventories and
-all 2,097 outcomes. The real optimizer failure control stops before emission.
-The floating cancellation repair passes focused/full units, calibrated native
-checks, readiness and structural validation. Its complete serial Tier 3 run
-passes all 17 gates, including the full 230-population native suite, with the
-same frozen source and Fast executable. Preserve this candidate and finish
-original-population preservation, committed-source verification and storage
-closure. Two earlier canceled integration attempts keep their original SIGTERM
-outcomes and grant no aggregate acceptance. New native
-populations remain separate from the accepted 225. Preopt milestone acceptance
-remains open.
-The [implementation checkpoint](evidence/release_safe_preopt_checkpoint_20261115.md)
-records the qualified tooling, repairs, source bridge and current limits.
+The [ReleaseSafe preopt milestone](plans/2026-11-14-release-safe-preopt-behavior.md)
+is complete at backend source `ae9d359f`. One unchanged local run matches all
+2,097 ordered reference outcomes, with complete 921-definition runtime and
+7,716-definition test objects, reconciled inventory and independent audits.
+The optimizer failure control stops before emission. All 17 integration gates,
+both native preservation proofs, fixed-input qualifications and four-mode
+postopt preservation pass. The
+[acceptance](evidence/release_safe_preopt_acceptance_20261116.md) records the
+source bridge, exact qualified artifact changes and final storage disposition.
+Original failed or canceled aggregates remain unchanged; actual completed
+subcommand reuse is explicit. LLVM construction, setup and declared providers
+remain dependencies.
+
+The current action, authorized by the user on 2026-11-16, is to implement the
+[compiler generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md)
+after committing Safe acceptance. Follow its five ordered stages: shared use
+queries and atomic rewrite admission; typed constant-table descriptions and a
+bounded extension; one structural fixture-handler migration; compact value-use
+identities; and selective legalization only if measured benefit justifies it.
+The three proposed follow-up abstractions are outside this implementation.
+Use separate stage evidence and managed workspaces. The qualified Fast/Debug
+Safe binaries remain temporary comparison baselines until their final stage-1
+consumer closes; preserve historical model/guard transitions and other holds.
 
 Further work starts from the accepted baseline:
 

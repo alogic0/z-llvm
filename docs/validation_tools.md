@@ -121,6 +121,16 @@ cannot lower the shared floor. `space-admission.json`, `space-samples.tsv` and
 reports with `resource_stop=true`, a stage and the original error, so diagnosed
 scratch can use the existing explicit workspace-release contract.
 
+The [accepted ReleaseSafe run](evidence/release_safe_preopt_acceptance_20261116.md)
+qualifies the complete 2,097-outcome suite, separate runtime/test inventories,
+both optimizer/emitter chains and complete object/event audits. Its global hook
+policy is `ZLLVM_ZIG_MODE=ReleaseSafe`, while compiler-runtime frontend mode is
+recorded as Fast. The acceptance also binds the optimizer failure control,
+native preservation and all four existing postopt modes. Failed outer receipts
+stay failed; independently verified completed child results are identified
+explicitly. Audited trace retirement and storage disposition are separate from
+successful behavior execution.
+
 For managed roots, private caches, the test executable and captured local objects
 use the temporary workspace; reports, captured inputs, event traces and logs
 stay in evidence. Pass this tool's `--retain-products` while independent object
