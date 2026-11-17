@@ -19,8 +19,11 @@ The [table admission/emission agreement](evidence/table_admission_contract_20261
 passes Tier 2 and storage closure: 2,433 Fast units, 78 table tests in each mode,
 74 structural checks, four native populations and all 243 fault controls. Fixed
 Debug bytes, captured rows, ABI and executable boundaries remain preserved.
-Current action is ordered production promotion and qualification of the rewrite
-builder, then checked byte facts. Final cumulative integration remains required
+The [rewrite builder](evidence/rewrite_builder_20261117.md) also passes Tier 2
+and storage closure: 2,436 Fast units, 74 structural checks, both affected native
+populations and all 81 fault controls, with fixed Debug and executable boundaries
+preserved. Current action is production promotion and qualification of checked
+byte facts. Final cumulative integration remains required
 before closing the later maintenance tracker.
 
 The user's [consumer fallback follow-up](evidence/table_consumer_fallback_20261116.md)
@@ -37,12 +40,12 @@ Original failed setup receipts and source-bound subcommand reuse remain explicit
 The user has now authorized the ordered follow-up in the
 [generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions),
 starting from the consumer-fallback repair at `11fd57ec`. The current action is
-the rewrite builder, following table admission/fallback consolidation and the
+checked byte facts, following the rewrite builder, table admission/fallback and
 accepted shared exact query for constant tables and backend storage. The
 separately qualified i24/f80 stride
 correction precedes that query; semantic corrections remain distinguished from
-factoring. Subsequent slices share narrow rewrite construction for floating pair
-loads and memory bitcasts, then caller-audited byte/access facts. Preserve the
+factoring. The remaining slice shares caller-audited byte/access facts while
+keeping object identity and alias admission local. Preserve the
 completed five-stage acceptance and scheduling deferral.
 
 The earlier constant-table review batch is accepted at `1fa64f9e`. Its

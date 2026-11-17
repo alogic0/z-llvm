@@ -6,7 +6,7 @@ const ir = @import("../../../ir.zig");
 const machine = @import("../machine.zig");
 const abi = @import("../sysv_abi.zig");
 const uses = @import("stage2_planning.zig");
-const forms = @import("scalar_forms.zig");
+const Builder = @import("rewrite_builder.zig").Builder;
 const pairs = @import("word_pair_memory.zig");
 
 fn admitted(a: std.mem.Allocator, function: ir.Function, inst: ir.Instruction) !bool {
@@ -35,39 +35,36 @@ pub fn legalize(a: std.mem.Allocator, function: ir.Function, context: ?*const ma
     if (!pairs.supportsLayout(context)) return null;
     const layout = @import("storage_layout.zig").query(context, .{ .aggregate = "{ double, double }" }) orelse return null;
     if (layout.bytes != 16 or layout.alignment != 8) return null;
-    var names: forms.TemporaryNames = .{ .prefix = "__zllvm_fp_pair_load_" };
-    defer names.deinit(a);
-    var result = function;
-    result.blocks = .empty;
-    var changed = false;
-    for (function.blocks.items) |original| {
+    var builder = Builder.init(a, function, "__zllvm_fp_pair_load_");
+    defer builder.deinit();
+    for (function.blocks.items, 0..) |original, block_index| {
         var block = original;
         block.instructions = .empty;
-        for (original.instructions.items) |inst| {
+        for (original.instructions.items, 0..) |inst, instruction_index| {
             if (!try admitted(a, function, inst)) {
-                try block.instructions.append(a, inst);
+                try builder.keep(&block, inst);
                 continue;
             }
             const load = inst.kind.load;
-            const lo = try forms.temporary(a, function, &names);
-            const high_ptr = try forms.temporary(a, function, &names);
-            const hi = try forms.temporary(a, function, &names);
-            const first = try forms.temporary(a, function, &names);
+            try builder.begin(&block, block_index, instruction_index);
+            const lo = try builder.temporary();
+            const high_ptr = try builder.temporary();
+            const hi = try builder.temporary();
+            const first = try builder.temporary();
             var attrs = load.attrs;
             // The second field is eight bytes from the aggregate base.
             if (attrs.@"align") |alignment| attrs.@"align" = @min(alignment, 8);
-            try block.instructions.append(a, .{ .result = lo, .kind = .{ .load = .{ .ty = .double, .ptr = load.ptr, .attrs = attrs } } });
+            try builder.append(&block, .{ .result = lo, .kind = .{ .load = .{ .ty = .double, .ptr = load.ptr, .attrs = attrs } } });
             var indices: std.ArrayList(ir.GepIndex) = .empty;
             try indices.append(a, .{ .ty = .{ .int = 64 }, .value = .{ .int = 8 } });
-            try block.instructions.append(a, .{ .result = high_ptr, .kind = .{ .gep = .{ .source_ty = .{ .int = 8 }, .ptr = load.ptr, .indices = indices } } });
-            try block.instructions.append(a, .{ .result = hi, .kind = .{ .load = .{ .ty = .double, .ptr = .{ .named = high_ptr }, .attrs = attrs } } });
-            try block.instructions.append(a, .{ .result = first, .kind = .{ .insertvalue = .{ .aggregate_ty = load.ty, .aggregate = .poison, .value_ty = .double, .value = .{ .named = lo }, .indices = "0" } } });
-            try block.instructions.append(a, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .insertvalue = .{ .aggregate_ty = load.ty, .aggregate = .{ .named = first }, .value_ty = .double, .value = .{ .named = hi }, .indices = "1" } } });
-            changed = true;
+            try builder.append(&block, .{ .result = high_ptr, .kind = .{ .gep = .{ .source_ty = .{ .int = 8 }, .ptr = load.ptr, .indices = indices } } });
+            try builder.append(&block, .{ .result = hi, .kind = .{ .load = .{ .ty = .double, .ptr = .{ .named = high_ptr }, .attrs = attrs } } });
+            try builder.append(&block, .{ .result = first, .kind = .{ .insertvalue = .{ .aggregate_ty = load.ty, .aggregate = .poison, .value_ty = .double, .value = .{ .named = lo }, .indices = "0" } } });
+            try builder.append(&block, .{ .result = inst.result, .metadata = inst.metadata, .kind = .{ .insertvalue = .{ .aggregate_ty = load.ty, .aggregate = .{ .named = first }, .value_ty = .double, .value = .{ .named = hi }, .indices = "1" } } });
         }
-        try result.blocks.append(a, block);
+        try builder.finishBlock(block);
     }
-    return if (changed) result else null;
+    return try builder.finish();
 }
 
 test "floating pair loads snapshot only complete ordinary return values" {

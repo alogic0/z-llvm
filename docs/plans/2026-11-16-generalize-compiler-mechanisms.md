@@ -392,7 +392,10 @@ closes ordinary products and names the next slice's exact predecessor consumer.
 The [table-admission slice](../evidence/table_admission_contract_20261117.md) now
 passes production Tier 2 and storage closure, including full-selector removed and
 opaque consumers, all 243 focused faults and exact fixed Debug preservation.
-The rewrite-builder and byte-fact slices remain pending production acceptance.
+The [rewrite builder](../evidence/rewrite_builder_20261117.md) also passes
+production Tier 2 and storage closure, including allocation/source preservation,
+2,436 Fast units, both native consumers and all 81 fault controls. The byte-fact
+slice remains pending production acceptance.
 Final cumulative integration remains required before closing this maintenance
 batch; isolated prototype results do not close it.
 
