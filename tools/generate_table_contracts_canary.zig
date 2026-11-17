@@ -37,6 +37,12 @@ pub fn main(init: std.process.Init) !void {
                 try reader(w, "contract_masked", "contract_table", " %bounded = and i64 %index, 63\n", "[2 x i8]", "i64 %bounded");
                 try reader(w, "contract_stride4", "contract_table", " %bounded = and i64 %index, 15\n", "[4 x i8]", "i64 %bounded");
                 try reader(w, "contract_array_element", "contract_table", "", "[64 x i16]", "i64 0, i64 %index");
+                try w.writeAll(
+                    "define i32 @contract_wide(i64 %index) {\nentry:\n %bounded = and i64 %index, 31\n %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded\n %v = load i32, ptr %p, align 2\n ret i32 %v\n}\n" ++
+                        "define i32 @contract_mixed(i64 %index) {\nentry:\n %bounded = and i64 %index, 31\n %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded\n %n = load i16, ptr %p, align 2\n %wide = zext i16 %n to i32\n %v = load i32, ptr %p, align 2\n %sum = add i32 %wide, %v\n ret i32 %sum\n}\n" ++
+                        "define i32 @contract_shifted_wide(i64 %index) {\nentry:\n %bounded = and i64 %index, 31\n %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded\n %q = getelementptr i8, ptr %p, i64 2\n %v = load i32, ptr %q, align 2\n ret i32 %v\n}\n" ++
+                        "define ptr @contract_escaped(i64 %index) {\nentry:\n %bounded = and i64 %index, 31\n %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded\n ret ptr %p\n}\n",
+                );
             }
         },
         .private_a, .private_b => {

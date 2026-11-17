@@ -141,6 +141,43 @@ fn checkLocalTables(object: []const u8, visibility: u8) !void {
     try std.testing.expectEqual(@as(usize, 2), found);
 }
 
+test "constant table unsupported consumers retain full selector fallback" {
+    const a = std.testing.allocator;
+    const storage = try tableText(native_layout, 64, "i16", "7", "align 2");
+    defer a.free(storage);
+    for ([_][]const u8{
+        // The reported valid read spans two adjacent i16 elements.
+        "%v = load i32, ptr %p, align 2\n ret i32 %v",
+        // Every use must be admitted, even when a supported load comes first.
+        "%n = load i16, ptr %p, align 2\n %w = zext i16 %n to i32\n %v = load i32, ptr %p, align 2\n %sum = add i32 %w, %v\n ret i32 %sum",
+        // A derived pointer must not keep an unsupported consumer trapped.
+        "%q = getelementptr i8, ptr %p, i64 2\n %v = load i32, ptr %q, align 2\n ret i32 %v",
+    }) |body| {
+        const text = try std.fmt.allocPrint(a, "{s}\ndefine i32 @read(i64 %index) {{\nentry:\n %bounded = and i64 %index, 31\n %p = getelementptr [2 x i8], ptr @table, i64 %bounded\n {s}\n}}\n", .{ storage, body });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        const ctx = context(&module);
+        const function = module.functions.items[0];
+        // Exercise the complete production selector, not only strict table
+        // lowering or the private pointer-rewrite helper.
+        var selected = try compilation.select(a, module.target_triple.?, function, .{ .generic_cfg_selector = true, .module_context = &ctx });
+        defer selected.deinit(a);
+        try @import("../codegen/x86_64/verify.zig").verifyFunction(selected);
+        var ordinary_address = false;
+        for (selected.instructions.items) |instruction| {
+            try std.testing.expect(instruction != .lea_global_arg64);
+            if (instruction == .lea_global_offset_rax) ordinary_address = true;
+        }
+        try std.testing.expect(ordinary_address);
+        const object = try elf.buildObjectWithModuleContext(a, &.{selected}, &.{}, ctx);
+        defer a.free(object);
+        try std.testing.expectEqualSlices(u8, "\x7fELF", object[0..4]);
+        try module.verify();
+    }
+}
+
 test "constant table independent objects keep private and internal storage local through ordinary placement" {
     const a = std.testing.allocator;
     // Identical private names in independently emitted modules must never

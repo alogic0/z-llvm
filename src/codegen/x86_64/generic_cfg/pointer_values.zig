@@ -72,7 +72,42 @@ fn materializeIntegerAddress(allocator: std.mem.Allocator, function: ir.Function
     return .{ .named = integer };
 }
 
-fn tableGep(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) !bool {
+fn tableConsumers(function: ir.Function, name: []const u8, shape: tables.Description, offset: u8) bool {
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |inst| {
+            const uses = ir.operands.instructionUses(&inst, name, .ptr);
+            // An optional specialization cannot prove absence of hidden uses.
+            if (uses.coverage.has_opaque_references) return false;
+            if (uses.occurrences == 0) continue;
+            if (uses.occurrences != 1 or !uses.types_match or inst.result == null) return false;
+            switch (inst.kind) {
+                .load => |load| {
+                    if (load.ty_addrspace != null or load.ptr_addrspace != null or
+                        load.attrs.isAtomic() or load.attrs.syncscope != null or
+                        !shape.allowsLoad(offset, load.ty)) return false;
+                },
+                .gep => |gep| {
+                    // The table address action supports only the first +8
+                    // double-pair tail. This also bounds recursion to one edge.
+                    if (offset != 0 or !shape.allowsOffset(8) or gep.ptr_addrspace != null or
+                        !gep.source_ty.eql(.{ .int = 8 }) or gep.indices.items.len != 1 or
+                        !gep.indices.items[0].ty.eql(word) or !gep.indices.items[0].value.eql(.{ .int = 8 }) or
+                        !tableConsumers(function, inst.result.?, shape, 8)) return false;
+                },
+                else => return false,
+            }
+        }
+        if (block.terminator) |term| {
+            const uses = ir.operands.terminatorUses(&term, name, .ptr);
+            if (uses.coverage.has_opaque_references or uses.occurrences != 0) return false;
+        }
+    }
+    return true;
+}
+
+fn tableGep(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, result: ?[]const u8, gep: ir.GepInst) !bool {
+    const name = result orelse return false;
+    if (gep.ptr != .named or !std.mem.startsWith(u8, gep.ptr.named, "@")) return false;
     const address = addresses.fromValue(gep.ptr) orelse return false;
     if (address.addend != 0) return false;
     const ctx = context orelse return false;
@@ -80,12 +115,13 @@ fn tableGep(allocator: std.mem.Allocator, function: ir.Function, context: ?*cons
     const index = gep.indices.items[0];
     if (!index.ty.eql(.{ .int = 64 }) or index.value != .named) return false;
     // Storage recognition alone does not reserve an address. Keep the table
-    // owner only when its source stride and the shared index proof apply;
-    // otherwise ordinary pointer materialization must remain available.
+    // owner only when the stride, shared index proof and every live consumer
+    // fit that representation. Otherwise materialize an ordinary pointer.
     if (try tables.decodeSymbol(allocator, ctx.*, address.symbol)) |value| {
         var decoded = value;
         defer decoded.deinit(allocator);
         return tables.sourceStrideMatches(ctx.target_datalayout, gep.source_ty, decoded.shape) and
+            tableConsumers(function, name, decoded.shape, 0) and
             try @import("../constant_table_index.zig").proves(allocator, context, function, index.value.named, decoded.shape.allowed_index_bits);
     }
     return false;
@@ -140,7 +176,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         copy.kind.icmp.operand_ty = word;
                     }
                 },
-                .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, function, context, gep)) {
+                .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, function, context, inst.result, gep)) {
                     copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);
                 },
                 .load => |load| if (load.ptr_addrspace == null and (!load.attrs.isBarrier() or absoluteVolatile(load.ty, load.ty_addrspace, load.ptr, load.attrs) or symbolicVolatile(load.ty, load.ty_addrspace, load.ptr, load.attrs))) {

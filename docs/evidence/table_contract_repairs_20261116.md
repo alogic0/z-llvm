@@ -1,5 +1,10 @@
 # Constant-table layout, fallback and linkage repairs
 
+The subsequent [consumer fallback repair](table_consumer_fallback_20261116.md)
+addresses a remaining P2 case where a proven table address has an unsupported
+load or another consumer. This original batch proves producer/index admission;
+its validation below applies to `1fa64f9e`, before that consumer-side follow-up.
+
 Status: accepted after validation, identity checks and storage closure under
 `local-state/validations/table-contract-fixes-20261116/batch-01`.
 The user's three review findings authorize this bounded repair independently of

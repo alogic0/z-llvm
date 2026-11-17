@@ -47,3 +47,34 @@ entry:
  %wide = zext i16 %v to i32
  ret i32 %wide
 }
+define i32 @contract_wide(i64 %index) {
+entry:
+ %bounded = and i64 %index, 31
+ %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded
+ %v = load i32, ptr %p, align 2
+ ret i32 %v
+}
+define i32 @contract_mixed(i64 %index) {
+entry:
+ %bounded = and i64 %index, 31
+ %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded
+ %n = load i16, ptr %p, align 2
+ %wide = zext i16 %n to i32
+ %v = load i32, ptr %p, align 2
+ %sum = add i32 %wide, %v
+ ret i32 %sum
+}
+define i32 @contract_shifted_wide(i64 %index) {
+entry:
+ %bounded = and i64 %index, 31
+ %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded
+ %q = getelementptr i8, ptr %p, i64 2
+ %v = load i32, ptr %q, align 2
+ ret i32 %v
+}
+define ptr @contract_escaped(i64 %index) {
+entry:
+ %bounded = and i64 %index, 31
+ %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded
+ ret ptr %p
+}

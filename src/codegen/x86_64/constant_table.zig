@@ -175,6 +175,16 @@ pub const Description = struct {
         const end = std.math.add(u64, field, width) catch return false;
         return end <= description.serialized_extent and end <= std.math.maxInt(i32);
     }
+
+    /// Loads represented by the specialized table pointer. Other valid byte
+    /// interpretations of this storage belong to ordinary pointer lowering.
+    pub fn allowsLoad(description: Description, offset: u8, ty: ir.Type) bool {
+        const width: u8 = switch (description.element) {
+            .i16 => if (offset == 0 and ty.eql(.{ .int = 16 })) 2 else return false,
+            .f64, .f64_pair => if (ty == .double) 8 else return false,
+        };
+        return description.allowsAccess(offset, width);
+    }
 };
 
 pub fn sourceStrideMatches(datalayout: ?[]const u8, source_ty: ir.Type, shape: Description) bool {

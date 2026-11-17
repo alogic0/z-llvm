@@ -1,6 +1,17 @@
 # Next steps
 
-The user's constant-table review repairs are accepted. The
+The user's [consumer fallback follow-up](evidence/table_consumer_fallback_20261116.md)
+is accepted after Tier-2 qualification and storage closure. Table reservation now
+requires compatible consumers, retaining generic addressing for a bounded i32
+load, mixed uses, derived addresses and escapes. Full-selector tests pass in
+Debug/Fast, along with 2,422 Fast units, 74 structural checks and four native table
+populations/all 234 faults. Captured-row object smoke, all 60 ABI comparisons,
+three hello_libc modes, fixed __multi3/FMA canaries and all 27 M1 executables also
+pass on unchanged qualified source. All consumers and candidate/scratch pipelines
+are closed; seven current contracts and seventeen independent holds are unchanged.
+Original failed setup receipts and source-bound subcommand reuse remain explicit.
+
+The earlier constant-table review batch is accepted at `1fa64f9e`. Its
 [repair evidence](evidence/table_contract_repairs_20261116.md) records allocation
 and serialized-layout checks, index-proof-aware fallback, ordinary ELF placement
 and permanent two-object link coverage. All 2,421 Fast units, 74 structural
