@@ -11,6 +11,16 @@ pass on unchanged qualified source. All consumers and candidate/scratch pipeline
 are closed; seven current contracts and seventeen independent holds are unchanged.
 Original failed setup receipts and source-bound subcommand reuse remain explicit.
 
+The user has now authorized the ordered follow-up in the
+[generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions),
+starting from the consumer-fallback repair at `11fd57ec`. The current action is
+the layout audit and shared exact query, with constant tables and backend storage
+as its first consumers. Investigate the i24/f80 GEP discrepancy before claiming
+a bug; qualify any semantic correction separately from refactoring. Subsequent
+slices consolidate table admission/fallback, share narrow rewrite construction
+for floating pair loads and memory bitcasts, then audit broader pointer/access
+facts. Preserve the completed five-stage acceptance and scheduling deferral.
+
 The earlier constant-table review batch is accepted at `1fa64f9e`. Its
 [repair evidence](evidence/table_contract_repairs_20261116.md) records allocation
 and serialized-layout checks, index-proof-aware fallback, ordinary ELF placement
@@ -79,9 +89,9 @@ median elapsed time changes from 101.63 to 101.58 seconds, median RSS rises
 0.7033%, and one pair is slower. The declared performance gate fails; production
 scheduling is unchanged and the qualified prototype patch remains evidence.
 
-No implementation action remains in this sequence. The three proposed follow-up
-abstractions require a separately authorized scope. All cycle compiler and
-source-worktree pipelines have closed through their named consumers. Guarded
+No implementation action remains in the original five-stage sequence. Its
+compiler and source-worktree pipelines have closed through their named consumers.
+The separately authorized follow-up is recorded above. Guarded
 collection preserves the seven current contracts and seventeen independent
 holds. Two diagnosed ordinary-product admission exceptions remain explicit;
 they have no validation consumer and are not required acceptance data.

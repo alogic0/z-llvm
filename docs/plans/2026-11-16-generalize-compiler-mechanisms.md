@@ -4,11 +4,13 @@ Date: 2026-11-16
 Status: complete. Stages 1 through 4 are accepted after ReleaseSafe acceptance
 commit `338b8972`; stage 5 is measured and deferred under its conditional benefit
 requirement. Stage 2 qualifies its mechanical description migration separately
-from the power-of-two length extension. No further implementation is authorized
-by this sequence.
+from the power-of-two length extension. The user subsequently authorized the
+follow-up sequence under Proposed follow-up abstractions below.
 Review baseline: repository HEAD `97b6eced`, with compiler changes through `ae9d359f`.
 Review reconciliation: 2026-11-16; operand mutation, proof semantics, identity
 namespaces, effective scheduling order and storage boundaries clarified.
+Follow-up reconciliation: 2026-11-16; priorities refined after table repairs at
+`1fa64f9e` and the consumer-fallback repair accepted at `11fd57ec`.
 
 ## Objective
 
@@ -360,38 +362,103 @@ conditional production/profile-event/integration route was never opened.
 
 ## Proposed follow-up abstractions
 
-The review agreed on these three additional maintenance candidates. They sit
-outside the five-stage delivery sequence above and do not change its order or
-the preferred first consumer, vector-combine. Prioritize shared layout facts,
-then small rewrite-construction helpers. Pointer/access facts require a precise
-caller-contract audit before selecting an implementation slice.
+The three maintenance candidates remain useful after the accepted
+[table layout, fallback and linkage repairs](../evidence/table_contract_repairs_20261116.md)
+at `1fa64f9e`. The subsequent consumer-fallback repair sharpens their scope:
+layout facts and specialization eligibility need consistent contracts. Split
+the pointer proposal into early admission/fallback work and later general
+pointer facts. The completed five-stage sequence above keeps its acceptance
+and measured scheduling deferral.
 
-These are proposed follow-up work, not demonstrated bugs or implementation
-requests. Any selected slice needs its own bounded scope and the validation,
-ownership and storage requirements below. The ReleaseSafe acceptance prerequisite
-and existing preopt exception ownership remain unchanged.
+The consumer-fallback qualification and storage disposition closed at
+`11fd57ec`. The user's subsequent instruction authorizes this follow-up sequence
+in the order below. Read [next steps](../next_steps.md) and bind the accepted
+source at each slice's admission; the earlier reviewed working tree is not an
+implicit baseline.
+
+| Order | Bounded work | Initial consumers |
+| --- | --- | --- |
+| 1 | Audit layout semantics, then share one exact layout query | Constant tables and backend aggregate storage |
+| 2 | Consolidate specialization admission and ordinary-address fallback | Table pointer reservation and table load lowering |
+| 3 | Extract a small rewrite-construction helper | Floating pair loads and memory bitcasts |
+| 4 | Share broader pointer/access facts after a caller audit | Memory-location analysis and aggregate-object views |
+
+Each implementation slice needs its own bounded scope and the validation,
+ownership and storage requirements below.
+Source-level discrepancies require investigation before a runtime failure is
+claimed. Existing preopt exception ownership remains unchanged.
 
 ### Shared module-aware layout facts
 
 Starting points: [target data layout](../../src/target/datalayout.zig),
+[constant tables](../../src/codegen/x86_64/constant_table.zig),
 [memory-location analysis](../../src/analysis/memory_location.zig) and
 [backend storage layout](../../src/codegen/x86_64/generic_cfg/storage_layout.zig).
 
-Extend the shared target/IR layer to provide module-aware type and field-layout
-facts consumed by both analysis and backend storage code. Resolve named types
-against the actual module and target layout, with explicit unknown, ambiguous
-and cyclic-type handling. Preserve each caller's identifier-equality contract.
+Audit the selected callers before consolidating them. The table repair now
+checks allocation stride and serialized extent, with local checks for explicit
+alignment overrides. Backend storage has its own bounded layout and override
+admission. Identify their shared facts and intentional policy differences.
 
-Keep store size, allocation size/stride, field offset and alignment as distinct
-facts. Knowing an object's memory layout does not establish register ABI support
-or backend admission. Keep backend size limits, supported-layout restrictions
-and ABI checks with their existing owners. Use checked extent/offset arithmetic
-and do not reuse facts across changed module or layout identities.
+One concrete audit target is `memory_location.gepOffsetInternal`: its first
+GEP step calls `typeSizeMaybeLayout`, whose target-aware path returns store size.
+Existing `DataLayout` tests distinguish i24 store size 3 from allocation stride
+4, and x86_fp80 store size 10 from allocation stride 16. Check those padded
+scalar steps and their alias-analysis consumers before migrating this caller.
+This is a source-level discrepancy; the review has not reproduced an end-to-end
+wrong-code failure. Record a focused reproduction and affected consumers for
+any confirmed semantic correction, and qualify it separately from refactoring.
 
-A first slice should migrate one bounded layout query while preserving its
-accepted and rejected inputs. Qualification should cover named and nested types,
-packed/unpacked fields, scalar padding, unsupported overrides, cycles and overflow.
-Any new admitted layout is a separately classified capability change.
+Start with one shared layout query in the target/IR layer, used by constant-table
+and backend-storage consumers. Extend module-aware type and field resolution
+only as needed for that query. Resolve names against the actual module and
+target layout, preserving unknown, ambiguous and cyclic-type handling and each
+caller's identifier-equality contract. Keep x86-specific assumptions explicit.
+
+Keep store size, allocation size/stride, field offset, serialized extent and
+alignment as distinct facts. Explicit integer, floating, vector and aggregate
+overrides must be interpreted exactly or leave the affected query unsupported.
+Knowing an object's memory layout does not establish register ABI support or
+backend admission. Keep backend limits and support policy with their existing
+owners. Use checked extent/offset arithmetic and do not reuse facts across
+changed module or layout identities.
+
+Qualify both initial consumers while preserving accepted and rejected inputs.
+Cover padded scalar GEPs, named and nested types, packed/unpacked fields,
+alignment overrides, cycles and overflow. Keep malformed/unsupported layouts
+distinct from successfully queried ones; use LLVM comparisons only for inputs
+LLVM accepts. Migrate memory-location queries after the semantic audit. Any new
+admitted layout is a separately classified capability change.
+
+### Specialization admission and ordinary-address fallback
+
+Start with [pointer materialization](../../src/codegen/x86_64/generic_cfg/pointer_values.zig),
+[table load lowering](../../src/codegen/x86_64/generic_cfg/composed_selector_memory.zig)
+and the table description. Use the accepted successor of the current repair as
+the baseline. Its `Description.allowsLoad` and `tableConsumers` checks already
+share part of this contract; preserve that work and consolidate only remaining
+duplication or demonstrated disagreement.
+
+Proving the storage, index and bounds is insufficient to reserve a specialized
+pointer representation. Every live consumer must be supported by that
+representation. A valid i32 load spanning adjacent i16 table elements needs an
+ordinary pointer when the specialized path supports only i16 loads. Mixed-width
+uses, derived addresses and escapes must retain the same fallback opportunity.
+
+Make reservation and emission agree on load types, access widths, offsets,
+address spaces, memory attributes and bounded derived-pointer forms. Reuse the
+[shared operand queries](../../src/ir/operands.zig) for live uses and opaque
+coverage. Unknown references cannot prove that every consumer is supported.
+Decide optional specialization before publication; a later failure needs full
+rollback before another route can be tried. Keep allocation failures and actual
+compilation errors distinct from optional specialization being inapplicable.
+
+Qualification must exercise the complete production selector and emitted native
+behavior for supported loads, wide/mixed loads, derived uses, escapes, removed
+uses and uncertain coverage. Preserve successful specialized cases as well as
+ordinary fallback, including their ownership and rejection boundaries. Keep the
+first slice within the table pipeline; a broader shared admission framework
+needs another concrete consumer with the same contract.
 
 ### Small rewrite-construction helper
 
@@ -416,16 +483,24 @@ candidate-owned resources through the declared allocator/lifetime contract.
 Qualify both initial consumers, including allocation-failure and unchanged-source
 checks. Keep instruction selection, family-specific rewrites and legality tests
 outside this helper; this candidate does not introduce a universal legalizer.
+Keep memory-byte CFG construction outside the initial slice. The initial benefit
+is consistent construction and ownership handling. The measured stage-5 deferral
+still applies: fewer allocations alone establish no elapsed-time or RSS gain.
+Scheduling changes and performance claims need a separate measured scope.
 
 ### Bounded pointer and access facts
 
 Starting points: [memory-location analysis](../../src/analysis/memory_location.zig)
 and [aggregate-object views](../../src/codegen/x86_64/generic_cfg/aggregate_object.zig).
 
-Audit each caller's proof requirements before extracting shared facts for object
-identity, byte offset, extent and access bounds. Keep unknown information explicit
-and preserve checked arithmetic, address-space restrictions, alias assumptions,
-identifier equality and proof budgets.
+This broader part of the pointer proposal follows the bounded admission/fallback
+work and a precise caller audit. Audit each caller's proof requirements before
+extracting shared facts for object identity, byte offset, extent and access
+bounds. Pointer facts and a particular lowering's supported consumers are
+separate contracts. Keep unknown information explicit and preserve checked
+arithmetic, address-space restrictions, alias assumptions, identifier equality
+and proof budgets. Reuse the qualified layout facts without inheriting another
+caller's backend admission limits.
 
 Equal PHI offsets do not prove that incoming pointers have the same underlying
 object. Different roots may still support a valid bounds proof on every incoming
