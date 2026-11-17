@@ -1,5 +1,13 @@
 # Next steps
 
+The user has authorized the bounded
+[ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)
+from reviewed source `c32ba3cf`. Current action is baseline/reference/provider
+admission, then complete unchanged behavior qualification through the local
+optimizer and object emitter. All 2,097 ordered outcomes, independent audits,
+route-failure control, preservation and storage closure are required. ReleaseSmall
+and the deferred scheduler remain outside this assignment.
+
 The [consumer fallback repair](evidence/table_consumer_fallback_20261116.md) is
 accepted at `11fd57ec`. Table reservation checks compatible consumers, preserving
 generic addressing for bounded i32 loads, mixed uses, derived addresses and
@@ -25,7 +33,8 @@ integration checks. All owned pipelines are closed, with no owned temporary
 roots remaining; all seven current integrity manifests verify, and seventeen
 independent holds and storage policy are unchanged.
 
-Current action: stop after the completion commit and await new user direction.
+That maintenance sequence closed at `c32ba3cf`; the newly authorized milestone
+above starts separately.
 The original five-stage acceptance and measured scheduling deferral remain in
 force. This follow-up adds no new 2,097-outcome or performance claim.
 
