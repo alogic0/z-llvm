@@ -1,12 +1,16 @@
 # Next steps
 
-The user has authorized the bounded
+The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)
-from reviewed source `c32ba3cf`. Current action is baseline/reference/provider
-admission, then complete unchanged behavior qualification through the local
-optimizer and object emitter. All 2,097 ordered outcomes, independent audits,
-route-failure control, preservation and storage closure are required. ReleaseSmall
-and the deferred scheduler remain outside this assignment.
+is complete at unchanged source `c32ba3cf`. Its
+[acceptance](evidence/release_fast_preopt_acceptance_20261117.md) records one local
+optimizer/object-emitter run matching all 2,097 ordered outcomes, including skips,
+complete independent runtime/test audits and the real no-fallback failure control.
+Fresh preservation passes all seventeen gates and 237 native populations. Source,
+SDK/library/reference/providers verify, own pipelines close with zero temporary
+roots, and all eight current manifests verify with the seventeen independent
+holds unchanged. Current action: stop after the completion commit for review.
+ReleaseSmall and the deferred scheduler remain outside this assignment.
 
 The [consumer fallback repair](evidence/table_consumer_fallback_20261116.md) is
 accepted at `11fd57ec`. Table reservation checks compatible consumers, preserving

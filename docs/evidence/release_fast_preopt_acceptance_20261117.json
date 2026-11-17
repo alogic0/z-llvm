@@ -1,0 +1,288 @@
+{
+  "schema": "release-fast-preopt-acceptance-v1",
+  "status": "passed",
+  "date": "2026-11-17",
+  "scope": "Full unchanged pinned upstream behavior suite in ReleaseFast through local optimization and local object emission",
+  "code_revision": "c32ba3cfb1f67340ac5706fbc77ac56569b37007",
+  "runtime_source_changes": false,
+  "frontend": {
+    "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/install/bin/zig",
+    "sha256": "972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b"
+  },
+  "upstream_source_pin": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "suite": {
+    "path": "/home/oleg/prog/ziglang/test/behavior.zig",
+    "sha256": "3ef0e65cb6a9bb8a112549d0d8a52ded81cf4b154bd1f059c4dd878e38098af6"
+  },
+  "libc_configuration": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/native-libc-link-v8/native-libc.txt",
+    "sha256": "76ec8b788d551b0beed8f7359fd5ded95086f4a758b4bf2e07dfe31b2afdd34f"
+  },
+  "backend": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/candidate/ReleaseFast/bin/z_llvm",
+    "sha256": "87ab3a8e4eeb5bf69265bdf2d5a344b923ccca2eb9205835b437c1da0bc04c09"
+  },
+  "reference": {
+    "current": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/preserve-reference-ReleaseFast/run/report.json",
+      "sha256": "3974cd8a3f677667d91d568a5ed16d5bd77bf8ea7796ae8747a8aa8b6a8ca273"
+    },
+    "original_generation1_fast_sha256": "33ac5970f58e8250448272dbaabd9251ac9cdbdbb8e839cb671b6bd54947c00a",
+    "normal_llvm": true,
+    "current_reference_refresh_needed": false,
+    "providers_verified": 25,
+    "complete_ordered_outcomes_frozen": true
+  },
+  "source_and_binary_bridge": {
+    "compiler_source_files": 679,
+    "all_committed_membership_and_blobs_verified": true,
+    "build_source_head": "6a95f245a75e68e1444fbf7f989d1742b2c924af",
+    "build_mode": "ReleaseFast",
+    "target": "x86_64-linux-gnu",
+    "cpu": "baseline",
+    "strip": false,
+    "omit_frame_pointer": false,
+    "sdk": {
+      "path": "/home/oleg/.zig/0.17.0/files/zig",
+      "sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+      "version": "0.17.0",
+      "host_target": "x86_64-linux.7.0...7.0-gnu.2.39",
+      "library": {
+        "path": "/home/oleg/.zig/0.17.0/files/lib",
+        "files": 19501,
+        "sha256": "da12ef3b9d8d4a6120652a8b53e18a905dace8a7eeb10a260c3db619a10f4a99"
+      }
+    },
+    "final_sdk_and_complete_library_unchanged": true
+  },
+  "execution_route": {
+    "local_pipeline": "preopt",
+    "hook_mode": "ReleaseFast",
+    "hook_passes": "zig-release-fast-accepted",
+    "compiler_rt_frontend_mode": "ReleaseFast",
+    "llvm_optimizer_passes_execute": false,
+    "llvm_object_emission_passes_execute": false,
+    "llvm_fallback_delivery": false,
+    "llvm_setup_constructed": true,
+    "frontend_instrumentation_added": false,
+    "real_failure_control": {
+      "actual_failed_optimizer_invocations": 1,
+      "emitters": 0,
+      "objects": 0,
+      "behavior_execution": false,
+      "original_actual_returncode": 1
+    }
+  },
+  "behavior": {
+    "one_complete_unchanged_final_run": true,
+    "tests": 2097,
+    "ok": 2063,
+    "skip": 34,
+    "fail": 0,
+    "all_named_ordered_outcomes_match": true,
+    "full_suite": true,
+    "resources": "normal",
+    "fresh_private_frontend_caches": true,
+    "fresh_backend_link_execution": true,
+    "authenticated_reuse": "generation-1 frontend, pinned source/providers and existing matching LLVM reference; no backend/object/executable result reuse",
+    "space": {
+      "policy": {
+        "filesystem_total_bytes": 982240026624,
+        "reserve_bytes": 11410065408,
+        "projected_peak_bytes": 8589934592,
+        "required_start_bytes": 20000000000
+      },
+      "starting_free_bytes": 193635164160,
+      "minimum_sampled_free_bytes": 192268689408,
+      "observed_global_decrease_bytes": 1366474752,
+      "reserve_violated": false,
+      "sampling_failed": false,
+      "interval_ms": 2000
+    }
+  },
+  "inventory": {
+    "status": "passed",
+    "optimizer_invocations": 2,
+    "emitter_invocations": 2,
+    "runtime_modules": 1,
+    "test_modules": 1,
+    "unexplained_population_count": 0,
+    "modules": [
+      {
+        "source_filename": "compiler_rt",
+        "definitions": 921,
+        "declarations": 48,
+        "globals": 145,
+        "aliases": 462,
+        "optimizer": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/198826",
+        "emitter": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/198830",
+        "raw_input_sha256": "c8f47222ae1cc7cb81ad027c1ebc30133867e91634895f863ed9d73cc3242bf7",
+        "raw_input_bytes": 9067653,
+        "optimized_input_sha256": "572596a4534f8814f2a82d77e8df94d3085daae960257875917274bd99eb0177",
+        "optimized_input_bytes": 7455455,
+        "raw_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/inventory-01/module-198826.json",
+        "optimized_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/inventory-01/module-198830.json",
+        "all_function_declaration_global_alias_identities_preserved": true,
+        "local_verification": true,
+        "llvm_verify_only": true,
+        "object_ownership_elf_audited": true
+      },
+      {
+        "source_filename": "test",
+        "definitions": 7459,
+        "declarations": 619,
+        "globals": 5079,
+        "aliases": 46,
+        "optimizer": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/199033",
+        "emitter": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/199140",
+        "raw_input_sha256": "a33449c306f1069c7f3db6be8b5b8238ebca6665dd0c1c4549b85471c500ae20",
+        "raw_input_bytes": 44873406,
+        "optimized_input_sha256": "141344c57720c8b57668f3bc86b3640a70070986d89a14ada42a371c24596715",
+        "optimized_input_bytes": 37309433,
+        "raw_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/inventory-01/module-199033.json",
+        "optimized_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/inventory-01/module-199140.json",
+        "all_function_declaration_global_alias_identities_preserved": true,
+        "local_verification": true,
+        "llvm_verify_only": true,
+        "object_ownership_elf_audited": true
+      }
+    ]
+  },
+  "objects": [
+    {
+      "directory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/198830",
+      "optimizer_directory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/198826",
+      "input": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/198830/input.ll",
+        "bytes": 7455455,
+        "sha256": "572596a4534f8814f2a82d77e8df94d3085daae960257875917274bd99eb0177"
+      },
+      "object": {
+        "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/release-fast-preopt-20261117/batch-01/capture-01/run/.workspaces/validation/captures/198830/local.o",
+        "bytes": 2878256,
+        "sha256": "bd1a083a36224b3afbc0fdb5700163a9ae4e1ad8a546c8ec067a6a52eedec9b4"
+      },
+      "selected_definitions": 921,
+      "failed_definitions": 0
+    },
+    {
+      "directory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/199140",
+      "optimizer_directory": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/199033",
+      "input": {
+        "path": "/home/oleg/prog/z_llvm/local-state/validations/release-fast-preopt-20261117/batch-01/capture-01/run/captures/199140/input.ll",
+        "bytes": 37309433,
+        "sha256": "141344c57720c8b57668f3bc86b3640a70070986d89a14ada42a371c24596715"
+      },
+      "object": {
+        "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/release-fast-preopt-20261117/batch-01/capture-01/run/.workspaces/validation/captures/199140/local.o",
+        "bytes": 20522352,
+        "sha256": "3ad7015d0d68a1b20c5aea8ffbe519c5f04981eba691afddfa27749a0624e1b6"
+      },
+      "selected_definitions": 7459,
+      "failed_definitions": 0
+    }
+  ],
+  "audits": {
+    "all_objects_census_owners_elf_verified": true,
+    "all_ordered_event_streams_verified": true,
+    "runtime_records": 425916,
+    "test_records": 2876595,
+    "total_records": 3302511,
+    "summary": "local-state/retirements/native-event-audit/1794922116642381911-211285/summary.json",
+    "llvm_ir_use": "verify-only validation reference"
+  },
+  "preservation": {
+    "fixed_debug_object_sha256": "92825c8e7821e8c2becc774942f149aacfd14a99167247199b1ee44c4d4d81c1",
+    "fixed_debug_owners_sha256": "50a5e008c6f1a489cd8c71bf9be2fcc3d24e61f53820064f0065ae2da3a2b075",
+    "abi_cases": 60,
+    "m1_executables": 27,
+    "integration_gates": 17,
+    "native_populations": 237,
+    "integration_run_id": "dce612f4ce8a62a319cfd89b7adcfb50",
+    "real_row_reuse": "authenticated frontend AIR only; fresh backend/object/link/execution",
+    "existing_safe_postopt_acceptance_preserved": true,
+    "maintenance_units_and_structural": "Source-bound c32ba3cf baseline: 2438 Fast units and 74 structural checks; no fresh execution credit in this milestone"
+  },
+  "tool_qualification": {
+    "adopted_contract_tests_per_mode": 14,
+    "modes": [
+      "Debug",
+      "ReleaseFast"
+    ],
+    "selected_executables": 5,
+    "exact_publication_verified": true,
+    "setup_duplicate_build_diagnosed": true,
+    "actual_original_exits": [
+      0,
+      0
+    ],
+    "attempted_stop_delivered_signal": false
+  },
+  "storage": {
+    "workspace_closure": {
+      "status": "passed",
+      "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1794928634410961222-406119/report.json",
+      "all_owned_pipelines_closed": true,
+      "remaining_owned_temporary_roots": 0,
+      "closed_compiler_pipelines": 1,
+      "closed_tool_pipelines": 1,
+      "ordinary_default_compiler_retired": true,
+      "raw_streams_retired": 2,
+      "original_actual_outcomes_preserved": true,
+      "seven_existing_integrity_manifests_verified": true,
+      "independent_holds_and_prior_policy_unchanged": true,
+      "owned_acceptance_manifest_registration_pending": true
+    },
+    "trace_retirement": {
+      "status": "passed",
+      "raw_streams_retired": 2,
+      "reclaimed_allocated_file_bytes": 1030979584,
+      "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1794928345814245086-401036/report.json",
+      "whole_stream_records_audited": 3302511,
+      "inputs_reports_audits_and_sources_preserved": true,
+      "no_compiler_replay_pin_added": true,
+      "seven_current_integrity_manifests_verified": true
+    },
+    "policy_registration": {
+      "status": "passed",
+      "previous_current_manifests": 7,
+      "current_manifests": 8,
+      "all_eight_verify": true,
+      "original_seven_paths_and_bytes_unchanged": true,
+      "every_other_policy_field_unchanged": true,
+      "independent_holds": 17,
+      "independent_holds_unchanged": true,
+      "owned_manifest": "local-state/validations/release-fast-preopt-20261117/batch-01/maintained-release-fast-preopt-proof-20261117.sha256",
+      "owned_manifest_sha256": "3a609f41d4ae95e06e905a7fd08908fd81d47d6374d311d651ca87031832c959",
+      "maintained_files": 170,
+      "ordinary_payloads_pinned": false,
+      "remaining_owned_temporary_roots": 0
+    },
+    "all_own_work_closed": true,
+    "remaining_owned_temporary_roots": 0,
+    "ordinary_payloads_pinned": false,
+    "original_actual_outcomes_preserved": true
+  },
+  "evidence": {
+    "root": "local-state/validations/release-fast-preopt-20261117/batch-01",
+    "complete_run": "capture-01/run/report.json",
+    "inventory": "reconcile-01/report.json",
+    "final_consumer_verification": "final-verification/report.json",
+    "storage": "final-storage/report.json",
+    "maintained_manifest": "maintained-release-fast-preopt-proof-20261117.sha256",
+    "maintained_manifest_sha256": "3a609f41d4ae95e06e905a7fd08908fd81d47d6374d311d651ca87031832c959"
+  },
+  "limits": {
+    "new_full_safe_small_acceptance": false,
+    "compiler_preopt_self_rebuild": false,
+    "performance_parity": false,
+    "scheduling": "previous experiment remains deferred",
+    "llvm_ir_construction_removed": false,
+    "remaining_dependencies": [
+      "LLVM IR construction",
+      "bitcode parsing",
+      "target/analysis/pass-manager setup",
+      "declared LLVM/system providers"
+    ]
+  }
+}

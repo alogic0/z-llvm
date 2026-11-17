@@ -56,6 +56,14 @@ private rewrite construction and checked byte bounds. Current validation passes
 populations. The [follow-up evidence](docs/evidence/checked_byte_facts_20261117.md)
 distinguishes semantic corrections, admission policies and storage disposition.
 
+The [ReleaseFast preopt qualification](docs/evidence/release_fast_preopt_acceptance_20261117.md)
+matches all 2,097 ordered reference outcomes in one unchanged local run at
+`c32ba3cf`: 2,063 OK and 34 SKIP. Both runtime/test optimizer-emitter chains,
+all 921/7,459 definitions and complete object/ownership/ELF/event audits pass.
+The real optimizer-failure control stops before emission. Fresh preservation
+passes all 17 integration gates and 237 native populations; storage is closed.
+LLVM construction, setup and declared providers remain dependencies.
+
 Selective legalization was prototyped and measured, then deferred under the
 plan's benefit requirement. Five unprofiled pairs did not demonstrate the
 required time or memory gain; production scheduling is unchanged. The

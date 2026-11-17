@@ -1,9 +1,25 @@
 # ReleaseFast behavior through the local preopt pipeline
 
 Date: 2026-11-17
-Status: authorized; baseline admission in progress. Starting backend source:
-`c32ba3cf`. The reviewer found no blocking issues in the completed maintenance
-sequence. This plan owns only the newly assigned ReleaseFast milestone.
+Status: complete; qualified on 2026-11-17, with all E/F/G consumers and storage
+closed. Starting and final backend source: `c32ba3cf`. No compiler source repair
+was needed. The
+reviewer found no blocking issues in the completed maintenance sequence. This
+plan owns only the newly assigned ReleaseFast milestone.
+
+One unchanged first attempt matches all 2,097 ordered Fast outcomes: 2,063 OK and
+34 SKIP. Both optimizer/emitter chains, separate 921-definition runtime and
+7,459-definition test inventories, complete independent census/object/owner/ELF
+audits and all 3,302,511 ordered-event records pass. The real optimizer-failure
+control produces one failed optimizer, zero emitters and no behavior execution.
+Fresh fixed Debug bytes/owners, all 60 ABI cases and 27 M1 executables pass.
+Final serial Tier 3 passes all seventeen gates and 237 native populations.
+Source/SDK/library/provider verification, guarded producer teardown, audited
+trace retirement and all own pipeline releases pass, with zero owned temporary
+roots. The additive eighth maintained-proof contract verifies with the original
+seven and seventeen independent holds preserved. The
+[acceptance](../evidence/release_fast_preopt_acceptance_20261117.md) binds the
+complete result and exact storage evidence. Stop for review; no successor starts.
 
 ## Objective and acceptance
 
@@ -143,3 +159,10 @@ holds/policy, lists every owned temporary root and its disposition, and retains
 collector/release receipts. Build an explicit maintained-file acceptance list;
 do not seal an entire temporary run. Record all remaining LLVM/provider
 dependencies and exact proof limits in the final acceptance and commit.
+
+After own closure, register the new selected maintained-file manifest as an
+additive eighth policy entry. Preserve all seven existing manifest paths and
+bytes, every other policy field and all seventeen independent holds. Record
+the exact before/after policy identities and verify all eight manifests. This
+owned acceptance addition does not rewrite earlier unchanged-policy receipts
+or extend the lifetime of independently owned dependencies.

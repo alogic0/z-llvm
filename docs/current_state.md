@@ -161,6 +161,25 @@ seven current integrity manifests verify; seventeen independent holds and
 storage policy are unchanged.
 This adds no new 2,097-outcome or performance claim; scheduling remains deferred.
 
+The separate [ReleaseFast preopt milestone](evidence/release_fast_preopt_acceptance_20261117.md)
+is qualified at unchanged backend source `c32ba3cf`. One complete run matches all
+2,097 ordered normal LLVM Fast outcomes: 2,063 OK and 34 SKIP. The global hook
+selects `zig-release-fast-accepted`; compiler-runtime frontend mode is recorded
+separately as Fast. Both optimizer/emitter pairs, complete 921-definition runtime
+and 7,459-definition test inventories/censuses, object/ownership/ELF audits and
+all 3,302,511 ordered-event records verify. A real failed optimizer starts no
+emitter or behavior execution and cannot fall back to LLVM delivery.
+
+Fresh fixed Debug bytes/owners, all 60 ABI cases, 27 M1 executables, seventeen
+integration gates and the complete 237-population native suite pass. Final
+verification binds all 679 compiler sources, SDK/library, frontend, reference
+and providers. Existing Safe/postopt acceptance remains separate. All owned
+pipelines close with zero temporary roots; audited raw events retire explicitly.
+The additive eighth maintained-proof manifest preserves the original seven
+contracts and seventeen independent holds. All eight verify. ReleaseSmall,
+performance parity, compiler preopt self-rebuild and LLVM construction removal
+remain separate scopes; scheduling remains deferred.
+
 ## Fixed compiler-core execution cohort
 
 [accepted_status.json](accepted_status.json) records the separate fixed
