@@ -77,6 +77,30 @@ existing quarantine journal before removing exact inventoried entries. A raw
 `profile.events.jsonl` accidentally placed in scratch blocks collection. An
 unknown folder under `local-state/tmp` is never automatically disposable.
 
+### Interrupted compiler-build monitor
+
+An active layout can outlive a checked monitor whose terminal status was lost.
+For the supported case of a completed, separately admitted child compiler build,
+the owner can submit a single-workspace disposal plan. The original layout,
+running receipt and running job continue to record the unknown monitor outcome.
+The plan binds those three records, the observed outer exit, child build and
+admission, closed consumers, process families and a complete native tree
+snapshot. Each file in the proposed tree is hashed.
+
+```sh
+tools/clean-storage recover-interrupted-workspace --review PLAN --minimal
+```
+
+Review the one ready action, tree, collector and effective retained list before
+using the same command with `--apply`. The owner’s canonical policy, current
+integrity manifests, independent holds and retained declarations apply at the
+live checks. The completed record pins every path in the action’s retained
+list. Use maintained snapshots or identity lists when a control has an
+independent lifecycle. The collector checks for live processes, command lines
+and open files, including after quarantine, and journals the removal.
+Ordinary workspace release still requires a terminal producer result.
+[Recovery plan and qualification](plans/2026-11-17-interrupted-workspace-recovery.md)
+
 The standalone producers publish their result for the next `clean-storage
 --minimal --apply`; `run_checked` also attempts that collection on exit.
 `tools/run-validation` attempts the same collection before starting the next

@@ -56,6 +56,9 @@ pub const Action = struct {
     reviewed_record: bool = false,
     shared_input: bool = false,
     workspace_release: ?[]const u8 = null,
+    // Explicit disposal authority; never a replacement terminal producer result.
+    interrupted_workspace_recovery: ?Evidence = null,
+    original_monitor_outcome: ?[]const u8 = null,
     retired_compiler: ?Evidence = null,
     retired_pins: []const p.PinTransition = &.{},
 };
@@ -1069,6 +1072,9 @@ pub const Engine = struct {
             try @import("reviewed_records.zig").verifyFile(e, a.*);
             for (a.retained) |ev| try e.keep(&kept, ev.path, ev.sha256);
             a.replay_required = false;
+        } else if (a.interrupted_workspace_recovery != null) {
+            try @import("interrupted_workspaces.zig").verify(e, a.*, &kept);
+            a.replay_required = false;
         } else if (a.kind == .temporary_workspace) {
             try @import("workspaces.zig").verify(e, a.*, &kept);
             a.replay_required = false;
@@ -1094,6 +1100,7 @@ pub const Engine = struct {
             var snap = try fa.scan(e.c.gpa, e.c.io, try e.absolute(a.path), .{ .hash_files = true, .max_entries = e.config.max_candidate_entries });
             defer snap.deinit();
             try e.checkCache(snap.value);
+            if (a.interrupted_workspace_recovery != null) try @import("interrupted_workspaces.zig").verifyQualifiedTree(e, a.*, snap.value);
             if (a.kind == .temporary_workspace or a.reviewed_shared_cache) for (snap.value.entries) |entry| {
                 // Misfiled raw evidence never inherits a blanket scratch release.
                 if (std.mem.eql(u8, std.fs.path.basename(entry.path), "profile.events.jsonl")) return error.WorkspaceContainsRawTrace;
@@ -1271,6 +1278,7 @@ pub const Engine = struct {
         e.hash_cache.clearRetainingCapacity();
         for (e.controls.items) |row| try e.check(row);
         for (a.retained) |row| try e.check(row);
+        if (a.interrupted_workspace_recovery != null) try @import("interrupted_workspaces.zig").quiescent(e, a, null);
         if (a.retired_compiler) |compiler| try retired_compiler.absent(e, compiler.path);
         if (a.replay_required) {
             try e.verifyRevisions();

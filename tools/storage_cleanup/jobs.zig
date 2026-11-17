@@ -36,7 +36,8 @@ pub fn scan(e: *core.Engine, discover: bool) !void {
         defer record.deinit();
         const job = record.value;
         if (!try validate(e, job)) {
-            if (!discover) try e.held.append(e.c.a, try e.c.a.dupe(u8, job.run_root));
+            if (!discover and !try @import("interrupted_workspaces.zig").authorizedStorageJob(e, name, job))
+                try e.held.append(e.c.a, try e.c.a.dupe(u8, job.run_root));
             continue;
         }
         if (!discover) continue;

@@ -278,6 +278,9 @@ pub fn apply(e: *core.Engine, index: usize) !void {
         try compareMoved(s.value, after.value);
         try e.checkMounts(after.value);
         if (a.kind == .temporary_workspace) {
+            // Production's root has no hook. The isolated fixture entrypoint
+            // uses this compile-time seam to exercise pre-unlink rollback.
+            if (@hasDecl(@import("root"), "storageCleanupBeforeUnlink")) try @import("root").storageCleanupBeforeUnlink(e, quarantine);
             // A large scratch tree can take time to rehash. Refresh its owner
             // decision and pins after quarantine, while rollback is still possible.
             try e.loadHolds();
@@ -285,6 +288,7 @@ pub fn apply(e: *core.Engine, index: usize) !void {
             try e.consumers();
             if (a.status != .ready) return error.WorkspaceBecameHeld;
             try e.verifyEvidence(a.*);
+            if (a.interrupted_workspace_recovery != null) try @import("interrupted_workspaces.zig").quiescent(e, a.*, quarantine);
         }
         // Delete exact inventoried entries. Never use a recursive wildcard;
         // unexpected membership makes final directory removal fail closed.

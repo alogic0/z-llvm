@@ -40,6 +40,7 @@ const usage =
     \\       tools/clean-storage retire-held-products --review PLAN [--minimal] [--apply]
     \\       tools/clean-storage retire-reviewed-products --review PLAN [--minimal] [--apply]
     \\       tools/clean-storage retire-reviewed-records --review PLAN [--minimal] [--apply]
+    \\       tools/clean-storage recover-interrupted-workspace --review PLAN [--minimal] [--apply]
     \\       tools/clean-storage prepare-pins --requests FILE --review FILE
     \\       tools/clean-storage [--apply] --requests FILE
     \\
@@ -95,6 +96,7 @@ pub fn main(init: std.process.Init) !void {
     const retire_held_products = args.len > 1 and std.mem.eql(u8, args[1], "retire-held-products");
     const retire_reviewed_products = args.len > 1 and std.mem.eql(u8, args[1], "retire-reviewed-products");
     const retire_reviewed_records = args.len > 1 and std.mem.eql(u8, args[1], "retire-reviewed-records");
+    const recover_interrupted_workspace = args.len > 1 and std.mem.eql(u8, args[1], "recover-interrupted-workspace");
     const prepare_pins = args.len > 1 and std.mem.eql(u8, args[1], "prepare-pins");
     var requests_path: ?[]const u8 = null;
     var builds_path: ?[]const u8 = null;
@@ -112,7 +114,7 @@ pub fn main(init: std.process.Init) !void {
     var build_path: ?[]const u8 = null;
     var reason: ?[]const u8 = null;
     var reconstruction_paths: std.ArrayList([]const u8) = .empty;
-    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy or narrow_cache_holds or retire_held_products or retire_reviewed_products or retire_reviewed_records) 2 else 1;
+    var i: usize = if (publishing or inventory_requested or share_inputs or prepare_builds or prepare_pins or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_legacy or narrow_cache_holds or retire_held_products or retire_reviewed_products or retire_reviewed_records or recover_interrupted_workspace) 2 else 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--help")) return c.print("{s}", .{usage});
         if (std.mem.eql(u8, args[i], "--apply")) {
@@ -198,7 +200,7 @@ pub fn main(init: std.process.Init) !void {
             reason = args[i];
             continue;
         }
-        if ((prepare_pins or retire_held_products or retire_reviewed_products or retire_reviewed_records) and std.mem.eql(u8, args[i], "--review") and i + 1 < args.len) {
+        if ((prepare_pins or retire_held_products or retire_reviewed_products or retire_reviewed_records or recover_interrupted_workspace) and std.mem.eql(u8, args[i], "--review") and i + 1 < args.len) {
             i += 1;
             review_path = args[i];
             continue;
@@ -259,6 +261,8 @@ pub fn main(init: std.process.Init) !void {
     if (retire_held_products and (review_path == null or requests_path != null or capture_aliases or artifact_aliases)) return error.InvalidHeldProductReview;
     if (retire_reviewed_products and (review_path == null or requests_path != null or capture_aliases)) return error.InvalidReviewedProducts;
     if (retire_reviewed_records and (review_path == null or requests_path != null or capture_aliases or artifact_aliases)) return error.InvalidReviewedRecords;
+    if (recover_interrupted_workspace and (review_path == null or requests_path != null or capture_aliases or artifact_aliases)) return error.InvalidInterruptedWorkspacePlan;
+    if (recover_interrupted_workspace and !std.mem.eql(u8, policy_path, "docs/storage_cleanup_policy.json")) return error.InterruptedWorkspaceRequiresOwnerPolicy;
     if (publishing and requests_path != null) return error.InvalidReleaseArguments;
     if ((capture_aliases or artifact_aliases) and ((requests_path == null and !retire_reviewed_products) or publishing or share_inputs or prepare_builds or prepare_caches or prepare_traces or prepare_generated or prepare_any_outputs or prepare_pins or prepare_legacy)) return error.InvalidCaptureAliasArguments;
     if (!p.relative(policy_path)) return error.InvalidPolicyPath;
@@ -337,7 +341,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     try c.print("Discovering completed runs and release records...\n", .{});
-    if (retire_held_products) try @import("storage_cleanup/held_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_products) try @import("storage_cleanup/reviewed_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_records) try @import("storage_cleanup/reviewed_records.zig").prepare(&e, review_path.?) else try e.discover();
+    if (recover_interrupted_workspace) try @import("storage_cleanup/interrupted_workspaces.zig").prepare(&e, review_path.?) else if (retire_held_products) try @import("storage_cleanup/held_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_products) try @import("storage_cleanup/reviewed_products.zig").prepare(&e, review_path.?) else if (retire_reviewed_records) try @import("storage_cleanup/reviewed_records.zig").prepare(&e, review_path.?) else try e.discover();
     if (requests_path) |path| try batch.discover(&e, path);
     try e.loadHolds();
     // Required control files must still exist on a no-op pass. Expensive
@@ -479,6 +483,7 @@ fn collectorSources(c: *u.Context) ![]const core.Evidence {
         .{ .path = "tools/storage_cleanup/jobs.zig", .bytes = @embedFile("storage_cleanup/jobs.zig") },
         .{ .path = "tools/storage_cleanup/shared_inputs.zig", .bytes = @embedFile("storage_cleanup/shared_inputs.zig") },
         .{ .path = "tools/storage_cleanup/workspaces.zig", .bytes = @embedFile("storage_cleanup/workspaces.zig") },
+        .{ .path = "tools/storage_cleanup/interrupted_workspaces.zig", .bytes = @embedFile("storage_cleanup/interrupted_workspaces.zig") },
         .{ .path = "tools/zllvm_artifact_store/store.zig", .bytes = @embedFile("zllvm_artifact_store/store.zig") },
         .{ .path = "tools/validation/storage_lifecycle.zig", .bytes = @embedFile("validation/storage_lifecycle.zig") },
         .{ .path = "tools/validation/storage_paths.zig", .bytes = @embedFile("validation/storage_paths.zig") },

@@ -11,7 +11,7 @@ const D = std.Io.Dir;
 const limit = 128;
 
 pub fn accepts(a: core.Action) bool {
-    return (a.kind == .cache or a.kind == .temporary_workspace) and a.snapshot != null;
+    return a.interrupted_workspace_recovery == null and (a.kind == .cache or a.kind == .temporary_workspace) and a.snapshot != null;
 }
 
 pub fn select(e: *core.Engine, start: usize) ![]const usize {
