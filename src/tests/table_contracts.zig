@@ -178,6 +178,75 @@ test "constant table unsupported consumers retain full selector fallback" {
     }
 }
 
+test "constant table shared access contract preserves attributes widths and derived bounds" {
+    var load: ir.LoadInst = .{ .ty = .{ .int = 16 }, .ptr = .{ .named = "p" } };
+    const integer = tables.Description.init(.i16, 64, false).?;
+    try std.testing.expect(integer.allowsLoadInst(0, load));
+    load.attrs.is_volatile = true;
+    try std.testing.expect(integer.allowsLoadInst(0, load));
+    load.attrs.atomic_ordering = "monotonic";
+    try std.testing.expect(!integer.allowsLoadInst(0, load));
+    load.attrs = .{ .syncscope = "singlethread" };
+    try std.testing.expect(!integer.allowsLoadInst(0, load));
+    load.attrs = .{};
+    load.ptr_addrspace = "addrspace(1)";
+    try std.testing.expect(!integer.allowsLoadInst(0, load));
+    load.ptr_addrspace = null;
+    load.ty_addrspace = "addrspace(1)";
+    try std.testing.expect(!integer.allowsLoadInst(0, load));
+    load.ty_addrspace = null;
+    load.ty = .{ .int = 32 };
+    try std.testing.expect(!integer.allowsLoadInst(0, load));
+    try std.testing.expect(integer.derivedOffset(0, 8) == null);
+    load.ty = .double;
+    for ([_]tables.Description{ tables.Description.f64_16, tables.Description.f64_512_pairs, tables.Description.f64_pair_128 }) |shape| {
+        try std.testing.expect(shape.allowsLoadInst(0, load));
+        const tail: ?u8 = if (shape.eql(tables.Description.f64_16)) null else 8;
+        try std.testing.expectEqual(tail, shape.derivedOffset(0, 8));
+        try std.testing.expectEqual(tail != null, shape.allowsLoadInst(8, load));
+        try std.testing.expect(shape.derivedOffset(8, 8) == null);
+        try std.testing.expect(shape.derivedOffset(0, 4) == null);
+        try std.testing.expect(shape.derivedOffset(0, -8) == null);
+    }
+}
+
+test "constant table removed and opaque consumers preserve complete selector routes" {
+    const a = std.testing.allocator;
+    const storage = try tableText(native_layout, 64, "i16", "7", "align 2");
+    defer a.free(storage);
+    for ([_]bool{ false, true }) |has_opaque| {
+        const extra = if (has_opaque)
+            "%tag = add i64 ptrtoint (ptr @table to i64), 0\n %bit = and i64 %tag, 1\n %low = trunc i64 %bit to i32"
+        else
+            "%dead = load i32, ptr %p, align 2";
+        const tail = if (has_opaque) "%sum = add i32 %wide, %low\n ret i32 %sum" else "ret i32 %wide";
+        const text = try std.fmt.allocPrint(a, "{s}\ndefine i32 @read(i64 %index) {{\nentry:\n %bounded = and i64 %index, 31\n %p = getelementptr [2 x i8], ptr @table, i64 %bounded\n {s}\n %v = load i16, ptr %p, align 2\n %wide = zext i16 %v to i32\n {s}\n}}\n", .{ storage, extra, tail });
+        defer a.free(text);
+        var module = try ir.Module.parse(a, text);
+        defer module.deinit();
+        try module.verify();
+        if (!has_opaque) for (module.functions.items[0].blocks.items[0].instructions.items) |*inst| {
+            if (inst.result != null and std.mem.eql(u8, inst.result.?, "dead")) inst.removed = true;
+        };
+        const ctx = context(&module);
+        var selected = try compilation.select(a, module.target_triple.?, module.functions.items[0], .{ .generic_cfg_selector = true, .module_context = &ctx });
+        defer selected.deinit(a);
+        try @import("../codegen/x86_64/verify.zig").verifyFunction(selected);
+        var specialized = false;
+        var ordinary = false;
+        for (selected.instructions.items) |inst| {
+            if (inst == .lea_global_arg64) specialized = true;
+            if (inst == .lea_global_offset_rax) ordinary = true;
+        }
+        try std.testing.expectEqual(!has_opaque, specialized);
+        try std.testing.expectEqual(has_opaque, ordinary);
+        const object = try elf.buildObjectWithModuleContext(a, &.{selected}, &.{}, ctx);
+        defer a.free(object);
+        try std.testing.expectEqualSlices(u8, "\x7fELF", object[0..4]);
+        try module.verify();
+    }
+}
+
 test "constant table independent objects keep private and internal storage local through ordinary placement" {
     const a = std.testing.allocator;
     // Identical private names in independently emitted modules must never

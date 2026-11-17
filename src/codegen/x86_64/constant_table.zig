@@ -185,7 +185,21 @@ pub const Description = struct {
         };
         return description.allowsAccess(offset, width);
     }
+
+    pub fn allowsLoadInst(description: Description, offset: u8, load: ir.LoadInst) bool {
+        return load.ty_addrspace == null and load.ptr_addrspace == null and
+            supportsLoadAttributes(load) and description.allowsLoad(offset, load.ty);
+    }
+
+    /// Only the first eight-byte double tail has a table-pointer representation.
+    pub fn derivedOffset(description: Description, offset: u8, delta: i128) ?u8 {
+        return if (offset == 0 and delta == 8 and description.allowsOffset(8)) 8 else null;
+    }
 };
+
+pub fn supportsLoadAttributes(load: ir.LoadInst) bool {
+    return !load.attrs.isAtomic() and load.attrs.syncscope == null;
+}
 
 pub fn sourceStrideMatches(datalayout: ?[]const u8, source_ty: ir.Type, shape: Description) bool {
     if (!shape.valid()) return false;

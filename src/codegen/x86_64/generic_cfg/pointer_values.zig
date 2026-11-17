@@ -82,17 +82,16 @@ fn tableConsumers(function: ir.Function, name: []const u8, shape: tables.Descrip
             if (uses.occurrences != 1 or !uses.types_match or inst.result == null) return false;
             switch (inst.kind) {
                 .load => |load| {
-                    if (load.ty_addrspace != null or load.ptr_addrspace != null or
-                        load.attrs.isAtomic() or load.attrs.syncscope != null or
-                        !shape.allowsLoad(offset, load.ty)) return false;
+                    if (!shape.allowsLoadInst(offset, load)) return false;
                 },
                 .gep => |gep| {
                     // The table address action supports only the first +8
                     // double-pair tail. This also bounds recursion to one edge.
-                    if (offset != 0 or !shape.allowsOffset(8) or gep.ptr_addrspace != null or
+                    if (gep.ptr_addrspace != null or
                         !gep.source_ty.eql(.{ .int = 8 }) or gep.indices.items.len != 1 or
-                        !gep.indices.items[0].ty.eql(word) or !gep.indices.items[0].value.eql(.{ .int = 8 }) or
-                        !tableConsumers(function, inst.result.?, shape, 8)) return false;
+                        !gep.indices.items[0].ty.eql(word) or gep.indices.items[0].value != .int) return false;
+                    const next = shape.derivedOffset(offset, gep.indices.items[0].value.int) orelse return false;
+                    if (!tableConsumers(function, inst.result.?, shape, next)) return false;
                 },
                 else => return false,
             }

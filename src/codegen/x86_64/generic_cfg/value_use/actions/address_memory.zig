@@ -889,10 +889,10 @@ pub fn executeByteAddress(
                     });
                 },
                 .readonly_table_ptr => |ptr| {
-                    if (offset != 8 or ptr.offset != 0 or !ptr.shape.allowsOffset(8))
+                    const next = ptr.shape.derivedOffset(ptr.offset, offset) orelse
                         return error.ValueUseAddressOffsetOutOfRange;
                     var result = ptr;
-                    result.offset = 8;
+                    result.offset = next;
                     try selector_state.bindValueLoc(transaction.selector, result_name, .{ .readonly_table_ptr = result });
                 },
                 else => {

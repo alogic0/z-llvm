@@ -8,16 +8,20 @@ unknown. The unchanged predecessor fails both unit regressions and all four
 independent native pipeline comparisons. The corrected source passes 2,425 Fast
 units, all seventeen integration gates and all 236 native populations; storage
 closure passes with only two explicitly adopted follow-up pipelines remaining.
-The accepted successor shares the
-[shared module-aware layout query](evidence/module_layout_query_20261117.md)
-and five additional confirmed integer-geometry corrections. Fresh 2,431 Fast
+The [shared module-aware layout query](evidence/module_layout_query_20261117.md)
+successor also corrects five additional confirmed integer-geometry errors.
+Fresh 2,431 Fast
 units, native/fixed-byte preservation, all 396 fault controls, ABI and M1 checks
 pass. Its own fresh Tier 3 now passes all seventeen gates and all 237 native
 populations. Storage closure passes; only the next table slice's predecessor and
 the isolated later-prototype source/compiler remain declared consumers.
-Current action is ordered production promotion and Tier-2 qualification of
-table admission/emission agreement, then the rewrite builder and checked byte
-facts. No later follow-up slice is complete yet.
+The [table admission/emission agreement](evidence/table_admission_contract_20261117.md)
+passes Tier 2 and storage closure: 2,433 Fast units, 78 table tests in each mode,
+74 structural checks, four native populations and all 243 fault controls. Fixed
+Debug bytes, captured rows, ABI and executable boundaries remain preserved.
+Current action is ordered production promotion and qualification of the rewrite
+builder, then checked byte facts. Final cumulative integration remains required
+before closing the later maintenance tracker.
 
 The user's [consumer fallback follow-up](evidence/table_consumer_fallback_20261116.md)
 is accepted after Tier-2 qualification and storage closure. Table reservation now
@@ -33,8 +37,9 @@ Original failed setup receipts and source-bound subcommand reuse remain explicit
 The user has now authorized the ordered follow-up in the
 [generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions),
 starting from the consumer-fallback repair at `11fd57ec`. The current action is
-table admission/fallback consolidation, following the accepted shared exact query
-for constant tables and backend storage. The separately qualified i24/f80 stride
+the rewrite builder, following table admission/fallback consolidation and the
+accepted shared exact query for constant tables and backend storage. The
+separately qualified i24/f80 stride
 correction precedes that query; semantic corrections remain distinguished from
 factoring. Subsequent slices share narrow rewrite construction for floating pair
 loads and memory bitcasts, then caller-audited byte/access facts. Preserve the

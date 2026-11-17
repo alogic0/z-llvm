@@ -78,3 +78,15 @@ entry:
  %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded
  ret ptr %p
 }
+define i32 @contract_opaque(i64 %index) {
+entry:
+ %bounded = and i64 %index, 63
+ %p = getelementptr [2 x i8], ptr @contract_table, i64 %bounded
+ %tag = add i64 ptrtoint (ptr @contract_table to i64), 0
+ %bit = and i64 %tag, 1
+ %low = trunc i64 %bit to i32
+ %v = load i16, ptr %p, align 2
+ %wide = zext i16 %v to i32
+ %result = add i32 %wide, %low
+ ret i32 %result
+}

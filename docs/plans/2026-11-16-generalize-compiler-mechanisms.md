@@ -389,8 +389,12 @@ geometry, five separately demonstrated integer-layout corrections and explicitly
 classified newly known wide analysis strides. Fresh 2,431 Fast units, all
 seventeen integration gates and 237 native populations pass. Its storage record
 closes ordinary products and names the next slice's exact predecessor consumer.
-The later three slices remain pending production acceptance; isolated prototype
-results do not close them.
+The [table-admission slice](../evidence/table_admission_contract_20261117.md) now
+passes production Tier 2 and storage closure, including full-selector removed and
+opaque consumers, all 243 focused faults and exact fixed Debug preservation.
+The rewrite-builder and byte-fact slices remain pending production acceptance.
+Final cumulative integration remains required before closing this maintenance
+batch; isolated prototype results do not close it.
 
 Each implementation slice needs its own bounded scope and the validation,
 ownership and storage requirements below.

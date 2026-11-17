@@ -13732,9 +13732,9 @@
       "population": "table_contracts",
       "fixture": "table_contracts",
       "prefix": "table-contracts",
-      "functions": ["contract_unbounded", "contract_typed", "contract_literal", "contract_masked", "contract_stride4", "contract_array_element", "contract_wide", "contract_mixed", "contract_shifted_wide", "contract_escaped"],
-      "observations": 1280,
-      "stdout": "table-contracts observations=1280 fallback=typed=literal=bounded=strides=consumers=preserved\n"
+      "functions": ["contract_unbounded", "contract_typed", "contract_literal", "contract_masked", "contract_stride4", "contract_array_element", "contract_wide", "contract_mixed", "contract_shifted_wide", "contract_escaped", "contract_opaque"],
+      "observations": 1408,
+      "stdout": "table-contracts observations=1408 fallback=typed=literal=bounded=strides=consumers=coverage=preserved\n"
     },
     {
       "population": "table_private_link",

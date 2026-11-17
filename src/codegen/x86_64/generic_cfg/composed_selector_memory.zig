@@ -1303,9 +1303,10 @@ fn lowerReadOnlyTableLoad(
     ptr: selector_types.ReadOnlyTablePtrLoc,
 ) !?Diagnostic {
     if (load.ty_addrspace != null or load.ptr_addrspace != null) return .{ .no_emitter = "composed-block-load-readonly-table-addrspace" };
+    if (!constant_table.supportsLoadAttributes(load)) return .{ .no_emitter = "composed-block-load-barrier" };
     if (!ptr.shape.allowsOffset(ptr.offset)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
     if (ptr.shape.element == .i16 and ptr.offset == 0 and load.ty.eql(.{ .int = 16 })) {
-        if (!ptr.shape.allowsLoad(ptr.offset, load.ty)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
+        if (!ptr.shape.allowsLoadInst(ptr.offset, load)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
         return lowerReadOnlyTableI16Transactional(selector, result_name, load);
     }
 
@@ -1326,7 +1327,7 @@ fn lowerReadOnlyTableLoad(
         try selector_state.observeRejectedInstruction(selector, .{ .result = result_name, .kind = .{ .load = load } }, diagnostic);
         return diagnostic;
     }
-    if (!ptr.shape.allowsLoad(ptr.offset, load.ty)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
+    if (!ptr.shape.allowsLoadInst(ptr.offset, load)) return .{ .no_emitter = "composed-block-load-readonly-table-offset" };
     try selector_state.clobberXmmReg(selector, .xmm0);
     try selector.machine.instructions.append(selector.allocator, .{ .load_arg_ptr_disp8_xmm = .{ .base = base, .dst = .xmm0, .offset = ptr.offset } });
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
