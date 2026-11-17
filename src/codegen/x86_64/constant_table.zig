@@ -1,6 +1,8 @@
 const std = @import("std");
 const ir = @import("../../ir.zig");
 const match = @import("match.zig");
+const target = @import("../../target.zig");
+const addresses = @import("symbol_address.zig");
 
 pub const ReadOnlyModuleContext = struct {
     globals: []const ir.Global,
@@ -175,7 +177,7 @@ pub const Description = struct {
     }
 };
 
-pub fn sourceStrideMatches(source_ty: ir.Type, shape: Description) bool {
+pub fn sourceStrideMatches(datalayout: ?[]const u8, source_ty: ir.Type, shape: Description) bool {
     if (!shape.valid()) return false;
     const expected = switch (shape.stride()) {
         2 => "[2 x i8]",
@@ -183,7 +185,11 @@ pub fn sourceStrideMatches(source_ty: ir.Type, shape: Description) bool {
         16 => "[16 x i8]",
         else => return false,
     };
-    return source_ty == .aggregate and std.mem.eql(u8, std.mem.trim(u8, source_ty.aggregate, " \t"), expected);
+    if (source_ty != .aggregate or !std.mem.eql(u8, std.mem.trim(u8, source_ty.aggregate, " \t"), expected)) return false;
+    const text = datalayout orelse return false;
+    if (!addresses.supportsLayout(text) or !nativeAlignmentOverrides(text, "i8:", 8)) return false;
+    const layout = target.DataLayout.parse(text) catch return false;
+    return (layout.typeAllocSizeBytes(source_ty) catch return false) == shape.stride();
 }
 
 pub const Decoded = struct {
@@ -222,6 +228,7 @@ pub fn decodeGlobal(
     }
 
     const classified = classify(context, global.ty) orelse return null;
+    if (!serializedLayoutMatches(context.target_datalayout, global.ty, classified.shape)) return null;
     const declared_alignment = parseAlignment(global.attrs) orelse return null;
     if (declared_alignment < classified.shape.alignment() or !std.math.isPowerOfTwo(declared_alignment)) return null;
 
@@ -296,7 +303,60 @@ fn parseArray(text: []const u8) ?Array {
 
 fn supportsCapturedDataLayout(datalayout: ?[]const u8) bool {
     const text = datalayout orelse return false;
-    return std.mem.startsWith(u8, text, "e-") and std.mem.indexOf(u8, text, "i64:64") != null;
+    return std.mem.startsWith(u8, text, "e-") and std.mem.indexOf(u8, text, "i64:64") != null and
+        addresses.supportsLayout(text) and nativeAlignmentOverrides(text, "i64:", 64);
+}
+
+fn nativeAlignmentOverrides(text: []const u8, prefix: []const u8, expected: u16) bool {
+    var parts = std.mem.splitScalar(u8, text, '-');
+    while (parts.next()) |part| {
+        if (!std.mem.startsWith(u8, part, prefix)) continue;
+        var fields = std.mem.splitScalar(u8, part[prefix.len..], ':');
+        const abi = std.fmt.parseUnsigned(u16, fields.next() orelse return false, 10) catch return false;
+        if (abi != expected) return false;
+        if (fields.next()) |value| {
+            const preferred = std.fmt.parseUnsigned(u16, value, 10) catch return false;
+            if (preferred < abi or !std.math.isPowerOfTwo(preferred)) return false;
+        }
+        if (fields.next() != null) return false;
+    }
+    return true;
+}
+
+fn serializedLayoutMatches(datalayout: ?[]const u8, ty: ir.Type, shape: Description) bool {
+    const text = datalayout orelse return false;
+    const layout = target.DataLayout.parse(text) catch return false;
+    const element: ir.Type = switch (shape.element) {
+        .i16 => .{ .int = 16 },
+        .f64 => .double,
+        .f64_pair => .{ .aggregate = "{ double, double }" },
+    };
+    if (!nativeAlignmentOverrides(text, if (shape.element == .i16) "i16:" else "f64:", if (shape.element == .i16) 16 else 64)) return false;
+    if (shape.element == .f64_pair) {
+        // The shared layout query uses natural struct alignment. An explicit
+        // aggregate floor up to 16 bytes still leaves this exact pair's two
+        // field offsets and 16-byte allocation unchanged; larger floors do not.
+        var parts = std.mem.splitScalar(u8, text, '-');
+        while (parts.next()) |part| {
+            if (!std.mem.startsWith(u8, part, "a:")) continue;
+            var fields = std.mem.splitScalar(u8, part[2..], ':');
+            const abi = std.fmt.parseUnsigned(u16, fields.next() orelse return false, 10) catch return false;
+            if (abi != 0 and (abi < 8 or abi > 128 or !std.math.isPowerOfTwo(abi))) return false;
+            if (fields.next()) |value| {
+                const preferred = std.fmt.parseUnsigned(u16, value, 10) catch return false;
+                if (preferred != 0 and (preferred < abi or !std.math.isPowerOfTwo(preferred))) return false;
+            }
+            if (fields.next() != null) return false;
+        }
+    }
+    if ((layout.typeAllocSizeBytes(element) catch return false) != shape.stride()) return false;
+    // classify resolved the sole named-pair spelling to this exact body. Use
+    // that body for the shared query, which does not resolve module type names.
+    const storage_ty: ir.Type = if (shape.element == .f64_pair)
+        .{ .aggregate = "[128 x { double, double }]" }
+    else
+        ty;
+    return (layout.typeAllocSizeBytes(storage_ty) catch return false) == shape.serialized_extent;
 }
 
 fn parseAlignment(attrs: ?[]const u8) ?u32 {
@@ -527,7 +587,7 @@ test "constant table description rejects altered derived facts before access" {
         @field(description, field) += 1;
         try std.testing.expect(!description.valid());
         try std.testing.expect(!description.allowsAccess(0, 2));
-        try std.testing.expect(!sourceStrideMatches(.{ .aggregate = "[2 x i8]" }, description));
+        try std.testing.expect(!sourceStrideMatches("e-i64:64", .{ .aggregate = "[2 x i8]" }, description));
     }
     var description = Description.i16_128;
     description.paired_scalar_indices = true;

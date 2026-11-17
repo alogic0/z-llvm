@@ -1254,7 +1254,7 @@ fn lowerReadOnlyTableGep(selector: *ComposedBlockSelector, result_name: []const 
         return global_failure;
     };
     defer decoded.deinit(selector.allocator);
-    if (!sourceStrideMatchesShape(gep.source_ty, decoded.shape)) {
+    if (!sourceStrideMatchesShape(context.target_datalayout, gep.source_ty, decoded.shape)) {
         const diagnostic: Diagnostic = .{ .no_emitter = "composed-block-gep-readonly-table-source" };
         try selector_state.observeRejectedTableGep(selector, result_name, gep, diagnostic, null);
         return diagnostic;
@@ -1379,57 +1379,14 @@ fn readOnlyTableLoadValueUseDiagnostic(
     };
 }
 
-fn sourceStrideMatchesShape(source_ty: ir.Type, shape: constant_table.Description) bool {
-    return constant_table.sourceStrideMatches(source_ty, shape);
+fn sourceStrideMatchesShape(datalayout: ?[]const u8, source_ty: ir.Type, shape: constant_table.Description) bool {
+    return constant_table.sourceStrideMatches(datalayout, source_ty, shape);
 }
 
 fn hasAdmittedIndexProof(selector: *const ComposedBlockSelector, name: []const u8, shape: constant_table.Description) !bool {
     if (!shape.valid()) return false;
     const function = selector.function orelse return false;
-    const allowed = shape.allowed_index_bits;
-    if (maskedIndex(function.*, .{ .named = name }, allowed, 0)) return true;
-    if (try @import("../constant_table_index.zig").proves(selector.allocator, selector.module_context, function.*, name, allowed)) return true;
-    const source_name = stripZext(function.*, name) orelse name;
-    const mask: i128 = allowed;
-    const binary = findInstruction(function.*, source_name) orelse return false;
-    const and_inst = switch (binary.kind) {
-        .binary => |value| if (value.op == .@"and" and intOperand(value.lhs, value.rhs, mask)) value else return false,
-        else => return false,
-    };
-    if (!shape.paired_scalar_indices) return true;
-    const shifted = namedNonIntOperand(and_inst.lhs, and_inst.rhs) orelse return false;
-    const shift_inst = findInstruction(function.*, shifted) orelse return false;
-    return switch (shift_inst.kind) {
-        .binary => |value| value.op == .shl and intOperand(value.lhs, value.rhs, 1),
-        else => false,
-    };
-}
-
-// Width normalization can add masks and casts around the original table mask.
-// Every admitted path still proves all bits outside the address envelope zero;
-// the 512-word paired table additionally requires its low index bit zero.
-fn maskedIndex(function: ir.Function, value: ir.Value, allowed: u64, depth: u8) bool {
-    if (depth >= 16) return false;
-    if (value == .int) return value.int >= 0 and value.int <= std.math.maxInt(u64) and @as(u64, @intCast(value.int)) & ~allowed == 0;
-    if (value != .named) return false;
-    const inst = findInstruction(function, value.named) orelse return false;
-    return switch (inst.kind) {
-        .cast => |cast| (cast.op == .zext or cast.op == .trunc) and cast.from_ty == .int and cast.to_ty == .int and
-            cast.from_ty.int <= 64 and cast.to_ty.int <= 64 and maskedIndex(function, cast.value, allowed, depth + 1),
-        .binary => |binary| switch (binary.op) {
-            .@"and" => maskedIndex(function, binary.lhs, allowed, depth + 1) or maskedIndex(function, binary.rhs, allowed, depth + 1),
-            .@"or" => maskedIndex(function, binary.lhs, allowed, depth + 1) and maskedIndex(function, binary.rhs, allowed, depth + 1),
-            .add => if (binary.rhs == .int and binary.rhs.int == 0) maskedIndex(function, binary.lhs, allowed, depth + 1) else if (binary.lhs == .int and binary.lhs.int == 0) maskedIndex(function, binary.rhs, allowed, depth + 1) else false,
-            .lshr => blk: {
-                if (binary.ty != .int or binary.ty.int == 0 or binary.ty.int > 64 or binary.rhs != .int or binary.rhs.int < 0 or binary.rhs.int >= binary.ty.int) break :blk false;
-                const mask = (@as(u64, std.math.maxInt(u64)) >> @as(u6, @intCast(64 - binary.ty.int))) >> @as(u6, @intCast(binary.rhs.int));
-                break :blk mask & ~allowed == 0;
-            },
-            else => false,
-        },
-        .select => |select| select.cond_ty.eql(.{ .int = 1 }) and maskedIndex(function, select.true_value, allowed, depth + 1) and maskedIndex(function, select.false_value, allowed, depth + 1),
-        else => false,
-    };
+    return @import("../constant_table_index.zig").proves(selector.allocator, selector.module_context, function.*, name, shape.allowed_index_bits);
 }
 
 test "readonly table masks prove normalized casts and keep range and parity neighbors closed" {
@@ -1450,38 +1407,13 @@ test "readonly table masks prove normalized casts and keep range and parity neig
     defer module.deinit();
     try module.verify();
     const function = module.functions.items[0];
-    try std.testing.expect(maskedIndex(function, .{ .named = "wide" }, 127, 0));
-    try std.testing.expect(maskedIndex(function, .{ .named = "choice" }, 127, 0));
-    try std.testing.expect(maskedIndex(function, .{ .named = "even" }, 510, 0));
-    try std.testing.expect(!maskedIndex(function, .{ .named = "outside" }, 127, 0));
-    try std.testing.expect(!maskedIndex(function, .{ .named = "odd" }, 510, 0));
-    try std.testing.expect(!maskedIndex(function, .{ .named = "badchoice" }, 127, 0));
-    try std.testing.expect(!maskedIndex(function, .{ .named = "wide" }, 127, 16));
-}
-
-fn stripZext(function: ir.Function, name: []const u8) ?[]const u8 {
-    const instruction = findInstruction(function, name) orelse return null;
-    return switch (instruction.kind) {
-        .cast => |cast| if (cast.op == .zext and cast.value == .named) cast.value.named else null,
-        else => null,
-    };
-}
-
-fn findInstruction(function: ir.Function, name: []const u8) ?ir.Instruction {
-    for (function.blocks.items) |block| for (block.instructions.items) |instruction| {
-        if (instruction.result) |result| if (std.mem.eql(u8, result, name)) return instruction;
-    };
-    return null;
-}
-
-fn intOperand(lhs: ir.Value, rhs: ir.Value, expected: i128) bool {
-    return (lhs == .int and lhs.int == expected) or (rhs == .int and rhs.int == expected);
-}
-
-fn namedNonIntOperand(lhs: ir.Value, rhs: ir.Value) ?[]const u8 {
-    if (lhs == .named and rhs == .int) return lhs.named;
-    if (rhs == .named and lhs == .int) return rhs.named;
-    return null;
+    const proof = @import("../constant_table_index.zig");
+    try std.testing.expect(try proof.proves(std.testing.allocator, null, function, "wide", 127));
+    try std.testing.expect(try proof.proves(std.testing.allocator, null, function, "choice", 127));
+    try std.testing.expect(try proof.proves(std.testing.allocator, null, function, "even", 510));
+    try std.testing.expect(!try proof.proves(std.testing.allocator, null, function, "outside", 127));
+    try std.testing.expect(!try proof.proves(std.testing.allocator, null, function, "odd", 510));
+    try std.testing.expect(!try proof.proves(std.testing.allocator, null, function, "badchoice", 127));
 }
 
 pub fn isI32ElementPointerSource(ty: ir.Type) bool {

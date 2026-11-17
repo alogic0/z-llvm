@@ -72,15 +72,21 @@ fn materializeIntegerAddress(allocator: std.mem.Allocator, function: ir.Function
     return .{ .named = integer };
 }
 
-fn tableGep(allocator: std.mem.Allocator, context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) !bool {
+fn tableGep(allocator: std.mem.Allocator, function: ir.Function, context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) !bool {
     const address = addresses.fromValue(gep.ptr) orelse return false;
     if (address.addend != 0) return false;
     const ctx = context orelse return false;
-    // The existing table owner retains supported floating/integer table shapes.
+    if (gep.ptr_addrspace != null or gep.indices.items.len != 1) return false;
+    const index = gep.indices.items[0];
+    if (!index.ty.eql(.{ .int = 64 }) or index.value != .named) return false;
+    // Storage recognition alone does not reserve an address. Keep the table
+    // owner only when its source stride and the shared index proof apply;
+    // otherwise ordinary pointer materialization must remain available.
     if (try tables.decodeSymbol(allocator, ctx.*, address.symbol)) |value| {
         var decoded = value;
-        decoded.deinit(allocator);
-        return true;
+        defer decoded.deinit(allocator);
+        return tables.sourceStrideMatches(ctx.target_datalayout, gep.source_ty, decoded.shape) and
+            try @import("../constant_table_index.zig").proves(allocator, context, function, index.value.named, decoded.shape.allowed_index_bits);
     }
     return false;
 }
@@ -124,14 +130,17 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                         for ([_]*ir.Value{ &copy.kind.icmp.lhs, &copy.kind.icmp.rhs }) |value| {
                             const name = try forms.temporary(allocator, function, &serial);
                             try block.instructions.append(allocator, .{ .result = name, .kind = .{ .cast = .{
-                                .op = .ptrtoint, .from_ty = .ptr, .value = value.*, .to_ty = word,
+                                .op = .ptrtoint,
+                                .from_ty = .ptr,
+                                .value = value.*,
+                                .to_ty = word,
                             } } });
                             value.* = .{ .named = name };
                         }
                         copy.kind.icmp.operand_ty = word;
                     }
                 },
-                .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, context, gep)) {
+                .gep => |gep| if (gep.ptr_addrspace == null and addresses.fromGep(gep) == null and constant(gep.ptr) and !try tableGep(allocator, function, context, gep)) {
                     copy.kind.gep.ptr = try materialize(allocator, function, &block, &serial, gep.ptr);
                 },
                 .load => |load| if (load.ptr_addrspace == null and (!load.attrs.isBarrier() or absoluteVolatile(load.ty, load.ty_addrspace, load.ptr, load.attrs) or symbolicVolatile(load.ty, load.ty_addrspace, load.ptr, load.attrs))) {

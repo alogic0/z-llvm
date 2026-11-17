@@ -206,7 +206,7 @@ fn scalarTableShape(a: std.mem.Allocator, function: ir.Function, context: ?*cons
                 return null;
             }) orelse return null;
             defer decoded.deinit(a);
-            return if (decoded.shape.element != .i16 and tables.sourceStrideMatches(gep.source_ty, decoded.shape)) decoded.shape else null;
+            return if (decoded.shape.element != .i16 and tables.sourceStrideMatches(ctx.target_datalayout, gep.source_ty, decoded.shape)) decoded.shape else null;
         }
         const index = gep.indices.items[0].value;
         if (!gep.source_ty.eql(.{ .int = 8 }) or index != .int or index.int < 0 or index.int > 8) return null;

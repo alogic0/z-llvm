@@ -31,6 +31,9 @@ pub fn load(c: *u.Context) ![]u.Value {
                 if (name.len == 0 or (try seen_exports.getOrPut(name)).found_existing or u.contains(try u.stringSlice(c.a, try u.get(canary, "functions")), name)) return error.InvalidNativeProviderExports;
             }
         } else if (canary.object.contains("provider_exports")) return error.NativeProviderExportsWithoutFixture;
+        if (canary.object.get("provider_codegen_reachable")) |value| {
+            if (!canary.object.contains("provider_fixture") or value != .bool) return error.InvalidNativeProviderSelection;
+        }
         if (try u.json.integer(try u.get(canary, "observations")) <= 0) return error.InvalidNativeObservations;
         _ = try u.str(canary, "stdout");
         _ = try libraries(c, canary);
@@ -165,7 +168,12 @@ fn resolveProvider(runner: *Runner, directory: []const u8, zllvm: []const u8, en
     const stem = try c.join(&.{ directory, try c.fmt("{s}-provider-object", .{prefix}) });
     const owners_path = try c.join(&.{ directory, try c.fmt("{s}-provider-owners.tsv", .{prefix}) });
     const object = try c.temporaryPath(&.{ directory, try c.fmt("{s}-provider.o", .{prefix}) });
-    const emitted = try runner.run(&.{ zllvm, "--emit=obj", "--generic-cfg-selector", "--codegen-reachable", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{source.len + 1}), try c.fmt("--selection-owner-output={s}", .{owners_path}), fixture }, stem, env, .{ .timeout_ms = 900000, .stdout_file = object });
+    const selection: []const []const u8 = if (registered.object.get("provider_codegen_reachable")) |value|
+        (if (value.bool) &.{"--codegen-reachable"} else &.{})
+    else
+        &.{"--codegen-reachable"};
+    const arguments = try p.argv(c, &.{ zllvm, "--emit=obj", "--generic-cfg-selector", "--report-all-codegen-failures", "--target=x86_64-unknown-linux-gnu", try c.fmt("--input-limit={d}", .{source.len + 1}), try c.fmt("--selection-owner-output={s}", .{owners_path}), fixture }, selection);
+    const emitted = try runner.run(arguments, stem, env, .{ .timeout_ms = 900000, .stdout_file = object });
     if (!emitted.completed or emitted.code != 0) return error.NativeProviderEmissionFailed;
     if (!std.mem.eql(u8, digest, try c.digest(fixture))) return error.NativeProviderSourceChanged;
     var resolved = registered;

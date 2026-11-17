@@ -55,7 +55,7 @@ pub fn legalize(a: std.mem.Allocator, function: ir.Function, context: ?*const ma
                     break :rewrite;
                 }) orelse break :rewrite;
                 defer decoded.deinit(a);
-                if (!decoded.shape.paired_scalar_indices or !tables.sourceStrideMatches(gep.source_ty, decoded.shape) or
+                if (!decoded.shape.paired_scalar_indices or !tables.sourceStrideMatches(ctx.target_datalayout, gep.source_ty, decoded.shape) or
                     !decoded.shape.allowsAccess(8, 8) or
                     !try proof.proves(a, context, function, tail.base, decoded.shape.allowed_index_bits)) break :rewrite;
                 // An even in-range base cannot wrap when one is added, at

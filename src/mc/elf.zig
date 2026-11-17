@@ -170,7 +170,7 @@ fn buildObjectWithOptionalModuleContext(
     var tdata_alignment: u32 = 4;
     var rodata_alignment: u32 = 16;
     try appendReachableGlobals(allocator, &data, &data_alignment, &tdata, &tdata_alignment, &rodata, &rodata_alignment, &data_fixups, &symbols, &symbol_indices, functions, aliases, module_context);
-    try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals, module_context);
+    try appendSupportedGlobals(allocator, &data, &tdata, &symbols, &symbol_indices, globals);
     try appendSyntheticF128Constants(allocator, &data, &symbols, &symbol_indices, functions);
     try appendLocalFunctionAliases(allocator, &symbols, &symbol_indices, aliases, if (module_context) |context| context.require_resolved_aliases else false);
     const first_global = try orderLocalSymbols(allocator, &symbols, &symbol_indices);
@@ -387,10 +387,24 @@ fn appendReachableGlobals(
         // read-only section always goes through the owned section path.
         for (context.globals) |global| {
             const properties = symbol_address.globalProperties(global) catch continue;
-            if (properties.read_only_section) try queue.append(allocator, global.name);
+            if (properties.read_only_section) {
+                try queue.append(allocator, global.name);
+            } else if (try constant_table.decodeGlobal(allocator, context, global)) |value| {
+                var decoded = value;
+                defer decoded.deinit(allocator);
+                // Even unreferenced recognized tables use ordinary placement,
+                // preserving linkage, visibility, section and alignment.
+                try queue.append(allocator, global.name);
+            }
         }
     }
     for (functions) |function| for (function.instructions.items) |instruction| switch (instruction) {
+        .lea_global_arg64 => |address| {
+            if (context.dataAddress(address.symbol)) |resolved| {
+                if ((try symbol_address.globalProperties(resolved.global)).tls) return error.SymbolAddressClassMismatch;
+            }
+            try queue.append(allocator, address.symbol);
+        },
         .lea_global_offset_rax, .tls_address_rax => |address| {
             if (context.dataAddress(address.symbol)) |resolved| {
                 const properties = try symbol_address.globalProperties(resolved.global);
@@ -648,29 +662,12 @@ fn appendSupportedGlobals(
     symbols: *std.ArrayList(Symbol),
     symbol_indices: *symbol_names.Index,
     globals: []const ir.Global,
-    module_context: ?x86_64.ReadOnlyModuleContext,
 ) !void {
     for (globals) |global| {
         if (symbol_indices.contains(global.name)) continue;
         if (symbol_address.globalProperties(global) catch null) |properties| {
             if (properties.read_only_section) return error.UnsupportedGlobalData;
         }
-        if (module_context) |context| if (try constant_table.decodeGlobal(allocator, context, global)) |decoded_value| {
-            var decoded = decoded_value;
-            defer decoded.deinit(allocator);
-            try alignArrayList(data, allocator, decoded.alignment);
-            const start: u64 = data.items.len;
-            try data.appendSlice(allocator, decoded.bytes);
-            try symbols.append(allocator, .{
-                .name = decoded.symbol,
-                .value = start,
-                .size = decoded.serialized_size,
-                .section_index = 2,
-                .info = 0x11,
-            });
-            try symbol_indices.put(decoded.symbol, @intCast(symbols.items.len));
-            continue;
-        };
         const is_tls = isThreadLocal(global);
         const section_data = if (is_tls) tdata else data;
         const start: u64 = section_data.items.len;

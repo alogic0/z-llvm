@@ -1,5 +1,14 @@
 # Next steps
 
+The user's constant-table review repairs are accepted. The
+[repair evidence](evidence/table_contract_repairs_20261116.md) records allocation
+and serialized-layout checks, index-proof-aware fallback, ordinary ELF placement
+and permanent two-object link coverage. All 2,421 Fast units, 74 structural
+checks, seventeen integration stages and 235 native populations pass. Fixed
+Debug-module object/owner bytes remain exact. Both cycle compilers and all
+temporary workspaces are closed; seven current contracts and independent holds
+remain unchanged. No implementation action remains in this review repair.
+
 The [compiler-object, behavior and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
 is complete through milestone 8 at backend source `dbf7ade0`. The
 [final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)

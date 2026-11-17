@@ -13714,6 +13714,25 @@
       "functions": ["identity_sum", "identity_difference", "identity_mix", "identity_call"],
       "observations": 1056,
       "stdout": "identity-names observations=1056 long=quoted=distinct=relocations=preserved\n"
+    },
+    {
+      "population": "table_contracts",
+      "fixture": "table_contracts",
+      "prefix": "table-contracts",
+      "functions": ["contract_unbounded", "contract_typed", "contract_literal", "contract_masked", "contract_stride4", "contract_array_element"],
+      "observations": 768,
+      "stdout": "table-contracts observations=768 fallback=typed=literal=bounded=strides=preserved\n"
+    },
+    {
+      "population": "table_private_link",
+      "fixture": "table_private_a",
+      "provider_fixture": "table_private_b",
+      "provider_codegen_reachable": false,
+      "provider_exports": ["private_read_b", "internal_read_b"],
+      "prefix": "table-private-link",
+      "functions": ["private_read_a", "internal_read_a"],
+      "observations": 512,
+      "stdout": "table-private-link observations=512 private=internal=isolated\n"
     }
   ]
 }

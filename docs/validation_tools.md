@@ -199,6 +199,12 @@ pass calibration. Default runs retain their existing procedure and report fields
 A private research compiler remains research evidence; using this entry point
 does not grant production acceptance.
 
+A registry `provider_fixture` builds a separate local object with reachable
+selection by default. Set `provider_codegen_reachable` to `false` to exercise
+default object emission on both sides of a two-object link. The
+`table_private_link` regression uses this route to check colliding private and
+internal table names; provider source, backend and object hashes remain recorded.
+
 `tools/run_native_fault_checks.zig` replaces `check-pair-faults.py` and
 `check-aggregate-faults.py` when binaries already exist. Its input manifest is:
 

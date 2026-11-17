@@ -138,7 +138,7 @@ fn tableOwnsStride(allocator: std.mem.Allocator, context: ?*const machine.ReadOn
         return false;
     }) orelse return false;
     defer decoded.deinit(allocator);
-    return tables.sourceStrideMatches(gep.source_ty, decoded.shape);
+    return tables.sourceStrideMatches(ctx.target_datalayout, gep.source_ty, decoded.shape);
 }
 
 fn structureOffset(context: ?*const machine.ReadOnlyModuleContext, gep: ir.GepInst) ?u32 {
