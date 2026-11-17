@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../ir.zig");
 const datalayout = @import("../target/datalayout.zig");
+const geometry = @import("../target/module_layout.zig");
 
 pub const MemoryLocation = struct {
     pub const RootKind = enum {
@@ -200,7 +201,8 @@ pub fn typeSize(ty: ir.Type) ?u64 {
 }
 
 pub fn typeSizeWithLayout(layout: datalayout.DataLayout, ty: ir.Type) ?u64 {
-    return layout.typeStoreSizeBytes(ty) catch null;
+    const facts = (geometry.Query.init(layout.text, &.{}, .{}) orelse return null).query(ty) orelse return null;
+    return facts.store_bytes;
 }
 
 fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
@@ -210,7 +212,7 @@ fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
 
 /// GEP steps follow allocation spacing; access widths still use store size.
 fn allocationStrideMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
-    if (layout) |target_layout| return target_layout.typeAllocSizeBytes(ty) catch null;
+    if (layout) |target_layout| return ((geometry.Query.init(target_layout.text, &.{}, .{}) orelse return null).query(ty) orelse return null).allocation_bytes;
     const bytes = typeSize(ty) orelse return null;
     // Target-free padded scalars cannot establish a stride from their payload.
     // Keep them unknown instead of granting a false same-address proof.
@@ -263,7 +265,13 @@ pub fn aggregateFieldOffset(ty: ir.Type, field_index: usize) ?i128 {
 }
 
 pub fn aggregateFieldOffsetWithLayout(layout: datalayout.DataLayout, ty: ir.Type, field_index: usize) ?i128 {
-    return layout.aggregateFieldOffsetBytes(ty, field_index) catch null;
+    const query = geometry.Query.init(layout.text, &.{}, .{}) orelse return null;
+    if (ty == .aggregate) if (arrayInfo(ty.aggregate)) |array| {
+        _ = query.query(ty) orelse return null;
+        const element = query.query(array.element_ty) orelse return null;
+        return @intCast(std.math.mul(u64, @intCast(field_index), element.allocation_bytes) catch return null);
+    };
+    return @intCast((query.field(ty, field_index) orelse return null).offset);
 }
 
 fn aggregateFieldOffsetMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type, field_index: usize) ?i128 {

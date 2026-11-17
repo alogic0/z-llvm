@@ -13746,6 +13746,15 @@
       "functions": ["private_read_a", "internal_read_a"],
       "observations": 512,
       "stdout": "table-private-link observations=512 private=internal=isolated\n"
+    },
+    {
+      "population": "layout_integer",
+      "fixture": "layout_integer",
+      "reference_fixture": "layout_integer_reference",
+      "prefix": "layout-integer",
+      "functions": ["layout_i80_array", "layout_i80_struct", "layout_i24_array", "layout_i24_struct", "layout_i9_array"],
+      "observations": 320,
+      "stdout": "layout-integer observations=320 strides=alignments=preserved\n"
     }
   ]
 }

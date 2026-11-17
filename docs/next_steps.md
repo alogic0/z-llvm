@@ -8,9 +8,16 @@ unknown. The unchanged predecessor fails both unit regressions and all four
 independent native pipeline comparisons. The corrected source passes 2,425 Fast
 units, all seventeen integration gates and all 236 native populations; storage
 closure passes with only two explicitly adopted follow-up pipelines remaining.
-Current action is the shared module-aware layout query. Its isolated prototype
-and five additional confirmed integer-geometry corrections need separate
-production qualification; no later follow-up slice is complete yet.
+The accepted successor shares the
+[shared module-aware layout query](evidence/module_layout_query_20261117.md)
+and five additional confirmed integer-geometry corrections. Fresh 2,431 Fast
+units, native/fixed-byte preservation, all 396 fault controls, ABI and M1 checks
+pass. Its own fresh Tier 3 now passes all seventeen gates and all 237 native
+populations. Storage closure passes; only the next table slice's predecessor and
+the isolated later-prototype source/compiler remain declared consumers.
+Current action is ordered production promotion and Tier-2 qualification of
+table admission/emission agreement, then the rewrite builder and checked byte
+facts. No later follow-up slice is complete yet.
 
 The user's [consumer fallback follow-up](evidence/table_consumer_fallback_20261116.md)
 is accepted after Tier-2 qualification and storage closure. Table reservation now
@@ -26,12 +33,12 @@ Original failed setup receipts and source-bound subcommand reuse remain explicit
 The user has now authorized the ordered follow-up in the
 [generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions),
 starting from the consumer-fallback repair at `11fd57ec`. The current action is
-the layout audit and shared exact query, with constant tables and backend storage
-as its first consumers. Investigate the i24/f80 GEP discrepancy before claiming
-a bug; qualify any semantic correction separately from refactoring. Subsequent
-slices consolidate table admission/fallback, share narrow rewrite construction
-for floating pair loads and memory bitcasts, then audit broader pointer/access
-facts. Preserve the completed five-stage acceptance and scheduling deferral.
+table admission/fallback consolidation, following the accepted shared exact query
+for constant tables and backend storage. The separately qualified i24/f80 stride
+correction precedes that query; semantic corrections remain distinguished from
+factoring. Subsequent slices share narrow rewrite construction for floating pair
+loads and memory bitcasts, then caller-audited byte/access facts. Preserve the
+completed five-stage acceptance and scheduling deferral.
 
 The earlier constant-table review batch is accepted at `1fa64f9e`. Its
 [repair evidence](evidence/table_contract_repairs_20261116.md) records allocation

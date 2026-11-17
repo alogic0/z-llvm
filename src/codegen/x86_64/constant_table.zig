@@ -1,7 +1,7 @@
 const std = @import("std");
 const ir = @import("../../ir.zig");
 const match = @import("match.zig");
-const target = @import("../../target.zig");
+const geometry = @import("../../target/module_layout.zig");
 const addresses = @import("symbol_address.zig");
 
 pub const ReadOnlyModuleContext = struct {
@@ -198,8 +198,8 @@ pub fn sourceStrideMatches(datalayout: ?[]const u8, source_ty: ir.Type, shape: D
     if (source_ty != .aggregate or !std.mem.eql(u8, std.mem.trim(u8, source_ty.aggregate, " \t"), expected)) return false;
     const text = datalayout orelse return false;
     if (!addresses.supportsLayout(text) or !nativeAlignmentOverrides(text, "i8:", 8)) return false;
-    const layout = target.DataLayout.parse(text) catch return false;
-    return (layout.typeAllocSizeBytes(source_ty) catch return false) == shape.stride();
+    const layout = geometry.Query.init(text, &.{}, .{ .identifier_equality = .spelling }) orelse return false;
+    return (layout.query(source_ty) orelse return false).allocation_bytes == shape.stride();
 }
 
 pub const Decoded = struct {
@@ -238,7 +238,7 @@ pub fn decodeGlobal(
     }
 
     const classified = classify(context, global.ty) orelse return null;
-    if (!serializedLayoutMatches(context.target_datalayout, global.ty, classified.shape)) return null;
+    if (!serializedLayoutMatches(context, global.ty, classified)) return null;
     const declared_alignment = parseAlignment(global.attrs) orelse return null;
     if (declared_alignment < classified.shape.alignment() or !std.math.isPowerOfTwo(declared_alignment)) return null;
 
@@ -333,40 +333,26 @@ fn nativeAlignmentOverrides(text: []const u8, prefix: []const u8, expected: u16)
     return true;
 }
 
-fn serializedLayoutMatches(datalayout: ?[]const u8, ty: ir.Type, shape: Description) bool {
-    const text = datalayout orelse return false;
-    const layout = target.DataLayout.parse(text) catch return false;
+fn serializedLayoutMatches(context: ReadOnlyModuleContext, ty: ir.Type, classified: Classified) bool {
+    const text = context.target_datalayout orelse return false;
+    const layout = geometry.Query.init(text, context.named_types, .{ .identifier_equality = .spelling }) orelse return false;
+    const shape = classified.shape;
     const element: ir.Type = switch (shape.element) {
         .i16 => .{ .int = 16 },
         .f64 => .double,
-        .f64_pair => .{ .aggregate = "{ double, double }" },
+        .f64_pair => .{ .aggregate = classified.element_type },
     };
     if (!nativeAlignmentOverrides(text, if (shape.element == .i16) "i16:" else "f64:", if (shape.element == .i16) 16 else 64)) return false;
     if (shape.element == .f64_pair) {
-        // The shared layout query uses natural struct alignment. An explicit
-        // aggregate floor up to 16 bytes still leaves this exact pair's two
-        // field offsets and 16-byte allocation unchanged; larger floors do not.
-        var parts = std.mem.splitScalar(u8, text, '-');
-        while (parts.next()) |part| {
-            if (!std.mem.startsWith(u8, part, "a:")) continue;
-            var fields = std.mem.splitScalar(u8, part[2..], ':');
-            const abi = std.fmt.parseUnsigned(u16, fields.next() orelse return false, 10) catch return false;
-            if (abi != 0 and (abi < 8 or abi > 128 or !std.math.isPowerOfTwo(abi))) return false;
-            if (fields.next()) |value| {
-                const preferred = std.fmt.parseUnsigned(u16, value, 10) catch return false;
-                if (preferred != 0 and (preferred < abi or !std.math.isPowerOfTwo(preferred))) return false;
-            }
-            if (fields.next() != null) return false;
-        }
+        // Resolve the actual module type and prove the codec's field placement.
+        // A 16-byte ABI floor can preserve this stride without changing the
+        // existing scalar load's eight-byte minimum alignment.
+        if ((layout.field(element, 0) orelse return false).offset != 0 or
+            (layout.field(element, 1) orelse return false).offset != 8) return false;
     }
-    if ((layout.typeAllocSizeBytes(element) catch return false) != shape.stride()) return false;
-    // classify resolved the sole named-pair spelling to this exact body. Use
-    // that body for the shared query, which does not resolve module type names.
-    const storage_ty: ir.Type = if (shape.element == .f64_pair)
-        .{ .aggregate = "[128 x { double, double }]" }
-    else
-        ty;
-    return (layout.typeAllocSizeBytes(storage_ty) catch return false) == shape.serialized_extent;
+    if ((layout.query(element) orelse return false).allocation_bytes != shape.stride()) return false;
+    const storage = layout.query(ty) orelse return false;
+    return storage.allocation_bytes == shape.serialized_extent and storage.store_bytes == shape.serialized_extent;
 }
 
 fn parseAlignment(attrs: ?[]const u8) ?u32 {

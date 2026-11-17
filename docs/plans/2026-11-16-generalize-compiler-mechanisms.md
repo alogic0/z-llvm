@@ -383,6 +383,15 @@ implicit baseline.
 | 3 | Extract a small rewrite-construction helper | Floating pair loads and memory bitcasts |
 | 4 | Share broader pointer/access facts after a caller audit | Memory-location analysis and aggregate-object views |
 
+The ordered layout slice now has its own
+[production qualification](../evidence/module_layout_query_20261117.md): shared
+geometry, five separately demonstrated integer-layout corrections and explicitly
+classified newly known wide analysis strides. Fresh 2,431 Fast units, all
+seventeen integration gates and 237 native populations pass. Its storage record
+closes ordinary products and names the next slice's exact predecessor consumer.
+The later three slices remain pending production acceptance; isolated prototype
+results do not close them.
+
 Each implementation slice needs its own bounded scope and the validation,
 ownership and storage requirements below.
 Source-level discrepancies require investigation before a runtime failure is
