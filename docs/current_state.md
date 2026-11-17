@@ -176,9 +176,16 @@ verification binds all 679 compiler sources, SDK/library, frontend, reference
 and providers. Existing Safe/postopt acceptance remains separate. All owned
 pipelines close with zero temporary roots; audited raw events retire explicitly.
 The additive eighth maintained-proof manifest preserves the original seven
-contracts and seventeen independent holds. All eight verify. ReleaseSmall,
-performance parity, compiler preopt self-rebuild and LLVM construction removal
-remain separate scopes; scheduling remains deferred.
+contracts and seventeen independent holds. All eight verify.
+
+The subsequent ReleaseSmall run matched the normal LLVM reference on all 2,063
+passes and 34 skips. Its 903 runtime definitions and 6,684 test definitions
+were discovered independently with compiler-rt also in Small mode. Both local
+optimizer outputs matched the corresponding emitter inputs, and the independent
+auditors checked both objects and 2,943,342 ordered events. The observed
+optimizer failure stopped before object emission. All 17 preservation gates and
+237 native populations passed on the same compiler source.
+[ReleaseSmall result](evidence/release_small_preopt_acceptance_20261117.md)
 
 ## Fixed compiler-core execution cohort
 

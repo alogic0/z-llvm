@@ -2,10 +2,13 @@
 
 Current authorization is the ordered
 [M1/M2/M3 coordination plan](plans/2026-11-17-preopt-qualification-performance-self-rebuild.md).
-Begin [M1 ReleaseSmall preopt qualification](plans/2026-11-17-release-small-preopt-behavior.md)
-from reviewed `435ba95c` / compiler `c32ba3cf`. Complete all 2,097 ordered Small
-outcomes, separate runtime/test inventories and full audits, no-fallback control,
-preservation and owned storage closure; commit and stop for independent review.
+The M1 ReleaseSmall run matched all 2,097 ordered outcomes. The runtime and
+test audits, real optimizer-failure control, 17 integration gates and 237 native
+populations passed at compiler source `c32ba3cf`.
+[M1 plan and review state](plans/2026-11-17-release-small-preopt-behavior.md)
+
+All 63 M1 workspace roots are closed. The next decision is the independent
+review of the frozen M1 result.
 M2 generated-code measurements and M3 compiler preopt/self-rebuild remain gated
 on the reviewer's explicit authorization after each preceding milestone.
 
@@ -131,10 +134,10 @@ For a separately authorized successor, preserve these boundaries:
 1. Preserve the fixed inputs, generation identities, capture reports and sealed
    evidence. Keep the original five-milestone acceptance and fixed compiler-core
    cohort as separate records.
-2. Keep LLVM dependency removal bounded by the ReleaseSafe preopt plan's explicit
-   stage captures, independently inventoried inputs, negative control and
-   single-mode acceptance. Debug, other release modes, complete compiler preopt
-   builds and provider removal remain separate milestones.
+2. Each preopt behavior qualification binds its own reference, captured stages,
+   independent runtime/test inventories and failure control. Safe, Fast and
+   Small now have separate execution evidence. Debug, whole-compiler preopt
+   builds and provider removal retain their own scopes.
 3. For further compiler performance work, use the
    [profiling guide](compiler_profiling.md) and
    [validation performance results](evidence/validation_performance.md).

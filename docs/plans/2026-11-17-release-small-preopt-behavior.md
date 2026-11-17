@@ -1,7 +1,9 @@
 # ReleaseSmall behavior through the local preopt pipeline
 
 Date: 2026-11-17
-Status: authorized M1; baseline admission in progress. Starting tracked baseline
+The full Small run, audits, cumulative integration and final source verification
+passed. All 63 owned workspace roots are closed. M1 is ready for independent
+milestone review. Starting tracked baseline
 `435ba95c`, compiler source `c32ba3cf`. Canonical sequencing and review gates are
 in the [coordination plan](2026-11-17-preopt-qualification-performance-self-rebuild.md).
 
@@ -101,6 +103,39 @@ Write retention.md before each producer. Use tools/run-validation, including
 --command for scripts; generated products go under ZLLVM_TEMP_ROOT and selected
 evidence under ZLLVM_RUN_ROOT. No milestone-long outer lease.
 
+Execution update: the outer setup session returned 143 while its original SDK
+build continued. The monitor receipt remains unfinalized; a separate managed
+candidate admission binds the actual completed child build without a duplicate
+build or an invented monitor exit. Original receipts and diagnosis remain.
+Candidate `995d5d9d` has the same complete compiler source, SDK/library and build
+flags as Fast candidate `87ab3a8e`, but different executable bytes. Therefore
+the executable-identity reuse condition is not met: run fresh fixed Debug,
+60-case ABI, 27-executable preservation and full serial 17-gate/237-population
+integration. The planned adoption helper is unused and earns no execution credit.
+Drive subsequent managed stages separately and preserve original failures.
+
+The unchanged complete Small run matches all 2,097 ordered reference outcomes
+(2,063 OK and 34 SKIP). Independent runtime/test inventories find 903 and 6,684
+definitions. Exact stage pairing, measured input admission, complete censuses,
+objects/owners/ELF and all 2,943,342 ordered-event records pass. The first copied
+fault matcher recognized Fast only; its child actually succeeded and enclosing
+checker actually failed. It earns no failure-control credit; both extra objects
+were independently audited. A new Small-qualified matcher passes six dispatch
+checks and the real final-candidate optimizer failure: one failed optimizer,
+zero emitters, objects or behavior execution. Fresh fixed Debug object equality,
+60 ABI cases, 27 executable checks, 17 integration gates and 237 native
+populations passed. Final verification rechecked the 679 compiler sources,
+the complete SDK library, reference and providers before closing their consumers.
+
+The separate [interrupted-workspace recovery work](2026-11-17-interrupted-workspace-recovery.md)
+preserves the original unknown producer outcome. The reviewer approved the
+exact ten-file recovery patch and its Debug/Fast qualification after four
+findings were fixed. The first native dry review removed zero. The successor
+plan kept historical snapshots for the live policy, holds and independent
+release records. The separately authorized apply returned zero and reclaimed
+265,383,936 bytes from one workspace. Its final action record retained the
+reviewed 25 paths. The original layout, receipt and job verified after removal.
+
 Temporary producers: candidate/compiler build caches, five auditor/runner/tool
 executables, separate private tool-build/test scratch, full-suite caches/objects/
 executable, negative-control scratch and any demonstrated repair checks.
@@ -130,3 +165,10 @@ retains release/collector receipts. Build the new seal only from an explicit
 maintained-file list. If registered, add this owned proof as a ninth policy entry
 with exact before/after identities, preserving the original eight paths/bytes,
 all other policy fields and independent holds. Do not add ordinary payload pins.
+
+The final storage inventory, collector receipts, selected file list and proof
+identity are under `final-storage/` in the evidence root. The selected seal has
+468 files. The [qualification result](../evidence/release_small_preopt_acceptance_20261117.md)
+records the execution, failures, operational recovery and disposition.
+The ninth policy entry preserves the original eight contracts. All nine
+verified after publication, with the seventeen independent holds unchanged.

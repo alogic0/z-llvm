@@ -131,6 +131,14 @@ stay failed; independently verified completed child results are identified
 explicitly. Audited trace retirement and storage disposition are separate from
 successful behavior execution.
 
+The same runner qualified the full suite in Fast and Small. With
+`ZLLVM_ZIG_MODE=ReleaseSmall`, the hook selects `zig-release-small-accepted`
+and the compiler-rt frontend also uses Small. Runtime and test capture
+populations are discovered separately for each mode. The Small run found
+903 runtime definitions and 6,684 test definitions.
+[Fast qualification](evidence/release_fast_preopt_acceptance_20261117.md)
+and [Small qualification](evidence/release_small_preopt_acceptance_20261117.md)
+
 For managed roots, private caches, the test executable and captured local objects
 use the temporary workspace; reports, captured inputs, event traces and logs
 stay in evidence. Pass this tool's `--retain-products` while independent object

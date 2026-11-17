@@ -1,0 +1,312 @@
+{
+  "schema": "release-small-preopt-acceptance-v1",
+  "status": "passed",
+  "scope": "Full unchanged upstream ReleaseSmall behavior suite, local preopt optimizer and object emitter",
+  "compiler_source": "c32ba3cfb1f67340ac5706fbc77ac56569b37007",
+  "evidence_root": "local-state/validations/release-small-preopt-20261117/batch-01",
+  "frontend": {
+    "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/whole-qualified-normal-v1490/install/bin/zig",
+    "sha256": "972160f222580c039d2e3244983c0aa13b16957ed56548c6153fb46af896bf8b"
+  },
+  "upstream_source": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "suite": {
+    "path": "/home/oleg/prog/ziglang/test/behavior.zig",
+    "sha256": "3ef0e65cb6a9bb8a112549d0d8a52ded81cf4b154bd1f059c4dd878e38098af6"
+  },
+  "libc": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/native-libc-link-v8/native-libc.txt",
+    "sha256": "76ec8b788d551b0beed8f7359fd5ded95086f4a758b4bf2e07dfe31b2afdd34f"
+  },
+  "reference": {
+    "current": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/release-safe-preopt-20261115/batch-01/preserve-reference-ReleaseSmall/run/report.json",
+      "sha256": "61021ed755222a295ef4d6bbf683e0a7b60bedd08277934261f1cbaf2ec0ad21"
+    },
+    "generation1": {
+      "path": "/home/oleg/prog/z_llvm-validation-qualified-behavior-v1461/local-state/isolated-validations-qualified-behavior-v1461/final-generation1-llvm-v1549/ReleaseSmall/report.json",
+      "sha256": "9fe0c436e40e5edc77bde977d028dd4f22f00209f6eeb8e5a37d60796881dc53"
+    },
+    "providers": 25,
+    "refresh_required": false
+  },
+  "backend": {
+    "identity_at_execution": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/candidate/ReleaseFast/bin/z_llvm",
+      "sha256": "995d5d9d002e68898eb2641e67df92f3cbb7fb2127b6d0cfff33c9292ee8a068"
+    },
+    "build_revision": "fd52842bb311be8a6e078027b2fddf5dff9e54ae",
+    "source_files": 679,
+    "mode": "ReleaseFast",
+    "target": "x86_64-linux-gnu",
+    "cpu": "baseline",
+    "strip": false,
+    "omit_frame_pointer": false,
+    "sdk": {
+      "path": "/home/oleg/.zig/0.17.0/files/zig",
+      "sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+      "version": "0.17.0",
+      "host_target": "x86_64-linux.7.0...7.0-gnu.2.39",
+      "library": {
+        "path": "/home/oleg/.zig/0.17.0/files/lib",
+        "files": 19501,
+        "sha256": "da12ef3b9d8d4a6120652a8b53e18a905dace8a7eeb10a260c3db619a10f4a99"
+      }
+    }
+  },
+  "route": {
+    "pipeline": "preopt",
+    "mode": "ReleaseSmall",
+    "passes": "zig-release-small-accepted",
+    "compiler_rt_frontend_mode": "ReleaseSmall",
+    "llvm_construction_and_setup": true,
+    "local_optimizer_emitter": true
+  },
+  "behavior": {
+    "ordered": 2097,
+    "ok": 2063,
+    "skips": 34,
+    "failures": 0,
+    "single_complete_run": true,
+    "reference_matches": true,
+    "fresh_backend_link_execution": true,
+    "fresh_private_frontend_caches": true,
+    "resources": "normal",
+    "space": {
+      "policy": {
+        "filesystem_total_bytes": 982240026624,
+        "reserve_bytes": 11410065408,
+        "projected_peak_bytes": 8589934592,
+        "required_start_bytes": 20000000000
+      },
+      "starting_free_bytes": 191156727808,
+      "minimum_sampled_free_bytes": 190047985664,
+      "observed_global_decrease_bytes": 1108742144,
+      "reserve_violated": false,
+      "sampling_failed": false,
+      "interval_ms": 2000
+    }
+  },
+  "optimizer_invocations": 2,
+  "emitter_invocations": 2,
+  "unexplained_inputs": 0,
+  "modules": [
+    {
+      "source_filename": "compiler_rt",
+      "definitions": 903,
+      "declarations": 48,
+      "globals": 116,
+      "aliases": 462,
+      "optimizer": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/capture-01/run/captures/661865",
+      "emitter": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/capture-01/run/captures/661874",
+      "raw_input_sha256": "6c61c85fbb305a890cbeb2ee7872f07b72400f3274398865c37d458a853c1e4d",
+      "raw_input_bytes": 2595183,
+      "optimized_input_sha256": "17214f4b5c7472122d68f630c40972f8f84dbc0a742c10efae54d08464c67e65",
+      "optimized_input_bytes": 1928056,
+      "raw_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/inventory-01/module-661865.json",
+      "optimized_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/inventory-01/module-661874.json",
+      "all_function_declaration_global_alias_identities_preserved": true,
+      "local_verification": true,
+      "llvm_verify_only": true,
+      "object_ownership_elf_audited": true
+    },
+    {
+      "source_filename": "test",
+      "definitions": 6684,
+      "declarations": 611,
+      "globals": 4365,
+      "aliases": 46,
+      "optimizer": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/capture-01/run/captures/662067",
+      "emitter": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/capture-01/run/captures/662080",
+      "raw_input_sha256": "1f5da3d3b5a41e01d22106775b7037a4f9096535dd797a030e7207e66d157e2a",
+      "raw_input_bytes": 14462768,
+      "optimized_input_sha256": "aa9c9b3e028f4743a26339b8d3ea6a63b2ff3f287d2bac1c5604ee7ebcaad7b4",
+      "optimized_input_bytes": 10863806,
+      "raw_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/inventory-01/module-662067.json",
+      "optimized_inventory": "/home/oleg/prog/z_llvm/local-state/validations/release-small-preopt-20261117/batch-01/inventory-01/module-662080.json",
+      "all_function_declaration_global_alias_identities_preserved": true,
+      "local_verification": true,
+      "llvm_verify_only": true,
+      "object_ownership_elf_audited": true
+    }
+  ],
+  "delivered_objects": [
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/release-small-preopt-20261117/batch-01/capture-01/run/.workspaces/validation/captures/661874/local.o",
+      "bytes": 2825888,
+      "sha256": "e7a7c80e9c293720414f8dd53a846aeb133b1fbc22ebb9f6d860f5fb9920653b"
+    },
+    {
+      "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/release-small-preopt-20261117/batch-01/capture-01/run/.workspaces/validation/captures/662080/local.o",
+      "bytes": 18970464,
+      "sha256": "29f888ee6446f57324bbff4cf0ad2bf91b8a392dea8a844d2b2e127722850e40"
+    }
+  ],
+  "event_audits": {
+    "runtime": 418992,
+    "tests": 2524350,
+    "total": 2943342,
+    "complete": true
+  },
+  "real_failure_control": {
+    "compile_exit": 1,
+    "failed_optimizers": 1,
+    "emitters": 0,
+    "delivered_objects": 0,
+    "behavior_executed": false
+  },
+  "preservation": {
+    "fixed_debug": true,
+    "abi": 60,
+    "executables": 27,
+    "tier3_gates": 17,
+    "native_populations": 237,
+    "fresh_backend_link_execution": true,
+    "real_row_air": "authenticated reuse",
+    "prior_safe_fast_postopt": true
+  },
+  "original_incidents": {
+    "setup": {
+      "outer_exit": 143,
+      "checked_monitor": "unknown",
+      "child_exit": 0,
+      "duplicate_build": false,
+      "observation": {
+        "path": "local-state/validations/release-small-preopt-20261117/batch-01/orchestration-incident/observed.json",
+        "sha256": "945d121754305dbe6508c25baf40625c7c4197108c05fe799e886cb8e7b47aa6"
+      }
+    },
+    "first_control": {
+      "child_actual": 0,
+      "checker_actual": 1,
+      "injection_observed": false,
+      "extra_objects_audited": 2
+    },
+    "storage_tool_earlier_attempts": "orphan-recovery/qualification-diagnosis.md",
+    "documentation": {
+      "first_command_exit": 1,
+      "cause": "unsupported build option before checker execution",
+      "retry_coordinator_exit": 1,
+      "cause_of_deferral": "active-command protection on a sibling run prefix",
+      "final_receipt": "project-docs/checks.json"
+    }
+  },
+  "recovery": {
+    "source_commit": "ec639588",
+    "approved_patch": "b89ae2ec802f70b7c7ab684491779d73e6b5ab2fb4360f503c1af5cf0493c490",
+    "fresh_qualification": [
+      {
+        "mode": "Debug",
+        "actual_returncode": 0,
+        "focused_native_tests": 3,
+        "positive_dry_and_apply": true,
+        "negative_cases": 26,
+        "quarantine_rollback_cases": 2,
+        "legacy_workspace_cli_cases": 11,
+        "actual_fixture_interruption_status": 137,
+        "receipt": {
+          "path": "local-state/validations/release-small-preopt-20261117/batch-01/orphan-recovery/qualification-r8/Debug/checks.json",
+          "sha256": "38a346cd3235852efba9b64be5cd7310373ce56ac87ca4e7b27e591d9e3056e9"
+        },
+        "report": {
+          "path": "local-state/validations/release-small-preopt-20261117/batch-01/orphan-recovery/qualification-r8/Debug/report.json",
+          "sha256": "fd9f11db3a3d3b34e20f84a8430f71560126d133c284ebde36a6bce766ad0269"
+        }
+      },
+      {
+        "mode": "ReleaseFast",
+        "actual_returncode": 0,
+        "focused_native_tests": 3,
+        "positive_dry_and_apply": true,
+        "negative_cases": 26,
+        "quarantine_rollback_cases": 2,
+        "legacy_workspace_cli_cases": 11,
+        "actual_fixture_interruption_status": 137,
+        "receipt": {
+          "path": "local-state/validations/release-small-preopt-20261117/batch-01/orphan-recovery/qualification-r8/ReleaseFast/checks.json",
+          "sha256": "23b6149351feab5b2759231d3e1c0be7480b6afb7984172f99ace8c480bb5507"
+        },
+        "report": {
+          "path": "local-state/validations/release-small-preopt-20261117/batch-01/orphan-recovery/qualification-r8/ReleaseFast/report.json",
+          "sha256": "87c9702c385dd3c3c891f2d157668c25310d87ccbc5720ec1846b823406a52fd"
+        }
+      }
+    ],
+    "first_plan_held": "5d2f0b97df6f393b110ab4b844007f6d961f23745cf6e661540eeeec691fa6d3",
+    "applied_plan": "a95f43925e0a008a95319ef602e98ccbe403e7dab27d394f11ed0a5077a8e211",
+    "dry": {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794957258520889775-1063111/report.json",
+      "sha256": "aea83b45b9f742a35906e9723bdacde87657d678ca74dc1f55fa1a10fb7c63e8"
+    },
+    "apply": {
+      "path": "local-state/retirements/automatic-storage-cleanup/1794957605971871164-1072275/report.json",
+      "sha256": "72ec203e1ef4f4a8dbcd7b304ad4f1c2c78665f78d66970ba785355b648faf87"
+    },
+    "original_monitor": "unknown"
+  },
+  "storage": {
+    "status": "passed",
+    "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1794957870653458992-1079030/report.json",
+    "recovery_receipt": "local-state/retirements/automatic-storage-cleanup/1794957605971871164-1072275/report.json",
+    "documentation_collection": "local-state/retirements/automatic-storage-cleanup/1794958702101664120-1096803/report.json",
+    "all_owned_pipelines_closed": true,
+    "remaining_owned_temporary_roots": 0,
+    "unique_workspace_roots_accounted_for": 63,
+    "remaining_raw_streams_and_ordinary_objects": 0,
+    "original_monitor_outcome": "unknown",
+    "original_layout_receipt_job_unchanged": true,
+    "eight_current_integrity_manifests_verified": true,
+    "independent_holds": 17,
+    "framework_bootstrap_caches": "independent launcher and collector owners",
+    "recovery_apply_separate_from_compiler_qualification": true
+  },
+  "registration": {
+    "status": "passed",
+    "original_current_manifests": 8,
+    "current_manifests": 9,
+    "all_nine_verify": true,
+    "original_eight_paths_and_bytes_unchanged": true,
+    "all_other_policy_fields_unchanged": true,
+    "independent_holds": 17,
+    "independent_holds_unchanged": true,
+    "owned_manifest": "local-state/validations/release-small-preopt-20261117/batch-01/maintained-release-small-preopt-proof-20261117.sha256",
+    "owned_manifest_sha256": "dcb1fe9ba263f06ffd2ce46d81a47ac5af2eeab57a7eb2fc2faccceadc60c36a",
+    "maintained_files": 468,
+    "ordinary_compiler_object_and_cache_pins": 0
+  },
+  "proof": {
+    "behavior": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/capture-01/run/report.json",
+      "sha256": "6c81c052befe394043599bab39e0d36e85d64ff685cf844629dcfbb3a70bf0ed"
+    },
+    "inventories": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/reconcile-01/report.json",
+      "sha256": "1408434dc42ac99c09fb0dceb491c017a7cc9d3ad465fc37aa1bfd1cd2ba1506"
+    },
+    "events": {
+      "path": "local-state/retirements/native-event-audit/1794944284862711911-677085/summary.json",
+      "sha256": "688132c59fec06d45afbd56f9d093a9d03f1e81d142fa75b1e96e554baeaf7e5"
+    },
+    "failure_control": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/route-control-r2/control.json",
+      "sha256": "17ccb0f1fcbdfad3fb470eb745c205f00f4211a9cfd054909a9be6587470a664"
+    },
+    "preservation": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/preservation/report.json",
+      "sha256": "9c150d1aca54f56a0d8c0f070f711e5f6934ba108da38e70a7787c5debeecad3"
+    },
+    "integration": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/integration/report.json",
+      "sha256": "8f0612a2601d9e19d80cd1e265b1760ac41d4a5e61ebfae3d788a61923d664a5"
+    },
+    "source": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/final-verification/report.json",
+      "sha256": "7c8626c0cb1e4f84af7878ddc22e9f56064d55d0f19daa076e821b603012a9ae"
+    },
+    "storage": {
+      "path": "local-state/validations/release-small-preopt-20261117/batch-01/final-storage/report.json",
+      "sha256": "15d15cbde48a0f475c06a536f3f88c5da7f83f90cb80c9424ade20971bfbe8d6"
+    }
+  },
+  "review": "M1 submitted for independent milestone review",
+  "successor_measurement_and_self_build_credit": false
+}

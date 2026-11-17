@@ -30,6 +30,12 @@ native populations passing. Its
 [scheduler experiment](evidence/compiler_generalization_stage5_20261116.md) is
 measured and deferred because the declared benefit was not demonstrated.
 
+The subsequent Fast and Small qualifications each match all 2,097 ordered
+outcomes in one complete local preopt run. Their separate references, module
+inventories and failure controls are recorded in the
+[Fast result](evidence/release_fast_preopt_acceptance_20261117.md) and
+[Small result](evidence/release_small_preopt_acceptance_20261117.md).
+
 The [validation and compiler performance improvement plan](plans/2026-11-09-validation-performance-improvement.md)
 records the toolchain, profiling, and validation-reuse work. See
 [next steps](next_steps.md) for the active direction and

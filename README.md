@@ -64,6 +64,12 @@ The real optimizer-failure control stops before emission. Fresh preservation
 passes all 17 integration gates and 237 native populations; storage is closed.
 LLVM construction, setup and declared providers remain dependencies.
 
+The ReleaseSmall run at the same compiler source also matches all 2,097 ordered
+normal LLVM outcomes, including 34 skips. Compiler-rt switches to Small for
+this run. The independently inventoried runtime and test objects contain 903
+and 6,684 definitions. The local optimizer failure control stops the compile
+before emission. [ReleaseSmall qualification](docs/evidence/release_small_preopt_acceptance_20261117.md)
+
 Selective legalization was prototyped and measured, then deferred under the
 plan's benefit requirement. Five unprofiled pairs did not demonstrate the
 required time or memory gain; production scheduling is unchanged. The

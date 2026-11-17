@@ -5,12 +5,20 @@ The reviewer approved patch `b89ae2ec` and its Debug and ReleaseFast
 qualification. All ten promoted files match the approved overlay byte for byte.
 Promotion followed the final `c32ba3cf` source consumer.
 Owner: M1 implementation agent. Reviewer: 01a1cf53-4a3b-70d1-adb6-9655b6d4cb24.
-The operation concerns the original M1 compiler-build scratch. The first
-real dry run found one ready action and removed zero. Apply was held because
-its retained list included twelve live controls. The owner and reviewer agreed
-to keep the admission-time control identities under the M1 evidence root while
-the native collector checks the live canonical protections. The successor dry
-run and the separate apply decision are recorded under `orphan-recovery/`.
+The qualified collector reclaimed **265,383,936 allocated bytes** from the one
+interrupted M1 compiler-build workspace. The first dry plan `5d2f0b97` was held
+because twelve live controls would have become permanent pins. The successor
+plan `a95f4392` checked those live protections and retained historical copies
+and identity lists. Its dry report `aea83b45` had one ready action, zero
+removals and no overlap between its 25 retained paths and the twelve controls.
+The reviewer then approved one apply. Both the native command and post-checks
+returned zero. The original layout, receipt and job verified after removal,
+and the journal was clear. The native report and completed action are under
+`local-state/retirements/automatic-storage-cleanup/1794957605971871164-1072275/`.
+The ordinary collector removed both deferred inventory workspaces in receipt
+`1794957442248505635-1068737`. After the recovery transaction closed its
+last consumer, receipt `1794957870653458992-1079030` reclaimed the r5 tool
+pipeline's 84,140,032 allocated file bytes.
 
 The first source review requested two fixes: import held releases and retained
 declarations through discovery before selecting the single recovery action;
@@ -75,7 +83,7 @@ final-verification, finishes. The qualified r5 production collector may perform
 the real read-only inventory/dry review at the first available lease. Send the
 actual binary, plan/tree hashes, process topology, original-record identities,
 policy/holds/eight manifests and exactly one ready/zero removed action for a
-separate apply decision. No real apply or milestone acceptance is approved yet.
+separate apply decision. The operational outcome is recorded above.
 
 ## Observed case and protected semantics
 

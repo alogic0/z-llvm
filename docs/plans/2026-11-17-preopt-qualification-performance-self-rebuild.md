@@ -16,7 +16,7 @@ Findings receive a bounded fix and another review.
 
 | Milestone | Scope | State |
 | --- | --- | --- |
-| M1 | Full unchanged ReleaseSmall behavior through local preopt optimization and object emission | Authorized; admission in progress under the [M1 plan](2026-11-17-release-small-preopt-behavior.md) |
+| M1 | Full unchanged ReleaseSmall behavior through local preopt optimization and object emission | Qualified and storage closed. Awaiting independent milestone review. [M1 plan](2026-11-17-release-small-preopt-behavior.md) |
 | M2 | Generated-program runtime and code/executable size against LLVM | Pending M1 review and explicit authorization |
 | M3 | Compiler build and next-generation self-rebuild through local preopt, initially Fast | Pending M2 review and explicit authorization |
 
@@ -56,6 +56,21 @@ transport may deliver messages. A failed delivery leaves the gate pending.
 
 ## Review ledger
 
-- Baseline: `435ba95c` / compiler `c32ba3cf`, no blocking findings from reviewer.
-- M1: active; no completion or next-milestone authorization yet.
-- M2 and M3: gated; no implementation or benchmark collection started.
+| Decision | Independent review and disposition |
+| --- | --- |
+| Fast baseline `435ba95c` | Reviewed the accepted run at compiler source `c32ba3cf` and authorized M1. |
+| M1 admission `fd52842b` | Approved the plan and per-gate adoption policy. Reuse requires matching source membership and bytes, executable, SDK/library, providers, target, mode, corpus, arguments and expected contract. This decision authorized M1 execution only. |
+| Interrupted build | The outer command returned 143 and the original monitor outcome remained unknown. The child build completed with exit 0. The reviewer required a separate disposal protocol that preserved all three original records. |
+| First recovery patch `16a5e403` | Requested independent held-release and retained-member discovery, plus a current process-argument check for the quarantine path. The revised Debug/Fast fixtures covered both refusal and rollback. |
+| Recovery patch `3070d6c4` | Closed the first two findings. Requested use of the canonical owner policy and matching valid SHA-256 strings for the completed child and its admission. |
+| Recovery patch `b89ae2ec` | Approved the ten frozen files and r8 Debug/Fast results, including 26 refusals, two reader rollbacks and eleven legacy checks in each mode. The files were promoted at `ec639588` after final verification on `c32ba3cf`. |
+| First real dry plan `5d2f0b97` | One ready, zero removed. Apply was held because the retained list would pin twelve independent live controls. |
+| Successor plan `a95f4392` | Approved exactly one apply after reviewing the 25 retained paths, the one-action dry receipt, exact tree, original records and live controls. Native receipt `1794957605971871164-1072275` records one removal and 265,383,936 reclaimed file bytes. The monitor outcome remains unknown. |
+| M1 milestone | The implementation owner submits the frozen qualification and storage evidence to the reviewer. M2 needs a separate decision. |
+| M2 and M3 milestones | Pending their respective prerequisite reviews. |
+
+M1 matched 2,097 ordered Small outcomes and audited 903 runtime and 6,684 test
+definitions, both emitted objects and 2,943,342 ordered events. The corrected
+real failure control, fresh fixed Debug comparison, 60 ABI cases, 27
+executables, 17 integration gates and 237 native populations passed.
+[ReleaseSmall qualification](../evidence/release_small_preopt_acceptance_20261117.md)

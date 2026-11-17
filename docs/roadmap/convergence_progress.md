@@ -4788,6 +4788,10 @@ One line per completed cycle, append-only, newest last. This is the
   [cumulative checkpoint](../evidence/compiler_behavior_complete_checkpoint_20261113.json)
   and [final acceptance](../evidence/compiler_behavior_follow_up_acceptance_20261113.json).
 
+- 2026-11-17 ReleaseSmall local preopt matched 2,097 ordered upstream outcomes
+  on `c32ba3cf`. The runtime and test objects cover 903 and 6,684 definitions.
+  [Qualification evidence](../evidence/release_small_preopt_acceptance_20261117.md)
+
 ## Ratchet State
 
 Current values are generated from [the accepted record](../accepted_status.json).
