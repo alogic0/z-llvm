@@ -405,9 +405,15 @@ GEP step calls `typeSizeMaybeLayout`, whose target-aware path returns store size
 Existing `DataLayout` tests distinguish i24 store size 3 from allocation stride
 4, and x86_fp80 store size 10 from allocation stride 16. Check those padded
 scalar steps and their alias-analysis consumers before migrating this caller.
-This is a source-level discrepancy; the review has not reproduced an end-to-end
-wrong-code failure. Record a focused reproduction and affected consumers for
-any confirmed semantic correction, and qualify it separately from refactoring.
+The follow-up audit reproduced native wrong code in EarlyCSE/GVN, DSE and
+release-o3. Its [separate narrow correction](../evidence/layout_stride_repair_20261116.md)
+is accepted after all seventeen integration gates, 236 native populations and
+storage closure. It preserves store widths for accesses and keeps unproved
+target-free padded scalar offsets unknown. Shared-query production changes are
+the next slice; their isolated checks do not inherit this source acceptance.
+The wider audit also confirms five explicit integer-alignment geometry errors;
+classify those deliberate corrections separately from walker factoring and
+qualify their migrated production callers under the stronger validation tier.
 
 Start with one shared layout query in the target/IR layer, used by constant-table
 and backend-storage consumers. Extend module-aware type and field resolution

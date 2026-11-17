@@ -1,5 +1,8 @@
 const std = @import("std");
 comptime {
+    _ = @import("tests/padded_gep_alias.zig");
+}
+comptime {
     _ = @import("tests/table_contracts.zig");
 }
 comptime {

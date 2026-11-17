@@ -170,7 +170,7 @@ fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
             .named, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return null,
         };
         if (index_position == 0) {
-            const element_size = typeSizeMaybeLayout(layout, current_ty) orelse return null;
+            const element_size = allocationStrideMaybeLayout(layout, current_ty) orelse return null;
             offset += value * @as(i128, @intCast(element_size));
             continue;
         }
@@ -179,7 +179,7 @@ fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
             offset += aggregateFieldOffsetMaybeLayout(layout, current_ty, @intCast(value)) orelse return null;
             current_ty = aggregateFieldType(current_ty, @intCast(value)) orelse return null;
         } else {
-            const element_size = typeSizeMaybeLayout(layout, current_ty) orelse return null;
+            const element_size = allocationStrideMaybeLayout(layout, current_ty) orelse return null;
             offset += value * @as(i128, @intCast(element_size));
         }
     }
@@ -206,6 +206,16 @@ pub fn typeSizeWithLayout(layout: datalayout.DataLayout, ty: ir.Type) ?u64 {
 fn typeSizeMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
     if (layout) |target_layout| return typeSizeWithLayout(target_layout, ty);
     return typeSize(ty);
+}
+
+/// GEP steps follow allocation spacing; access widths still use store size.
+fn allocationStrideMaybeLayout(layout: ?datalayout.DataLayout, ty: ir.Type) ?u64 {
+    if (layout) |target_layout| return target_layout.typeAllocSizeBytes(ty) catch null;
+    const bytes = typeSize(ty) orelse return null;
+    // Target-free padded scalars cannot establish a stride from their payload.
+    // Keep them unknown instead of granting a false same-address proof.
+    if (ty == .x86_fp80 or (ty == .int and !std.math.isPowerOfTwo(bytes))) return null;
+    return bytes;
 }
 
 pub fn aggregateFieldType(ty: ir.Type, field_index: usize) ?ir.Type {

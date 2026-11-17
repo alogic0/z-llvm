@@ -1,5 +1,17 @@
 # Next steps
 
+The authorized layout audit confirmed a
+[padded GEP stride miscompile](evidence/layout_stride_repair_20261116.md).
+Its separate narrow correction is accepted: layout-aware GEPs use allocation
+stride, accesses retain store widths, and unproved padded scalar offsets remain
+unknown. The unchanged predecessor fails both unit regressions and all four
+independent native pipeline comparisons. The corrected source passes 2,425 Fast
+units, all seventeen integration gates and all 236 native populations; storage
+closure passes with only two explicitly adopted follow-up pipelines remaining.
+Current action is the shared module-aware layout query. Its isolated prototype
+and five additional confirmed integer-geometry corrections need separate
+production qualification; no later follow-up slice is complete yet.
+
 The user's [consumer fallback follow-up](evidence/table_consumer_fallback_20261116.md)
 is accepted after Tier-2 qualification and storage closure. Table reservation now
 requires compatible consumers, retaining generic addressing for a bounded i32

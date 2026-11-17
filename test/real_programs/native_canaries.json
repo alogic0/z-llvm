@@ -2233,6 +2233,19 @@
       "stdout": "type-layout-padding observations=128 scalar=nested=array=preserved\n"
     },
     {
+      "population": "padded_gep_alias",
+      "prefix": "padded-gep-alias",
+      "fixture": "padded_gep_alias",
+      "functions": [
+        "padded_i24", "padded_i24_negative",
+        "padded_f80", "padded_f80_negative",
+        "padded_i40", "padded_i40_negative",
+        "padded_vector", "padded_vector_negative"
+      ],
+      "observations": 256,
+      "stdout": "padded-gep-alias observations=256 strides=accesses=stores=preserved\n"
+    },
+    {
       "population": "word_pair",
       "prefix": "word-pair",
       "fixture": "word_pair_memory",
