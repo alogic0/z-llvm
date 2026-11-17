@@ -45,9 +45,16 @@ The completed
 [compiler generalization plan](docs/plans/2026-11-16-generalize-compiler-mechanisms.md)
 adds shared use queries, typed constant-table descriptions, optional-pointer
 cleanup with scalar preservation across branches, and compact scoped value-use
-identities. The final implementation passes all 17 integration gates and the
+identities. That four-stage implementation passes all 17 integration gates and the
 complete 233-population native suite. Table lengths and remaining name limits
 retain explicit boundaries in the stage evidence.
+
+Subsequent reviews fix table layout, consumer fallback and private ELF placement.
+The authorized follow-up shares exact module layout facts, table admission rules,
+private rewrite construction and checked byte bounds. Current validation passes
+2,438 Fast units, 74 structural checks, all 17 integration gates and all 237 native
+populations. The [follow-up evidence](docs/evidence/checked_byte_facts_20261117.md)
+distinguishes semantic corrections, admission policies and storage disposition.
 
 Selective legalization was prototyped and measured, then deferred under the
 plan's benefit requirement. Five unprofiled pairs did not demonstrate the

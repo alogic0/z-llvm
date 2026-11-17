@@ -1,6 +1,8 @@
 const std = @import("std");
 comptime {
     _ = @import("codegen/x86_64/generic_cfg/rewrite_builder_tests.zig");
+    _ = @import("tests/byte_range.zig");
+    _ = @import("codegen/x86_64/generic_cfg/composed_selector_aggregate_object_tests.zig");
     _ = @import("tests/padded_gep_alias.zig");
     _ = @import("tests/module_layout.zig");
     _ = @import("tests/module_layout_analysis.zig");

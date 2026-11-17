@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_types = @import("../types.zig");
+const ranges = @import("../../../analysis/byte_range.zig");
 
 pub const byte_size: u8 = 8;
 pub const alignment: u8 = 4;
@@ -9,7 +10,7 @@ pub const PointerView = struct {
     offset: u8,
 
     pub fn allows(view: PointerView, access_size: u8) bool {
-        return view.offset <= byte_size and access_size <= byte_size - view.offset;
+        return (ranges.ByteRange{ .offset = view.offset, .length = access_size }).within(byte_size);
     }
 };
 
@@ -46,7 +47,8 @@ fn pointerViewDepth(
             if (!index.ty.eql(.{ .int = 64 }) or index.value != .int) break :blk null;
             const offset = std.math.cast(u8, index.value.int) orelse break :blk null;
             const base = pointerViewDepth(function, context, gep.ptr, depth + 1) orelse break :blk null;
-            const total = std.math.add(u8, base.offset, offset) catch break :blk null;
+            const shifted = ranges.addOffset(base.offset, offset) orelse break :blk null;
+            const total = std.math.cast(u8, shifted) orelse break :blk null;
             if (total > byte_size) break :blk null;
             break :blk .{ .offset = total };
         },

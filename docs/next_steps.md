@@ -1,52 +1,33 @@
 # Next steps
 
-The authorized layout audit confirmed a
-[padded GEP stride miscompile](evidence/layout_stride_repair_20261116.md).
-Its separate narrow correction is accepted: layout-aware GEPs use allocation
-stride, accesses retain store widths, and unproved padded scalar offsets remain
-unknown. The unchanged predecessor fails both unit regressions and all four
-independent native pipeline comparisons. The corrected source passes 2,425 Fast
-units, all seventeen integration gates and all 236 native populations; storage
-closure passes with only two explicitly adopted follow-up pipelines remaining.
-The [shared module-aware layout query](evidence/module_layout_query_20261117.md)
-successor also corrects five additional confirmed integer-geometry errors.
-Fresh 2,431 Fast
-units, native/fixed-byte preservation, all 396 fault controls, ABI and M1 checks
-pass. Its own fresh Tier 3 now passes all seventeen gates and all 237 native
-populations. Storage closure passes; only the next table slice's predecessor and
-the isolated later-prototype source/compiler remain declared consumers.
-The [table admission/emission agreement](evidence/table_admission_contract_20261117.md)
-passes Tier 2 and storage closure: 2,433 Fast units, 78 table tests in each mode,
-74 structural checks, four native populations and all 243 fault controls. Fixed
-Debug bytes, captured rows, ABI and executable boundaries remain preserved.
-The [rewrite builder](evidence/rewrite_builder_20261117.md) also passes Tier 2
-and storage closure: 2,436 Fast units, 74 structural checks, both affected native
-populations and all 81 fault controls, with fixed Debug and executable boundaries
-preserved. Current action is production promotion and qualification of checked
-byte facts. Final cumulative integration remains required
-before closing the later maintenance tracker.
+The [consumer fallback repair](evidence/table_consumer_fallback_20261116.md) is
+accepted at `11fd57ec`. Table reservation checks compatible consumers, preserving
+generic addressing for bounded i32 loads, mixed uses, derived addresses and
+escapes. Permanent full-selector regressions cover these cases.
 
-The user's [consumer fallback follow-up](evidence/table_consumer_fallback_20261116.md)
-is accepted after Tier-2 qualification and storage closure. Table reservation now
-requires compatible consumers, retaining generic addressing for a bounded i32
-load, mixed uses, derived addresses and escapes. Full-selector tests pass in
-Debug/Fast, along with 2,422 Fast units, 74 structural checks and four native table
-populations/all 234 faults. Captured-row object smoke, all 60 ABI comparisons,
-three hello_libc modes, fixed __multi3/FMA canaries and all 27 M1 executables also
-pass on unchanged qualified source. All consumers and candidate/scratch pipelines
-are closed; seven current contracts and seventeen independent holds are unchanged.
-Original failed setup receipts and source-bound subcommand reuse remain explicit.
+The subsequently authorized
+[ordered follow-up](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions)
+is complete. It shares the
+[exact module layout query](evidence/module_layout_query_20261117.md),
+[table admission rules](evidence/table_admission_contract_20261117.md),
+[private rewrite construction](evidence/rewrite_builder_20261117.md) and
+[checked byte facts](evidence/checked_byte_facts_20261117.md).
+The separately qualified
+[padded GEP stride repair](evidence/layout_stride_repair_20261116.md) and five
+integer-layout corrections remain identified as semantic changes. Byte bounds
+carry no object identity; alias, PHI and backend admission policies stay local.
 
-The user has now authorized the ordered follow-up in the
-[generalization plan](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions),
-starting from the consumer-fallback repair at `11fd57ec`. The current action is
-checked byte facts, following the rewrite builder, table admission/fallback and
-accepted shared exact query for constant tables and backend storage. The
-separately qualified i24/f80 stride
-correction precedes that query; semantic corrections remain distinguished from
-factoring. The remaining slice shares caller-audited byte/access facts while
-keeping object identity and alias admission local. Preserve the
-completed five-stage acceptance and scheduling deferral.
+Final validation passes all 2,438 Fast units, 74 structural checks, seventeen
+integration gates and the complete 237-population native suite on unchanged
+source. Fixed Debug object and owner bytes remain exact. The evidence
+distinguishes source-bound adopted results from fresh ABI, M1 and cumulative
+integration checks. All owned pipelines are closed, with no owned temporary
+roots remaining; all seven current integrity manifests verify, and seventeen
+independent holds and storage policy are unchanged.
+
+Current action: stop after the completion commit and await new user direction.
+The original five-stage acceptance and measured scheduling deferral remain in
+force. This follow-up adds no new 2,097-outcome or performance claim.
 
 The earlier constant-table review batch is accepted at `1fa64f9e`. Its
 [repair evidence](evidence/table_contract_repairs_20261116.md) records allocation

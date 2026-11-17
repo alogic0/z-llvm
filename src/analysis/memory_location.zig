@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../ir.zig");
 const datalayout = @import("../target/datalayout.zig");
 const geometry = @import("../target/module_layout.zig");
+const ranges = @import("byte_range.zig");
 
 pub const MemoryLocation = struct {
     pub const RootKind = enum {
@@ -17,9 +18,7 @@ pub const MemoryLocation = struct {
     size: ?u64,
 
     pub fn rangeEnd(location: MemoryLocation) ?i128 {
-        const offset = location.offset orelse return null;
-        const size = location.size orelse return null;
-        return offset + @as(i128, @intCast(size));
+        return (ranges.ByteRange{ .offset = location.offset, .length = location.size }).end();
     }
 };
 
@@ -145,7 +144,7 @@ fn buildInternal(function: ir.Function, layout: ?datalayout.DataLayout, ptr: ir.
 }
 
 fn addOffsets(a: ?i128, b: ?i128) ?i128 {
-    return (a orelse return null) + (b orelse return null);
+    return ranges.addOffset(a, b);
 }
 
 pub fn gepOffset(gep: ir.GepInst) ?i128 {
@@ -172,16 +171,19 @@ fn gepOffsetInternal(layout: ?datalayout.DataLayout, gep: ir.GepInst) ?i128 {
         };
         if (index_position == 0) {
             const element_size = allocationStrideMaybeLayout(layout, current_ty) orelse return null;
-            offset += value * @as(i128, @intCast(element_size));
+            const step = std.math.mul(i128, value, @as(i128, @intCast(element_size))) catch return null;
+            offset = ranges.addOffset(offset, step) orelse return null;
             continue;
         }
         if (current_ty == .aggregate) {
             if (value < 0) return null;
-            offset += aggregateFieldOffsetMaybeLayout(layout, current_ty, @intCast(value)) orelse return null;
-            current_ty = aggregateFieldType(current_ty, @intCast(value)) orelse return null;
+            const field_index = std.math.cast(usize, value) orelse return null;
+            offset = ranges.addOffset(offset, aggregateFieldOffsetMaybeLayout(layout, current_ty, field_index)) orelse return null;
+            current_ty = aggregateFieldType(current_ty, field_index) orelse return null;
         } else {
             const element_size = allocationStrideMaybeLayout(layout, current_ty) orelse return null;
-            offset += value * @as(i128, @intCast(element_size));
+            const step = std.math.mul(i128, value, @as(i128, @intCast(element_size))) catch return null;
+            offset = ranges.addOffset(offset, step) orelse return null;
         }
     }
     return offset;

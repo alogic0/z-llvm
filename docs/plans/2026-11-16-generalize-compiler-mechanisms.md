@@ -371,10 +371,9 @@ pointer facts. The completed five-stage sequence above keeps its acceptance
 and measured scheduling deferral.
 
 The consumer-fallback qualification and storage disposition closed at
-`11fd57ec`. The user's subsequent instruction authorizes this follow-up sequence
-in the order below. Read [next steps](../next_steps.md) and bind the accepted
-source at each slice's admission; the earlier reviewed working tree is not an
-implicit baseline.
+`11fd57ec`. The user's subsequent instruction authorized the follow-up sequence
+below. All four slices and final cumulative qualification are now complete;
+their evidence binds each accepted source and its storage disposition.
 
 | Order | Bounded work | Initial consumers |
 | --- | --- | --- |
@@ -394,10 +393,18 @@ passes production Tier 2 and storage closure, including full-selector removed an
 opaque consumers, all 243 focused faults and exact fixed Debug preservation.
 The [rewrite builder](../evidence/rewrite_builder_20261117.md) also passes
 production Tier 2 and storage closure, including allocation/source preservation,
-2,436 Fast units, both native consumers and all 81 fault controls. The byte-fact
-slice remains pending production acceptance.
-Final cumulative integration remains required before closing this maintenance
-batch; isolated prototype results do not close it.
+2,436 Fast units, both native consumers and all 81 fault controls. The
+[checked byte-fact slice](../evidence/checked_byte_facts_20261117.md) is also
+accepted, with object identity and alias admission preserved locally.
+
+Final fresh cumulative qualification passes all 2,438 Fast units, 74 structural
+checks, seventeen integration gates and all 237 native populations on unchanged
+source. Fixed Debug object and owner bytes remain exact. The complete source
+bridge identifies adopted prototype results separately from fresh ABI, M1 and
+integration checks. All owned pipelines are closed and no owned temporary roots
+remain. Seven current integrity manifests verify; seventeen independent holds
+and storage policy are unchanged. The maintenance batch is closed. Stop and
+await new user direction; the scheduling experiment remains deferred.
 
 Each implementation slice needs its own bounded scope and the validation,
 ownership and storage requirements below.
@@ -425,8 +432,8 @@ The follow-up audit reproduced native wrong code in EarlyCSE/GVN, DSE and
 release-o3. Its [separate narrow correction](../evidence/layout_stride_repair_20261116.md)
 is accepted after all seventeen integration gates, 236 native populations and
 storage closure. It preserves store widths for accesses and keeps unproved
-target-free padded scalar offsets unknown. Shared-query production changes are
-the next slice; their isolated checks do not inherit this source acceptance.
+target-free padded scalar offsets unknown. The separately qualified shared-query
+successor is recorded above; its production acceptance has its own source proof.
 The wider audit also confirms five explicit integer-alignment geometry errors;
 classify those deliberate corrections separately from walker factoring and
 qualify their migrated production callers under the stronger validation tier.

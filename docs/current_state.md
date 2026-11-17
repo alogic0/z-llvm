@@ -138,8 +138,28 @@ elapsed time changes from 101.63 to 101.58 seconds, median RSS rises 0.7033%, an
 one pair is slower. Fewer scans and lower logical allocation traffic do not
 establish the required elapsed-time or RSS benefit. The prototype was never
 promoted, and production scheduling is unchanged. Final documentation and
-guarded collection close this authorized sequence; the three proposed follow-up
-abstractions need a separately authorized scope.
+guarded collection close that authorized sequence. The user subsequently
+authorized the ordered maintenance follow-up below; this does not resume the
+scheduling experiment.
+
+The [ordered follow-up](plans/2026-11-16-generalize-compiler-mechanisms.md#proposed-follow-up-abstractions)
+shares module-aware memory geometry, table reservation/emission rules, private
+rewrite construction and checked byte ranges. Earlier review repairs preserve
+ordinary addressing for unsupported table consumers and keep private/internal
+table symbols local. Separate evidence qualifies padded GEP and integer-layout
+corrections; newly known wide analysis geometry does not grant backend support.
+Byte bounds carry no object identity, and alias/PHI admission stays local.
+
+Fresh validation passes all 2,438 Fast units, 74 structural checks and seventeen
+integration gates, including the complete 237-population native suite. The fixed
+Debug object and owner bytes remain exact. The final
+[byte-fact evidence](evidence/checked_byte_facts_20261117.md) binds the complete
+source comparison, deliberately adopted prototype results, fresh ABI/M1 and
+cumulative integration, original diagnostics and final storage disposition.
+All owned pipelines are closed, with no owned temporary roots remaining. All
+seven current integrity manifests verify; seventeen independent holds and
+storage policy are unchanged.
+This adds no new 2,097-outcome or performance claim; scheduling remains deferred.
 
 ## Fixed compiler-core execution cohort
 
