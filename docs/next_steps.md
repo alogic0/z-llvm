@@ -1,5 +1,14 @@
 # Next steps
 
+Current authorization is the ordered
+[M1/M2/M3 coordination plan](plans/2026-11-17-preopt-qualification-performance-self-rebuild.md).
+Begin [M1 ReleaseSmall preopt qualification](plans/2026-11-17-release-small-preopt-behavior.md)
+from reviewed `435ba95c` / compiler `c32ba3cf`. Complete all 2,097 ordered Small
+outcomes, separate runtime/test inventories and full audits, no-fallback control,
+preservation and owned storage closure; commit and stop for independent review.
+M2 generated-code measurements and M3 compiler preopt/self-rebuild remain gated
+on the reviewer's explicit authorization after each preceding milestone.
+
 The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)
 is complete at unchanged source `c32ba3cf`. Its
@@ -9,8 +18,8 @@ complete independent runtime/test audits and the real no-fallback failure contro
 Fresh preservation passes all seventeen gates and 237 native populations. Source,
 SDK/library/reference/providers verify, own pipelines close with zero temporary
 roots, and all eight current manifests verify with the seventeen independent
-holds unchanged. Current action: stop after the completion commit for review.
-ReleaseSmall and the deferred scheduler remain outside this assignment.
+holds unchanged. That review passed with no blocking findings; the new M1
+authorization above supersedes its stop state. Scheduling remains deferred.
 
 The [consumer fallback repair](evidence/table_consumer_fallback_20261116.md) is
 accepted at `11fd57ec`. Table reservation checks compatible consumers, preserving
