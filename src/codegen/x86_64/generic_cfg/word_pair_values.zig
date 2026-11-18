@@ -102,10 +102,15 @@ fn memory(attrs: ir.MemoryAttrs, ty_space: ?[]const u8, ptr_space: ?[]const u8) 
     return !attrs.isBarrier() and attrs.syncscope == null and ty_space == null and ptr_space == null;
 }
 
+fn concreteField(ty: ir.Type, value: ir.Value) ir.Value {
+    return switch (value) {
+        .undef, .poison, .zero_initializer => if (ty == .ptr) .null_value else .{ .int = 0 },
+        else => value,
+    };
+}
+
 fn freezeOperand(allocator: std.mem.Allocator, function: ir.Function, block: *ir.BasicBlock, serial: *usize, ty: ir.Type, original: ir.Value) !ir.Value {
-    var value = original;
-    if (value == .undef or value == .poison or value == .zero_initializer)
-        value = if (ty == .ptr) .null_value else .{ .int = 0 };
+    const value = concreteField(ty, original);
     if (ty == .ptr) {
         if (value == .null_value) {
             const zero = try binary(allocator, function, block, serial, .add, word, .{ .int = 0 }, .{ .int = 0 }, null);
@@ -214,7 +219,8 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 },
                 .extractvalue => |extract| if (fields(extract.aggregate_ty)) |types| {
                     const part = index(extract.indices) orelse return null;
-                    const value = leaf(function, names, extract.aggregate, extract.aggregate_ty, part, 0) orelse return null;
+                    const field = leaf(function, names, extract.aggregate, extract.aggregate_ty, part, 0) orelse return null;
+                    const value = concreteField(types[part], field);
                     if (types[part] == .ptr) {
                         if (value == .null_value) {
                             _ = try cast(allocator, function, &block, &serial, .inttoptr, word, .{ .int = 0 }, .ptr, inst.result);

@@ -25,6 +25,14 @@ const ArgReg = selector_types.ArgReg;
 const ValueLoc = selector_types.ValueLoc;
 pub const MachineBinaryOp = x86_64_types.MachineBinaryOp;
 
+pub fn isBytePointerSource(ty: ir.Type) bool {
+    if (ty.eql(.{ .int = 8 })) return true;
+    return switch (ty) {
+        .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " "), "[1 x i8]"),
+        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
+    };
+}
+
 pub fn blockHasPhiIncomingFrom(block: ir.BasicBlock, predecessor: []const u8) bool {
     for (block.instructions.items) |instruction| {
         if (instruction.removed) continue;

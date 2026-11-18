@@ -903,7 +903,7 @@ pub fn materializeScalar64(selector: *ComposedBlockSelector, current: ValueLoc, 
 }
 pub fn materializeByteAddressPointer(selector: *ComposedBlockSelector, current: ValueLoc, destination: ArgReg) !void {
     switch (current) {
-        .stack_f32_pair_ptr => try selector_state.materializeLocIntoLoc(
+        .stack_scalar, .stack128, .stack_i32_array, .stack_f32_pair_ptr => try selector_state.materializeLocIntoLoc(
             selector,
             current,
             .{ .scratch64 = destination },

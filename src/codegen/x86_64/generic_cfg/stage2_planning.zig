@@ -1059,6 +1059,9 @@ fn collectPressureExemptValues(exempt_values: *NameSet, function: ir.Function) !
                         }
                     },
                     .gep => |gep| {
+                        // A byte GEP may materialize its stack-derived address in a
+                        // register. Its uses, including PHI edges, need an interval.
+                        if (@import("composed_helpers.zig").isBytePointerSource(gep.source_ty)) continue;
                         const ptr_name = namedValue(gep.ptr) orelse continue;
                         if (exempt_values.contains(ptr_name) and !exempt_values.contains(result)) {
                             try exemptValuesPut(exempt_values, result);

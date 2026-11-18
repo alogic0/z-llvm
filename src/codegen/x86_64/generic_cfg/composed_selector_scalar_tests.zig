@@ -706,6 +706,81 @@ test "generic cfg selector immediate i64 siblings preserve a current accumulator
     }
 }
 
+test "named wide shifts consume a final-use staged accumulator count without spilling" {
+    const allocator = std.testing.allocator;
+    for ([_]ir.BinaryOp{ .shl, .lshr, .ashr }) |op| {
+        var machine = MachineFunction.init("shift", .{ .int = 64 });
+        defer machine.deinit(allocator);
+        var plan = try allocateSelectorIntervals(allocator, &.{
+            .{ .name = "value", .class = .gpr64, .bits = 64, .start = 0, .end = 2 },
+            .{ .name = "count", .class = .gpr64, .bits = 64, .start = 1, .end = 2 },
+        });
+        defer plan.deinit();
+        var selector = ComposedBlockSelector.init(allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = 2;
+        try selector_state.bindValueLoc(&selector, "value", .{ .arg64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "count", .rax);
+        try std.testing.expect((try selector_scalar.lowerBinary(&selector, "result", .{
+            .op = op,
+            .ty = .{ .int = 64 },
+            .lhs = .{ .named = "value" },
+            .rhs = .{ .named = "count" },
+        })) == null);
+        try std.testing.expectEqualSlices(x86_64_machine.Instruction, &.{
+            .{ .mov_rax_to_arg = .rcx },
+            .{ .mov_arg_rax = .rdi },
+            switch (op) {
+                .shl => .shl_rax_cl,
+                .lshr => .shr_rax_cl,
+                .ashr => .sar_rax_cl,
+                else => unreachable,
+            },
+        }, machine.instructions.items);
+    }
+}
+
+test "generic cfg selector executes frameless i64 shifts with a final-use extended count" {
+    const allocator = std.testing.allocator;
+    for ([_]ir.BinaryOp{ .shl, .lshr, .ashr }) |op| {
+        const input = try std.fmt.allocPrint(allocator,
+            \\define i64 @shift(i64 %x, i8 %n) {{
+            \\entry:
+            \\  %lo = trunc i8 %n to i4
+            \\  %mid = zext i4 %lo to i6
+            \\  %count = zext i6 %mid to i64
+            \\  %result = {s} i64 %x, %count
+            \\  ret i64 %result
+            \\}}
+        , .{@tagName(op)});
+        defer allocator.free(input);
+        var module = try ir.Module.parse(allocator, input);
+        defer module.deinit();
+        try module.verify();
+        var machine = try @import("../../../compilation.zig").select(allocator, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+        defer machine.deinit(allocator);
+        const bytes = try encoding.encodeFunction(allocator, machine);
+        defer allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const shift: *const fn (u64, u8) callconv(.c) u64 = @ptrCast(mapping.ptr);
+        for ([_]u64{ 0, 1, 0x7fff_ffff_ffff_ffff, 0x8000_0000_0000_0000, 0xffff_ffff_ffff_ffed }) |value| {
+            for ([_]u8{ 0, 1, 7, 15, 16, 31, 0xff }) |raw_count| {
+                const count: u6 = @intCast(raw_count & 15);
+                const expected: u64 = switch (op) {
+                    .shl => value << count,
+                    .lshr => value >> count,
+                    .ashr => @bitCast(@as(i64, @bitCast(value)) >> count),
+                    else => unreachable,
+                };
+                try std.testing.expectEqual(expected, shift(value, raw_count));
+            }
+        }
+    }
+}
+
 test "generic cfg selector exact ei binary and shift preserve a current accumulator lhs" {
     const input =
         \\define double @exact(ptr readonly %input, i64 %bits) {
@@ -807,6 +882,37 @@ test "exact ei shift preserves the accepted current-use accumulator rhs spill" {
     var module = try ir.Module.parse(std.testing.allocator, input);
     defer module.deinit();
     try std.testing.expect(stage2_planning.isExactEiScalarFamily(module.functions.items[0]));
+
+    // Frameless exact-EI shifts keep their original refusal and rollback
+    // when a narrow final-use count would displace RAX.
+    for ([_]u16{ 55, 56 }) |bits| {
+        for ([_]ir.BinaryOp{ .ashr, .lshr, .shl }) |op| {
+            var narrow_machine = MachineFunction.init("frameless-exact-ei", .{ .int = bits });
+            defer narrow_machine.deinit(std.testing.allocator);
+            var narrow_plan = try allocateSelectorIntervals(std.testing.allocator, &.{
+                .{ .name = "lhs", .class = .gpr64, .bits = bits, .start = 0, .end = 4 },
+                .{ .name = "amount", .class = .gpr64, .bits = bits, .start = 1, .end = 4 },
+            });
+            defer narrow_plan.deinit();
+            var narrow = ComposedBlockSelector.init(std.testing.allocator, &narrow_machine);
+            defer narrow.deinit();
+            narrow.function = &module.functions.items[0];
+            narrow.allocation_plan = &narrow_plan;
+            narrow.current_position = 4;
+            try selector_state.bindValueLoc(&narrow, "lhs", .{ .arg64 = .rdi });
+            try selector_state.bindValueLoc(&narrow, "amount", .rax);
+            try std.testing.expectError(error.UnsupportedCodegenValue, selector_scalar.lowerBinary(&narrow, "result", .{
+                .op = op,
+                .ty = .{ .int = bits },
+                .lhs = .{ .named = "lhs" },
+                .rhs = .{ .named = "amount" },
+            }));
+            try std.testing.expectEqual(@as(usize, 0), narrow_machine.instructions.items.len);
+            try std.testing.expectEqual(ValueLoc{ .arg64 = .rdi }, selector_state.valueLoc(&narrow, "lhs").?);
+            try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&narrow, "amount").?);
+            try std.testing.expect(selector_state.valueLoc(&narrow, "result") == null);
+        }
+    }
 
     var machine = MachineFunction.init("current-rhs-exact-ei", .{ .int = 56 });
     defer machine.deinit(std.testing.allocator);

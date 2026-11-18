@@ -27,6 +27,120 @@ const SpillSlotAssignment = stage2_planning.SpillSlotAssignment;
 const allocateSelectorIntervals = stage2_planning.allocateSelectorIntervals;
 const stage2SpillReservedBytes = stage2_planning.stage2SpillReservedBytes;
 
+fn clobberByteAddressRegisters() callconv(.c) void {
+    asm volatile (
+        \\xor %%eax, %%eax
+        \\xor %%ecx, %%ecx
+        \\xor %%edx, %%edx
+        \\xor %%edi, %%edi
+        \\xor %%esi, %%esi
+        \\xor %%r8d, %%r8d
+        \\xor %%r9d, %%r9d
+        ::: .{ .rax = true, .rcx = true, .rdx = true, .rdi = true, .rsi = true, .r8 = true, .r9 = true, .cc = true });
+}
+
+test "stack byte addresses expire at last use and their live aliases survive a call" {
+    const allocator = std.testing.allocator;
+    for ([_]bool{ false, true }) |keep_alias| {
+        const input = try std.fmt.allocPrint(allocator,
+            \\define i64 @probe(ptr %output, i64 %seed, ptr %clobber, i8 %replacement) {{
+            \\entry:
+            \\  %frame = alloca i64, align 8
+            \\  store i64 %seed, ptr %frame, align 8
+            \\  %address = getelementptr i8, ptr %frame, i64 2
+            \\  store i8 61, ptr %address, align 1
+            \\{s}  call void %clobber()
+            \\  %other = getelementptr i8, ptr %frame, i64 5
+            \\  store i8 116, ptr %other, align 1
+            \\{s}  %word = load i64, ptr %frame, align 8
+            \\  store i64 %word, ptr %output, align 1
+            \\  ret i64 %word
+            \\}}
+        , .{
+            if (keep_alias) "  %alias = ptrtoint ptr %address to i64\n" else "",
+            if (keep_alias) "  %saved = inttoptr i64 %alias to ptr\n  store i8 %replacement, ptr %saved, align 1\n" else "",
+        });
+        defer allocator.free(input);
+        var module = try ir.Module.parse(allocator, input);
+        defer module.deinit();
+        try module.verify();
+        const function = module.functions.items[0];
+        var plan = try stage2_planning.buildSelectorAllocationPlan(allocator, function);
+        defer plan.deinit();
+        try std.testing.expectEqual(@as(?usize, if (keep_alias) 5 else 4), plan.intervalEnd("address"));
+        if (keep_alias) try std.testing.expectEqual(@as(?usize, 9), plan.intervalEnd("alias"));
+
+        var machine = try @import("../../../compilation.zig").select(allocator, "x86_64-unknown-linux-gnu", function, .{ .generic_cfg_selector = true });
+        defer machine.deinit(allocator);
+        try x86_64_verify.verifyFunction(machine);
+        const bytes = try encoding.encodeFunction(allocator, machine);
+        defer allocator.free(bytes);
+        const memory = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(memory);
+        @memcpy(memory, bytes);
+        const run: *const fn ([*]u8, u64, *const fn () callconv(.c) void, u8) callconv(.c) u64 = @ptrCast(memory.ptr);
+        for ([_]u64{ 0, 0xffff_ffff_ffff_ffff, 0x807f_1162_aa55_c38e }) |seed| {
+            for ([_]u8{ 0, 0x80, 0xff }) |replacement| {
+                var expected: [14]u8 = @splat(0xa7);
+                std.mem.writeInt(u64, expected[3..11], seed, .little);
+                expected[5] = if (keep_alias) replacement else 61;
+                expected[8] = 116;
+                var output: [14]u8 = @splat(0xa7);
+                try std.testing.expectEqual(std.mem.readInt(u64, expected[3..11], .little), run(output[3..].ptr, seed, &clobberByteAddressRegisters, replacement));
+                try std.testing.expectEqualSlices(u8, &expected, &output);
+            }
+        }
+    }
+}
+
+test "stack byte addresses used only on separate phi edges survive a clobber" {
+    const allocator = std.testing.allocator;
+    const input =
+        \\define i64 @edge_alias(ptr %out, i64 %seed, ptr %clobber, i8 %edge) {
+        \\entry:
+        \\  %frame = alloca i64, align 8
+        \\  store i64 %seed, ptr %frame, align 8
+        \\  %leftaddr = getelementptr i8, ptr %frame, i64 2
+        \\  %rightaddr = getelementptr i8, ptr %frame, i64 5
+        \\  call void %clobber()
+        \\  %choose = icmp ne i8 %edge, 0
+        \\  br i1 %choose, label %left, label %right
+        \\left:
+        \\  br label %join
+        \\right:
+        \\  br label %join
+        \\join:
+        \\  %alias = phi ptr [ %leftaddr, %left ], [ %rightaddr, %right ]
+        \\  store i8 -95, ptr %alias, align 1
+        \\  %word = load i64, ptr %frame, align 8
+        \\  store i64 %word, ptr %out, align 1
+        \\  ret i64 %word
+        \\}
+    ;
+    var module = try ir.Module.parse(allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = try @import("../../../compilation.zig").select(allocator, "x86_64-unknown-linux-gnu", module.functions.items[0], .{ .generic_cfg_selector = true });
+    defer machine.deinit(allocator);
+    try x86_64_verify.verifyFunction(machine);
+    const bytes = try encoding.encodeFunction(allocator, machine);
+    defer allocator.free(bytes);
+    const memory = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(memory);
+    @memcpy(memory, bytes);
+    const run: *const fn ([*]u8, u64, *const fn () callconv(.c) void, u8) callconv(.c) u64 = @ptrCast(memory.ptr);
+    const seed: u64 = 0x807f_1162_aa55_c38e;
+    for ([_]usize{ 5, 2 }, 0..) |offset, edge| {
+        var expected: [14]u8 = @splat(0xa7);
+        std.mem.writeInt(u64, expected[3..11], seed, .little);
+        expected[3 + offset] = 0xa1;
+        var output: [14]u8 = @splat(0xa7);
+        const actual = run(output[3..].ptr, seed, &clobberByteAddressRegisters, @intCast(edge));
+        try std.testing.expectEqual(std.mem.readInt(u64, expected[3..11], .little), actual);
+        try std.testing.expectEqualSlices(u8, &expected, &output);
+    }
+}
+
 test "array strides reserve preservation space only for values live across the action" {
     const source =
         \\define ptr @dead_operands(ptr %base, i64 %index) {

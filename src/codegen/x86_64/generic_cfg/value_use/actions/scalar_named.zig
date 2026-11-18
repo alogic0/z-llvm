@@ -111,11 +111,16 @@ pub fn executeNamedScalarBinary(
     switch (plan) {
         .b01_boolean, .b04_narrow_shift, .b05_wide_shift, .b06_wide_exact_binary => {
             try validateNamedSource(Authority, transaction, rhs_index, bits);
+            // A final-use count has already moved to CL when the wide shift
+            // prepares RAX. A frameless function can discard its old home.
+            const staged_final_count = plan == .b05_wide_shift and bits == 64 and transaction.selector.stack_frame_bytes == 0 and
+                locIsAccumulator(transaction.prepared_views[rhs_index].canonical_source_loc) and
+                !locIsAccumulator(transaction.prepared_views[lhs_index].canonical_source_loc) and
+                !try Authority.mustSurviveInstruction(Authority, transaction, rhs_index);
             {
-                // The narrow shift's LHS is still an input while a spilled
-                // count is staged. Keep its current home if it occupies RCX.
+                // The shift's LHS is still an input while the count is staged.
                 const previous = transaction.selector.preserve_current_position_values;
-                if (plan == .b04_narrow_shift) transaction.selector.preserve_current_position_values = true;
+                if (plan == .b04_narrow_shift or staged_final_count) transaction.selector.preserve_current_position_values = true;
                 defer transaction.selector.preserve_current_position_values = previous;
                 try stageNamedSource(
                     Authority,
@@ -131,7 +136,7 @@ pub fn executeNamedScalarBinary(
                 transaction,
                 lhs_index,
                 session,
-                try displacementForPlan(Authority, transaction, lhs_index, plan),
+                if (staged_final_count) .spill_live else try displacementForPlan(Authority, transaction, lhs_index, plan),
             );
             try failNamedForTest(transaction, .after_accumulator_preparation);
             try materializeNamedAccumulator(Authority, transaction, lhs_index, session, bits);

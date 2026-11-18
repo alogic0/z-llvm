@@ -1424,13 +1424,7 @@ pub fn isI32ElementPointerSource(ty: ir.Type) bool {
     };
 }
 
-pub fn isBytePointerSource(ty: ir.Type) bool {
-    if (ty.eql(.{ .int = 8 })) return true;
-    return switch (ty) {
-        .aggregate => |text| std.mem.eql(u8, std.mem.trim(u8, text, " "), "[1 x i8]"),
-        .void, .int, .half, .float, .double, .x86_fp80, .fp128, .metadata, .ptr, .vector => false,
-    };
-}
+pub const isBytePointerSource = composed_helpers.isBytePointerSource;
 
 pub fn appendLoadStackI32(selector: *ComposedBlockSelector, stack_ptr: StackPtrLoc) !void {
     try materializeStackIndex(selector, stack_ptr);

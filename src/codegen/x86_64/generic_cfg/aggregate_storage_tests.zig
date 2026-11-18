@@ -8,6 +8,68 @@ const storage = @import("storage_layout.zig");
 const frame = @import("padded_frame.zig");
 const values = @import("word_pair_values.zig");
 
+test "word pair extracts materialize undefined fields and preserve their defined neighbor" {
+    const inputs = [_]u64{ 0, 1, 0x123456789abcdef0, 1 << 63, std.math.maxInt(u64) };
+    for ([_][2][]const u8{ .{ "ptr", "i64" }, .{ "i64", "ptr" }, .{ "ptr", "ptr" }, .{ "i64", "i64" } }) |types| {
+        for (0..2) |missing| {
+            const present = 1 - missing;
+            const missing_ptr = std.mem.eql(u8, types[missing], "ptr");
+            const present_ptr = std.mem.eql(u8, types[present], "ptr");
+            for ([_][]const u8{ "undef", "poison", "zeroinitializer" }) |base| {
+                const text = try std.fmt.allocPrint(std.testing.allocator,
+                    \\define i64 @probe(i64 %input) {{
+                    \\entry:
+                    \\  %defined = {0s}
+                    \\  %pair = insertvalue {{ {1s}, {2s} }} {3s}, {4s} %defined, {5d}
+                    \\  %missing = extractvalue {{ {1s}, {2s} }} %pair, {6d}
+                    \\  %present = extractvalue {{ {1s}, {2s} }} %pair, {5d}
+                    \\  %safe = freeze {7s} %missing
+                    \\  %bits = {8s}
+                    \\  %value = {9s}
+                    \\  %masked = and i64 %bits, 0
+                    \\  %result = xor i64 %value, %masked
+                    \\  ret i64 %result
+                    \\}}
+                , .{
+                    if (present_ptr) "inttoptr i64 %input to ptr" else "add i64 %input, 0",
+                    types[0],
+                    types[1],
+                    base,
+                    types[present],
+                    present,
+                    missing,
+                    types[missing],
+                    if (missing_ptr) "ptrtoint ptr %safe to i64" else "add i64 %safe, 0",
+                    if (present_ptr) "ptrtoint ptr %present to i64" else "add i64 %present, 0",
+                });
+                defer std.testing.allocator.free(text);
+                var module = try ir.Module.parse(std.testing.allocator, text);
+                defer module.deinit();
+                try module.verify();
+                var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+                defer arena.deinit();
+                const original = module.functions.items[0];
+                const rewrite = (try values.legalize(arena.allocator(), original, null)) orelse return error.TestExpectedRewrite;
+                const scalar = for (rewrite.blocks.items[0].instructions.items) |inst| {
+                    if (std.mem.eql(u8, inst.result orelse continue, "missing")) break inst;
+                } else return error.TestMissingScalar;
+                if (missing_ptr) {
+                    try std.testing.expect(scalar.kind == .cast and scalar.kind.cast.op == .inttoptr);
+                    try std.testing.expect(scalar.kind.cast.value.eql(.{ .int = 0 }));
+                } else {
+                    try std.testing.expect(scalar.kind == .binary and scalar.kind.binary.op == .add);
+                    try std.testing.expect(scalar.kind.binary.lhs.eql(.{ .int = 0 }));
+                }
+                const code = try executable(module);
+                defer std.posix.munmap(code);
+                const run: *const fn (u64) callconv(.c) u64 = @ptrCast(code.ptr);
+                for (inputs) |input| try std.testing.expectEqual(input, run(input));
+                try std.testing.expect(original.blocks.items[0].instructions.items[2].kind == .extractvalue);
+            }
+        }
+    }
+}
+
 test "word pair freezes preserve defined fields and stable independent choices" {
     for ([_][2][]const u8{ .{ "ptr", "i64" }, .{ "i64", "ptr" }, .{ "ptr", "ptr" }, .{ "i64", "i64" } }) |types| {
         for ([_]bool{ false, true }) |partial| {
