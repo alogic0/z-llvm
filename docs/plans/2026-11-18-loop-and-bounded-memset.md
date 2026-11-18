@@ -20,6 +20,28 @@ backedge. The reviewer declined a release-pipeline promotion and assigned
 the bounded fill experiment. See `loop-original/`, `loop-sroa/` and
 `loop-sample/report.json` under the batch root below.
 
+**Bounded fill candidate, 2026-11-18.** The reviewer verified the frozen
+eight-file patch `46a70903`, the identities of the measured images and
+all 560 scheduled visits across five workloads. On the original fill
+driver, the paired median saving was 21.37 ms in Fast and 21.63 ms in
+Small. The other four workloads had identical baseline and candidate
+objects and executables. Fill kernel text grew from 843 to 1,130 bytes
+and the stripped executable grew by 288 bytes in both modes.
+
+The per-length runs showed gains even on long fills taking the byte loop.
+At the reviewer's request the implementer kept the candidate layout fixed
+and diverted just the seven eligible paths to the fallback. Fourteen bytes
+differed in each whole executable. The genuine candidate saved 3.86 ms in
+Fast and 3.93 ms in Small against this control, winning all twelve pairs
+in both modes. The control takes one extra branch on eligible lengths.
+This qualifies the performance tradeoff on the measured host and driver.
+The reviewer verified the guard results, assembled bytes at all fourteen
+mode/site combinations, 1,176 length-diagnostic visits and the 112
+fixed-layout visits. The core Tier 2 checks passed. The remaining review
+covers integrated native validation, the promoted source and storage closure.
+See `fill-sample/`, `fill-lengths/lengths/`, `fill-controls-02/` and
+`layout-control/` under the batch root below.
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local
