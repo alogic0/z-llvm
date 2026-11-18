@@ -42,9 +42,11 @@ const closure_source =
 fn checkClosure(allocator: std.mem.Allocator) !void {
     var module = try ir.Module.parse(allocator, closure_source);
     defer module.deinit();
-    var graph = try dependencies.Graph.build(allocator, module);
-    defer graph.deinit();
-    var selection = try graph.reachable();
+    var selection = blk: {
+        var graph = try dependencies.Graph.build(allocator, module);
+        defer graph.deinit();
+        break :blk try graph.reachable();
+    };
     defer selection.deinit();
     try std.testing.expect(!selection.has_unknown);
     for ([_][]const u8{ "root", "recursive", "\"debug.callback\"", "get_slot", "indirect_target" }) |name| {
@@ -65,7 +67,9 @@ test "module dependencies: transitive aliases recursion global callbacks and imp
 }
 
 test "module dependencies: allocation failures leave borrowed definitions intact" {
-    try std.testing.checkAllAllocationFailures(std.testing.allocator, checkClosure, .{});
+    // Growing the parser arena in place can change the allocation index between trials.
+    var backing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .resize_fail_index = 0 });
+    try std.testing.checkAllAllocationFailures(backing.allocator(), checkClosure, .{});
 }
 
 test "module dependencies: live opaque references conservatively retain all definitions" {
@@ -158,4 +162,60 @@ test "module dependencies: unrecognized definition spellings keep the closure co
     defer selection.deinit();
     try std.testing.expect(selection.has_unknown);
     try std.testing.expect(selection.contains(.function, "dead"));
+}
+
+test "module dependencies: first match, original spelling and order survive graph destruction" {
+    // Look up deliberately colliding definitions before module verification.
+    var module = try ir.Module.parse(std.testing.allocator,
+        \\@p = global ptr @"du\70"
+        \\@slot = global ptr @01
+        \\@digit = global ptr @"1"
+        \\@dup = internal global i32 9
+        \\@dup = internal alias i32 (), ptr @dead
+        \\define internal i32 @dup() {
+        \\entry:
+        \\  ret i32 7
+        \\}
+        \\define internal i32 @"du\70"() {
+        \\entry:
+        \\  call void asm sideeffect "", "~{memory}"()
+        \\  ret i32 8
+        \\}
+        \\define internal i32 @1() {
+        \\entry:
+        \\  ret i32 1
+        \\}
+        \\define internal i32 @"1"() {
+        \\entry:
+        \\  ret i32 2
+        \\}
+        \\define internal i32 @dead() {
+        \\entry:
+        \\  ret i32 0
+        \\}
+    );
+    defer module.deinit();
+    var selection = blk: {
+        var graph = try dependencies.Graph.build(std.testing.allocator, module);
+        defer graph.deinit();
+        break :blk try graph.reachable();
+    };
+    defer selection.deinit();
+    try std.testing.expect(!selection.has_unknown);
+    const expected = [_]dependencies.NodeRef{
+        .{ .kind = .global, .name = "p" },     .{ .kind = .global, .name = "slot" },
+        .{ .kind = .global, .name = "digit" }, .{ .kind = .function, .name = "\"1\"" },
+        .{ .kind = .function, .name = "1" },   .{ .kind = .function, .name = "dup" },
+    };
+    try std.testing.expectEqual(expected.len, selection.live.items.len);
+    for (expected, selection.live.items) |wanted, actual| {
+        try std.testing.expectEqual(wanted.kind, actual.kind);
+        try std.testing.expectEqualStrings(wanted.name, actual.name);
+    }
+    try std.testing.expect(selection.contains(.function, "\"du\\70\""));
+    try std.testing.expect(selection.contains(.function, "01"));
+    try std.testing.expect(selection.contains(.function, "\"1\""));
+    try std.testing.expect(!selection.contains(.global, "dup"));
+    try std.testing.expect(!selection.contains(.alias, "dup"));
+    try std.testing.expect(!selection.contains(.function, "dead"));
 }
