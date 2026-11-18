@@ -7,10 +7,10 @@ test audits, real optimizer-failure control, 17 integration gates and 237 native
 populations passed at compiler source `c32ba3cf`.
 [M1 plan and review state](plans/2026-11-17-release-small-preopt-behavior.md)
 
-All 63 M1 workspace roots are closed. The next decision is the independent
-review of the frozen M1 result.
-M2 generated-code measurements and M3 compiler preopt/self-rebuild remain gated
-on the reviewer's explicit authorization after each preceding milestone.
+The reviewer accepted M1 at `a27b8e86` with all 63 owned workspace roots
+closed and authorized the five-workload Fast/Small measurement against LLVM.
+M3 compiler preopt/self-rebuild awaits independent review of the frozen M2
+result and explicit authorization. [M2 plan](plans/2026-11-17-generated-program-performance.md)
 
 The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)

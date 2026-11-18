@@ -69,6 +69,7 @@ remain in this repository.
 | Checked semantic facts | `tools/validation/candidate_facts.zig` library |
 | Fact freezing and replay proof | `tools/freeze_real_candidate_facts.zig` / `freeze-real-candidate-facts` |
 | Frozen performance matrix | `tools/fixed_program_baseline.zig` / `fixed-program-baseline` |
+| Generated-program Fast/Small runtime and ELF size | `tools/measure_preopt_programs.zig` with `oracles`, `prepare` and `sample`. [Protocol and storage](plans/2026-11-17-generated-program-performance.md) |
 | Validation policy and lifecycle tests | `tools/validation_tests.zig` / `real-program-policy-tests` |
 
 Run tools from this checkout or a descendant directory. Set

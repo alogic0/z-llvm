@@ -127,6 +127,49 @@ pub fn executableBytes(a: std.mem.Allocator, data: []const u8) !u64 {
     return total;
 }
 
+pub const SizeBreakdown = struct {
+    file_bytes: u64,
+    executable_sections: u64 = 0,
+    text: u64 = 0,
+    rodata: u64 = 0,
+    data: u64 = 0,
+    bss: u64 = 0,
+    allocated_nobits: u64 = 0,
+    allocated_file_backed: u64 = 0,
+};
+
+fn sectionFamily(name: []const u8, base: []const u8) bool {
+    return std.mem.eql(u8, name, base) or
+        (std.mem.startsWith(u8, name, base) and name.len > base.len and name[base.len] == '.');
+}
+
+/// Named section families can overlap flag-based totals. NOBITS occupies
+/// address space and contributes no payload bytes to the file.
+pub fn sizeBreakdown(a: std.mem.Allocator, bytes: []const u8) !SizeBreakdown {
+    const elf = Elf{ .data = bytes };
+    const table = try sections(a, elf);
+    defer a.free(table);
+    const names_index = try elf.int(u16, 62);
+    if (names_index >= table.len) return error.InvalidElfStringTable;
+    const names = try elf.payload(table[names_index]);
+    var result = SizeBreakdown{ .file_bytes = bytes.len };
+    for (table) |section| {
+        if (section.flags & 2 == 0) continue;
+        const name = try string(names, section.name);
+        if (section.kind == 8) {
+            result.allocated_nobits = try std.math.add(u64, result.allocated_nobits, section.size);
+        } else {
+            result.allocated_file_backed = try std.math.add(u64, result.allocated_file_backed, section.size);
+        }
+        if (section.flags & 4 != 0) result.executable_sections = try std.math.add(u64, result.executable_sections, section.size);
+        if (sectionFamily(name, ".text")) result.text += section.size;
+        if (sectionFamily(name, ".rodata")) result.rodata += section.size;
+        if (sectionFamily(name, ".data")) result.data += section.size;
+        if (sectionFamily(name, ".bss")) result.bss = try std.math.add(u64, result.bss, section.size);
+    }
+    return result;
+}
+
 test "object contracts reject malformed headers and overflowing section tables" {
     try std.testing.expectError(error.ExpectedElf64LittleEndian, parse(std.testing.allocator, "not ELF"));
     var bytes: [64]u8 = @splat(0);

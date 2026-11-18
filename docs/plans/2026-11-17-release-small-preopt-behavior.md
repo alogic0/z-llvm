@@ -2,8 +2,8 @@
 
 Date: 2026-11-17
 The full Small run, audits, cumulative integration and final source verification
-passed. All 63 owned workspace roots are closed. M1 is ready for independent
-milestone review. Starting tracked baseline
+passed. All 63 owned workspace roots are closed. Independent milestone review
+accepted M1 at `a27b8e86` on 2026-11-17. Starting tracked baseline
 `435ba95c`, compiler source `c32ba3cf`. Canonical sequencing and review gates are
 in the [coordination plan](2026-11-17-preopt-qualification-performance-self-rebuild.md).
 

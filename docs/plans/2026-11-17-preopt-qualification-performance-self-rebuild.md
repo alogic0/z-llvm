@@ -16,8 +16,8 @@ Findings receive a bounded fix and another review.
 
 | Milestone | Scope | State |
 | --- | --- | --- |
-| M1 | Full unchanged ReleaseSmall behavior through local preopt optimization and object emission | Qualified and storage closed. Awaiting independent milestone review. [M1 plan](2026-11-17-release-small-preopt-behavior.md) |
-| M2 | Generated-program runtime and code/executable size against LLVM | Pending M1 review and explicit authorization |
+| M1 | Full unchanged ReleaseSmall behavior through local preopt optimization and object emission | Independently accepted at `a27b8e86`. [M1 plan](2026-11-17-release-small-preopt-behavior.md) |
+| M2 | Generated-program runtime and code/executable size against LLVM | Authorized. [Measurement plan](2026-11-17-generated-program-performance.md) |
 | M3 | Compiler build and next-generation self-rebuild through local preopt, initially Fast | Pending M2 review and explicit authorization |
 
 M2 freezes a representative bounded workload set, independent correctness
@@ -66,8 +66,8 @@ transport may deliver messages. A failed delivery leaves the gate pending.
 | Recovery patch `b89ae2ec` | Approved the ten frozen files and r8 Debug/Fast results, including 26 refusals, two reader rollbacks and eleven legacy checks in each mode. The files were promoted at `ec639588` after final verification on `c32ba3cf`. |
 | First real dry plan `5d2f0b97` | One ready, zero removed. Apply was held because the retained list would pin twelve independent live controls. |
 | Successor plan `a95f4392` | Approved exactly one apply after reviewing the 25 retained paths, the one-action dry receipt, exact tree, original records and live controls. Native receipt `1794957605971871164-1072275` records one removal and 265,383,936 reclaimed file bytes. The monitor outcome remains unknown. |
-| M1 milestone | The implementation owner submits the frozen qualification and storage evidence to the reviewer. M2 needs a separate decision. |
-| M2 and M3 milestones | Pending their respective prerequisite reviews. |
+| M1 milestone, 2026-11-17 | Reviewer `01a1cf53-4a3b-70d1-adb6-9655b6d4cb24` accepted `a27b8e86be13e26ff5eeabb9ed4c168358d9bf4d` on tested core `c32ba3cfb1f67340ac5706fbc77ac56569b37007`, x86_64-linux-gnu baseline. The accepted JSON SHA-256 is `ec181f836f66308aed9fc0e827b0f58c5d6b734928f0cf0689bb5366d83d7d7f`. The reviewer explicitly authorized M2. |
+| M2 and M3 milestones | M2 requires a frozen result and independent review. M3 requires a separate affirmative decision after that review. |
 
 M1 matched 2,097 ordered Small outcomes and audited 903 runtime and 6,684 test
 definitions, both emitted objects and 2,943,342 ordered events. The corrected
