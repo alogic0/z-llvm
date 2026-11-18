@@ -487,7 +487,9 @@ fn lowerScalarSseCall(selector: *ComposedBlockSelector, result: ?[]const u8, cal
     for (call.args.items) |arg| has_vector_abi = has_vector_abi or sysv_abi.isVector128AbiType(arg.ty);
     var has_pair_argument = false;
     for (call.args.items) |arg| has_pair_argument = has_pair_argument or arg.ty.eql(.{ .int = 128 });
-    if (has_vector_abi or has_pair_argument) if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+    if (has_vector_abi or has_pair_argument) {
+        if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
+    } else if (try selector_state.preserveCallArgumentSources(selector, call)) |diagnostic| return diagnostic;
     for (call.args.items) |arg| {
         if (!sysv_abi.isScalarSseAbiType(arg.ty) and !sysv_abi.isVector128AbiType(arg.ty)) continue;
         const name = switch (arg.value) {

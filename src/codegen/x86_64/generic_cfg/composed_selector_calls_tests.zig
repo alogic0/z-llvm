@@ -1773,3 +1773,51 @@ test "destructive intrinsic keeps canonical liveness failure closed" {
     try std.testing.expectEqual(original_binding, selector.values.get("value").?);
     try std.testing.expect(!selector.values.contains("result"));
 }
+
+test "mixed call keeps a last-use GPR argument until its ABI destination is ready" {
+    const allocator = std.testing.allocator;
+    const position = 48;
+    for ([_]usize{ position, position + 1 }) |buffer_end| {
+        var machine = MachineFunction.init("mixed-call", .void);
+        defer machine.deinit(allocator);
+        var plan = SelectorAllocationPlan.init(allocator);
+        defer plan.deinit();
+        inline for (.{ "out", "fp", "options" }) |name| try plan.interval_ends.put(name, position);
+        try plan.interval_ends.put("buffer", buffer_end);
+        var selector = ComposedBlockSelector.init(allocator, &machine);
+        defer selector.deinit();
+        selector.allocation_plan = &plan;
+        selector.current_position = position;
+        selector.stack_frame_bytes = 128;
+        try selector_state.bindValueLoc(&selector, "out", .{ .scratch64 = .rdx });
+        try selector_state.bindValueLoc(&selector, "buffer", .{ .scratch64 = .rdi });
+        try selector_state.bindValueLoc(&selector, "fp", .{ .xmm = .{ .reg = .xmm0, .bits = 64 } });
+        try selector_state.bindValueLoc(&selector, "options", .{ .arg64 = .r8 });
+
+        var call = ir.CallInst{ .ret_ty = .void, .callee = "render", .args = .empty };
+        defer call.deinit(allocator);
+        try call.args.appendSlice(allocator, &.{
+            .{ .ty = .ptr, .value = .{ .named = "out" } },
+            .{ .ty = .ptr, .value = .{ .named = "buffer" } },
+            .{ .ty = .{ .int = 64 }, .value = .{ .int = 347 } },
+            .{ .ty = .double, .value = .{ .named = "fp" } },
+            .{ .ty = .ptr, .value = .{ .named = "options" } },
+        });
+        try std.testing.expectEqual(@as(?impl.Diagnostic, null), try selector_calls.lowerCall(&selector, null, call));
+        const home = selector_state.valueLoc(&selector, "buffer").?.spill64;
+        var spilled = false;
+        var loaded = false;
+        for (machine.instructions.items) |inst| switch (inst) {
+            .spill_arg64_rsp => |s| if (s.reg == .rdi and s.frame_index.eql(home)) {
+                spilled = true;
+            },
+            .reload_arg64_rsp => |s| if (s.reg == .rsi and s.frame_index.eql(home)) {
+                try std.testing.expect(spilled);
+                loaded = true;
+            },
+            else => {},
+        };
+        try std.testing.expect(loaded);
+        try std.testing.expect(machine.instructions.getLast() == .direct_call);
+    }
+}
