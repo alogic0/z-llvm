@@ -12,8 +12,14 @@ closed. M2 subsequently measured five workloads in Fast and Small against
 LLVM. All 40 warmups and 240 measured runs had the expected outputs. The
 largest absolute Fast gap was the loop workload, about 150 ms per process.
 Memset had the largest median paired ratios at 5.55× O3 and 5.57× Oz.
-Independent review of M2 is the next decision. M3 compiler preopt/self-rebuild
-requires explicit authorization after that review. [Measurements and ranked proposals](evidence/generated_program_performance_20261117.md)
+The reviewer accepted M2 at `8594ba04` for those five whole processes on the
+recorded host. [Measurements and ranked proposals](evidence/generated_program_performance_20261117.md)
+
+The reviewer authorized M3. Build the pinned ReleaseFast compiler through the
+local preopt optimizer and object emitter, then use that fresh executable to
+rebuild the same source. Both generations require complete compiler/runtime
+inventories, usable binaries, behavior comparisons and failure controls under
+normal resources. [M3 plan and storage ownership](plans/2026-11-17-release-fast-compiler-preopt-self-rebuild.md)
 
 The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)

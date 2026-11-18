@@ -17,8 +17,8 @@ Findings receive a bounded fix and another review.
 | Milestone | Scope | State |
 | --- | --- | --- |
 | M1 | Full unchanged ReleaseSmall behavior through local preopt optimization and object emission | Independently accepted at `a27b8e86`. [M1 plan](2026-11-17-release-small-preopt-behavior.md) |
-| M2 | Generated-program runtime and code/executable size against LLVM | All 240 measurements completed under the [frozen protocol](2026-11-17-generated-program-performance.md). Independent review pending. [Runtime and size results](../evidence/generated_program_performance_20261117.md) |
-| M3 | Compiler build and next-generation self-rebuild through local preopt, initially Fast | Pending M2 review and explicit authorization |
+| M2 | Generated-program runtime and code/executable size against LLVM | Independently accepted at `8594ba04` for the five measured processes on the recorded host. [Runtime and size results](../evidence/generated_program_performance_20261117.md) |
+| M3 | Compiler build and next-generation self-rebuild through local preopt, initially Fast | Explicitly authorized after M2 review. [ReleaseFast build and self-rebuild plan](2026-11-17-release-fast-compiler-preopt-self-rebuild.md) |
 
 M2 freezes a representative bounded workload set, independent correctness
 oracles, commands, repeated unprofiled execution protocol, tool/source/provider
@@ -70,7 +70,8 @@ transport may deliver messages. A failed delivery leaves the gate pending.
 | M2 measurement | `32adb32c` froze five workloads and four routes. The first sampler exited 1 while checking affinity, before it launched a workload. At `1ee97b3b`, the corrected and qualified meter ran all 40 warmups and 240 measured processes on the twenty authenticated images. |
 | M2 preservation | Serial run `cbc9a73d6b32028addb6bf8ee5d091e1` passed all 17 gates. The three real-row modes reused authenticated frontend AIR. The fresh native report binds the selected backend `ab067396` and the 237-population registry. |
 | M2 report verification | The first order check exited 1 because it parsed the space-separated expected lists with a tab separator. The successor checks the original 280 rows and includes changed-route and missing-row controls. Both attempts remain in the batch evidence. |
-| M2 and M3 review gate | M2 awaits an independent disposition on its frozen result. Only a separate affirmative decision opens M3. |
+| M2 milestone | Reviewer `01a1cf53-4a3b-70d1-adb6-9655b6d4cb24` accepted `8594ba0471c2185b6c12f9b81b48a7b7a8656ac8` on core `c32ba3cf`. The verified result JSON SHA-256 is `6c3343f929f5ac2fa2d0d61f76f5a957004340f7100521d11df8a974e6d5f435`. Review covered the oracles, forty links, 280 executions, ratios, ELF sizes, seventeen gates, 237 populations and storage closure. |
+| M3 admission | The reviewer authorized the two-generation local preopt compiler build in ReleaseFast under normal resources. M3 must return as a frozen result for independent review. Preserve all nine current proofs and seventeen holds. |
 
 M1 matched 2,097 ordered Small outcomes and audited 903 runtime and 6,684 test
 definitions, both emitted objects and 2,943,342 ordered events. The corrected
