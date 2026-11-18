@@ -1,7 +1,12 @@
 # Next steps
 
-Current authorization is the ordered
-[M1/M2/M3 coordination plan](plans/2026-11-17-preopt-qualification-performance-self-rebuild.md).
+The current assignment is to measure the original and scalar-promoted loop on
+the accepted M3 backend, then follow the measured result into a bounded loop
+change or an 8–16-byte memset trial. The implementer reports to the primary
+reviewer at each decision. [Active performance plan](plans/2026-11-18-loop-and-bounded-memset.md)
+
+The completed [M1/M2/M3 coordination plan](plans/2026-11-17-preopt-qualification-performance-self-rebuild.md)
+records the preceding milestones.
 The M1 ReleaseSmall run matched all 2,097 ordered outcomes. The runtime and
 test audits, real optimizer-failure control, 17 integration gates and 237 native
 populations passed at compiler source `c32ba3cf`.
@@ -21,8 +26,8 @@ matched all 2,097 ordered upstream outcomes on LLVM and local preopt. The
 reviewer checked the four original execution logs, eight event audits and
 three real optimizer failures. The fresh serial preservation run passed
 all 17 gates and 237 native populations. All 180 deliberate faults were
-detected. The M3 qualification is ready for the reviewer's final decision.
-Loop and memset work follows that review. [M3 evidence](evidence/release_fast_compiler_preopt_self_rebuild_20261117.md)
+detected. The primary reviewer accepted M3 at `156346e3` with zero blocking
+findings. [M3 evidence](evidence/release_fast_compiler_preopt_self_rebuild_20261117.md)
 
 The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)
