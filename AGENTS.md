@@ -2,15 +2,17 @@
 
 ## Search and JSON tools
 
-Every agent working on z_llvm must read and follow the shared
-[jqz and zigrep workflow](/home/oleg/prog/docs/jqz-and-zigrep-workflow.md).
+Every agent working on z_llvm must read and follow the
+[project's jqz and zigrep workflow](docs/jqz-and-zigrep-workflow.md).
 
-- Start with `~/bin/zigrep` for text searches and file discovery. Use
+- Start with `zigrep` for text searches and file discovery. Use
   `--no-config` for reproducible searches and `rg` for reference comparisons.
-- Use `~/bin/jqz` for JSON and NDJSON queries. Check jqz's own query syntax.
-- When project work exposes a tool bug or missing feature, reproduce it and
-  follow the shared workflow to assign the fix in the owning repository,
-  qualify and install the ReleaseFast build, and rerun the original case.
+- A search exits 0 for a match and 1 for a miss. Any other exit is an error.
+  Preserve stderr and pause any acceptance or cleanup decision that relies
+  on that search.
+- Use `jqz` for JSON and NDJSON queries. For a tool defect, follow the
+  workflow in the owning repository. A verified workaround for a missing
+  convenience feature lets independent project work continue.
 
 ## Development storage
 
