@@ -1,0 +1,1320 @@
+{
+  "schema": "zllvm-generated-program-performance-v1",
+  "evidence_root": "local-state/validations/generated-program-performance-20261117/batch-01",
+  "workloads": 5,
+  "routes": 4,
+  "warmups": 40,
+  "timed_runs": 240,
+  "sizes_checked": 40,
+  "correctness": {
+    "scalar_observations_per_image": 272,
+    "memset_observations_per_image": 1442,
+    "common_driver_objects": 4,
+    "separately_linked_native_executables": 40,
+    "expected_sigill": 8,
+    "samples_excluded": 0,
+    "every_normal_stdout_matches": true,
+    "every_normal_stderr_empty": true,
+    "all_normal_exit_codes": 0,
+    "oracles": [
+      {
+        "id": "arguments_branches",
+        "sources": [
+          "test/behavioral/arguments_branches.ll"
+        ],
+        "semantic_driver": "test/behavioral/harness.zig",
+        "runtime_driver": "test/behavioral/performance_scalar.zig",
+        "oracle": {
+          "semantic": "465b1aeed36b80f1cd1eada3fb888abd9882c15d5096a873fb5f5d1f7cad264b",
+          "runtime": "e3a871a295d50eaa2dd4a8a69e10ac69d451077613ecafa8e8c9f6eb250f1894"
+        }
+      },
+      {
+        "id": "loops_memory",
+        "sources": [
+          "test/behavioral/loops_memory.ll"
+        ],
+        "semantic_driver": "test/behavioral/harness.zig",
+        "runtime_driver": "test/behavioral/performance_scalar.zig",
+        "oracle": {
+          "semantic": "d9bd50bd8633a7bae9552b9a0c84f6b73a43a0a731b94a250b442d91d3f65cbc",
+          "runtime": "cdc56f0f02d87ab771b3b0728dd62cee3885ff03ad8b3ec03628805e83dbfaaa"
+        }
+      },
+      {
+        "id": "nested_calls",
+        "sources": [
+          "test/behavioral/nested_calls.ll"
+        ],
+        "semantic_driver": "test/behavioral/harness.zig",
+        "runtime_driver": "test/behavioral/performance_scalar.zig",
+        "oracle": {
+          "semantic": "45018a709ff2c56fcf00438dd3db0b161871f641683fd43ad7870bfd45ac555a",
+          "runtime": "44d501490abd3eb8c5483ed5ec3832a94998bc28cec219f32bba0818e1793f37"
+        }
+      },
+      {
+        "id": "register_pressure",
+        "sources": [
+          "test/behavioral/register_pressure.ll"
+        ],
+        "semantic_driver": "test/behavioral/harness.zig",
+        "runtime_driver": "test/behavioral/performance_scalar.zig",
+        "oracle": {
+          "semantic": "175b65d8374beb47e2d679d0fddbf251ab0089df75412203689308d30f98997f",
+          "runtime": "6f041b609496ccd2fb9642dda5534f307831c70b7ac1d2578b396fcdbf6bca55"
+        }
+      },
+      {
+        "id": "memset",
+        "sources": [
+          "test/behavioral/memset_family.ll",
+          "test/behavioral/memset_compositions.ll"
+        ],
+        "semantic_driver": "test/behavioral/memset_harness.zig",
+        "runtime_driver": "test/behavioral/performance_memset.zig",
+        "oracle": {
+          "semantic": "9968d86cbede136cdfb2f2be42f61e58d4329f8b783e08c83ae85d06efd4266b",
+          "runtime": "76463dd5a599c9842424ce467b68ac31b168c406e407900dd029680de12c7ff9"
+        }
+      }
+    ]
+  },
+  "compiler": {
+    "compiler_core": "c32ba3cfb1f67340ac5706fbc77ac56569b37007",
+    "source_checkout": "a27b8e86be13e26ff5eeabb9ed4c168358d9bf4d",
+    "source_file_count": 679,
+    "backend_sha256": "ab067396ebbdaa1315e63dff554be4f75e7fa1ec28f080a651be89602b84f824",
+    "build_mode": "ReleaseFast",
+    "sdk": {
+      "path": "/home/oleg/.zig/0.17.0/files/zig",
+      "sha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+      "version": "0.17.0",
+      "host_target": "x86_64-linux.7.0...7.0-gnu.2.39",
+      "library": {
+        "path": "/home/oleg/.zig/0.17.0/files/lib",
+        "files": 19501,
+        "sha256": "da12ef3b9d8d4a6120652a8b53e18a905dace8a7eeb10a260c3db619a10f4a99"
+      }
+    },
+    "workload_target": "x86_64-unknown-linux-gnu",
+    "cpu": "baseline",
+    "reference": "Ubuntu clang 22.1.8",
+    "local_pipeline": [
+      "zig-release-fast-accepted",
+      "zig-release-small-accepted"
+    ],
+    "reference_flags": [
+      "-O3",
+      "-Oz"
+    ],
+    "common_link": "Pinned Zig SDK and LLD, static and stripped, baseline x86_64, no PIE or LTO. Every paired link used the same driver object and compiler-rt archive."
+  },
+  "procedure": {
+    "original_commit": "32adb32cbc0bd2191500383af3194eec194abf2d",
+    "original_freeze_sha256": "178dfbf6c61c87d893f63410c2d69b33b614a886e2f932f8b59a4ea65de7b929",
+    "original_meter_sha256": "ab04e0c3887ece9b1d9d086768e9c4ca934a501546b338cf6ddd80d6586674e1",
+    "final_commit": "1ee97b3b846860f358749b7cb1114007e529989b",
+    "final_freeze_sha256": "c97ab1a7923040d945d4c53ebb968e5662265d071ad6f4ca9eefa3f2878cc89d",
+    "final_meter_sha256": "8b32480210a88fc78f304d178065549a2a5c3a7270d1db4549b90681246acf49",
+    "first_sampling_attempt": {
+      "actual_exit": 1,
+      "generated_processes": 0,
+      "reason": "taskset rejected PID zero while observing affinity"
+    },
+    "prepared_sha256": "a7d0aa6db09e187d91810e9c6fb58f70eb23f6f96181847ea351999c23a0f724",
+    "workload_blocks": "rotate starting workload per block",
+    "within_workload_order": [
+      "0132",
+      "1203",
+      "2310",
+      "3021"
+    ],
+    "route_order": [
+      "local-fast",
+      "llvm-O3",
+      "local-small",
+      "llvm-Oz"
+    ],
+    "warmup_blocks": 2,
+    "measured_blocks": 12,
+    "local_optimization_to_emission_chains": 10,
+    "measured_length_plus_one_admission": true,
+    "host": "AMD Ryzen 7 7840HS",
+    "logical_cpu": 2,
+    "smt_sibling": 10,
+    "governor": "performance",
+    "scaling_driver": "amd-pstate-epp",
+    "boost": true,
+    "one_minute_host_load_before": 2.23,
+    "one_minute_host_load_after": 1.94,
+    "timing": "Unprofiled elapsed nanoseconds per whole native process, measured with a monotonic clock from launch through reap",
+    "ratios": "Median, MAD, minimum and maximum over twelve within-round local/reference runtime ratios",
+    "sizes": "Bytes. Kernel relocatable object and stripped timed executable per route. NOBITS contributes to memory allocation only."
+  },
+  "samples": {
+    "path": "docs/evidence/generated_program_performance_20261117_samples.tsv",
+    "sha256": "9a7e14c7fed7c62fa2eac221346836783a007d3ab8c330c5d9684b58c12c8c0d",
+    "rows": 280
+  },
+  "fresh": [
+    "Two local and two LLVM build routes per workload",
+    "Image correctness, all native links and executions",
+    "All reported ELF sizes, raw samples and paired statistics"
+  ],
+  "reused": [
+    "Five immutable IR workloads, four driver sources and historical LLVM stdout digests",
+    "Pinned SDK, libraries and external providers, reauthenticated before comparison"
+  ],
+  "preservation": {
+    "run": {
+      "status": "passed",
+      "serial_gates": 17,
+      "run_id": "cbc9a73d6b32028addb6bf8ee5d091e1",
+      "backend": "ab067396ebbdaa1315e63dff554be4f75e7fa1ec28f080a651be89602b84f824",
+      "emitter": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+      "prior_performance_measurements_reused": 0
+    },
+    "gates": [
+      {
+        "gate": "selected-object-suite",
+        "actual_exit": 0,
+        "wall_ms": 77643,
+        "cache_status": "none"
+      },
+      {
+        "gate": "selected-object-inspection",
+        "actual_exit": 0,
+        "wall_ms": 2350,
+        "cache_status": "none"
+      },
+      {
+        "gate": "selected-native-link",
+        "actual_exit": 0,
+        "wall_ms": 3966,
+        "cache_status": "none"
+      },
+      {
+        "gate": "selected-native-probe",
+        "actual_exit": 0,
+        "wall_ms": 3797,
+        "cache_status": "none"
+      },
+      {
+        "gate": "zig-source-native-link",
+        "actual_exit": 0,
+        "wall_ms": 18602,
+        "cache_status": "none"
+      },
+      {
+        "gate": "integrated-object-postopt",
+        "actual_exit": 0,
+        "wall_ms": 73340,
+        "cache_status": "none"
+      },
+      {
+        "gate": "integrated-object-preopt",
+        "actual_exit": 0,
+        "wall_ms": 34827,
+        "cache_status": "none"
+      },
+      {
+        "gate": "integrated-object-ir-writer",
+        "actual_exit": 0,
+        "wall_ms": 16488,
+        "cache_status": "none"
+      },
+      {
+        "gate": "integrated-object-release",
+        "actual_exit": 0,
+        "wall_ms": 11155,
+        "cache_status": "none"
+      },
+      {
+        "gate": "real-rows-release-fast",
+        "actual_exit": 0,
+        "wall_ms": 727510,
+        "cache_status": "hit"
+      },
+      {
+        "gate": "real-rows-release-safe",
+        "actual_exit": 0,
+        "wall_ms": 756687,
+        "cache_status": "hit"
+      },
+      {
+        "gate": "real-rows-release-small",
+        "actual_exit": 0,
+        "wall_ms": 418651,
+        "cache_status": "hit"
+      },
+      {
+        "gate": "integrated-executable",
+        "actual_exit": 0,
+        "wall_ms": 2594672,
+        "cache_status": "none"
+      },
+      {
+        "gate": "release-object-inspection",
+        "actual_exit": 0,
+        "wall_ms": 460,
+        "cache_status": "none"
+      },
+      {
+        "gate": "release-native-link",
+        "actual_exit": 0,
+        "wall_ms": 1168,
+        "cache_status": "none"
+      },
+      {
+        "gate": "release-native-probe",
+        "actual_exit": 0,
+        "wall_ms": 1036,
+        "cache_status": "none"
+      },
+      {
+        "gate": "boundary-gates",
+        "actual_exit": 0,
+        "wall_ms": 11498,
+        "cache_status": "none"
+      }
+    ],
+    "summaries": "summary distribution-all-timing subgates=17 total_duration_ms=4753850 cache_hit_subgates=3 cache_miss_subgates=0 cache_mixed_subgates=0 cache_none_subgates=14 cache_observation_unreported_subgates=14 slowest_reported=5 fresh_real_rows=false local_fail=0\nsummary distribution-all-serial-bundle schema_version=1 produced=1 consumers=3 identity=0e7cab5dcfe3264d659aad11290e0d79fea144d0b79d54adb9b4ebfd844ebfd1 executions_cached=false local_fail=0\nsummary distribution-all-serial schema_version=1 run_id=cbc9a73d6b32028addb6bf8ee5d091e1 scratch_path=local-state/tmp/validations/generated-program-performance-20261117/batch-01/preservation/.workspaces/checks/serial bundle_path=local-state/tmp/validations/generated-program-performance-20261117/batch-01/preservation/.workspaces/checks/serial/release_source_object_bundle target=x86_64-unknown-linux-gnu mode=serial real_rows_concurrency=3 subgates=17 wall_ms=3739416 starting_free_bytes=141925584896 minimum_observed_free_bytes=125216432128 final_free_bytes=125216432128 observed_peak_bytes=16709152768 reserve_bytes=11410065408 required_start_bytes=20000000000 local_fail=0\n",
+    "distribution_log_sha256": "7006f2f88513fc2353d58c8bf556d14abed88405cc81a8f903f178a94d1357d0",
+    "native": {
+      "status": "passed",
+      "registered_populations": 237,
+      "registry_sha256": "4da9079c270eaa07e0429653375bf7c38ae4237426524887c280fd2c8cba8133",
+      "selected_backend_sha256": "ab067396ebbdaa1315e63dff554be4f75e7fa1ec28f080a651be89602b84f824",
+      "three_mode_native_report_verified": true
+    },
+    "native_report_sha256": "b2479bb55dcd35bcc48335e3ca90a41941109630e6be4444d912d037bf0c577b",
+    "reference_population_counts": "M1 accepted baseline",
+    "original_final_check": {
+      "receipt": "local-state/validations/generated-program-performance-20261117/batch-01/final-checks/checks.json",
+      "sha256": "6ccb2d776294afecd04784f1c225f111447a1f067fa95840fd714f3cebc167e4",
+      "actual_exit": 1,
+      "cause": "Expected order lists inherited the TSV field separator in AWK. The first data row matched the frozen schedule."
+    },
+    "final_verification": "local-state/validations/generated-program-performance-20261117/batch-01/final-checks-r2/report.json",
+    "storage_disposition": "local-state/validations/generated-program-performance-20261117/batch-01/storage/result.json"
+  },
+  "preparation": [
+    {
+      "workload": "arguments_branches",
+      "route": "local-fast",
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "optimizer_output_emitter_input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "object_sha256": "d8d114efd17f3a19129cbfb0d1f12341caa5027348eea50bea858d5a5f1d40f1",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "arguments_branches",
+      "route": "llvm-O3",
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "87eed5ce784fc000c805236f6c29c82c1c417f6489d08a90e3b5d199df2b17d4",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "arguments_branches",
+      "route": "local-small",
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "optimizer_output_emitter_input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "object_sha256": "d8d114efd17f3a19129cbfb0d1f12341caa5027348eea50bea858d5a5f1d40f1",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "arguments_branches",
+      "route": "llvm-Oz",
+      "input_sha256": "8337fd92f392a2ce07da140b136000e678c15d3ea9b8c8e83fdbd38220068ecc",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "87eed5ce784fc000c805236f6c29c82c1c417f6489d08a90e3b5d199df2b17d4",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "local-fast",
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "optimizer_output_emitter_input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "object_sha256": "e8ea4eead07ade77a22f1c5345e70feaa348e27f2808f78a752de1926b89da03",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "llvm-O3",
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "243ada0d5bd5d39c8c2e19c56a3fb07db1fdcf96098c84ef06026204f9d7465e",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "local-small",
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "optimizer_output_emitter_input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "object_sha256": "e8ea4eead07ade77a22f1c5345e70feaa348e27f2808f78a752de1926b89da03",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "llvm-Oz",
+      "input_sha256": "27c80e903db475180f050e2e1d7c7e8af9c0633fad2a107260c9b64adfc54473",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "deef0fafad4c2bf64791573016c54ab8afe41c029e97b144f2b66042488184b7",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "local-fast",
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "optimizer_output_emitter_input_sha256": "4f9fc36db3bec1d5ec4127f6a6aca63969d409fb5088ce11e2bb471f8d672406",
+      "object_sha256": "48410b6e0db29c103be712fbcad9777a5a053755f60c32192332caed86dc3eeb",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "llvm-O3",
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "28bff983012ca945eda9ae109d23b537d35b9da690f61c588e2c24afd3fdce3a",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "local-small",
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "optimizer_output_emitter_input_sha256": "4f9fc36db3bec1d5ec4127f6a6aca63969d409fb5088ce11e2bb471f8d672406",
+      "object_sha256": "48410b6e0db29c103be712fbcad9777a5a053755f60c32192332caed86dc3eeb",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "llvm-Oz",
+      "input_sha256": "dfa56dbb401735a06d8d9a646db924a252cb5a0a72addd7d846d87b25f5b3234",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "28bff983012ca945eda9ae109d23b537d35b9da690f61c588e2c24afd3fdce3a",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "local-fast",
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "optimizer_output_emitter_input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "object_sha256": "f6f1a1832999983044c8876a6239ce7b725570db2ae351b99075b76086075259",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "llvm-O3",
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "eaeb10f3ba3608f4c93c6fda9573298488f666619a62cb11be516c9e4308b904",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "local-small",
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "optimizer_output_emitter_input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "object_sha256": "f6f1a1832999983044c8876a6239ce7b725570db2ae351b99075b76086075259",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "llvm-Oz",
+      "input_sha256": "2095b3b83986def5781e024247b0735aa1010fd5de0951b94ee1a5dadc0c258c",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "eaeb10f3ba3608f4c93c6fda9573298488f666619a62cb11be516c9e4308b904",
+      "semantic_driver_sha256": "77b3d080af573da3d85e97425e791a2f2ef9b97b7d74e63f2f7e6589c67f9c17",
+      "runtime_driver_sha256": "2cd383880d3c4f3bc8e25dfc9490b7241e92516cf8b8e3197dba42e09848aadb"
+    },
+    {
+      "workload": "memset",
+      "route": "local-fast",
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "optimizer_output_emitter_input_sha256": "e2134274e9ae12989681df98485b36fcd573e7201b351252e3fd933207573a3b",
+      "object_sha256": "7c9a95f9bd49030f8645049d47107587abb8597309f680cdf19c2d5fe145bbbf",
+      "semantic_driver_sha256": "50fd1770c80c3c9fc450aaa1fd81b974e0e37b448496c043f84d92005d7d3f98",
+      "runtime_driver_sha256": "0558cd5d7358c7fff9d4c7e0620ee3984578bee543aac061a047302dfd9f2f18"
+    },
+    {
+      "workload": "memset",
+      "route": "llvm-O3",
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "d3bd48fca26e5fb29e17a5fd4b64584b161da89de877400c0b07876610960c4a",
+      "semantic_driver_sha256": "50fd1770c80c3c9fc450aaa1fd81b974e0e37b448496c043f84d92005d7d3f98",
+      "runtime_driver_sha256": "0558cd5d7358c7fff9d4c7e0620ee3984578bee543aac061a047302dfd9f2f18"
+    },
+    {
+      "workload": "memset",
+      "route": "local-small",
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "optimizer_output_emitter_input_sha256": "e2134274e9ae12989681df98485b36fcd573e7201b351252e3fd933207573a3b",
+      "object_sha256": "7c9a95f9bd49030f8645049d47107587abb8597309f680cdf19c2d5fe145bbbf",
+      "semantic_driver_sha256": "50fd1770c80c3c9fc450aaa1fd81b974e0e37b448496c043f84d92005d7d3f98",
+      "runtime_driver_sha256": "0558cd5d7358c7fff9d4c7e0620ee3984578bee543aac061a047302dfd9f2f18"
+    },
+    {
+      "workload": "memset",
+      "route": "llvm-Oz",
+      "input_sha256": "23e8b061eb8b2b5a50039788bd762c1f1853fdf3e53ca45f9ad644fcdef6ef71",
+      "optimizer_output_emitter_input_sha256": null,
+      "object_sha256": "d3bd48fca26e5fb29e17a5fd4b64584b161da89de877400c0b07876610960c4a",
+      "semantic_driver_sha256": "50fd1770c80c3c9fc450aaa1fd81b974e0e37b448496c043f84d92005d7d3f98",
+      "runtime_driver_sha256": "0558cd5d7358c7fff9d4c7e0620ee3984578bee543aac061a047302dfd9f2f18"
+    }
+  ],
+  "results": [
+    {
+      "workload": "arguments_branches",
+      "route": "local-fast",
+      "runtime_ns": {
+        "median": 70639812,
+        "min": 70268862,
+        "max": 71644861,
+        "mad": 192972
+      },
+      "object": {
+        "file_bytes": 816,
+        "executable_sections": 116,
+        "text": 116,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 116
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145385,
+        "text": 145385,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "969ed8c8fa849c7d4efb2779ded0e511d2bc3a4d7aa78bee6526cbebb9082072"
+    },
+    {
+      "workload": "arguments_branches",
+      "route": "llvm-O3",
+      "runtime_ns": {
+        "median": 50671780,
+        "min": 50392950,
+        "max": 50942414,
+        "mad": 176745.5
+      },
+      "object": {
+        "file_bytes": 616,
+        "executable_sections": 22,
+        "text": 22,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 22
+      },
+      "executable": {
+        "file_bytes": 237400,
+        "executable_sections": 145289,
+        "text": 145289,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307132,
+        "allocated_file_backed": 235917
+      },
+      "runtime_sha256": "44f11c4d6089f98697b28dcf82ab9d664b1810f7e0cd9411440b4caaf7e898dc"
+    },
+    {
+      "workload": "arguments_branches",
+      "route": "local-small",
+      "runtime_ns": {
+        "median": 70673207.5,
+        "min": 70259865,
+        "max": 71286000,
+        "mad": 252639
+      },
+      "object": {
+        "file_bytes": 816,
+        "executable_sections": 116,
+        "text": 116,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 116
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145385,
+        "text": 145385,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "969ed8c8fa849c7d4efb2779ded0e511d2bc3a4d7aa78bee6526cbebb9082072"
+    },
+    {
+      "workload": "arguments_branches",
+      "route": "llvm-Oz",
+      "runtime_ns": {
+        "median": 50561580,
+        "min": 50395495,
+        "max": 50797320,
+        "mad": 111823.5
+      },
+      "object": {
+        "file_bytes": 616,
+        "executable_sections": 22,
+        "text": 22,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 22
+      },
+      "executable": {
+        "file_bytes": 237400,
+        "executable_sections": 145289,
+        "text": 145289,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307132,
+        "allocated_file_backed": 235917
+      },
+      "runtime_sha256": "44f11c4d6089f98697b28dcf82ab9d664b1810f7e0cd9411440b4caaf7e898dc"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "local-fast",
+      "runtime_ns": {
+        "median": 230050324.5,
+        "min": 229148261,
+        "max": 231112910,
+        "mad": 456547
+      },
+      "object": {
+        "file_bytes": 816,
+        "executable_sections": 127,
+        "text": 127,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 127
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145385,
+        "text": 145385,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "8ebe255cb4a48bed1c4964825ce3415fbfb54ba512cf1787cee549a3f21ac6aa"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "llvm-O3",
+      "runtime_ns": {
+        "median": 79889253.5,
+        "min": 79229994,
+        "max": 80285067,
+        "mad": 215581.5
+      },
+      "object": {
+        "file_bytes": 720,
+        "executable_sections": 124,
+        "text": 124,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 124
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145385,
+        "text": 145385,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "1cb1c9ffddf155d689570aab4e538a0f14eb56c4e5f0d2d42935299795e19928"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "local-small",
+      "runtime_ns": {
+        "median": 229883949,
+        "min": 228972167,
+        "max": 230511685,
+        "mad": 483785.5
+      },
+      "object": {
+        "file_bytes": 816,
+        "executable_sections": 127,
+        "text": 127,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 127
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145385,
+        "text": 145385,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "8ebe255cb4a48bed1c4964825ce3415fbfb54ba512cf1787cee549a3f21ac6aa"
+    },
+    {
+      "workload": "loops_memory",
+      "route": "llvm-Oz",
+      "runtime_ns": {
+        "median": 101322639,
+        "min": 100961864,
+        "max": 103063100,
+        "mad": 231072
+      },
+      "object": {
+        "file_bytes": 624,
+        "executable_sections": 28,
+        "text": 28,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 28
+      },
+      "executable": {
+        "file_bytes": 237400,
+        "executable_sections": 145289,
+        "text": 145289,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307132,
+        "allocated_file_backed": 235917
+      },
+      "runtime_sha256": "163e2c0345e17849a7bab7711e91d4ea4ad2eeeb3ee96df3eb3733c1b2ae370e"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "local-fast",
+      "runtime_ns": {
+        "median": 144593606,
+        "min": 144266772,
+        "max": 145146982,
+        "mad": 145224.5
+      },
+      "object": {
+        "file_bytes": 936,
+        "executable_sections": 105,
+        "text": 105,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 105
+      },
+      "executable": {
+        "file_bytes": 237480,
+        "executable_sections": 145369,
+        "text": 145369,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307052,
+        "allocated_file_backed": 235997
+      },
+      "runtime_sha256": "d9f616bba31faf9d4535cd2ed0b486fce39b34c2e11d1c4e0053f10978fd4836"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "llvm-O3",
+      "runtime_ns": {
+        "median": 54894086.5,
+        "min": 54639148,
+        "max": 55261324,
+        "mad": 106478
+      },
+      "object": {
+        "file_bytes": 712,
+        "executable_sections": 59,
+        "text": 59,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 59
+      },
+      "executable": {
+        "file_bytes": 237432,
+        "executable_sections": 145321,
+        "text": 145321,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307100,
+        "allocated_file_backed": 235949
+      },
+      "runtime_sha256": "f482825d326f0d0ef5f2fafc795703c20d9ceff98efff870c3818624df164113"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "local-small",
+      "runtime_ns": {
+        "median": 144400509,
+        "min": 143984200,
+        "max": 145015205,
+        "mad": 240184.5
+      },
+      "object": {
+        "file_bytes": 936,
+        "executable_sections": 105,
+        "text": 105,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 105
+      },
+      "executable": {
+        "file_bytes": 237480,
+        "executable_sections": 145369,
+        "text": 145369,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307052,
+        "allocated_file_backed": 235997
+      },
+      "runtime_sha256": "d9f616bba31faf9d4535cd2ed0b486fce39b34c2e11d1c4e0053f10978fd4836"
+    },
+    {
+      "workload": "nested_calls",
+      "route": "llvm-Oz",
+      "runtime_ns": {
+        "median": 54919190,
+        "min": 54643267,
+        "max": 55324177,
+        "mad": 102926.5
+      },
+      "object": {
+        "file_bytes": 712,
+        "executable_sections": 59,
+        "text": 59,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 59
+      },
+      "executable": {
+        "file_bytes": 237432,
+        "executable_sections": 145321,
+        "text": 145321,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307100,
+        "allocated_file_backed": 235949
+      },
+      "runtime_sha256": "f482825d326f0d0ef5f2fafc795703c20d9ceff98efff870c3818624df164113"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "local-fast",
+      "runtime_ns": {
+        "median": 94014913,
+        "min": 93584678,
+        "max": 94503232,
+        "mad": 341878
+      },
+      "object": {
+        "file_bytes": 896,
+        "executable_sections": 199,
+        "text": 199,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 199
+      },
+      "executable": {
+        "file_bytes": 237576,
+        "executable_sections": 145465,
+        "text": 145465,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 306956,
+        "allocated_file_backed": 236093
+      },
+      "runtime_sha256": "8d0a85dd7d10ddca69720eb8946283378b6dfc510c966bcc75c21445113acffe"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "llvm-O3",
+      "runtime_ns": {
+        "median": 47764674,
+        "min": 47618348,
+        "max": 47963231,
+        "mad": 63233.5
+      },
+      "object": {
+        "file_bytes": 1040,
+        "executable_sections": 74,
+        "text": 74,
+        "rodata": 48,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 122
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145337,
+        "text": 145337,
+        "rodata": 59632,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "fd1707fe698f350715c5286a4c88bddc8e4f84518b22148c86dad927b8b2f455"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "local-small",
+      "runtime_ns": {
+        "median": 93897393.5,
+        "min": 93514460,
+        "max": 94789962,
+        "mad": 196368.5
+      },
+      "object": {
+        "file_bytes": 896,
+        "executable_sections": 199,
+        "text": 199,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 199
+      },
+      "executable": {
+        "file_bytes": 237576,
+        "executable_sections": 145465,
+        "text": 145465,
+        "rodata": 59584,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 306956,
+        "allocated_file_backed": 236093
+      },
+      "runtime_sha256": "8d0a85dd7d10ddca69720eb8946283378b6dfc510c966bcc75c21445113acffe"
+    },
+    {
+      "workload": "register_pressure",
+      "route": "llvm-Oz",
+      "runtime_ns": {
+        "median": 47846744,
+        "min": 47342779,
+        "max": 48311883,
+        "mad": 196649
+      },
+      "object": {
+        "file_bytes": 1040,
+        "executable_sections": 74,
+        "text": 74,
+        "rodata": 48,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 122
+      },
+      "executable": {
+        "file_bytes": 237496,
+        "executable_sections": 145337,
+        "text": 145337,
+        "rodata": 59632,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 307036,
+        "allocated_file_backed": 236013
+      },
+      "runtime_sha256": "fd1707fe698f350715c5286a4c88bddc8e4f84518b22148c86dad927b8b2f455"
+    },
+    {
+      "workload": "memset",
+      "route": "local-fast",
+      "runtime_ns": {
+        "median": 80836654.5,
+        "min": 80538222,
+        "max": 85351828,
+        "mad": 257678.5
+      },
+      "object": {
+        "file_bytes": 1992,
+        "executable_sections": 843,
+        "text": 843,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 843
+      },
+      "executable": {
+        "file_bytes": 239288,
+        "executable_sections": 147049,
+        "text": 147049,
+        "rodata": 59712,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 305244,
+        "allocated_file_backed": 237805
+      },
+      "runtime_sha256": "94d58ea12b912decefcf4e73e6942254b6073864fc1bf579db1ec4def58d8ff6"
+    },
+    {
+      "workload": "memset",
+      "route": "llvm-O3",
+      "runtime_ns": {
+        "median": 14611023,
+        "min": 14421554,
+        "max": 15425966,
+        "mad": 130709.5
+      },
+      "object": {
+        "file_bytes": 1832,
+        "executable_sections": 275,
+        "text": 275,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 427
+      },
+      "executable": {
+        "file_bytes": 238872,
+        "executable_sections": 146489,
+        "text": 146489,
+        "rodata": 59712,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 305660,
+        "allocated_file_backed": 237397
+      },
+      "runtime_sha256": "8af7a0e6a18b227463032fc9e64075ed738ea200147c9014048d3fffaf1641ff"
+    },
+    {
+      "workload": "memset",
+      "route": "local-small",
+      "runtime_ns": {
+        "median": 80928784.5,
+        "min": 80376045,
+        "max": 82945486,
+        "mad": 449954
+      },
+      "object": {
+        "file_bytes": 1992,
+        "executable_sections": 843,
+        "text": 843,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 843
+      },
+      "executable": {
+        "file_bytes": 239288,
+        "executable_sections": 147049,
+        "text": 147049,
+        "rodata": 59712,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 305244,
+        "allocated_file_backed": 237805
+      },
+      "runtime_sha256": "94d58ea12b912decefcf4e73e6942254b6073864fc1bf579db1ec4def58d8ff6"
+    },
+    {
+      "workload": "memset",
+      "route": "llvm-Oz",
+      "runtime_ns": {
+        "median": 14540711.5,
+        "min": 14390853,
+        "max": 14776767,
+        "mad": 66174
+      },
+      "object": {
+        "file_bytes": 1832,
+        "executable_sections": 275,
+        "text": 275,
+        "rodata": 0,
+        "data": 0,
+        "bss": 0,
+        "allocated_nobits": 0,
+        "allocated_file_backed": 427
+      },
+      "executable": {
+        "file_bytes": 238872,
+        "executable_sections": 146489,
+        "text": 146489,
+        "rodata": 59712,
+        "data": 19072,
+        "bss": 41216,
+        "allocated_nobits": 305660,
+        "allocated_file_backed": 237397
+      },
+      "runtime_sha256": "8af7a0e6a18b227463032fc9e64075ed738ea200147c9014048d3fffaf1641ff"
+    }
+  ],
+  "comparisons": [
+    {
+      "workload": "arguments_branches",
+      "local": "local-fast",
+      "llvm": "llvm-O3",
+      "paired_wall_ratio": {
+        "median": 1.3938862016113198,
+        "min": 1.3867327083633798,
+        "max": 1.4063892025218907,
+        "mad": 0.004412197941965013
+      }
+    },
+    {
+      "workload": "arguments_branches",
+      "local": "local-small",
+      "llvm": "llvm-Oz",
+      "paired_wall_ratio": {
+        "median": 1.3950766559171561,
+        "min": 1.3874245430202712,
+        "max": 1.4120883766145835,
+        "mad": 0.0017077879705214016
+      }
+    },
+    {
+      "workload": "loops_memory",
+      "local": "local-fast",
+      "llvm": "llvm-O3",
+      "paired_wall_ratio": {
+        "median": 2.87853332519867,
+        "min": 2.868555660685959,
+        "max": 2.916987599418473,
+        "mad": 0.003951031697764229
+      }
+    },
+    {
+      "workload": "loops_memory",
+      "local": "local-small",
+      "llvm": "llvm-Oz",
+      "paired_wall_ratio": {
+        "median": 2.2700507486203207,
+        "min": 2.2360117733699063,
+        "max": 2.2815832894962917,
+        "mad": 0.005775560890088904
+      }
+    },
+    {
+      "workload": "nested_calls",
+      "local": "local-fast",
+      "llvm": "llvm-O3",
+      "paired_wall_ratio": {
+        "median": 2.63622465382179,
+        "min": 2.6129434534756975,
+        "max": 2.6466634509015403,
+        "mad": 0.004762825507806934
+      }
+    },
+    {
+      "workload": "nested_calls",
+      "local": "local-small",
+      "llvm": "llvm-Oz",
+      "paired_wall_ratio": {
+        "median": 2.6336742576987984,
+        "min": 2.6078088427777244,
+        "max": 2.646402573770911,
+        "mad": 0.006778552887065192
+      }
+    },
+    {
+      "workload": "register_pressure",
+      "local": "local-fast",
+      "llvm": "llvm-O3",
+      "paired_wall_ratio": {
+        "median": 1.9648329744975164,
+        "min": 1.9549593160689984,
+        "max": 1.9787139950491965,
+        "mad": 0.0042393762567704
+      }
+    },
+    {
+      "workload": "register_pressure",
+      "local": "local-small",
+      "llvm": "llvm-Oz",
+      "paired_wall_ratio": {
+        "median": 1.9632846111442281,
+        "min": 1.9423323243269155,
+        "max": 1.9811383273466054,
+        "mad": 0.0133090119067788
+      }
+    },
+    {
+      "workload": "memset",
+      "local": "local-fast",
+      "llvm": "llvm-O3",
+      "paired_wall_ratio": {
+        "median": 5.548038951984269,
+        "min": 5.2616554451111845,
+        "max": 5.799911090320519,
+        "mad": 0.03946847308553192
+      }
+    },
+    {
+      "workload": "memset",
+      "local": "local-small",
+      "llvm": "llvm-Oz",
+      "paired_wall_ratio": {
+        "median": 5.567630560190426,
+        "min": 5.514530636557205,
+        "max": 5.701826175370496,
+        "mad": 0.03481696168640136
+      }
+    }
+  ],
+  "evidence_files": [
+    {
+      "path": "admission/report.json",
+      "sha256": "a2d97612d5d9a93f4e1cf3329899cee6999803014e3b596aebe25ce94ed01bcc"
+    },
+    {
+      "path": "freeze-r2/report.json",
+      "sha256": "147e5b11f81aec57d6289bb5d99a7b6f4143d1db45250ad50d64e8a546f06c68"
+    },
+    {
+      "path": "freeze-r2/oracles.json",
+      "sha256": "f6ad5ccf76b0b832a29dd0c14b992fe0746f65493d9222f17a2f0a9515c57c37"
+    },
+    {
+      "path": "freeze-r2/procedure-and-inputs.txt",
+      "sha256": "286aeb9bcbb59a3b911aeeb3bc2004ff4be7f3decaa5344b309df9a210135436"
+    },
+    {
+      "path": "freeze-r2/tool-providers.txt",
+      "sha256": "b2ff1fae5c7f0d915ebaed755a10c75f85dcd284e81a55cc6f072541535bdda5"
+    },
+    {
+      "path": "freeze-r2/prepared-image-identities.tsv",
+      "sha256": "73aca0cd902a40b92ce289ddb5f912b853eba0cf14574038a56f4eb46b6a800c"
+    },
+    {
+      "path": "freeze-r2/backend-build.json",
+      "sha256": "62944e60baa96aca817bd9f615a4c3ed2cf77a43b8d3069c33619106e3c12850"
+    },
+    {
+      "path": "samples/checks.json",
+      "sha256": "7b26bf87752ec47cf8663bd1f99618115112225254d5e744a21c3b7e34e54d88"
+    },
+    {
+      "path": "affinity-incident/diagnosis.md",
+      "sha256": "16899f6ca05e4ac24016070c0c004013cf8f815931104b58e3e95fef617290fc"
+    },
+    {
+      "path": "meter/checks.json",
+      "sha256": "3a4d73ba41cc1b75f0f178c76fe6274d76612fa4f71cdc2721aa92bd67799c34"
+    },
+    {
+      "path": "meter/identities.txt",
+      "sha256": "f80c2731ad692840880d3c96e4fdd4288d899ff075d672cd4fe7bb0d5a68b22d"
+    },
+    {
+      "path": "programs/report.json",
+      "sha256": "a7d0aa6db09e187d91810e9c6fb58f70eb23f6f96181847ea351999c23a0f724"
+    },
+    {
+      "path": "programs/commands.json",
+      "sha256": "ff7d44ad8fb46add7ed2ab4cf85febd3b275dd5e8025a6b1f163abb43040cbfa"
+    },
+    {
+      "path": "timed-run/commands.json",
+      "sha256": "851b0039f1055af5481d585cb70d9e5ef81aa62a2a7040fb05468f67c35fab2b"
+    },
+    {
+      "path": "timed-run/report.json",
+      "sha256": "8df6c83037731ae9e57d4da333e69ebc216cd56e5e3810a0752631a0f9d3f3cf"
+    },
+    {
+      "path": "timed-run/affinity-child.status",
+      "sha256": "7559c85fe4976f5d7d8a37091a3fa0e69fcd1088d52c6ac022321d5badf00310"
+    },
+    {
+      "path": "inspect/report.json",
+      "sha256": "cc745f14e4dcd4b7f5657be3e1cc0c07c31a93608df64a20396394e7bb35be00"
+    },
+    {
+      "path": "inspect/samples.tsv",
+      "sha256": "9a7e14c7fed7c62fa2eac221346836783a007d3ab8c330c5d9684b58c12c8c0d"
+    },
+    {
+      "path": "inspect/elf-sizes.tsv",
+      "sha256": "1b96310e43fc92c819e53de52d08903e2b9f6a447356ac4bd3193876c853219d"
+    },
+    {
+      "path": "inspect/recomputed-pairs.tsv",
+      "sha256": "4d355192a4c486e5a515b7d66b9d3617b1e9359a4bc511859b995ca779c72817"
+    },
+    {
+      "path": "inspect/recomputed-runtime.tsv",
+      "sha256": "9e4388f09f337e13b70e02760356b3390eee32f2f3285c1e923919812ccdb602"
+    },
+    {
+      "path": "inspect/static-instructions.tsv",
+      "sha256": "caf5d4e23b315333654935c0c27399366e207c77b05a5643722e96e034122ac5"
+    },
+    {
+      "path": "inspect/link-inputs.tsv",
+      "sha256": "19d62dfb6f49d8a71ca764513484637423162bba9a58a983a5fa82de2a6cf45f"
+    },
+    {
+      "path": "inspect/common-link-inputs.tsv",
+      "sha256": "d7391cc7b6a8937398e09ab6803147a0b8efa4c9ada93bf1bc3aac7cfb57ebe4"
+    },
+    {
+      "path": "inspect/route-bindings.tsv",
+      "sha256": "2d3770ea712b069805a5dc4a8c23f4716bb1e50716ef28767148aa5d84b52a52"
+    }
+  ]
+}

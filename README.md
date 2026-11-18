@@ -70,6 +70,13 @@ this run. The independently inventoried runtime and test objects contain 903
 and 6,684 definitions. The local optimizer failure control stops the compile
 before emission. [ReleaseSmall qualification](docs/evidence/release_small_preopt_acceptance_20261117.md)
 
+Five generated-program benchmarks compare the local Fast and Small pipelines
+with LLVM O3 and Oz on baseline x86_64. The largest elapsed-time difference
+was the loop workload, about 150 ms per Fast process. The largest relative
+difference was the memset family, 5.55× LLVM O3 and 5.57× LLVM Oz. The report
+includes paired timings, object and executable sizes, and the disassembly
+behind the proposed improvements. [Runtime and size measurements](docs/evidence/generated_program_performance_20261117.md)
+
 Selective legalization was prototyped and measured, then deferred under the
 plan's benefit requirement. Five unprofiled pairs did not demonstrate the
 required time or memory gain; production scheduling is unchanged. The

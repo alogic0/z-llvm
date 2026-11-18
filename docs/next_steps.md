@@ -8,9 +8,12 @@ populations passed at compiler source `c32ba3cf`.
 [M1 plan and review state](plans/2026-11-17-release-small-preopt-behavior.md)
 
 The reviewer accepted M1 at `a27b8e86` with all 63 owned workspace roots
-closed and authorized the five-workload Fast/Small measurement against LLVM.
-M3 compiler preopt/self-rebuild awaits independent review of the frozen M2
-result and explicit authorization. [M2 plan](plans/2026-11-17-generated-program-performance.md)
+closed. M2 subsequently measured five workloads in Fast and Small against
+LLVM. All 40 warmups and 240 measured runs had the expected outputs. The
+largest absolute Fast gap was the loop workload, about 150 ms per process.
+Memset had the largest median paired ratios at 5.55× O3 and 5.57× Oz.
+Independent review of M2 is the next decision. M3 compiler preopt/self-rebuild
+requires explicit authorization after that review. [Measurements and ranked proposals](evidence/generated_program_performance_20261117.md)
 
 The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)

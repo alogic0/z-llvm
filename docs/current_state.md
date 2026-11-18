@@ -187,6 +187,14 @@ optimizer failure stopped before object emission. All 17 preservation gates and
 237 native populations passed on the same compiler source.
 [ReleaseSmall result](evidence/release_small_preopt_acceptance_20261117.md)
 
+The reviewer accepted ReleaseSmall at `a27b8e86`. The subsequent generated-code
+measurement used the same compiler core for five fixed workloads. Across
+twelve measured processes per route, the median paired local/LLVM runtime
+ratios ranged from 1.39× to 5.55× for Fast/O3 and 1.40× to 5.57× for Small/Oz.
+All five local Fast/Small pairs produced byte-identical kernel objects and
+timed images. The ranked proposals begin with loop-carried scalars and byte
+fills. [Generated-program performance](evidence/generated_program_performance_20261117.md)
+
 ## Fixed compiler-core execution cohort
 
 [accepted_status.json](accepted_status.json) records the separate fixed
