@@ -1317,18 +1317,33 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                     "3:\n" ++
                     "\tmovb $0, (%rdi,%r8)\n",
             ),
-            .memset_rdi_sil_rdx_rax => try writer.writeAll(
-                "\tmovq %rdi, %rax\n" ++
-                    "\ttestq %rdx, %rdx\n" ++
-                    "\tje 2f\n" ++
-                    "\txorl %ecx, %ecx\n" ++
-                    "1:\n" ++
-                    "\tmovb %sil, (%rdi,%rcx)\n" ++
-                    "\tincq %rcx\n" ++
-                    "\tcmpq %rcx, %rdx\n" ++
-                    "\tjne 1b\n" ++
-                    "2:\n",
-            ),
+            .memset_rdi_sil_rdx_rax => |strategy| {
+                if (strategy == .bounded_8_to_16) try writer.writeAll(
+                    "\tleaq -8(%rdx), %rcx\n" ++
+                        "\tcmpq $8, %rcx\n" ++
+                        "\tja 0f\n" ++
+                        "\tmovzbl %sil, %eax\n" ++
+                        "\tmovabsq $0x0101010101010101, %rcx\n" ++
+                        "\timulq %rax, %rcx\n" ++
+                        "\tmovq %rcx, (%rdi)\n" ++
+                        "\tmovq %rcx, -8(%rdi,%rdx)\n" ++
+                        "\tmovq %rdi, %rax\n" ++
+                        "\tjmp 2f\n" ++
+                        "0:\n",
+                );
+                try writer.writeAll(
+                    "\tmovq %rdi, %rax\n" ++
+                        "\ttestq %rdx, %rdx\n" ++
+                        "\tje 2f\n" ++
+                        "\txorl %ecx, %ecx\n" ++
+                        "1:\n" ++
+                        "\tmovb %sil, (%rdi,%rcx)\n" ++
+                        "\tincq %rcx\n" ++
+                        "\tcmpq %rcx, %rdx\n" ++
+                        "\tjne 1b\n" ++
+                        "2:\n",
+                );
+            },
             .strlen_rdi_rax => try writer.writeAll(
                 "\txorl %eax, %eax\n" ++
                     "1:\n" ++

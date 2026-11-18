@@ -266,7 +266,7 @@ pub fn lowerByteMemsetLoop(allocator: std.mem.Allocator, machine: *MachineFuncti
     const len_reg = try paramReg(function, function.params.items[2].name, .{ .int = 64 });
     if (ptr_reg != .rdi or byte_reg != .rsi or len_reg != .rdx) return error.UnsupportedCodegenAbi;
 
-    try machine.instructions.append(allocator, .memset_rdi_sil_rdx_rax);
+    try machine.instructions.append(allocator, .{ .memset_rdi_sil_rdx_rax = .byte_loop });
     try machine.instructions.append(allocator, .ret);
     return true;
 }

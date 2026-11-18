@@ -924,8 +924,7 @@ fn lowerMemset(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.C
     if (dst.ty != .ptr or !fill.ty.eql(.{ .int = 8 }) or !len.ty.eql(.{ .int = 64 }) or
         !vol.ty.eql(.{ .int = 1 }) or !vol.value.eql(.{ .int = 0 }))
         return .{ .no_emitter = "composed-block-memset-args" };
-    // Use the same validated advisory facts as ordinary pointer calls. The
-    // byte loop does not need the promises, and never widens the memory access.
+    // Both fill paths work at byte alignment and stay inside the supplied length.
     if ((if (dst.attrs) |attrs| !sysv_abi.pointerCallAttrsAreAdvisory(attrs) else false) or
         !integerAdvisoryAttributes(fill) or !integerAdvisoryAttributes(len) or vol.attrs != null)
         return .{ .no_emitter = "composed-block-memset-attrs" };

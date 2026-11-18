@@ -696,7 +696,9 @@ pub fn executeInlineMemset(
         try transaction.selector.machine.instructions.append(transaction.selector.allocator, .{ .mov_imm_rdx = @bitCast(action.length_immediate) });
     }
     try failMemcpyForTest(Authority, transaction, .after_length);
-    try selector_state.emitEflagsInstruction(transaction.selector, .memset_rdi_sil_rdx_rax, .clobber);
+    try selector_state.emitEflagsInstruction(transaction.selector, .{
+        .memset_rdi_sil_rdx_rax = if (action.length != null) .bounded_8_to_16 else .byte_loop,
+    }, .clobber);
     try failMemcpyForTest(Authority, transaction, .after_call_append);
 }
 

@@ -103,6 +103,32 @@ const appendI32 = encoding_helpers.appendI32;
 const appendU32 = encoding_helpers.appendU32;
 const appendU64 = encoding_helpers.appendU64;
 
+const memsetByteLoop = [_]u8{
+    0x48, 0x89, 0xf8, // movq %rdi, %rax
+    0x48, 0x85, 0xd2, // testq %rdx, %rdx
+    0x74, 0x0e, // je 2f
+    0x31, 0xc9, // xorl %ecx, %ecx
+    0x40, 0x88, 0x34, 0x0f, // movb %sil, (%rdi,%rcx)
+    0x48, 0xff, 0xc1, // incq %rcx
+    0x48, 0x39, 0xca, // cmpq %rcx, %rdx
+    0x75, 0xf4, // jne 1b
+};
+
+// Unsigned (len - 8) <= 8 proves both unaligned words fit. The overlapping
+// bytes receive the same fill. RDI, RSI and the full-width RDX remain intact.
+const boundedMemsetPrefix = [_]u8{
+    0x48, 0x8d, 0x4a, 0xf8, // leaq -8(%rdx), %rcx
+    0x48, 0x83, 0xf9, 0x08, // cmpq $8, %rcx
+    0x77, 0x1f, // ja byte loop
+    0x40, 0x0f, 0xb6, 0xc6, // movzbl %sil, %eax
+    0x48, 0xb9, 1, 1, 1, 1, 1, 1, 1, 1, // movabsq $0x0101010101010101, %rcx
+    0x48, 0x0f, 0xaf, 0xc8, // imulq %rax, %rcx
+    0x48, 0x89, 0x0f, // movq %rcx, (%rdi)
+    0x48, 0x89, 0x4c, 0x17, 0xf8, // movq %rcx, -8(%rdi,%rdx)
+    0x48, 0x89, 0xf8, // movq %rdi, %rax
+    0xeb, memsetByteLoop.len, // jmp past byte loop
+};
+
 pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunction) ![]u8 {
     try x86_64.verifyFunction(function);
 
@@ -1312,16 +1338,10 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 0xeb, 0xe8, // jmp 2b
                 0x42, 0xc6, 0x04, 0x07, 0x00, // movb $0, (%rdi,%r8)
             }),
-            .memset_rdi_sil_rdx_rax => try bytes.appendSlice(allocator, &.{
-                0x48, 0x89, 0xf8, // movq %rdi, %rax
-                0x48, 0x85, 0xd2, // testq %rdx, %rdx
-                0x74, 0x0e, // je 2f
-                0x31, 0xc9, // xorl %ecx, %ecx
-                0x40, 0x88, 0x34, 0x0f, // movb %sil, (%rdi,%rcx)
-                0x48, 0xff, 0xc1, // incq %rcx
-                0x48, 0x39, 0xca, // cmpq %rcx, %rdx
-                0x75, 0xf4, // jne 1b
-            }),
+            .memset_rdi_sil_rdx_rax => |strategy| {
+                if (strategy == .bounded_8_to_16) try bytes.appendSlice(allocator, &boundedMemsetPrefix);
+                try bytes.appendSlice(allocator, &memsetByteLoop);
+            },
             .strlen_rdi_rax => try bytes.appendSlice(allocator, &.{
                 0x31, 0xc0,
                 0x80, 0x3c,
@@ -2186,7 +2206,10 @@ pub fn instructionSize(instruction: x86_64.Instruction) u32 {
         .guarded_strcat_rdi_rsi_rdx_rax => 66,
         .guarded_strncpy_rdi_rsi_rdx_rcx_rax => 55,
         .guarded_strcpy_rdi_rsi_rdx_rax => 42,
-        .memset_rdi_sil_rdx_rax => 22,
+        .memset_rdi_sil_rdx_rax => |strategy| switch (strategy) {
+            .byte_loop => memsetByteLoop.len,
+            .bounded_8_to_16 => boundedMemsetPrefix.len + memsetByteLoop.len,
+        },
         .strlen_rdi_rax => 13,
         .strnlen_rdi_rsi_rax => 18,
         .atomic_try_lock_rdi_al => 14,

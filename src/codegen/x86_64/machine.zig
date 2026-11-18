@@ -285,7 +285,8 @@ pub const Instruction = union(enum) {
     guarded_strcat_rdi_rsi_rdx_rax,
     guarded_strncpy_rdi_rsi_rdx_rcx_rax,
     guarded_strcpy_rdi_rsi_rdx_rax,
-    memset_rdi_sil_rdx_rax,
+    // Both forms return RDI in RAX and use RCX and flags as scratch.
+    memset_rdi_sil_rdx_rax: enum { byte_loop, bounded_8_to_16 },
     strlen_rdi_rax,
     strnlen_rdi_rsi_rax,
     atomic_try_lock_rdi_al,

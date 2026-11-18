@@ -1969,6 +1969,6 @@ test "x86_64 generic cfg lowers byte memset loop without name admission" {
 
     try std.testing.expectEqual(codegen.x86_64.CodegenPath.generic_cfg, machine.codegen_path);
     try std.testing.expectEqual(@as(usize, 2), machine.instructions.items.len);
-    try std.testing.expectEqual(codegen.x86_64.Instruction.memset_rdi_sil_rdx_rax, machine.instructions.items[0]);
+    try std.testing.expectEqual(codegen.x86_64.Instruction{ .memset_rdi_sil_rdx_rax = .byte_loop }, machine.instructions.items[0]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[1]);
 }
