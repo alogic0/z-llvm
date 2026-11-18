@@ -102,3 +102,16 @@ objects and the twenty pairs of semantic and timed executables. A separate
 managed `sample --prepared REPORT` reads that preparation report and verifies
 the linked images before and after the complete schedule. The admission receipt
 binds the implementation binary used by all three commands.
+
+## Affinity observation correction
+
+Preparation at `32adb32c` produced all twenty correct images. The first sampling
+command exited 1 before any generated program ran because the installed
+`taskset -pc 0` rejects PID zero. Preserve that terminal receipt, the original
+meter and preparation identities, and the original size observations.
+The successor launches the meter with `taskset -c 2`, reads back the kernel
+affinity mask and checks the affinity inherited by a child through the same
+process library. Qualify this observation in Debug and ReleaseFast, including
+refusal when CPU 2 is outside the launch mask. Freeze the corrected meter
+before the first warmup. Reauthenticate the existing twenty images and run the
+entire original schedule with the same inputs, commands, oracles and statistics.

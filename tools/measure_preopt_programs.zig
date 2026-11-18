@@ -15,7 +15,7 @@ pub fn main(init: std.process.Init) !void {
     u.installSignals();
     const argv = try init.minimal.args.toSlice(c.a);
     if (argv.len < 2 or u.contains(argv[1..], "--help"))
-        return c.print("usage: tools/run-validation ... measure_preopt_programs oracles | prepare --compiler EXE --zig EXE | sample --prepared REPORT\n", .{});
+        return c.print("usage: tools/run-validation ... measure_preopt_programs oracles | affinity | prepare --compiler EXE --zig EXE | sample --prepared REPORT\n", .{});
     run(&c, argv) catch |err| {
         try c.print("generated-program measurement failed: {s}\n", .{c.diagnostic orelse @errorName(err)});
         std.process.exit(1);
@@ -27,6 +27,7 @@ fn run(c: *u.Context, argv: []const []const u8) !void {
     const temporary = c.env.get("ZLLVM_TEMP_ROOT") orelse return error.ManagedRunRequired;
     const args = try u.Args.parse(c.a, argv[2..], &.{ "compiler", "zig", "prepared" }, &.{});
     var runner = Runner.init(c, evidence);
+    if (std.mem.eql(u8, argv[1], "affinity")) return recordAffinity(c, evidence);
     const corpus = try workloads.corpus(c);
     if (std.mem.eql(u8, argv[1], "oracles")) return c.writeJson(try c.join(&.{ evidence, "oracles.json" }), corpus);
     if (std.mem.eql(u8, argv[1], "sample")) return sample(&runner, try args.require("prepared"), corpus);
@@ -43,7 +44,7 @@ fn run(c: *u.Context, argv: []const []const u8) !void {
     try c.writeJson(try c.join(&.{ evidence, "report.json" }), .{ .complete = true, .rows = rows, .common_driver_objects = builder.drivers.count() });
 }
 
-fn pinCpu() !void {
+fn recordAffinity(c: *u.Context, evidence: []const u8) !void {
     const linux = std.os.linux;
     var mask: linux.cpu_set_t = undefined;
     if (linux.errno(linux.sched_getaffinity(0, @sizeOf(linux.cpu_set_t), &mask)) != .SUCCESS) return error.AffinityUnavailable;
@@ -51,6 +52,22 @@ fn pinCpu() !void {
     @memset(&mask, 0);
     mask[0] = 1 << cpu;
     try linux.sched_setaffinity(0, &mask);
+    var observed: linux.cpu_set_t = undefined;
+    if (linux.errno(linux.sched_getaffinity(0, @sizeOf(linux.cpu_set_t), &observed)) != .SUCCESS or
+        !std.mem.eql(usize, &mask, &observed)) return error.AffinityReadbackMismatch;
+    // Open /proc/self/status in the child, so this observation includes the
+    // affinity inherited through the process launcher.
+    const status = try c.capture(&.{ "/usr/bin/cat", "/proc/self/status" });
+    try c.write(try c.join(&.{ evidence, "affinity-child.status" }), status);
+    var lines = std.mem.splitScalar(u8, status, '\n');
+    while (lines.next()) |line| {
+        const prefix = "Cpus_allowed_list:";
+        if (!std.mem.startsWith(u8, line, prefix)) continue;
+        if (!std.mem.eql(u8, u.trim(line[prefix.len..]), try c.fmt("{d}", .{cpu}))) return error.ChildAffinityMismatch;
+        try c.write(try c.join(&.{ evidence, "observed-affinity.txt" }), try c.fmt("{s}\n", .{line}));
+        return;
+    }
+    return error.MissingChildAffinity;
 }
 
 fn verifyImages(c: *u.Context, rows: []const u.Value, corpus: u.Value) !void {
@@ -76,9 +93,7 @@ fn sample(r: *Runner, prepared: []const u8, corpus: u.Value) !void {
     if (try u.json.integer(try u.get(build, "common_driver_objects")) != 4 or !(try u.get(build, "complete")).bool) return error.IncompletePreparation;
     const rows = try u.json.array(try u.get(build, "rows"));
     try verifyImages(c, rows, corpus);
-    try pinCpu();
-    const affinity = try c.capture(&.{ "/usr/bin/taskset", "-pc", "0" });
-    try c.write(try c.join(&.{ r.output, "observed-affinity.txt" }), affinity);
+    try recordAffinity(c, r.output);
     var observations = u.array(c.a);
     var durations: [workloads.ids.len][workloads.routes.len][samples]f64 = undefined;
     for (0..warmups + samples) |block| {
