@@ -1,4 +1,18 @@
-# Development storage
+# Project agent instructions
+
+## Search and JSON tools
+
+Every agent working on z_llvm must read and follow the shared
+[jqz and zigrep workflow](/home/oleg/prog/docs/jqz-and-zigrep-workflow.md).
+
+- Start with `~/bin/zigrep` for text searches and file discovery. Use
+  `--no-config` for reproducible searches and `rg` for reference comparisons.
+- Use `~/bin/jqz` for JSON and NDJSON queries. Check jqz's own query syntax.
+- When project work exposes a tool bug or missing feature, reproduce it and
+  follow the shared workflow to assign the fix in the owning repository,
+  qualify and install the ReleaseFast build, and rerun the original case.
+
+## Development storage
 
 Before producing build, validation or profiling data, read
 [the development storage contract](docs/development_storage.md).
