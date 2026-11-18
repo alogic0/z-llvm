@@ -140,14 +140,50 @@ pub fn find(c: *u.Context, root: []const u8, input: u.Value, original: []const u
     return selected orelse error.MissingOptimizerInput;
 }
 
+pub const Captures = struct { objects: u.Value, optimizations: u.Value };
+
+pub fn split(a: std.mem.Allocator, all: u.Value, is_preopt: bool) !Captures {
+    var result = Captures{ .objects = u.array(a), .optimizations = u.array(a) };
+    for (try u.json.array(all)) |capture| {
+        const kind = capture.object.get("stage") orelse .null;
+        if (is_preopt and u.json.is(kind, "optimize")) {
+            try u.add(&result.optimizations, capture);
+        } else {
+            if (is_preopt and !u.json.is(kind, "emit")) return error.MisclassifiedPreoptCapture;
+            try u.add(&result.objects, capture);
+        }
+    }
+    return result;
+}
+
+pub fn reconcile(a: std.mem.Allocator, captures: Captures) !void {
+    var pending = std.StringHashMap(void).init(a);
+    defer pending.deinit();
+    for (captures.optimizations.array.items) |optimization| {
+        if ((try pending.getOrPut(try u.str(optimization, "directory"))).found_existing) return error.IncompletePreoptChain;
+    }
+    for (captures.objects.array.items) |object| if (!pending.remove(try u.str(object, "optimizer_directory"))) return error.IncompletePreoptChain;
+    if (pending.count() != 0 or captures.objects.array.items.len == 0) return error.IncompletePreoptChain;
+}
+
+fn optimizationField(first: []const u8, second: ?[]const u8, object: []const u8, optimizer: []const u8) ![]const u8 {
+    const object_parent = std.fs.path.dirname(object) orelse return error.OptimizerOutsideRun;
+    const optimizer_parent = std.fs.path.dirname(optimizer) orelse return error.OptimizerOutsideRun;
+    if (!std.mem.eql(u8, object_parent, optimizer_parent)) return error.OptimizerOutsideRun;
+    if (std.mem.eql(u8, first, object_parent)) return "optimizations";
+    if (second) |path| if (std.mem.eql(u8, path, object_parent)) return "self_rebuild_optimizations";
+    return error.OptimizerOutsideRun;
+}
+
 pub fn audit(c: *u.Context, root: []const u8, parent: u.Value, object: u.Value) !void {
     if (!u.json.is(parent.object.get("local_pipeline") orelse .null, "preopt")) return;
     if (!u.json.is(try u.get(object, "stage"), "emit") or !u.json.eql(try u.get(object, "object_delivered"), u.b(true))) return error.IncompletePreoptChain;
     const directory = try u.str(object, "optimizer_directory");
-    if (!u.isWithin(try c.join(&.{ root, "captures" }), directory)) return error.OptimizerOutsideRun;
+    const whole = u.json.is(parent.object.get("population") orelse .null, "whole-zig-compiler");
+    const field_name = try optimizationField(try c.join(&.{ root, "captures" }), if (whole) try c.join(&.{ root, "self-rebuild/captures" }) else null, try u.str(object, "directory"), directory);
     const report = try c.load(try c.join(&.{ directory, "report.json" }));
     var matched: usize = 0;
-    for ((try u.get(parent, "optimizations")).array.items) |recorded| {
+    for ((try u.get(parent, field_name)).array.items) |recorded| {
         if (!u.json.is(try u.get(recorded, "directory"), directory)) continue;
         if (recorded.object.count() != report.object.count() + 1) return error.OptimizerCaptureChanged;
         var fields = report.object.iterator();
@@ -171,7 +207,9 @@ pub fn audit(c: *u.Context, root: []const u8, parent: u.Value, object: u.Value) 
     for (original_values, original_argv) |value, *arg| arg.* = try u.json.text(value);
     if (try stage(original_argv, try u.str(parent, "mode")) != .optimize) return error.OptimizerCommandMismatch;
     const backend = try u.get(parent, "backend");
-    if (!u.json.eql(backend, try u.toValue(c.a, .{ .path = try u.str(try u.get(report, "backend"), "path"), .sha256 = try u.str(try u.get(report, "backend"), "sha256") }))) return error.BackendIdentityChanged;
+    const executed = try u.get(report, "backend");
+    inline for (.{ "path", "sha256" }) |field| if (!u.json.eql(try u.get(backend, field), try u.get(executed, field))) return error.BackendIdentityChanged;
+    if (backend.object.get("bytes")) |bytes| if (!u.json.eql(bytes, try u.get(executed, "bytes"))) return error.BackendIdentityChanged;
     const commands = try c.load(try c.join(&.{ directory, "commands.json" }));
     if (commands.array.items.len != 1) return error.ExpectedOneOptimizerCommand;
     const command = commands.array.items[0];
@@ -184,6 +222,21 @@ pub fn audit(c: *u.Context, root: []const u8, parent: u.Value, object: u.Value) 
         try u.str(try u.get(report, "input"), "path"),
     });
     if (!u.json.eql(effective, expected) or !u.json.eql(try u.get(command, "argv"), expected)) return error.OptimizerCommandMismatch;
+}
+
+test "preopt binds each optimizer once and only inside the emitter generation" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const opt = .{ .stage = "optimize", .directory = "/one/1" };
+    const emit = .{ .stage = "emit", .optimizer_directory = "/one/1" };
+    try reconcile(a, try split(a, try u.toValue(a, .{ emit, opt }), true));
+    try std.testing.expectError(error.IncompletePreoptChain, reconcile(a, try split(a, try u.toValue(a, .{opt}), true)));
+    try std.testing.expectError(error.IncompletePreoptChain, reconcile(a, try split(a, try u.toValue(a, .{ opt, emit, emit }), true)));
+    try std.testing.expectError(error.IncompletePreoptChain, reconcile(a, try split(a, try u.toValue(a, .{ opt, opt, emit }), true)));
+    try std.testing.expectEqualStrings("self_rebuild_optimizations", try optimizationField("/one", "/two", "/two/4", "/two/1"));
+    try std.testing.expectError(error.OptimizerOutsideRun, optimizationField("/one", "/two", "/two/4", "/one/1"));
+    try std.testing.expectError(error.OptimizerOutsideRun, optimizationField("/one", null, "/two/4", "/two/1"));
 }
 
 test "preopt stages reject wrong modes mixed contracts and changed pipelines" {

@@ -48,7 +48,7 @@ remain in this repository.
 | Validation role | Zig entry point / build step |
 | --- | --- |
 | Unchanged upstream Zig program, including capture hook | `tools/run_real_program.zig` / `real-program` |
-| Standalone whole-compiler postopt diagnostic | `tools/run_whole_compiler.zig` |
+| Whole-compiler build and self-rebuild with postopt or preopt captures | `tools/run_whole_compiler.zig` |
 | Full pinned upstream behavior suite with named outcome comparison and optional local hook | `tools/run_upstream_behavior.zig` |
 | Candidate frontend f80 layout and C ABI regression | `tools/run_frontend_f80.zig` |
 | Audit a retained completed object against its command, owners, census and ELF | `tools/audit_captured_object.zig` |
@@ -289,17 +289,17 @@ commands do not invoke them or inline Python.
 
 The [whole-compiler diagnostic plan](plans/2026-11-07-whole-compiler-diagnostic.md)
 adds an opt-in runner outside the accepted gate inventory. It attempts the
-pinned LLVM-enabled Zig compiler, x86_64 Linux GNU, baseline CPU, ReleaseFast,
-through the postopt hook. LLVM still performs optimization. Original and
+pinned LLVM-enabled Zig compiler, x86_64 Linux GNU, baseline CPU, ReleaseFast.
+The default postopt hook uses LLVM optimization. Original and
 resolved CMake provider configurations, library hashes, closed hook environment,
 commands and each exact backend input are retained. Explicit multiarch provider
 paths avoid relying on native library discovery for the selected GNU target.
 
 ```sh
-zig run -O ReleaseFast tools/run_whole_compiler.zig -- \
-  --output-root local-state/validations/my-whole-compiler \
-  --zllvm /absolute/path/to/ReleaseFast/z_llvm
-zig test tools/run_whole_compiler.zig
+stage=local-state/validations/whole-compiler/batch-01/build
+tools/run-validation --output-root "$stage" checks run_whole_compiler \
+  --output-root "$stage/run" --zllvm "$backend" --libc-file "$libc" \
+  --local-pipeline preopt --profile-events --retain-products
 ```
 
 `--zig-source`, `--zig-emitter` and `--config-h` select the pinned checkout and
@@ -307,7 +307,19 @@ its existing frontend/CMake inputs. `--timeout-ms` defaults to 3,600,000 per
 build/backend command. `--input-ir FILE` runs a separately labelled captured-IR
 diagnostic without claiming a compiler build. All runs require new output
 directories. Admission and sampled runtime reserve use the existing serial
-space policy; the runner cancels its process group on a reserve violation.
+space policy. `--reserve-bytes N` selects a stronger floor. The runner cancels
+its process group on a reserve violation.
+
+With `--local-pipeline preopt`, the frontend sends complete LLVM text to the
+local ReleaseFast optimizer, then sends its output to the local object emitter.
+The initial build records `optimizations` and `invocations`. The candidate's
+own build records `self_rebuild_optimizations` and `self_rebuild_invocations`.
+Each successful build checks the hook markers, optimizer output and emitter
+input identity, compiler and runtime objects, and actual object delivery.
+Preopt requires a fresh whole build. The nested `--retain-products` keeps its
+two install prefixes and objects available for subsequent behavior and audits.
+Declare those consumers in the checked stage's `retention.md` before launch.
+[ReleaseFast self-rebuild plan](plans/2026-11-17-release-fast-compiler-preopt-self-rebuild.md)
 
 `--libc-file FILE` selects an explicit native libc installation for host provider
 libraries. The closed child environment receives a retained copy through

@@ -90,6 +90,8 @@ pub const Guard = struct {
         defer g.watch.log.close(c.io);
         try c.writeJson(try c.join(&.{ output, "space.json" }), .{
             .policy = g.watch.limits,
+            .reserve_bytes = g.watch.limits.reserve_bytes,
+            .required_start_bytes = g.watch.limits.required_start_bytes,
             .starting_free_bytes = g.watch.start,
             .minimum_sampled_free_bytes = g.watch.minimum,
             .observed_global_decrease_bytes = g.watch.start - g.watch.minimum,

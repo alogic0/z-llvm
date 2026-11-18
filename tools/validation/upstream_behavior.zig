@@ -199,21 +199,12 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
     const compiled = try runner.run(command.items, try c.join(&.{ output, "compile" }), &env, .{ .timeout_ms = 7200000 });
     if (local) {
         const all_captures = try @import("whole_compiler.zig").collect(c, try c.join(&.{ output, "captures" }));
-        var captures = u.array(c.a);
-        var optimizations = u.array(c.a);
-        for (all_captures.array.items) |capture| {
-            if (is_preopt and u.json.is(capture.object.get("stage") orelse .null, "optimize")) {
-                try u.add(&optimizations, capture);
-            } else {
-                if (is_preopt and !u.json.is(capture.object.get("stage") orelse .null, "emit")) return error.MisclassifiedPreoptCapture;
-                try u.add(&captures, capture);
-            }
-        }
-        try u.put(c.a, report, "captures", captures);
-        if (is_preopt) try u.put(c.a, report, "optimizations", optimizations);
+        const captures = try preopt.split(c.a, all_captures, is_preopt);
+        try u.put(c.a, report, "captures", captures.objects);
+        if (is_preopt) try u.put(c.a, report, "optimizations", captures.optimizations);
         if (compiled.code == 0) {
-            if (captures.array.items.len == 0 or !u.exists(c.io, try c.join(&.{ output, "hook.marker" }))) return error.MissingLocalCapture;
-            for (captures.array.items) |capture| {
+            if (captures.objects.array.items.len == 0 or !u.exists(c.io, try c.join(&.{ output, "hook.marker" }))) return error.MissingLocalCapture;
+            for (captures.objects.array.items) |capture| {
                 if (!(try u.get(capture, "object_complete")).bool) return error.IncompleteLocalObject;
                 if (is_preopt) try preopt.audit(c, output, report.*, capture);
                 if (args.flag("profile-events")) {
@@ -224,11 +215,7 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
                 }
             }
             if (is_preopt) {
-                var pending = std.StringHashMap(void).init(c.a);
-                defer pending.deinit();
-                for (optimizations.array.items) |optimization| try pending.put(try u.str(optimization, "directory"), {});
-                for (captures.array.items) |capture| if (!pending.remove(try u.str(capture, "optimizer_directory"))) return error.IncompletePreoptChain;
-                if (pending.count() != 0) return error.IncompletePreoptChain;
+                try preopt.reconcile(c.a, captures);
                 try u.put(c.a, report, "stage_chains_complete", u.b(true));
             }
         }

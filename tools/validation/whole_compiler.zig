@@ -6,13 +6,14 @@ const program = @import("program.zig");
 const reports = @import("whole_compiler_report.zig");
 const provenance = @import("provenance.zig");
 const elf = @import("object_contract.zig");
-const policy = @import("../distribution_headroom_policy.zig");
+const headroom = @import("behavior_headroom.zig");
 const retained = @import("whole_compiler_reuse.zig");
 const resources = @import("whole_compiler_resources.zig");
 const storage = @import("storage_workspace.zig");
 const preopt = @import("preopt_capture.zig");
+const generations = @import("whole_compiler_generations.zig");
 const pin = "1c08b09d1c847f4f02c8216e3b62df323861a437";
-const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--self-cpu N] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
+const usage = "usage: run_whole_compiler --output-root DIR --zllvm EXE [--zig-source DIR] [--zig-emitter EXE] [--config-h FILE] [--libc-file FILE] [--reuse-captured-objects ROOT] [--local-pipeline postopt|preopt] [--retain-products] [--reserve-bytes N] [--self-cpu N] [--timeout-ms N] [--input-ir FILE] [--profile-events] [--runtime-checks]\n";
 
 pub fn main(init: std.process.Init) !void {
     var c = try u.Context.init(init);
@@ -26,24 +27,31 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(code);
     }
     if (argv.len == 2 and std.mem.eql(u8, argv[1], "--help")) return c.print("{s}", .{usage});
-    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "libc-file", "reuse-captured-objects", "self-cpu", "timeout-ms", "input-ir" }, &.{ "profile-events", "runtime-checks" });
+    const args = try u.Args.parse(c.a, argv[1..], &.{ "output-root", "zllvm", "zig-source", "zig-emitter", "config-h", "libc-file", "reuse-captured-objects", "self-cpu", "timeout-ms", "input-ir", "local-pipeline", "reserve-bytes" }, &.{ "profile-events", "runtime-checks", "retain-products" });
+    const pipeline = args.get("local-pipeline") orelse "postopt";
+    if (!u.contains(&.{ "postopt", "preopt" }, pipeline)) return error.InvalidLocalPipeline;
+    if (std.mem.eql(u8, pipeline, "preopt") and (args.get("input-ir") != null or args.get("reuse-captured-objects") != null)) return error.PreoptRequiresFreshWholeBuild;
     if (args.flag("runtime-checks") and args.get("input-ir") == null) return error.RuntimeChecksRequireCapturedInput;
     if (args.get("self-cpu")) |cpu| {
         _ = try resources.cpuIndex(cpu);
         if (args.get("input-ir") != null) return error.SelfCpuRequiresWholeBuild;
     }
-    const output = try c.newOutput(try args.require("output-root"));
-    const workspace = try storage.start(&c, output, "validation");
+    const requested = try c.ownedPath(try args.require("output-root"));
+    if (args.flag("retain-products") and try @import("storage_lifecycle.zig").outputRoot(&c, requested) == null) return error.PipelineRequiresManagedStorage;
+    const output = try c.newOutput(requested);
+    const workspace = if (args.flag("retain-products")) try storage.startPipeline(&c, output, "validation") else try storage.start(&c, output, "validation");
     defer if (workspace) |w| w.close(&c);
     var report = u.object(c.a);
     try u.put(c.a, &report, "schema", u.s("whole-compiler-diagnostic-v1"));
     try u.put(c.a, &report, "population", u.s(if (args.get("input-ir") != null) "captured-ir-diagnostic" else "whole-zig-compiler"));
-    try u.put(c.a, &report, "route", u.s("llvm-postopt-to-zllvm-object"));
+    try u.put(c.a, &report, "local_pipeline", u.s(pipeline));
+    try u.put(c.a, &report, "route", u.s(if (std.mem.eql(u8, pipeline, "preopt")) "local-preopt-to-zllvm-object" else "llvm-postopt-to-zllvm-object"));
     try u.put(c.a, &report, "status", u.s("incomplete"));
     try u.put(c.a, &report, "failure_stage", u.s("setup"));
     try u.put(c.a, &report, "capability_credit", u.b(false));
     var runner = Runner.init(&c, output);
     execute(&c, args, output, &runner, &report) catch |err| {
+        if (u.json.is(try u.get(report, "status"), "passed")) try u.put(c.a, &report, "status", u.s("failed"));
         try u.put(c.a, &report, "runner_error", u.s(c.diagnostic orelse @errorName(err)));
     };
     try u.put(c.a, &report, "commands", runner.commands);
@@ -132,32 +140,17 @@ fn execute(c: *u.Context, args: u.Args, output: []const u8, runner: *Runner, rep
         if (u.isWithin(output, root) or u.isWithin(root, output)) return error.ReuseRootMustBeIndependent;
         try env.put("ZLLVM_WHOLE_REUSE_ROOT", root);
         try u.put(c.a, report, "initial_build_reuse_root", u.s(root));
-        try u.put(c.a, report, "self_rebuild_backend_reuse", u.b(false));
     }
     try saveEnvironment(c, &env, try c.join(&.{ output, "base-environment.json" }));
-    const first = try freeSpace(c.io, output);
-    if (first < policy.serial_reserve_floor_bytes + policy.serial_projected_peak_bytes) return error.InsufficientAdmissionSpace;
-    var watch: Watch = .{ .io = c.io, .path = output, .minimum = first, .start = first, .log = try c.createLog(try c.join(&.{ output, "space-samples.tsv" }), true) };
-    defer watch.log.close(c.io);
-    const space_path = try c.join(&.{ output, "space.json" });
-    const thread = try std.Thread.spawn(.{}, Watch.run, .{&watch});
-    defer {
-        watch.stop.store(true, .release);
-        thread.join();
-        c.writeJson(space_path, .{
-            .starting_free_bytes = watch.start,
-            .minimum_sampled_free_bytes = watch.minimum,
-            .reserve_bytes = policy.serial_reserve_floor_bytes,
-            .required_start_bytes = policy.serial_reserve_floor_bytes + policy.serial_projected_peak_bytes,
-            .reserve_violated = watch.violation,
-            .sampling_failed = watch.failed,
-            .interval_ms = 2000,
-        }) catch {};
-        if (watch.violation or watch.failed) {
-            u.put(c.a, report, "status", u.s("resource-stop")) catch {};
-            u.put(c.a, report, "failure_stage", u.s(if (watch.violation) "disk-reserve" else "disk-sampling")) catch {};
-        }
-    }
+    const monitor = headroom.Guard.start(c, output, args.get("reserve-bytes")) catch |err| {
+        try u.put(c.a, report, "status", u.s("resource-stop"));
+        try u.put(c.a, report, "failure_stage", u.s("disk-admission"));
+        return err;
+    };
+    defer monitor.finish(c, output) catch |err| {
+        u.put(c.a, report, "status", u.s("resource-stop")) catch {};
+        u.put(c.a, report, "failure_stage", u.s(if (err == error.DiskReserveViolated) "disk-reserve" else "disk-sampling")) catch {};
+    };
     if (args.get("input-ir")) |input| {
         const directory = try c.join(&.{ output, "backend" });
         try c.mkdir(directory);
@@ -242,6 +235,15 @@ fn resolveProviders(c: *u.Context, config: []const u8, output: []const u8, repor
 }
 
 fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const u8, env: *std.process.Environ.Map, runner: *Runner, report: *u.Value) !void {
+    const pipeline = try u.str(report.*, "local_pipeline");
+    const is_preopt = std.mem.eql(u8, pipeline, "preopt");
+    try u.put(c.a, report, "initial_backend_reuse", u.b(args.get("reuse-captured-objects") != null));
+    try u.put(c.a, report, "self_rebuild_backend_reuse", u.b(false));
+    if (is_preopt) {
+        try u.put(c.a, report, "hook_passes", u.s(try preopt.passes("ReleaseFast")));
+        try u.put(c.a, report, "stage_chains_complete", u.b(false));
+        try u.put(c.a, report, "self_rebuild_stage_chains_complete", u.b(false));
+    }
     const self_cpu = args.get("self-cpu");
     // Resource controls are explicit process launchers. They do not alter the
     // source, target CPU, generated-frame guard or captured object contract.
@@ -268,7 +270,7 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try u.put(c.a, report, "cpu", u.s("baseline"));
     try u.put(c.a, report, "mode", u.s("ReleaseFast"));
     try u.put(c.a, report, "llvm_enabled", u.b(true));
-    try u.put(c.a, report, "llvm_optimization", u.b(true));
+    try u.put(c.a, report, "llvm_optimization", u.b(!is_preopt));
     try u.put(c.a, report, "cmake_config", try fileIdentity(c, original_config));
     try c.copy(original_config, try c.join(&.{ output, "config.h" }));
     const config = try resolveProviders(c, original_config, output, report);
@@ -287,7 +289,7 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     var local_env = try env.clone(c.a);
     const proxy = try std.Io.Dir.cwd().realPathFileAlloc(c.io, "/proc/self/exe", c.a);
     for ([_][2][]const u8{
-        .{ "ZIG_USE_ZLLVM_OBJECT", "1" },                                  .{ "ZLLVM_PIPELINE", "postopt" },
+        .{ "ZIG_USE_ZLLVM_OBJECT", "1" },                                  .{ "ZLLVM_PIPELINE", pipeline },
         .{ "ZLLVM_EXE", proxy },                                           .{ "ZLLVM_WHOLE_BACKEND", compiler },
         .{ "ZLLVM_WHOLE_CAPTURE_ROOT", captures },                         .{ "ZLLVM_ZIG_MODE", "ReleaseFast" },
         .{ "ZLLVM_MARKER_PATH", try c.join(&.{ output, "hook.marker" }) }, .{ "ZLLVM_WHOLE_TIMEOUT_MS", try c.fmt("{d}", .{try timeout(args)}) },
@@ -295,23 +297,11 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try saveEnvironment(c, &local_env, try c.join(&.{ output, "hook-environment.json" }));
     try u.put(c.a, report, "failure_stage", u.s("frontend-or-optimization"));
     const build = try timed(c, runner, command, try c.join(&.{ output, "build" }), &local_env, .{ .timeout_ms = try timeout(args) });
-    const invocations = try collect(c, captures);
-    try u.put(c.a, report, "invocations", invocations);
+    const first = try preopt.split(c.a, try collect(c, captures), is_preopt);
+    const first_evidence = try generations.record(c, report, first, is_preopt, false);
     try u.put(c.a, report, "build_returncode", u.n(build.code));
     try u.put(c.a, report, "build_completed", u.b(build.completed));
-    var compiler_seen = false;
-    var complete = invocations.array.items.len != 0;
-    for (invocations.array.items) |invocation| {
-        const input = try u.str(invocation, "original_input");
-        const name = std.fs.path.basename(input);
-        if (std.mem.eql(u8, name, "zig_zcu.o.zllvm.ll") or std.mem.eql(u8, name, "zig.o.zllvm.ll") or std.mem.eql(u8, name, "zig.zllvm.ll")) compiler_seen = true;
-        if (!(try u.get(invocation, "object_complete")).bool) {
-            complete = false;
-            try u.put(c.a, report, "failure_stage", try u.get(invocation, "failure_stage"));
-        }
-    }
-    try u.put(c.a, report, "compiler_object_captured", u.b(compiler_seen));
-    try u.put(c.a, report, "all_hook_objects_complete", u.b(complete));
+    if (first_evidence.failure_stage) |failure| try u.put(c.a, report, "failure_stage", failure);
     if (!build.completed) try u.put(c.a, report, "failure_stage", u.s("build-process-interruption"));
     if (!std.mem.eql(u8, zig_hash, try c.digest(zig))) return error.FrontendBinaryChanged;
     if (!std.mem.eql(u8, revision, u.trim(try c.capture(&.{ "git", "-C", source, "rev-parse", "HEAD" })))) return error.FrontendRevisionChanged;
@@ -319,19 +309,16 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     for ((try u.get(report.*, "external_libraries")).array.items) |provider| {
         if (!std.mem.eql(u8, try c.digest(try u.str(provider, "path")), try u.str(provider, "sha256"))) return error.ExternalProviderChanged;
     }
-    if (build.code != 0 or !complete) {
+    if (!build.completed or build.code != 0 or !first_evidence.objects_complete or first_evidence.failure_stage != null) {
         try u.put(c.a, report, "status", u.s("blocked"));
-        if (complete) try u.put(c.a, report, "failure_stage", u.s("link-or-runtime-build"));
-        // The build may reject compiler_rt before ever emitting the compiler
-        // module. Preserve that failure, then diagnose the actual compiler's
-        // postopt IR separately. This cannot earn link/startup/rebuild credit.
-        if (build.completed and !compiler_seen and invocations.array.items.len != 0)
+        if (build.completed and first_evidence.objects_complete and first_evidence.failure_stage == null) try u.put(c.a, report, "failure_stage", u.s("link-or-runtime-build"));
+        // A postopt diagnostic can capture the main module after a runtime failure.
+        if (!is_preopt and build.completed and !first_evidence.compiler and first.objects.array.items.len != 0)
             try diagnoseCompilerModule(c, args, output, source, zig, compiler, env, runner, report);
         return;
     }
-    if (!compiler_seen) return error.MissingCompilerObjectCapture;
-    const marker = try c.read(try c.join(&.{ output, "hook.marker" }));
-    if (std.mem.indexOf(u8, marker, "pipeline=postopt") == null) return error.MissingPostoptHookMarker;
+    try generations.verify(c, output, output, report.*, first, first_evidence, is_preopt);
+    if (is_preopt) try u.put(c.a, report, "stage_chains_complete", u.b(true));
     const candidate = try c.temporaryPath(&.{ output, "install/bin/zig" });
     try u.put(c.a, report, "candidate", try fileIdentity(c, candidate));
     try u.put(c.a, report, "failure_stage", u.s("startup"));
@@ -368,22 +355,31 @@ fn wholeBuild(c: *u.Context, args: u.Args, output: []const u8, compiler: []const
     try local_env.put("ZIG_GLOBAL_CACHE_DIR", rebuild_global_cache);
     try saveEnvironment(c, &local_env, try c.join(&.{ rebuild, "hook-environment.json" }));
     const rebuilt = try timed(c, runner, self_build_command, try c.join(&.{ output, "self-build" }), &local_env, .{ .timeout_ms = try timeout(args) });
-    const rebuild_invocations = try collect(c, rebuild_captures);
-    try u.put(c.a, report, "self_rebuild_invocations", rebuild_invocations);
-    if (rebuilt.code != 0 or rebuild_invocations.array.items.len == 0) return;
-    var rebuilt_compiler_seen = false;
-    for (rebuild_invocations.array.items) |invocation| {
-        if (!(try u.get(invocation, "object_complete")).bool) return error.IncompleteSelfRebuild;
-        const name = std.fs.path.basename(try u.str(invocation, "original_input"));
-        if (std.mem.eql(u8, name, "zig_zcu.o.zllvm.ll") or std.mem.eql(u8, name, "zig.o.zllvm.ll") or std.mem.eql(u8, name, "zig.zllvm.ll")) rebuilt_compiler_seen = true;
-    }
-    // Runtime-only captures cannot prove that the new compiler rebuilt itself.
-    if (!rebuilt_compiler_seen) return error.MissingCompilerObjectCapture;
-    if (std.mem.indexOf(u8, try c.read(try c.join(&.{ rebuild, "hook.marker" })), "pipeline=postopt") == null) return error.MissingPostoptHookMarker;
+    const second = try preopt.split(c.a, try collect(c, rebuild_captures), is_preopt);
+    const second_evidence = try generations.record(c, report, second, is_preopt, true);
+    try u.put(c.a, report, "self_rebuild_returncode", u.n(rebuilt.code));
+    try u.put(c.a, report, "self_rebuild_completed", u.b(rebuilt.completed));
+    if (second_evidence.failure_stage) |failure| try u.put(c.a, report, "failure_stage", failure);
+    if (!rebuilt.completed) try u.put(c.a, report, "failure_stage", u.s("self-build-process-interruption"));
+    if (!u.json.eql(try fileIdentity(c, candidate), try u.get(report.*, "candidate"))) return error.SelfRebuildFrontendChanged;
+    if (!rebuilt.completed or rebuilt.code != 0 or !second_evidence.objects_complete or second_evidence.failure_stage != null) return;
+    try generations.verify(c, output, rebuild, report.*, second, second_evidence, is_preopt);
+    if (is_preopt) try u.put(c.a, report, "self_rebuild_stage_chains_complete", u.b(true));
     const rebuilt_exe = try c.temporaryPath(&.{ rebuild, "install/bin/zig" });
     try u.put(c.a, report, "rebuilt_candidate", try fileIdentity(c, rebuilt_exe));
     try runner.observe(rebuilt_exe, &.{"version"}, 0, try c.fmt("{s}\n", .{try u.str(report.*, "zig_version")}), try c.join(&.{ output, "self-version" }), env);
     try behaviors(c, rebuild, source, rebuilt_exe, env, runner);
+    if (!u.json.eql(try fileIdentity(c, rebuilt_exe), try u.get(report.*, "rebuilt_candidate"))) return error.RebuiltCompilerChanged;
+    if (!std.mem.eql(u8, zig_hash, try c.digest(zig))) return error.FrontendBinaryChanged;
+    if (!std.mem.eql(u8, revision, u.trim(try c.capture(&.{ "git", "-C", source, "rev-parse", "HEAD" })))) return error.FrontendRevisionChanged;
+    if (u.trim(try c.capture(&.{ "git", "-C", source, "status", "--porcelain", "--untracked-files=no" })).len != 0) return error.ModifiedFrontendSource;
+    for ([_][]const u8{ "cmake_config", "resolved_cmake_config", "zigcpp_provider" }) |key| {
+        const original = try u.get(report.*, key);
+        if (!u.json.eql(original, try fileIdentity(c, try u.str(original, "path")))) return error.CompilerProviderChanged;
+    }
+    for ((try u.get(report.*, "external_libraries")).array.items) |original| {
+        if (!u.json.eql(original, try fileIdentity(c, try u.str(original, "path")))) return error.ExternalProviderChanged;
+    }
     try u.put(c.a, report, "self_rebuild_passed", u.b(true));
     if (self_cpu != null) {
         const recorded_launcher = try u.get(report.*, "self_rebuild_cpu_launcher");
@@ -672,49 +668,3 @@ fn scan(c: *u.Context, path: []const u8) !u.Value {
     try u.put(c.a, &result, "global_or_alias_lines", u.n(globals));
     return result;
 }
-
-fn freeSpace(io: std.Io, path: []const u8) !u64 {
-    const a = std.heap.page_allocator;
-    const result = try u.process.runReport(a, io, .{ .spawn = .{ .argv = &.{ "/bin/df", "-B1", "--output=avail", path } }, .timeout_ms = 5000, .stdout_limit = 1024, .stderr_limit = 1024 });
-    defer result.deinit(a);
-    if (!result.success()) return error.DiskSampleFailed;
-    var fields = std.mem.tokenizeAny(u8, result.stdout, " \r\n\t");
-    _ = fields.next() orelse return error.DiskSampleFailed;
-    const value = try std.fmt.parseInt(u64, fields.next() orelse return error.DiskSampleFailed, 10);
-    if (fields.next() != null) return error.DiskSampleFailed;
-    return value;
-}
-
-const Watch = struct {
-    io: std.Io,
-    path: []const u8,
-    start: u64,
-    minimum: u64,
-    log: std.Io.File,
-    stop: std.atomic.Value(bool) = .init(false),
-    violation: bool = false,
-    failed: bool = false,
-    fn run(w: *Watch) void {
-        while (!w.stop.load(.acquire)) {
-            const value = freeSpace(w.io, w.path) catch {
-                w.failed = true;
-                @constCast(u.cancellation()).request();
-                return;
-            };
-            w.minimum = @min(w.minimum, value);
-            var buffer: [120]u8 = undefined;
-            const line = std.fmt.bufPrint(&buffer, "{d}\t{d}\n", .{ std.Io.Timestamp.now(w.io, .real).nanoseconds, value }) catch unreachable;
-            w.log.writeStreamingAll(w.io, line) catch {
-                w.failed = true;
-                @constCast(u.cancellation()).request();
-                return;
-            };
-            if (value < policy.serial_reserve_floor_bytes) {
-                w.violation = true;
-                @constCast(u.cancellation()).request();
-                return;
-            }
-            std.Io.sleep(w.io, .fromSeconds(2), .awake) catch return;
-        }
-    }
-};
