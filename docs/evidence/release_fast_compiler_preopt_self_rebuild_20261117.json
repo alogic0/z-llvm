@@ -1,0 +1,1167 @@
+{
+  "schema": "release-fast-preopt-compiler-self-rebuild-v1",
+  "status": "ready_for_independent_review",
+  "evidence_root": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01",
+  "review_thread": "01a1ed95-6d13-7532-803a-576eed555ef8",
+  "range_start": "8594ba0471c2185b6c12f9b81b48a7b7a8656ac8",
+  "tested_backend_source": "d968e3acb6372b2fdcab426b75bd1ffddcc559ca",
+  "backend": {
+    "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/compiler-01/ReleaseFast/bin/z_llvm",
+    "bytes": 44095496,
+    "sha256": "90a9904d12030337a37993ade6c0609681b4e5770230bde6715f0e6934445f13"
+  },
+  "source_members": 679,
+  "upstream": "1c08b09d1c847f4f02c8216e3b62df323861a437",
+  "seed": {
+    "path": "/home/oleg/prog/ziglang/build/stage4/bin/zig",
+    "bytes": 149918648,
+    "sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e"
+  },
+  "target": "x86_64-linux-gnu",
+  "cpu": "baseline",
+  "mode": "ReleaseFast",
+  "route": "local-preopt-to-zllvm-object",
+  "pass_list": "zig-release-fast-accepted",
+  "original_attempts": [
+    {
+      "root": "build-01",
+      "compiler_selected": 66539,
+      "compiler_emitted": 66531,
+      "compiler_failed": 8,
+      "compiler_delivered": false,
+      "actual": 1,
+      "optimized_compiler_input_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+      "original_evidence": {
+        "whole_build": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/report.json",
+        "whole_build_sha256": "903bd1e2db286832e0693b4ce78655af1f9ce5fb2d698c909d4a3442efe35ab6",
+        "compiler_report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1613679/report.json",
+        "compiler_report_sha256": "a2607d93ea1318c007065a58bc2561ab31f38f83095e98ff8eef52ef55f06517",
+        "invocation": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1613679/invocation.json",
+        "invocation_sha256": "b694c1ee849876a4e558b44b4adb4c55f0ed854da21e7014764799d7f2f0b337",
+        "commands": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1613679/commands.json",
+        "commands_sha256": "03c656c6d2efaf45ce6d05cc59228d640d498466dd0db57335cce19c84222c21",
+        "backend_stderr": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1613679/backend.stderr",
+        "backend_stderr_sha256": "d570d743a497ebc3b5217b0f625a9ca313112bf424755db9740c304ac3520337"
+      }
+    },
+    {
+      "root": "build-02",
+      "compiler_selected": 66539,
+      "compiler_emitted": 66536,
+      "compiler_failed": 3,
+      "compiler_delivered": false,
+      "actual": 1,
+      "optimized_compiler_input_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+      "original_evidence": {
+        "whole_build": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/report.json",
+        "whole_build_sha256": "635a3742d87ee861e34e522c29b7f99fcfb9e358c3ce7c226e4c09957d4fd976",
+        "compiler_report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2167670/report.json",
+        "compiler_report_sha256": "e00a9b7153b9a8be5995c87c8628080416f089790b9efa18928cb589660cc402",
+        "invocation": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2167670/invocation.json",
+        "invocation_sha256": "fd0f62cdae15e87cfcc0db30a469620a755eb00cfc4e121c574a4a2760a8452b",
+        "commands": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2167670/commands.json",
+        "commands_sha256": "227c2a700561e016f19ce9af80375bf9ea69cba3c997604bce5a2b7e1c9de5b8",
+        "backend_stderr": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2167670/backend.stderr",
+        "backend_stderr_sha256": "c112e4bdb94b691c2956c2744a0b5e8b41598e278cb34fdc0a16cf8242d7b7c9"
+      }
+    }
+  ],
+  "selector_checkpoints": {
+    "first_commit": "070dab56b77d6f5be7646c88b269bc3a728613c5",
+    "first_patch_sha256": "35e0dfeeec825b39eb5a4d0be3388256dc57c2e2df4163f6c0e577f1e5318f90",
+    "first_backend_sha256": "8232fd24a8b11819239055e77a9b4783282e94be7af3dff46d31c3cc3ebc6446",
+    "first_extracts": 8,
+    "first_defined_per_route": 390,
+    "first_detected_mutations": 5,
+    "first_patch": "selector-combined/focused-03/comparison.patch",
+    "final_patch": "selector-mixed-call/focused-06/comparison.patch",
+    "reviewed_final_replay": {
+      "status": "ready_for_primary_review",
+      "base": "070dab56b77d6f5be7646c88b269bc3a728613c5",
+      "patch_sha256": "5a450f6feb0e85cecda989c00fb8283b97be3e4388c83c20df1bb83a6ef31b12",
+      "candidate_sha256": "90a9904d12030337a37993ade6c0609681b4e5770230bde6715f0e6934445f13",
+      "backend_receipt_sha256": "ef6370c6333bcc6d32786172daac6a121205360daede313968d8bd929d18021c",
+      "source_membership_sha256": "1ae12837ed1f8fed2834495e2b22c200aaa8a791a72a537d5cb22f18bd82d7dc",
+      "source_members": 679,
+      "changed_files": 2,
+      "original_extracts": 8,
+      "new_extracts": 3,
+      "defined_per_route": 490,
+      "negative_controls": 8
+    }
+  },
+  "whole": {
+    "report_sha256": "8567bccc4828fcb676103be86f71a0ba9c86e301560fb486bca118eac248a013",
+    "version": "0.17.0-dev.11+1c08b09d1",
+    "initial": {
+      "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/.workspaces/validation/install/bin/zig",
+      "bytes": 94633352,
+      "sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63"
+    },
+    "self_rebuild": {
+      "path": "/home/oleg/prog/z_llvm/local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/.workspaces/validation/self-rebuild/install/bin/zig",
+      "bytes": 94633352,
+      "sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63"
+    },
+    "initial_reuse": false,
+    "self_rebuild_reuse": false,
+    "initial_exit": 0,
+    "self_rebuild_exit": 0,
+    "executables": {
+      "initial_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+      "self_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+      "byte_identical": true,
+      "section_contents_identical": true
+    },
+    "space": {
+      "policy": {
+        "filesystem_total_bytes": 982240026624,
+        "reserve_bytes": 30000000000,
+        "projected_peak_bytes": 8589934592,
+        "required_start_bytes": 38589934592
+      },
+      "reserve_bytes": 30000000000,
+      "required_start_bytes": 38589934592,
+      "starting_free_bytes": 219073703936,
+      "minimum_sampled_free_bytes": 174580842496,
+      "observed_global_decrease_bytes": 44492861440,
+      "reserve_violated": false,
+      "sampling_failed": false,
+      "interval_ms": 2000
+    }
+  },
+  "matched_reachability": {
+    "status": "passed",
+    "phase": "reachability",
+    "field": "exclusive_ns",
+    "original_capture": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1613679",
+    "indexed_capture": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/captures/2383671",
+    "self_rebuild_indexed_capture": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/self-rebuild/captures/2445232",
+    "intermediate_failed_capture": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2167670",
+    "original_backend": "387cb339c2182545d89cddabfbbe72d95ac46b42e21d4020c479b8b7c05bcb4f",
+    "indexed_backend": "90a9904d12030337a37993ade6c0609681b4e5770230bde6715f0e6934445f13",
+    "input_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+    "input_bytes": 294963087,
+    "original_ns": 3423803790946,
+    "indexed_ns": 1254359517,
+    "self_rebuild_indexed_ns": 1252821441,
+    "intermediate_indexed_ns": 1296401262,
+    "saved_ns": 3422549431429,
+    "ratio_decimal": "2729.523509",
+    "self_rebuild_ratio_decimal": "2732.874517",
+    "original_emitter_exit": 1,
+    "intermediate_emitter_exit": 1,
+    "indexed_emitter_exit": 0,
+    "self_rebuild_emitter_exit": 0
+  },
+  "module_inventories": [
+    {
+      "generation": "initial",
+      "run": "compiler-audit",
+      "source_filename": "compiler_rt",
+      "definitions": 921,
+      "declarations": 48,
+      "globals": 116,
+      "aliases": 462,
+      "raw_bytes": 2616230,
+      "raw_sha256": "2f3751cd1ab2b9a9e4054778577bb0a3bc5849fb6911e80f9a4c6c7c08c7d855",
+      "optimized_bytes": 1954307,
+      "optimized_sha256": "e74f80549220e3f0325a598da073ae0c9a1a3b9a229ca3e2260c2cb3c50aacb2",
+      "object_bytes": 2857456,
+      "object_sha256": "7b65b19174e01f9ece8b84e195c6a52acc5012d17a7e3474581c869beab81643",
+      "owned_functions": 921,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "initial",
+      "run": "compiler-audit",
+      "source_filename": "zig",
+      "definitions": 66539,
+      "declarations": 475,
+      "globals": 52467,
+      "aliases": 1,
+      "raw_bytes": 342034159,
+      "raw_sha256": "9a157489b4f60b8df3f089acc7498bc3c4ec314147b596dd5023fe0f461e8482",
+      "optimized_bytes": 294963087,
+      "optimized_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+      "object_bytes": 105870528,
+      "object_sha256": "0c2c52b3139ba04e59cbd75f13658241e9b254e69fbe4c01f6477cdad5e4be8a",
+      "owned_functions": 66539,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "initial",
+      "run": "local-audit",
+      "source_filename": "compiler_rt",
+      "definitions": 921,
+      "declarations": 48,
+      "globals": 145,
+      "aliases": 462,
+      "raw_bytes": 9067674,
+      "raw_sha256": "cef6a7227e8861733df0ebea608eb4153d31609ef14cc7cbd0f1501e1c0886b4",
+      "optimized_bytes": 7455476,
+      "optimized_sha256": "94c2f303797de2cec9f46d19ced993797633ed7ad372ed89e3ebfdcee82dfa1a",
+      "object_bytes": 2884720,
+      "object_sha256": "5a938b9e5ccb0903d8edb4a1090a018febb7bb39cc5907f1df4ffddc2c8e7159",
+      "owned_functions": 921,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "initial",
+      "run": "local-audit",
+      "source_filename": "test",
+      "definitions": 7459,
+      "declarations": 619,
+      "globals": 5079,
+      "aliases": 46,
+      "raw_bytes": 44873427,
+      "raw_sha256": "43a081297714229ac53e93af0dbb54e665458ffa77570751e6227a54cbe15891",
+      "optimized_bytes": 37309454,
+      "optimized_sha256": "9b34c5f47196b4a75ad5790a42ddccd7c891f48351da1693daf7f5135f137c05",
+      "object_bytes": 20353648,
+      "object_sha256": "1239accea250a35ebb2fbab52127d80f8be4c5f049d142e45d786d221e3eee97",
+      "owned_functions": 7459,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "self",
+      "run": "compiler-audit",
+      "source_filename": "compiler_rt",
+      "definitions": 921,
+      "declarations": 48,
+      "globals": 116,
+      "aliases": 462,
+      "raw_bytes": 2616230,
+      "raw_sha256": "b64122a110ccfcb63caec01fa485f9d72ce5ce5d608edd494475b19f44f70875",
+      "optimized_bytes": 1954307,
+      "optimized_sha256": "c4b43c2289dfd81815aba4752c62754eabaa570502f04a5262ddbfca2cf30b01",
+      "object_bytes": 2857456,
+      "object_sha256": "47572bc70b336fe2366fbf9d10290d00b215a3b5016b85163d80559f9629333c",
+      "owned_functions": 921,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "self",
+      "run": "compiler-audit",
+      "source_filename": "zig",
+      "definitions": 66539,
+      "declarations": 475,
+      "globals": 52467,
+      "aliases": 1,
+      "raw_bytes": 342034159,
+      "raw_sha256": "9a157489b4f60b8df3f089acc7498bc3c4ec314147b596dd5023fe0f461e8482",
+      "optimized_bytes": 294963087,
+      "optimized_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+      "object_bytes": 105870528,
+      "object_sha256": "0c2c52b3139ba04e59cbd75f13658241e9b254e69fbe4c01f6477cdad5e4be8a",
+      "owned_functions": 66539,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "self",
+      "run": "local-audit",
+      "source_filename": "compiler_rt",
+      "definitions": 921,
+      "declarations": 48,
+      "globals": 145,
+      "aliases": 462,
+      "raw_bytes": 9067671,
+      "raw_sha256": "434a48e235cf08b988d283b06c6e63d5960ba9c07099ce802fd42c1571a95752",
+      "optimized_bytes": 7455473,
+      "optimized_sha256": "c0d8c96899a95535d3a1a6ae58096d6e5fdf5081c819ef66bc3bb7b0b6246f4e",
+      "object_bytes": 2884720,
+      "object_sha256": "5a938b9e5ccb0903d8edb4a1090a018febb7bb39cc5907f1df4ffddc2c8e7159",
+      "owned_functions": 921,
+      "identity_sets_match": true
+    },
+    {
+      "generation": "self",
+      "run": "local-audit",
+      "source_filename": "test",
+      "definitions": 7459,
+      "declarations": 619,
+      "globals": 5079,
+      "aliases": 46,
+      "raw_bytes": 44873424,
+      "raw_sha256": "b3da1df9f0a357e483d2c9646eeda8653a3b697110e1fcee66643c99017610c5",
+      "optimized_bytes": 37309451,
+      "optimized_sha256": "11cba98ee9f9f4d4d57276d01e771eb2d2cebee2e71d48ada0924caddfd34d4a",
+      "object_bytes": 20353648,
+      "object_sha256": "1239accea250a35ebb2fbab52127d80f8be4c5f049d142e45d786d221e3eee97",
+      "owned_functions": 7459,
+      "identity_sets_match": true
+    }
+  ],
+  "ordered_event_audits": [
+    {
+      "generation": "initial",
+      "run": "compiler-audit",
+      "audit": "local-state/retirements/native-event-audit/1795013089994441859-2542402/audit-0.json",
+      "audit_sha256": "bf572e752119d1f3d324f46e54dd42dd1b896128add88bb24b916f2617c915e3",
+      "stream_sha256": "ea646c7d0af622874c5caf306539c0dba37488efc31d0409520372bac8e563fc",
+      "records": 425916,
+      "bytes": 125758716,
+      "definitions": 921
+    },
+    {
+      "generation": "initial",
+      "run": "compiler-audit",
+      "audit": "local-state/retirements/native-event-audit/1795013089994441859-2542402/audit-1.json",
+      "audit_sha256": "e08037301baef0a362e5c7326ae915c143fed302943b1b05fe5592178e6423fe",
+      "stream_sha256": "44d067e317093f59abbc52889e01240a0b23ec7c034bd1ae922cf468d2d7d780",
+      "records": 26115184,
+      "bytes": 8720536698,
+      "definitions": 66539
+    },
+    {
+      "generation": "initial",
+      "run": "local-audit",
+      "audit": "local-state/retirements/native-event-audit/1795014266981074134-2569160/audit-0.json",
+      "audit_sha256": "47efcc68db0561a4bb5d0f3b235ae279df14695e923687ec303e3fca4eada089",
+      "stream_sha256": "a6b231650ca49f052659a3283d03463a026d7386aeec225b67ea6b0988508681",
+      "records": 425916,
+      "bytes": 125778945,
+      "definitions": 921
+    },
+    {
+      "generation": "initial",
+      "run": "local-audit",
+      "audit": "local-state/retirements/native-event-audit/1795014266981074134-2569160/audit-1.json",
+      "audit_sha256": "6e0737d0c602f6b94233636a6009bd768b5516429b74d0dc57136fa29714734d",
+      "stream_sha256": "526302fa4bb56067a00faf1dc60412043699b76a79ac6751c598b7ae531a399f",
+      "records": 2876595,
+      "bytes": 904605245,
+      "definitions": 7459
+    },
+    {
+      "generation": "self",
+      "run": "compiler-audit",
+      "audit": "local-state/retirements/native-event-audit/1795016775777155534-2631232/audit-0.json",
+      "audit_sha256": "c8bfe57fe8b4c6fe2b745181d22f2cbf4133a60abae3e4abcc2161310f2a8e5a",
+      "stream_sha256": "0f21580a51ede5c4f4b8daf92e81ebfc7ea32799f70c2f1b308c350a0966df8f",
+      "records": 425916,
+      "bytes": 125757055,
+      "definitions": 921
+    },
+    {
+      "generation": "self",
+      "run": "compiler-audit",
+      "audit": "local-state/retirements/native-event-audit/1795016775777155534-2631232/audit-1.json",
+      "audit_sha256": "886f31a8fab55493c429f9cc0d357b3d7086370164591050bcf80f00506606e5",
+      "stream_sha256": "ac23986458c3693e0a0be64667d03a080d1147b1c2b61e66905e7c9e99c484c8",
+      "records": 26115184,
+      "bytes": 8720706149,
+      "definitions": 66539
+    },
+    {
+      "generation": "self",
+      "run": "local-audit",
+      "audit": "local-state/retirements/native-event-audit/1795017807791708970-2654293/audit-0.json",
+      "audit_sha256": "9e3db6b6cf0dd9f8bc8d82120112f398023aca9be2cbd72cb5dc3c87230ad10c",
+      "stream_sha256": "639e97416f13a930c4c9019fe9981c2f70210b0d4ad310231892073ebbcbe004",
+      "records": 425916,
+      "bytes": 125767010,
+      "definitions": 921
+    },
+    {
+      "generation": "self",
+      "run": "local-audit",
+      "audit": "local-state/retirements/native-event-audit/1795017807791708970-2654293/audit-1.json",
+      "audit_sha256": "c40ceda9544907001a6d05b8ba4019aee2cd54cd4767f8f62ec574f0c5243842",
+      "stream_sha256": "71882747d9e3d499db79a1b7b022a6114d271b0c1a0e9f79d96161891efc6dd0",
+      "records": 2876595,
+      "bytes": 904565091,
+      "definitions": 7459
+    }
+  ],
+  "cross_generation_inputs": [
+    {
+      "comparison": "original-vs-second-attempt-runtime-raw",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1610598/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2166366/input.ll",
+      "first_sha256": "2f3751cd1ab2b9a9e4054778577bb0a3bc5849fb6911e80f9a4c6c7c08c7d855",
+      "second_sha256": "52a068ec49f523b4545d2edf9e06eac85a5106d7227bcc182d2f73117ecc0420",
+      "result": "anonymous_global_renumbering",
+      "lines_inspected_when_different": 69430,
+      "changed_lines": 111,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 28
+    },
+    {
+      "comparison": "original-vs-second-attempt-runtime-optimized",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1610613/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-02/run/captures/2166375/input.ll",
+      "first_sha256": "e74f80549220e3f0325a598da073ae0c9a1a3b9a229ca3e2260c2cb3c50aacb2",
+      "second_sha256": "ad0e0a8aa2adbfafb5fb94f8c398dc8ad89d1dd0b4df5a7d1b5a1f23e2056e0e",
+      "result": "anonymous_global_renumbering",
+      "lines_inspected_when_different": 54458,
+      "changed_lines": 111,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 28
+    },
+    {
+      "comparison": "compiler-audit-compiler_rt-optimizer",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/captures/2382175/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/self-rebuild/captures/2432890/input.ll",
+      "first_sha256": "2f3751cd1ab2b9a9e4054778577bb0a3bc5849fb6911e80f9a4c6c7c08c7d855",
+      "second_sha256": "b64122a110ccfcb63caec01fa485f9d72ce5ce5d608edd494475b19f44f70875",
+      "result": "anonymous_global_renumbering",
+      "lines_inspected_when_different": 69430,
+      "changed_lines": 111,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 28
+    },
+    {
+      "comparison": "compiler-audit-compiler_rt-emitter",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/captures/2382215/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/self-rebuild/captures/2432893/input.ll",
+      "first_sha256": "e74f80549220e3f0325a598da073ae0c9a1a3b9a229ca3e2260c2cb3c50aacb2",
+      "second_sha256": "c4b43c2289dfd81815aba4752c62754eabaa570502f04a5262ddbfca2cf30b01",
+      "result": "anonymous_global_renumbering",
+      "lines_inspected_when_different": 54458,
+      "changed_lines": 111,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 28
+    },
+    {
+      "comparison": "original-vs-initial-runtime",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-01/run/captures/1610613/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/captures/2382215/input.ll",
+      "first_sha256": "e74f80549220e3f0325a598da073ae0c9a1a3b9a229ca3e2260c2cb3c50aacb2",
+      "second_sha256": "e74f80549220e3f0325a598da073ae0c9a1a3b9a229ca3e2260c2cb3c50aacb2",
+      "result": "identical",
+      "lines_inspected_when_different": 0,
+      "changed_lines": 0,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    },
+    {
+      "comparison": "compiler-audit-zig-optimizer",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/captures/2382749/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/self-rebuild/captures/2443765/input.ll",
+      "first_sha256": "9a157489b4f60b8df3f089acc7498bc3c4ec314147b596dd5023fe0f461e8482",
+      "second_sha256": "9a157489b4f60b8df3f089acc7498bc3c4ec314147b596dd5023fe0f461e8482",
+      "result": "identical",
+      "lines_inspected_when_different": 0,
+      "changed_lines": 0,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    },
+    {
+      "comparison": "compiler-audit-zig-emitter",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/captures/2383671/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/self-rebuild/captures/2445232/input.ll",
+      "first_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+      "second_sha256": "6f3af5dc9e2a8b716ad6dc8a561e2789f06f7b25741b4dd929933919b6be1209",
+      "result": "identical",
+      "lines_inspected_when_different": 0,
+      "changed_lines": 0,
+      "verified_generated_builtin_records": 0,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    },
+    {
+      "comparison": "local-audit-compiler_rt-optimizer",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-local/run/captures/2556171/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-local/run/captures/2644438/input.ll",
+      "first_sha256": "cef6a7227e8861733df0ebea608eb4153d31609ef14cc7cbd0f1501e1c0886b4",
+      "second_sha256": "434a48e235cf08b988d283b06c6e63d5960ba9c07099ce802fd42c1571a95752",
+      "result": "generated_builtin_debug_path",
+      "lines_inspected_when_different": 143045,
+      "changed_lines": 1,
+      "verified_generated_builtin_records": 1,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    },
+    {
+      "comparison": "local-audit-compiler_rt-emitter",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-local/run/captures/2556180/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-local/run/captures/2644448/input.ll",
+      "first_sha256": "94c2f303797de2cec9f46d19ced993797633ed7ad372ed89e3ebfdcee82dfa1a",
+      "second_sha256": "c0d8c96899a95535d3a1a6ae58096d6e5fdf5081c819ef66bc3bb7b0b6246f4e",
+      "result": "generated_builtin_debug_path",
+      "lines_inspected_when_different": 108812,
+      "changed_lines": 1,
+      "verified_generated_builtin_records": 1,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    },
+    {
+      "comparison": "local-audit-test-optimizer",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-local/run/captures/2557586/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-local/run/captures/2645129/input.ll",
+      "first_sha256": "43a081297714229ac53e93af0dbb54e665458ffa77570751e6227a54cbe15891",
+      "second_sha256": "b3da1df9f0a357e483d2c9646eeda8653a3b697110e1fcee66643c99017610c5",
+      "result": "generated_builtin_debug_path",
+      "lines_inspected_when_different": 717876,
+      "changed_lines": 1,
+      "verified_generated_builtin_records": 1,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    },
+    {
+      "comparison": "local-audit-test-emitter",
+      "first": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-local/run/captures/2557703/input.ll",
+      "second": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-local/run/captures/2645201/input.ll",
+      "first_sha256": "9b34c5f47196b4a75ad5790a42ddccd7c891f48351da1693daf7f5135f137c05",
+      "second_sha256": "11cba98ee9f9f4d4d57276d01e771eb2d2cebee2e71d48ada0924caddfd34d4a",
+      "result": "generated_builtin_debug_path",
+      "lines_inspected_when_different": 577335,
+      "changed_lines": 1,
+      "verified_generated_builtin_records": 1,
+      "other_changed_lines": 0,
+      "binding_conflicts": 0,
+      "distinct_renames": 0
+    }
+  ],
+  "cross_generation_objects": [
+    {
+      "comparison": "compiler-audit-compiler_rt-emitter",
+      "first_object_sha256": "7b65b19174e01f9ece8b84e195c6a52acc5012d17a7e3474581c869beab81643",
+      "self_object_sha256": "47572bc70b336fe2366fbf9d10290d00b215a3b5016b85163d80559f9629333c",
+      "optimized_ir_comparison": "anonymous_global_renumbering",
+      "object_comparison": "anonymous_names_and_elf_metadata",
+      "explained": true
+    },
+    {
+      "comparison": "compiler-audit-zig-emitter",
+      "first_object_sha256": "0c2c52b3139ba04e59cbd75f13658241e9b254e69fbe4c01f6477cdad5e4be8a",
+      "self_object_sha256": "0c2c52b3139ba04e59cbd75f13658241e9b254e69fbe4c01f6477cdad5e4be8a",
+      "optimized_ir_comparison": "identical",
+      "object_comparison": "identical",
+      "explained": true
+    },
+    {
+      "comparison": "local-audit-compiler_rt-emitter",
+      "first_object_sha256": "5a938b9e5ccb0903d8edb4a1090a018febb7bb39cc5907f1df4ffddc2c8e7159",
+      "self_object_sha256": "5a938b9e5ccb0903d8edb4a1090a018febb7bb39cc5907f1df4ffddc2c8e7159",
+      "optimized_ir_comparison": "generated_builtin_debug_path",
+      "object_comparison": "identical",
+      "explained": true
+    },
+    {
+      "comparison": "local-audit-test-emitter",
+      "first_object_sha256": "1239accea250a35ebb2fbab52127d80f8be4c5f049d142e45d786d221e3eee97",
+      "self_object_sha256": "1239accea250a35ebb2fbab52127d80f8be4c5f049d142e45d786d221e3eee97",
+      "optimized_ir_comparison": "generated_builtin_debug_path",
+      "object_comparison": "identical",
+      "explained": true
+    }
+  ],
+  "final_verifier": {
+    "original": "final-verification-03",
+    "original_actual": 2,
+    "diagnosis": "Nonexistent optional Git archive pathspec build.zig.zon",
+    "successor": "final-verification-04",
+    "successor_actual": 0,
+    "archive_entries": 2589
+  },
+  "provider_reconciliation": {
+    "original": "reconcile-03",
+    "original_exit": 1,
+    "corrected": "reconcile-04",
+    "corrected_exit": 0
+  },
+  "behavior": {
+    "suite": {
+      "path": "/home/oleg/prog/ziglang/test/behavior.zig",
+      "sha256": "3ef0e65cb6a9bb8a112549d0d8a52ded81cf4b154bd1f059c4dd878e38098af6"
+    },
+    "libc": {
+      "path": "/home/oleg/prog/z_llvm/local-state/validations/compiler-object-completion-20261111/batch-01/native-libc-link-v8/native-libc.txt",
+      "sha256": "76ec8b788d551b0beed8f7359fd5ded95086f4a758b4bf2e07dfe31b2afdd34f"
+    },
+    "reference_path": "local-state/validations/release-safe-preopt-20261115/batch-01/preserve-reference-ReleaseFast/run/report.json",
+    "reference_sha256": "3974cd8a3f677667d91d568a5ed16d5bd77bf8ea7796ae8747a8aa8b6a8ca273",
+    "per_route_counts": [
+      {
+        "key": "OK",
+        "count": 2063
+      },
+      {
+        "key": "SKIP",
+        "count": 34
+      }
+    ],
+    "runs": [
+      {
+        "generation": "initial",
+        "route": "llvm",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-llvm/run/report.json",
+        "report_sha256": "3e5ef29967da277ea0c6452802a07f43b7f2692643d5833e14bfcd3bb1f882d6",
+        "frontend_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+        "executable_sha256": "98937c1b7aeea00e80748a9f06371501c74370594a9200231dac0cf981fc56bf",
+        "tests": 2097,
+        "ordered_sha256": "d2f366d355bce75fc6b8beccb234f92f48cc07b82f4acdd7607940c1103474ba",
+        "reference_sha256": "3974cd8a3f677667d91d568a5ed16d5bd77bf8ea7796ae8747a8aa8b6a8ca273"
+      },
+      {
+        "generation": "initial",
+        "route": "local",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-local/run/report.json",
+        "report_sha256": "31178a8beeb3ed6a7de34e5bf50b0b173c47d2c5c30f02e7338cca8314e3c778",
+        "frontend_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+        "executable_sha256": "9cf83220a1d488f58ae6b037d074a3dfffb86b81366a52c77cfd3dad45526c43",
+        "tests": 2097,
+        "ordered_sha256": "d2f366d355bce75fc6b8beccb234f92f48cc07b82f4acdd7607940c1103474ba",
+        "reference_sha256": "3e5ef29967da277ea0c6452802a07f43b7f2692643d5833e14bfcd3bb1f882d6"
+      },
+      {
+        "generation": "self",
+        "route": "llvm",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-llvm/run/report.json",
+        "report_sha256": "142fbb0217afc28bb4f7e46b752d2e2ae96812dfcc3ccb995b1a1c5d4e6451ea",
+        "frontend_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+        "executable_sha256": "8b3f014a35205e76395713d88547f941bd3294ea30d032709d7247f924df96be",
+        "tests": 2097,
+        "ordered_sha256": "d2f366d355bce75fc6b8beccb234f92f48cc07b82f4acdd7607940c1103474ba",
+        "reference_sha256": "3974cd8a3f677667d91d568a5ed16d5bd77bf8ea7796ae8747a8aa8b6a8ca273"
+      },
+      {
+        "generation": "self",
+        "route": "local",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-local/run/report.json",
+        "report_sha256": "56a132e6cbc5e05be56523578a521307e1a5ba60bca1a5a54702d2c13f049794",
+        "frontend_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+        "executable_sha256": "9cf83220a1d488f58ae6b037d074a3dfffb86b81366a52c77cfd3dad45526c43",
+        "tests": 2097,
+        "ordered_sha256": "d2f366d355bce75fc6b8beccb234f92f48cc07b82f4acdd7607940c1103474ba",
+        "reference_sha256": "142fbb0217afc28bb4f7e46b752d2e2ae96812dfcc3ccb995b1a1c5d4e6451ea"
+      }
+    ]
+  },
+  "real_failure_controls": [
+    {
+      "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/seed-control-03/report.json",
+      "frontend_sha256": "d505fc64b5b42ba1bf38a46d44a68899e478306d18fdc8605126a9c2c304982e",
+      "backend_sha256": "90a9904d12030337a37993ade6c0609681b4e5770230bde6715f0e6934445f13",
+      "frontend_exit": 1,
+      "real_optimizer_failures": 1,
+      "emitter_invocations": 0,
+      "delivered_objects": 0,
+      "installed_compilers": 0
+    },
+    {
+      "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-initial-optimizer-failure/report.json",
+      "frontend_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+      "backend_sha256": "90a9904d12030337a37993ade6c0609681b4e5770230bde6715f0e6934445f13",
+      "frontend_exit": 1,
+      "real_optimizer_failures": 1,
+      "emitter_invocations": 0,
+      "delivered_objects": 0,
+      "installed_compilers": 0
+    },
+    {
+      "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03-self-optimizer-failure/report.json",
+      "frontend_sha256": "622c7d9e406bc5f1cf458d6f6a7b90f5488a2566a4ec1beb47ec9c1797d84b63",
+      "backend_sha256": "90a9904d12030337a37993ade6c0609681b4e5770230bde6715f0e6934445f13",
+      "frontend_exit": 1,
+      "real_optimizer_failures": 1,
+      "emitter_invocations": 0,
+      "delivered_objects": 0,
+      "installed_compilers": 0
+    }
+  ],
+  "preservation": {
+    "fixed_debug": {
+      "status": "executed",
+      "tier2_result": "selector-tier2-03",
+      "fixed_owners_equal": true,
+      "original_object_sha256": "92825c8e7821e8c2becc774942f149aacfd14a99167247199b1ee44c4d4d81c1",
+      "candidate_object_sha256": "e02b15b20af4efa5317bc37308bf6200cd45792eec17ab77d17d1f6b05910f6e",
+      "fixed_object_equal": false
+    },
+    "fixed_debug_diagnosis": {
+      "status": "diagnosed",
+      "input_sha256": "d8b983f4686a19acdf9f5bcc84c084b6fbc68e104e1671032509f7180c9aa02b",
+      "original_sha256": "92825c8e7821e8c2becc774942f149aacfd14a99167247199b1ee44c4d4d81c1",
+      "candidate_sha256": "e02b15b20af4efa5317bc37308bf6200cd45792eec17ab77d17d1f6b05910f6e",
+      "strict_object_equal": false,
+      "owners_equal": true,
+      "owned_functions": 7874,
+      "changed_function_records": 4882,
+      "fresh_positive_executions": 2,
+      "ordered_fixed_outcomes_per_object": 2097,
+      "native_mutations_detected": 1,
+      "unchanged_inherited_vector_exp_failure": true,
+      "historical_normal_reference_sha256": "61a6a91d1dc921f35720259ad450ba2c662af48c80942dd2cda6d091e2eed673"
+    },
+    "fixed_debug_whole_elf": {
+      "status": "passed",
+      "complete_elf_sha256": "6549a1d229efdf676cb21ff4dee8d2a96f5ddd9d07a602e5f8c8947603f99b31",
+      "observed_variants": 6,
+      "reused_emissions": 4,
+      "fresh_reordered_emissions": 2,
+      "source_order": [
+        "original",
+        "graph",
+        "shift",
+        "aggregate",
+        "mixed_call",
+        "stack_address"
+      ],
+      "failed_gep_before_mixed_functions": 3,
+      "strict_object_equal": false,
+      "all_endpoint_changes_attributed": true,
+      "all_7936_functions_accounted": true,
+      "all_4916_data_relocations_accounted": true,
+      "verified_blockaddresses_per_variant": 74,
+      "deliberate_wrong_objects_detected": 6,
+      "endpoint": {
+        "changed_owner_records": 4882,
+        "changed_owner_bodies": 4882,
+        "changed_alias_bodies": 26,
+        "nonfunction_symbols_bit_identical": 5819,
+        "changed_symbol_values_or_sizes": 7936,
+        "code_bytes_delta": 220361,
+        "zero_text_padding_delta": 651,
+        "relocations_moved_within_owner": 47862,
+        "raw_text_relocation_sites_moved": 61925,
+        "text_relocation_targets_types_and_addends_equal": true,
+        "data_source_offsets_types_and_symbols_equal": true,
+        "data_addends_moved": 73,
+        "unchanged_data_entries": 4843,
+        "verified_ir_blockaddresses": 74,
+        "raw_changed_sections": [
+          ".text",
+          ".rela.text",
+          ".symtab",
+          ".rela.data"
+        ],
+        "smallest_changed_example": "Io.Threaded.doNothingSignalHandler"
+      },
+      "adjacent_transitions": {
+        "graph": {
+          "changed_owner_records": 0,
+          "changed_owner_bodies": 0,
+          "changed_alias_bodies": 0,
+          "nonfunction_symbols_bit_identical": 5819,
+          "changed_symbol_values_or_sizes": 0,
+          "code_bytes_delta": 0,
+          "zero_text_padding_delta": 0,
+          "relocations_moved_within_owner": 0,
+          "raw_text_relocation_sites_moved": 0,
+          "text_relocation_targets_types_and_addends_equal": true,
+          "data_source_offsets_types_and_symbols_equal": true,
+          "data_addends_moved": 0,
+          "unchanged_data_entries": 4916,
+          "verified_ir_blockaddresses": 74,
+          "raw_changed_sections": [],
+          "smallest_changed_example": null
+        },
+        "shift": {
+          "changed_owner_records": 0,
+          "changed_owner_bodies": 0,
+          "changed_alias_bodies": 0,
+          "nonfunction_symbols_bit_identical": 5819,
+          "changed_symbol_values_or_sizes": 0,
+          "code_bytes_delta": 0,
+          "zero_text_padding_delta": 0,
+          "relocations_moved_within_owner": 0,
+          "raw_text_relocation_sites_moved": 0,
+          "text_relocation_targets_types_and_addends_equal": true,
+          "data_source_offsets_types_and_symbols_equal": true,
+          "data_addends_moved": 0,
+          "unchanged_data_entries": 4916,
+          "verified_ir_blockaddresses": 74,
+          "raw_changed_sections": [],
+          "smallest_changed_example": null
+        },
+        "aggregate": {
+          "changed_owner_records": 0,
+          "changed_owner_bodies": 0,
+          "changed_alias_bodies": 0,
+          "nonfunction_symbols_bit_identical": 5819,
+          "changed_symbol_values_or_sizes": 0,
+          "code_bytes_delta": 0,
+          "zero_text_padding_delta": 0,
+          "relocations_moved_within_owner": 0,
+          "raw_text_relocation_sites_moved": 0,
+          "text_relocation_targets_types_and_addends_equal": true,
+          "data_source_offsets_types_and_symbols_equal": true,
+          "data_addends_moved": 0,
+          "unchanged_data_entries": 4916,
+          "verified_ir_blockaddresses": 74,
+          "raw_changed_sections": [],
+          "smallest_changed_example": null
+        },
+        "mixed_call": {
+          "changed_owner_records": 0,
+          "changed_owner_bodies": 0,
+          "changed_alias_bodies": 0,
+          "nonfunction_symbols_bit_identical": 5819,
+          "changed_symbol_values_or_sizes": 0,
+          "code_bytes_delta": 0,
+          "zero_text_padding_delta": 0,
+          "relocations_moved_within_owner": 0,
+          "raw_text_relocation_sites_moved": 0,
+          "text_relocation_targets_types_and_addends_equal": true,
+          "data_source_offsets_types_and_symbols_equal": true,
+          "data_addends_moved": 0,
+          "unchanged_data_entries": 4916,
+          "verified_ir_blockaddresses": 74,
+          "raw_changed_sections": [],
+          "smallest_changed_example": null
+        },
+        "stack_address": {
+          "changed_owner_records": 4882,
+          "changed_owner_bodies": 4882,
+          "changed_alias_bodies": 26,
+          "nonfunction_symbols_bit_identical": 5819,
+          "changed_symbol_values_or_sizes": 7936,
+          "code_bytes_delta": 220361,
+          "zero_text_padding_delta": 651,
+          "relocations_moved_within_owner": 47862,
+          "raw_text_relocation_sites_moved": 61925,
+          "text_relocation_targets_types_and_addends_equal": true,
+          "data_source_offsets_types_and_symbols_equal": true,
+          "data_addends_moved": 73,
+          "unchanged_data_entries": 4843,
+          "verified_ir_blockaddresses": 74,
+          "raw_changed_sections": [
+            ".text",
+            ".rela.text",
+            ".symtab",
+            ".rela.data"
+          ],
+          "smallest_changed_example": "Io.Threaded.doNothingSignalHandler"
+        }
+      },
+      "endpoint_family_sets": {
+        "stack_address": 4882
+      },
+      "moved_case_family_sets": {
+        "stack_address": 73
+      },
+      "distinct_function_label_pairs": 68
+    },
+    "fixed_debug_review": {
+      "review_approved": true,
+      "review_thread": "01a1ed95-6d13-7532-803a-576eed555ef8",
+      "review_turn": "01a1efbe-1254-7b31-b617-9e23d931df62",
+      "reviewed_scope": "fixed Debug object transition on the qualified compiler and fixed IR",
+      "backend_commit": "d968e3acb6372b2fdcab426b75bd1ffddcc559ca",
+      "input_sha256": "d8b983f4686a19acdf9f5bcc84c084b6fbc68e104e1671032509f7180c9aa02b",
+      "old_sha256": "92825c8e7821e8c2becc774942f149aacfd14a99167247199b1ee44c4d4d81c1",
+      "new_sha256": "e02b15b20af4efa5317bc37308bf6200cd45792eec17ab77d17d1f6b05910f6e",
+      "complete_elf_sha256": "6549a1d229efdf676cb21ff4dee8d2a96f5ddd9d07a602e5f8c8947603f99b31",
+      "strict_object_equal": false,
+      "strict_actual": 1,
+      "fixed_native_outcomes_per_object": 2097,
+      "historical_vector_exp_failure": true,
+      "elffuncs": 7936,
+      "affected_owner_bodies": 4882,
+      "affected_alias_bodies": 26,
+      "verified_table_slots": 74,
+      "moved_table_addends": 73,
+      "all_six_deliberate_artifact_failures_verified": true,
+      "reverse_order_refused_functions": 3,
+      "release_authorized_after_final_consumers": true
+    },
+    "native_populations": 237,
+    "serial_tier3_gates": 17,
+    "faults_detected": 180,
+    "receipts": [
+      {
+        "stage": "final-verification-04",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/final-verification-04/report.json",
+        "sha256": "fd0698bf35b05439874867bd8475cb4ac93181dbf61e3405d1593a4fa30fd2d2"
+      },
+      {
+        "stage": "reconcile-04",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/reconcile-04/report.json",
+        "sha256": "46b1ab414c7ba805be97ef622ca22dce9ef18918923fe2da5f88a18543487e3d"
+      },
+      {
+        "stage": "reachability-full-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/reachability-full-03/report.json",
+        "sha256": "37bbe9034e58aad99ca8985081d32b70abfb8c63fec744543bbddf5ca41c157f"
+      },
+      {
+        "stage": "preservation-unit-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-unit-03/report.json",
+        "sha256": "6f4f8a9616a5b896a027938c58351ace018f924eabf9dc40c4ef6b2d8e49a862"
+      },
+      {
+        "stage": "selector-tier2-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-tier2-03/report.json",
+        "sha256": "484a9943a856ecea19e07ca8de41ed8e75b2fd1369e95211be324daff576de70"
+      },
+      {
+        "stage": "preservation-graph-04",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-graph-04/report.json",
+        "sha256": "b7c190dc35b445afba178686ee0f578c8cab0765d17952974bca88c43de9f18c"
+      },
+      {
+        "stage": "preservation-native-transition-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-transition-03/report.json",
+        "sha256": "fbab2120a9f1eb099170ec453dad50af2e9c278bda75c8b9c4cf8ed7a7508c3a"
+      },
+      {
+        "stage": "preservation-native-objects-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-objects-03/report.json",
+        "sha256": "3fde8cf0793a843eaeada69b03a8bf4f5cc8588d2450fcc14367e69e831a804e"
+      },
+      {
+        "stage": "preservation-native-intermediates-05",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-intermediates-05/report.json",
+        "sha256": "cd17e7d2c22ce0ebfe3ae672587eefee79c59688b19ca91bd03883024b4d95f7"
+      },
+      {
+        "stage": "preservation-native-elf-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-elf-03/report.json",
+        "sha256": "88a4d240056d8e4a69dd2a9057eb3fea1f7fbd23c256d35adfa6a1e60ba08afc"
+      },
+      {
+        "stage": "storage/preservation-links-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/storage/preservation-links-03/report.json",
+        "sha256": "ffc6fb4932d9f95f743133464f143ea217b40ee558070d7cd701cfa64e44944c"
+      },
+      {
+        "stage": "storage/preservation-link-identities-04",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/storage/preservation-link-identities-04/report.json",
+        "sha256": "6d77503ed20843816d7fbf8009f54f863a9ce69320800cd3faea43edc9e0322f"
+      },
+      {
+        "stage": "integration-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/integration-03/report.json",
+        "sha256": "0d5826227c63fec5cad96a4e502323f08fd73287ce7cdae60c1450e095396261"
+      },
+      {
+        "stage": "preservation-faults-03",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-faults-03/report.json",
+        "sha256": "db190efd3a823112e326f1e2807674d38650fa141217040654cbf4fe3f14762d"
+      },
+      {
+        "stage": "runtime-comparison-01",
+        "report": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/runtime-comparison-01/report.json",
+        "sha256": "27516fa238b5a9b66c09749ea52f1e799358ecc5319e49cb5df6f4082782df19"
+      }
+    ]
+  },
+  "fresh": [
+    "separate host warmups and both whole builds with local optimizer and emitter",
+    "both generation-specific normal LLVM and local behavior runs",
+    "all three real optimizer failures, both f80 checks and eight ordered event audits",
+    "matched-input reachability profiling, fixed Debug native and ELF controls, cumulative Tier 3 and native fault executions"
+  ],
+  "reused": [
+    "pinned upstream source and stage-4 warmup and seed",
+    "authenticated normal Fast oracle and 25 providers",
+    "unchanged native corpus and three authenticated AIR inputs",
+    "previously accepted mode-specific Safe, Fast, Small and postopt evidence"
+  ],
+  "limits": {
+    "fixed_debug_strict_object_exit": 1,
+    "fixed_debug_historical_failure": "behavior.floatop.test.@exp with vectors",
+    "historical_fixed_debug_ordered_outcomes_each": 2097,
+    "reachability_timing_scope": "exclusive reachability phase on byte-identical optimized compiler IR",
+    "other_target_or_mode_self_rebuilds": "outside this qualification",
+    "loop_memset_followup": "deferred"
+  },
+  "storage": {
+    "final_product_removals": [
+      {
+        "layout": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/validation.storage-layout.json",
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/validation.workspace-release.json",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795032769266430046-3169856/report.json",
+        "collector_receipt_sha256": "63435b2fcb17f3ad6d5ae7cb2dbf425da7ce6d63e16d25dd0b0fc6e98acf50bf",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/run/.workspaces/validation",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 2499985408
+        }
+      },
+      {
+        "layout": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/checks.storage-layout.json",
+        "release": "completed-validation",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795019374795304601-2701410/report.json",
+        "collector_receipt_sha256": "70a4d5ed8299a82f5527f07a4646386a12cb911b6ac026f0d3fa79e0989f1004",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/build-03/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 0
+        }
+      },
+      {
+        "layout": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/source-01/checks.storage-layout.json",
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/source-01/checks.workspace-release.json",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795032769266430046-3169856/report.json",
+        "collector_receipt_sha256": "63435b2fcb17f3ad6d5ae7cb2dbf425da7ce6d63e16d25dd0b0fc6e98acf50bf",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/source-01/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 97882112
+        }
+      },
+      {
+        "layout": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/compiler-01/ReleaseFast/compiler.storage-layout.json",
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/compiler-01/ReleaseFast/compiler.workspace-release.json",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795032769266430046-3169856/report.json",
+        "collector_receipt_sha256": "63435b2fcb17f3ad6d5ae7cb2dbf425da7ce6d63e16d25dd0b0fc6e98acf50bf",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/selector-mixed-call/compiler-01/ReleaseFast/.workspaces/compiler",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 44101632
+        }
+      },
+      {
+        "layout": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/tools-03/checks.storage-layout.json",
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/tools-03/checks.workspace-release.json",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795032769266430046-3169856/report.json",
+        "collector_receipt_sha256": "63435b2fcb17f3ad6d5ae7cb2dbf425da7ce6d63e16d25dd0b0fc6e98acf50bf",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/tools-03/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 239296512
+        }
+      },
+      {
+        "layout": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/backend/ReleaseFast/compiler.storage-layout.json",
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/backend/ReleaseFast/compiler.workspace-release.json",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795032769266430046-3169856/report.json",
+        "collector_receipt_sha256": "63435b2fcb17f3ad6d5ae7cb2dbf425da7ce6d63e16d25dd0b0fc6e98acf50bf",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/backend/ReleaseFast/.workspaces/compiler",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 44052480
+        }
+      }
+    ],
+    "closed_debug_investigation": [
+      {
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-intermediates-05/checks.workspace-release.json",
+        "release_sha256": "1ce983b1a01b51879feefc42725d4857dc70e51f1c1d5e3fc521df3d347fa11a",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795030684459571839-3103291/report.json",
+        "collector_receipt_sha256": "132797e4f3652c64a5f24cc24bcc93b9120ac6ef2dfc6198691906ddb9906c21",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-intermediates-05/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 595877888
+        }
+      },
+      {
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-intermediates-04/checks.workspace-release.json",
+        "release_sha256": "c8e26e83b72cae30e63131e594e5ef5d53991676d3569eb006e5c5554536388f",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795031578248386392-3134152/report.json",
+        "collector_receipt_sha256": "cd77fb4286a30002e10633ffb976a245280aaea5443e88be3eeeac86eca0d339",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-intermediates-04/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 1118167040
+        }
+      },
+      {
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-objects-03/checks.workspace-release.json",
+        "release_sha256": "09f35af6d62192a9712d4bb2f1251d437d625a9c0efd07988145962e815986d9",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795031578248386392-3134152/report.json",
+        "collector_receipt_sha256": "cd77fb4286a30002e10633ffb976a245280aaea5443e88be3eeeac86eca0d339",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-objects-03/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 54796288
+        }
+      },
+      {
+        "release": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-03/checks.workspace-release.json",
+        "release_sha256": "a3bacbffa2bbbc709e7c2cc3bbb48c7f9e5da90715d8c09c353b5e32b294733a",
+        "collector_receipt": "local-state/retirements/automatic-storage-cleanup/1795031578248386392-3134152/report.json",
+        "collector_receipt_sha256": "cd77fb4286a30002e10633ffb976a245280aaea5443e88be3eeeac86eca0d339",
+        "action": {
+          "path": "local-state/tmp/validations/compiler-preopt-self-rebuild-20261117/batch-01/preservation-native-03/.workspaces/checks",
+          "kind": "temporary_workspace",
+          "status": "removed",
+          "reclaimed_file_bytes": 27508736
+        }
+      }
+    ],
+    "ordinary_checksum_record": {
+      "status": "passed",
+      "previous_path": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/storage/preservation-links-03/original-targets.sha256",
+      "ordinary_identity_receipt": "local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/storage/preservation-links-03/original-targets.txt",
+      "original_and_current_sha256": "56c75f0b7a7fddb83cba4a22bf6d19475058ebca67c92921441006e366144959",
+      "unchanged_inode_and_bytes": true,
+      "targets_reverified": 8,
+      "prior_real_release_held": true,
+      "existing_accepted_manifests": 9,
+      "unchanged_independent_holds": 17,
+      "rollback_entered": false
+    },
+    "failed_whole_build_disposition": {
+      "real_transaction": {
+        "status": "closed",
+        "source_commit": "b6f04956fbbbe4edcbb1dba8e8771316a41ab3a2",
+        "collector_sha256": "cfe7e9c514a1e7a705ba72fd778d6299f9e6c7a3aa56319be2c41d6ff3c0124c",
+        "installed_fixture_cases": 41,
+        "real_workspace_releases": 2,
+        "real_workspaces_collected": 2,
+        "reclaimed_allocated_file_bytes": 1693540352,
+        "dry_receipt": "local-state/retirements/automatic-storage-cleanup/1795021671008924766-2767077/report.json",
+        "apply_receipt": "local-state/retirements/automatic-storage-cleanup/1795021801948305050-2771441/report.json",
+        "all_eight_original_owner_roots_absent": true,
+        "original_failure_evidence_unchanged": true,
+        "original_manifests_content_checked": 9,
+        "independent_holds_unchanged": 17
+      },
+      "first_unapplied_dry": "local-state/retirements/automatic-storage-cleanup/1795021213838213713-2756967/report.json",
+      "empty_fixture_collection": "local-state/retirements/automatic-storage-cleanup/1795021514872628909-2763563/report.json",
+      "storage_commit": "b6f04956fbbbe4edcbb1dba8e8771316a41ab3a2",
+      "focused_owner": "storage/whole-release-focused-02",
+      "fixtures": {
+        "status": "passed",
+        "base": "d968e3acb6372b2fdcab426b75bd1ffddcc559ca",
+        "patch_sha256": "27dae53b69a7f5232569a502e4c182028537787de1510ecb1045e05a32324b45",
+        "releasefast_collector_sha256": "437ad2b0b1350e7a1803a42b7d7fd74b85776f045d197af663ca9dfa10e12fe9",
+        "changed_members": 2,
+        "modes": [
+          "Debug",
+          "ReleaseFast"
+        ],
+        "existing_cli_per_mode": 11,
+        "whole_compiler_cli_per_mode": 30,
+        "production_mutations": 0
+      },
+      "production_native": {
+        "status": "passed",
+        "production_collector_sha256": "cfe7e9c514a1e7a705ba72fd778d6299f9e6c7a3aa56319be2c41d6ff3c0124c",
+        "qualified_source": "/home/oleg/prog/z_llvm/local-state/validations/compiler-preopt-self-rebuild-20261117/batch-01/storage/whole-release-focused-02",
+        "whole_compiler_cases": 30,
+        "previous_workspace_cases": 11,
+        "production_layouts_released_by_fixtures": 0
+      },
+      "real_dry_receipt": "local-state/retirements/automatic-storage-cleanup/1795021671008924766-2767077/report.json",
+      "real_apply_receipt": "local-state/retirements/automatic-storage-cleanup/1795021801948305050-2771441/report.json"
+    },
+    "closure": "final-storage-03/report.json",
+    "manifest": "maintained-compiler-preopt-self-rebuild-20261117.sha256",
+    "registration": "final-storage-03/policy-registration/report.json",
+    "prior_manifests": 9,
+    "independent_holds": 17
+  },
+  "scope": "ReleaseFast preopt compiler build and self-rebuild on baseline x86_64-linux-gnu with LLVM construction, host tools and the declared providers and linker. Loop and memset implementation is deferred."
+}

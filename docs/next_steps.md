@@ -15,11 +15,14 @@ Memset had the largest median paired ratios at 5.55× O3 and 5.57× Oz.
 The reviewer accepted M2 at `8594ba04` for those five whole processes on the
 recorded host. [Measurements and ranked proposals](evidence/generated_program_performance_20261117.md)
 
-The reviewer authorized M3. Build the pinned ReleaseFast compiler through the
-local preopt optimizer and object emitter, then use that fresh executable to
-rebuild the same source. Both generations require complete compiler/runtime
-inventories, usable binaries, behavior comparisons and failure controls under
-normal resources. [M3 plan and storage ownership](plans/2026-11-17-release-fast-compiler-preopt-self-rebuild.md)
+M3 produced byte-identical ReleaseFast compiler executables on the fresh
+preopt build and self-rebuild at backend source `d968e3ac`. Both generations
+matched all 2,097 ordered upstream outcomes on LLVM and local preopt. The
+reviewer checked the four original execution logs, eight event audits and
+three real optimizer failures. The fresh serial preservation run passed
+all 17 gates and 237 native populations. All 180 deliberate faults were
+detected. The M3 qualification is ready for the reviewer's final decision.
+Loop and memset work follows that review. [M3 evidence](evidence/release_fast_compiler_preopt_self_rebuild_20261117.md)
 
 The bounded
 [ReleaseFast preopt milestone](plans/2026-11-17-release-fast-preopt-behavior.md)
