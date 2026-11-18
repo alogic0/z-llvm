@@ -6,6 +6,20 @@ measurements and handoffs. The primary reviewer
 (`01a1ed95-6d13-7532-803a-576eed555ef8`) owns the independent review and
 the decision on each candidate. The user authorized this plan on 2026-11-18.
 
+## Review decisions
+
+**Loop timing, 2026-11-18.** Both IR forms used the same fresh M3 compiler
+(`6a4dcb44`) and common drivers. Primary review checked the schedule, image
+identities, stdout and stderr of all 112 visits and recalculated the paired
+medians from the original observations. Promotion was slower in all twelve
+pairs in each mode, by 40.99 ms in Fast (MAD 2.47 ms) and 40.09 ms in
+Small (MAD 3.15 ms). The original and promoted forms matched on all 272
+scalar outputs. Promotion removed the IR slot and cut object text from
+127 to 125 bytes, but added stack transfers for the accumulator on the
+backedge. The reviewer declined a release-pipeline promotion and assigned
+the bounded fill experiment. See `loop-original/`, `loop-sroa/` and
+`loop-sample/report.json` under the batch root below.
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local

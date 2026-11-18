@@ -1,9 +1,10 @@
 # Next steps
 
-The current assignment is to measure the original and scalar-promoted loop on
-the accepted M3 backend, then follow the measured result into a bounded loop
-change or an 8–16-byte memset trial. The implementer reports to the primary
-reviewer at each decision. [Active performance plan](plans/2026-11-18-loop-and-bounded-memset.md)
+The current assignment is the 8–16-byte memset trial on the accepted M3
+backend. The reviewer checked the paired loop measurements. Scalar promotion
+alone slowed both Fast and Small by about 40 ms. The implementer will
+return the fill candidate and its measurements for independent review.
+[Active performance plan](plans/2026-11-18-loop-and-bounded-memset.md)
 
 The completed [M1/M2/M3 coordination plan](plans/2026-11-17-preopt-qualification-performance-self-rebuild.md)
 records the preceding milestones.
