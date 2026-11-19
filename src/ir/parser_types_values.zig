@@ -214,7 +214,7 @@ pub fn parseValue(text: []const u8) !core.Value {
         return .{ .named = trimmed };
     }
     if (isFpLiteral(trimmed)) return .{ .fp = trimmed };
-    const value = std.fmt.parseInt(i128, trimmed, 10) catch |err| {
+    const value = @import("wide_integers.zig").parseCompact(trimmed) catch |err| {
         if (err == error.Overflow and @import("wide_integers.zig").decimal(trimmed)) return .{ .constant_expr = trimmed };
         return err;
     };
