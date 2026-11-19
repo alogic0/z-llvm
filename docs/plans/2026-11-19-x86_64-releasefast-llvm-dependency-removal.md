@@ -379,6 +379,41 @@ The primary owns the full behavior comparison for each generation.
 
 ## 3. Rebuild and qualify the compiler in the isolated environment
 
+The first full-suite compilation from the shipped G1 package and the
+first isolated G2 Zig build both stopped in the selected optimizer with
+`UnsupportedCallAttribute`. The G1 suite reached the runtime archive
+and stopped before linking the test executable. The G2 Zig build
+installed the SDK files and stopped before installing the compiler.
+The primary owns reduction of the 46,421,094-byte behavior module.
+The implementer owns the compiler and helper build witnesses, source
+repair and fresh installs. Recheck the affected original modules, then
+use the revised installed package for the ordinary builds and both
+generations' behavior runs. Keep the earlier receipts with their
+original package identities. [First full-suite result](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior/result.json)
+· [First isolated compiler build](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig/build-result.json)
+
+The first behavior failure came from upstream's ten-line empty-struct
+method test. At line 282,884 of the generated module, a pointer argument
+has alignment, read-only and non-null attributes followed by an outer
+`getelementptr` and an inner `inttoptr`. The parser selected the inner
+expression as the argument. The verifier then saw part of the outer
+expression among the attributes. The implementer is correcting the
+operand boundary and the primary is checking the original source,
+observable pointer offsets and malformed-input behavior.
+[Original verifier result and function](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-behavior-attribute/diagnosis.json)
+
+The G2 compiler contained the same split in `InternPool.Key.hash64` at
+line 845,782 of its 305,089,486-byte module. The reviewer isolated the
+original behavior test as an ordinary `zig test`. LLVM and G1's native
+backend each ran it successfully. The original G1 provider reproduced
+the failure on the same argument. A separate LLVM executable read 66
+from a real four-byte array through a nested pointer expression. The
+original helper read 66 using the single-operation control and rejected
+the nested form. Both rejected alignment 3.
+[Original G2 compiler diagnosis](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-attribute-02/diagnosis.json)
+· [Ten-line Zig test and three compiler routes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-empty-struct-source/result.json)
+· [Independent LLVM, positive and malformed IR controls](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-behavior-attribute-oracles/result.json)
+
 Record the seed executable, how it was produced, its libraries and every
 host tool it prebuilds. The seed can build generation one in a separately
 recorded environment. Then let generation one build generation two from

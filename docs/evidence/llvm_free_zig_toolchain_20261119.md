@@ -26,6 +26,15 @@ with the inputs used for the install. The published Zig tree is `60e74519`.
 [Independent file inventory](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-package-elf/package-inventory.json)
 · [ELF headers and loader closure](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-package-elf/elf-closure.json)
 · [Source tree and patch identities](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/source-02/source.json)
+· [Committed files compared with build inputs](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/source-publication/published-package-sources.json)
+
+The pinned SDK source tree held 19,620 files. Its normal installation
+copied 19,413 byte for byte, created 88 empty files for paths ending in
+`test.zig` and excluded 119 files under the build script's ten suffix
+rules. Both independent checks accounted for all 19,501 installed SDK
+files. Adding the helper changed a single entry in the initial Zig
+installation. [Source-to-install accounting](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-link-audit-03/sdk-install-policy.json)
+· [Complete package and both native links](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-link-audit-03/report.json)
 
 ## What built the package
 
@@ -38,8 +47,13 @@ is present in the installed Zig. The newly installed Zig then built
 compiler runtime and linker. The reviewer checked bytes at the recorded ELF
 offsets in both installed binaries. In the original helper report,
 `memcpy` and `compiler_rt.memcpy.memcpyFast` name the same body.
+A second scan located eight disjoint bodies from the actual runtime
+archive in each installed executable. The reviewer checked all sixteen
+byte ranges. The eighth helper body was the 859-byte
+`mem.readPackedIntBig__func_121` at file offset 99,864,112.
 [Seed build and inputs to the installed Zig](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig-link-03/report.json)
 · [Installed Zig building the helper](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper-link-03/report.json)
+· [Distinct archive code in each installed executable](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-distinct-witnesses/report.json)
 · [Archive member selection control](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/archive-reader-control/control.json)
 
 ## Ordinary builds in the isolated root
@@ -64,6 +78,13 @@ reference results in the first milestone. The selected executable's
 SHA-256 is `ef08cbf48a1e91ec3138cb5d933ce40c79c1645cf09554f8586320e1f6de1cc0`.
 [Actual inputs, archive member and linked functions](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-cat-positive/result.json)
 · [17 numerical results on the same member](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-cold/observed.tsv)
+
+The seed and installed compiler produced different whole-file hashes for
+the selected `cat`. They had the same 6,526,422-byte length, entry point
+and linked code. Of the named section contents, only `.comment` differed.
+It contains the Zig version string, which changed from
+`0.17.0-dev.11+1c08b09d1` to `0.17.0`. The two files differed at 76 byte
+positions including section metadata. [Comparison of both original executables](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-handoff-comparison/result.json)
 
 In each failure control the real application optimizer exited zero.
 The real emitter rejected the injected undefined value with
