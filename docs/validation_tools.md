@@ -208,6 +208,11 @@ pass calibration. Default runs retain their existing procedure and report fields
 A private research compiler remains research evidence; using this entry point
 does not grant production acceptance.
 
+Native registry runs accept `ZLLVM_NATIVE_CANARY_COMPILER_TIMEOUT_MS` as a
+positive decimal deadline in milliseconds for each local helper optimization,
+object emission and selection-owner command. The default is 120,000 ms.
+The command ledger records each effective deadline and process outcome.
+
 A registry `provider_fixture` builds a separate local object with reachable
 selection by default. Set `provider_codegen_reachable` to `false` to exercise
 default object emission on both sides of a two-object link. The

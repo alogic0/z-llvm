@@ -76,8 +76,18 @@ pub fn variadic(runner: *Runner, directory: []const u8, zllvm: []const u8, env: 
     try runner.require(&.{ "cc", "-O2", "-no-pie", try c.join(&.{"test/real_programs/variadic_integer_driver.c"}), try c.join(&.{"test/real_programs/variadic_integer_shim.S"}), obj, "-o", exe }, try c.join(&.{ directory, "varargs-link" }), env);
     try runner.observe(exe, &.{}, 0, "integer-call-canary varargs_cases=16 heap_cases=6 al=0 pointers=preserved live=preserved\n", try c.join(&.{ directory, "varargs-run" }), env);
 }
+pub fn compileTimeoutMs(text: ?[]const u8) !u32 {
+    const value = text orelse return (Runner.Options{}).timeout_ms;
+    if (value.len == 0) return error.InvalidNativeCanaryCompileTimeout;
+    for (value) |byte| if (!std.ascii.isDigit(byte)) return error.InvalidNativeCanaryCompileTimeout;
+    const ms = std.fmt.parseInt(u32, value, 10) catch return error.InvalidNativeCanaryCompileTimeout;
+    if (ms == 0) return error.InvalidNativeCanaryCompileTimeout;
+    return ms;
+}
+
 pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *const std.process.Environ.Map, mode: []const u8, report: *u.Value, registered: u.Value) !void {
     const c = runner.context;
+    const compile_timeout_ms = try compileTimeoutMs(c.env.get("ZLLVM_NATIVE_CANARY_COMPILER_TIMEOUT_MS"));
     const canary = try resolveProvider(runner, directory, zllvm, env, report, registered);
     const population = try u.str(canary, "population");
     const providers = try providerObjects(c, canary);
@@ -104,7 +114,7 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         var source = fixture;
         if (std.mem.eql(u8, route, "release")) {
             const stem = try c.join(&.{ directory, try c.fmt("{s}-optimize", .{prefix}) });
-            try runner.require(&.{ zllvm, try c.fmt("--pipeline={s}", .{try u.pipeline(mode)}), fixture }, stem, env);
+            try runner.requireWithOptions(&.{ zllvm, try c.fmt("--pipeline={s}", .{try u.pipeline(mode)}), fixture }, stem, env, .{ .timeout_ms = compile_timeout_ms });
             source = try c.join(&.{ directory, try c.fmt("{s}-optimized.ll", .{prefix}) });
             try c.copy(try c.fmt("{s}.stdout", .{stem}), source);
         }
@@ -112,7 +122,7 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
         const arguments = try p.argv(c, codegen_args, &.{ "--generic-cfg-selector", "--target=x86_64-unknown-linux-gnu", source });
         const object_stem = try c.join(&.{ directory, try c.fmt("{s}-{s}-object", .{ prefix, route }) });
         const obj = try c.temporaryPath(&.{ directory, try c.fmt("{s}-{s}.o", .{ prefix, route }) });
-        try runner.requireOutput(try p.argv(c, &.{ zllvm, "--emit=obj" }, arguments), object_stem, env, obj);
+        try runner.requireWithOptions(try p.argv(c, &.{ zllvm, "--emit=obj" }, arguments), object_stem, env, .{ .timeout_ms = compile_timeout_ms, .stdout_file = obj });
         if (std.mem.eql(u8, population, "module_dependencies")) {
             if (std.mem.indexOf(u8, try c.read(try c.fmt("{s}.stderr", .{object_stem})), "coverage=complete") == null) return error.IncompleteModuleDependencyCoverage;
             try moduleObject(c, obj);
@@ -124,13 +134,13 @@ pub fn run(runner: *Runner, directory: []const u8, zllvm: []const u8, env: *cons
                 var selected = try env.clone(c.a);
                 try selected.put("ZLLVM_CODEGEN_REACHABLE", "1");
                 const env_object = try c.temporaryPath(&.{try c.fmt("{s}.stdout", .{env_stem})});
-                try runner.requireOutput(env_args.items, env_stem, &selected, env_object);
+                try runner.requireWithOptions(env_args.items, env_stem, &selected, .{ .timeout_ms = compile_timeout_ms, .stdout_file = env_object });
                 if (!std.mem.eql(u8, try c.read(env_object), try c.read(obj))) return error.ModuleSelectionEnvironmentDiffers;
                 try u.increment(c.a, report, "module_dependencies_environment_checks", 1);
             }
         }
         const owner_stem = try c.join(&.{ directory, try c.fmt("{s}-{s}-owners", .{ prefix, route }) });
-        try runner.require(try p.argv(c, &.{ zllvm, "--emit=selection-owner-manifest" }, arguments), owner_stem, env);
+        try runner.requireWithOptions(try p.argv(c, &.{ zllvm, "--emit=selection-owner-manifest" }, arguments), owner_stem, env, .{ .timeout_ms = compile_timeout_ms });
         try owners(c, try c.read(try c.fmt("{s}.stdout", .{owner_stem})), try u.stringSlice(c.a, try u.get(canary, "functions")));
         const exe = try c.temporaryPath(&.{ directory, try c.fmt("{s}-{s}", .{ prefix, route }) });
         try link(runner, driver, obj, exe, shared, dependencies, canary, env);

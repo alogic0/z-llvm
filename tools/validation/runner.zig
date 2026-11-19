@@ -114,7 +114,11 @@ pub const Runner = struct {
 
     /// Binary stdout is a product, while stderr and the command remain evidence.
     pub fn requireOutput(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, output: []const u8) !void {
-        const result = try r.run(argv, stem, env, .{ .stdout_file = output });
+        return r.requireWithOptions(argv, stem, env, .{ .stdout_file = output });
+    }
+
+    pub fn requireWithOptions(r: *Runner, argv: []const []const u8, stem: []const u8, env: *const std.process.Environ.Map, options: Options) !void {
+        const result = try r.run(argv, stem, env, options);
         if (!result.completed or result.code != 0) return r.context.fail("command failed ({d}): {s}; see {s}.stderr", .{ result.code, argv[0], stem });
     }
 

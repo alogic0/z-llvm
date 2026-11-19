@@ -480,6 +480,15 @@ test "program runtime linking requires an explicit known manifest driver without
     try u.put(f.c.a, &manifest, "link_driver", u.s("unknown"));
     try std.testing.expectError(error.UnsupportedProgramLinkDriver, program.linkDriver(args, manifest));
 }
+test "native canary compiler accepts a positive decimal command deadline" {
+    try std.testing.expectEqual(@as(u32, 120_000), try canaries.compileTimeoutMs(null));
+    try std.testing.expectEqual(@as(u32, 900_000), try canaries.compileTimeoutMs("900000"));
+    try std.testing.expectEqual(@as(u32, 7), try canaries.compileTimeoutMs("0007"));
+    for ([_][]const u8{ "", "0", "-1", "+1", "1_000", " 7", "7s", "4294967296" }) |invalid| {
+        try std.testing.expectError(error.InvalidNativeCanaryCompileTimeout, canaries.compileTimeoutMs(invalid));
+    }
+}
+
 test "program compile budget is explicit and rejects invalid manifest values" {
     var f: Fixture = undefined;
     try f.init();
