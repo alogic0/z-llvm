@@ -120,6 +120,22 @@ for diagnosis on the original input and an aligned-alloca regression test.
 The first freeze and both disassemblies are retained in `a-source/`,
 `a-original/` and `a-promoted/` in the follow-up batch.
 
+**Corrected backedge performance review.** The parsed `align 4` on the
+original loop's alloca was the only opaque field in the failed use proof.
+Patch `8ea76782` recognizes a complete literal numeric alignment and keeps
+the alloca count and metadata visible to the checker. Its production
+object now stores EAX directly into the header's slot. Loop text fell from
+127 to 119 bytes and arguments text from 116 to 100. The other three
+workloads produced identical executables. The reviewer recalculated the
+twelve paired production-loop savings at 18.29 ms in Fast (MAD 2.22) and
+18.76 ms in Small (MAD 0.92). The candidate won every loop pair. Arguments
+saved 7.53 and 7.61 ms respectively. Independent native tests matched
+2,240 observations on each of the direct, Fast and Small routes, including
+reads of the old index and swaps. The reviewer accepted this performance
+result and assigned the comparison change against compiler `f5cb5493`.
+Source promotion awaits the selector qualification. See `a-diagnosis-02/`,
+`a2-original/`, `a2-sample-original/` and `review-a2/` in the batch.
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local

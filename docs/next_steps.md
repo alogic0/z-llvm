@@ -1,10 +1,11 @@
 # Next steps
 
-The user authorized two x86_64 selector changes on 2026-11-18. Start with
-the redundant stack copy at the loop backedge, then measure a single-use
-integer comparison feeding its conditional branch. The implementer owns
-both candidates and reports each to the primary reviewer. The production
-baseline is `5d6b921e`. [Active plan, measurements and review criteria](plans/2026-11-18-loop-and-bounded-memset.md#loop-backedge-and-compare-follow-ups)
+The user authorized two x86_64 selector changes on 2026-11-18. Primary
+review accepted the measured backedge improvement on the production loop
+in both release modes. The implementer is qualifying that patch and
+implementing the single-use integer comparison feeding its conditional
+branch, measured against the corrected backedge compiler `f5cb5493`.
+[Active plan, measurements and review criteria](plans/2026-11-18-loop-and-bounded-memset.md#loop-backedge-and-compare-follow-ups)
 
 The loop and bounded memset assignments are complete. The primary reviewer
 accepted the x86_64 dynamic fill change at `5d6b921e`. The original mixed
