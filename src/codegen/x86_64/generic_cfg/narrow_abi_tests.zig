@@ -641,6 +641,96 @@ test "scalar tail narrow carriers preserve signed arguments and terminal return 
     try module.verify();
 }
 
+test "symbolic musttail proves the original ABI before narrowing and jumps to the complete symbol" {
+    const callee = "\"target with spaces\"";
+    const gep = "getelementptr inbounds (i8, ptr @" ++ callee ++ ", i64 0)";
+    var module = try ir.Module.parse(std.testing.allocator,
+        "define internal fastcc void @" ++ callee ++ "(i8 %v) {\nentry:\n ret void\n}\n" ++
+            "define internal fastcc void @caller(i8 %v) {\nentry:\n" ++
+            " musttail call fastcc void " ++ gep ++ "(i8 %v)\n ret void\n}\n");
+    defer module.deinit();
+    try module.verify();
+    const ctx: machine.ReadOnlyModuleContext = .{
+        .globals = module.globals.items,
+        .named_types = module.named_types.items,
+        .target_datalayout = module.target_datalayout,
+        .functions = module.functions.items,
+    };
+    const original = module.functions.items[1];
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const view = (try legalization.resolveTailSymbols(arena.allocator(), original, &ctx)).?;
+    const call = view.blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings(callee, call.callee);
+    try std.testing.expect(call.callee_value == null and call.args.items[0].ty.eql(.{ .int = 8 }));
+    try std.testing.expectEqualStrings("musttail", call.tail_kind.?);
+    var output = machine.MachineFunction.init(original.name, original.ret_ty);
+    defer output.deinit(std.testing.allocator);
+    try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLowerWithContext(std.testing.allocator, &output, original, &ctx));
+    try verify.verifyFunction(output);
+    var jumps: usize = 0;
+    for (output.instructions.items) |inst| switch (inst) {
+        .direct_jump => |name| {
+            try std.testing.expectEqualStrings(callee, name);
+            jumps += 1;
+        },
+        .direct_call, .tail_jump_rax => return error.UnexpectedTransfer,
+        else => {},
+    };
+    try std.testing.expectEqual(@as(usize, 1), jumps);
+    try std.testing.expectEqualStrings(gep, original.blocks.items[0].instructions.items[0].kind.call.callee_value.?.constant_expr);
+    try module.verify();
+}
+
+test "symbolic musttail refuses unproved targets and source ABI neighbors" {
+    const Case = struct {
+        target: []const u8 = "declare fastcc void @target(i8)",
+        caller_param: []const u8 = "i8 %v",
+        arg: []const u8 = "i8 %v",
+        offset: u8 = 0,
+        after: []const u8 = "",
+    };
+    for ([_]Case{
+        .{ .offset = 1 },
+        .{ .target = "@target = global i8 0" },
+        .{ .target = "" },
+        .{ .target = "declare extern_weak fastcc void @target(i8)" },
+        .{ .target = "declare void @target(i8)" },
+        .{ .target = "declare fastcc i8 @target(i8)" },
+        .{ .target = "declare fastcc void @target(i8, ...)" },
+        .{ .target = "declare fastcc void @target(i8 signext)" },
+        .{ .target = "declare fastcc void @target(ptr byval(i8))", .caller_param = "ptr %v", .arg = "ptr %v" },
+        .{ .target = "declare fastcc void @target(ptr sret(i8))", .caller_param = "ptr %v", .arg = "ptr %v" },
+        .{ .target = "declare fastcc void @target(i32)", .arg = "i32 19" },
+        .{ .after = " %other = add i8 %v, 1\n" },
+    }) |case| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            "{s}\ndefine internal fastcc void @caller({s}) {{\nentry:\n musttail call fastcc void getelementptr (i8, ptr @target, i64 {d})({s})\n{s} ret void\n}}\n",
+            .{ case.target, case.caller_param, case.offset, case.arg, case.after });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        const ctx: machine.ReadOnlyModuleContext = .{
+            .globals = module.globals.items,
+            .named_types = module.named_types.items,
+            .target_datalayout = module.target_datalayout,
+            .functions = module.functions.items,
+            .declarations = module.declarations.items,
+        };
+        const original = module.functions.items[0];
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect((try legalization.resolveTailSymbols(arena.allocator(), original, &ctx)) == null);
+        var output = machine.MachineFunction.init(original.name, original.ret_ty);
+        defer output.deinit(std.testing.allocator);
+        const result = selector.tryLowerWithContext(std.testing.allocator, &output, original, &ctx) catch |err| switch (err) {
+            error.UnsupportedTailCallAbi => continue,
+            else => return err,
+        };
+        try std.testing.expect(result == .unsupported);
+    }
+}
+
 test "scalar tail transfer keeps public floating and seventh-argument boundaries closed" {
     const cases = [_][]const u8{
         "declare i32 @callee(i32)\ndefine i32 @closed(i32 %x) {\nentry:\n %r = musttail call i32 @callee(i32 %x)\n ret i32 %r\n}\n",

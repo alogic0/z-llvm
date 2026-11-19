@@ -7,6 +7,8 @@ const helpers = @import("composed_helpers.zig");
 const temporary_names = @import("scalar_forms.zig");
 const TemporaryNames = temporary_names.TemporaryNames;
 const syntax = @import("../../../ir/parser_syntax.zig");
+const addresses = @import("../symbol_address.zig");
+const ModuleContext = @import("../constant_table.zig").ReadOnlyModuleContext;
 
 fn carrier(ty: ir.Type) ir.Type {
     return .{ .int = if (ty.int < 32) 32 else 64 };
@@ -374,39 +376,46 @@ pub fn legalizeSigned(allocator: std.mem.Allocator, function: ir.Function) !?ir.
 /// A private scalar tail-call envelope. Stack arguments, vectors, ABI payloads,
 /// varargs and externally visible callers retain their existing boundaries.
 pub fn terminalTail(function: ir.Function, block: ir.BasicBlock) ?usize {
-    if ((function.linkage != .internal and function.linkage != .private) or function.is_varargs or
-        !helpers.isDefaultOrFastcc(function.calling_conv) or function.params.items.len > 6 or
-        (function.ret_ty != .void and !SelfTail.scalar(function.ret_ty)) or !Tail.attrs(function.ret_ty, function.ret_attrs)) return null;
-    const term = block.terminator orelse return null;
-    if (term != .ret or term.ret.ptr_addrspace != null or !term.ret.ty.eql(function.ret_ty)) return null;
+    const at = lastCall(block) orelse return null;
+    return if (terminalCallFits(function, block, block.instructions.items[at])) at else null;
+}
+
+fn lastCall(block: ir.BasicBlock) ?usize {
     var last = block.instructions.items.len;
     while (last > 0 and block.instructions.items[last - 1].removed) last -= 1;
-    if (last == 0) return null;
-    const instruction = block.instructions.items[last - 1];
-    if (instruction.kind != .call) return null;
+    if (last == 0 or block.instructions.items[last - 1].kind != .call) return null;
+    return last - 1;
+}
+
+fn terminalCallFits(function: ir.Function, block: ir.BasicBlock, instruction: ir.Instruction) bool {
+    if ((function.linkage != .internal and function.linkage != .private) or function.is_varargs or
+        !helpers.isDefaultOrFastcc(function.calling_conv) or function.params.items.len > 6 or
+        (function.ret_ty != .void and !SelfTail.scalar(function.ret_ty)) or !Tail.attrs(function.ret_ty, function.ret_attrs)) return false;
+    const term = block.terminator orelse return false;
+    if (term != .ret or term.ret.ptr_addrspace != null or !term.ret.ty.eql(function.ret_ty)) return false;
     const call = instruction.kind.call;
     if (call.tail_kind == null or !std.mem.eql(u8, call.tail_kind.?, "musttail") or
         call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or
         call.callee_function_ty != null or call.native_query != null or call.va_arg or call.abi_x87_return or
         std.mem.startsWith(u8, call.callee, "llvm.") or !Tail.sameConvention(function.calling_conv, call.calling_conv) or
         !call.ret_ty.eql(function.ret_ty) or call.args.items.len != function.params.items.len or
-        !Tail.attrs(call.ret_ty, call.ret_attrs) or Tail.extension(function.ret_attrs) != Tail.extension(call.ret_attrs)) return null;
+        !Tail.attrs(call.ret_ty, call.ret_attrs) or Tail.extension(function.ret_attrs) != Tail.extension(call.ret_attrs)) return false;
     if (function.ret_ty == .void) {
-        if (instruction.result != null or term.ret.value != null) return null;
+        if (instruction.result != null or term.ret.value != null) return false;
     } else {
-        const value = term.ret.value orelse return null;
-        if (value != .named or instruction.result == null or !ir.identifiers.eql(value.named, instruction.result.?)) return null;
+        const value = term.ret.value orelse return false;
+        if (value != .named or instruction.result == null or !ir.identifiers.eql(value.named, instruction.result.?)) return false;
     }
     var envelope = call;
     envelope.tail_kind = "tail";
-    if (!callForm(envelope)) return null;
+    if (!callForm(envelope)) return false;
     for (function.params.items, call.args.items) |param, arg| {
         if (!SelfTail.scalar(param.ty) or !param.ty.eql(arg.ty) or param.abi_incoming_address != null or
             param.abi_x87_memory or param.abi_split_integer or arg.abi_x87_memory or arg.abi_split_integer or
             !Tail.attrs(param.ty, param.attrs) or !Tail.attrs(arg.ty, arg.attrs) or
-            Tail.extension(param.attrs) != Tail.extension(arg.attrs)) return null;
+            Tail.extension(param.attrs) != Tail.extension(arg.attrs)) return false;
     }
-    return last - 1;
+    return true;
 }
 
 pub fn hasTail(function: ir.Function) bool {
@@ -419,6 +428,31 @@ pub fn hasOrdinaryReturn(function: ir.Function) bool {
 }
 
 const Tail = struct {
+    fn targetMatches(call: ir.CallInst, target: anytype, context: *const ModuleContext) bool {
+        if (target.is_varargs or !sameConvention(call.calling_conv, target.calling_conv) or
+            !call.ret_ty.eql(target.ret_ty) or call.args.items.len != target.params.items.len or
+            !attrs(target.ret_ty, target.ret_attrs) or extension(call.ret_attrs) != extension(target.ret_attrs) or
+            @import("../../../ir/function_attributes.zig").contains(target.attrs orelse "", context.attribute_groups, "naked")) return false;
+        for (target.params.items, call.args.items) |param, arg| {
+            if (comptime @TypeOf(param) == ir.Param) {
+                if (param.abi_incoming_address != null or param.abi_x87_memory or param.abi_split_integer) return false;
+            }
+            if (!arg.ty.eql(param.ty) or !attrs(param.ty, param.attrs) or extension(param.attrs) != extension(arg.attrs)) return false;
+        }
+        return true;
+    }
+
+    fn symbol(call: ir.CallInst, context: *const ModuleContext) ?[]const u8 {
+        const value = call.callee_value orelse return null;
+        if (value != .constant_expr or !std.mem.startsWith(u8, value.constant_expr, "getelementptr ")) return null;
+        const name = context.functionAddress(addresses.zeroOffsetSymbol(value) orelse return null) orelse return null;
+        for (context.functions) |function| if (ir.identifiers.eql(function.name, name))
+            return if (targetMatches(call, function, context)) name else null;
+        for (context.declarations) |decl| if (ir.identifiers.eql(decl.name, name))
+            return if (targetMatches(call, decl, context)) name else null;
+        return null;
+    }
+
     fn sameConvention(a: ?[]const u8, b: ?[]const u8) bool {
         return std.mem.eql(u8, a orelse "ccc", b orelse "ccc");
     }
@@ -436,6 +470,28 @@ const Tail = struct {
         return advisory(ty, text);
     }
 };
+
+/// Resolve a symbolic musttail before either signature is widened to physical
+/// carriers. The next selection pass owns argument placement and the jump.
+pub fn resolveTailSymbols(a: std.mem.Allocator, function: ir.Function, context: *const ModuleContext) !?ir.Function {
+    var view = function;
+    var changed = false;
+    for (function.blocks.items, 0..) |block, i| {
+        const at = lastCall(block) orelse continue;
+        var instruction = block.instructions.items[at];
+        const call = &instruction.kind.call;
+        if (call.callee_value == null or call.tail_kind == null or !std.mem.eql(u8, call.tail_kind.?, "musttail")) continue;
+        if (!addresses.supportsLayout(context.target_datalayout)) continue;
+        call.callee = Tail.symbol(call.*, context) orelse continue;
+        call.callee_value = null;
+        if (!terminalCallFits(function, block, instruction)) continue;
+        if (!changed) view.blocks = try function.blocks.clone(a);
+        view.blocks.items[i].instructions = try block.instructions.clone(a);
+        view.blocks.items[i].instructions.items[at] = instruction;
+        changed = true;
+    }
+    return if (changed) view else null;
+}
 
 /// Use the established signed/unsigned carrier transformations, then keep only
 /// the call's physical return home at the terminal edge. No receive code may

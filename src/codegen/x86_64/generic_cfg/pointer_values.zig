@@ -200,7 +200,9 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function, context: ?*
                 .call => |call| if (call.inline_asm == null and call.raw_args == null) {
                     // A byte GEP at offset zero denotes the original function
                     // pointer, including when the call supplies a naked ABI.
-                    if (call.callee_value) |value| if (value == .constant_expr and
+                    // Mandatory tail calls resolve their callee against the
+                    // original scalar signatures before carrier legalization.
+                    if (call.callee_value) |value| if ((call.tail_kind == null or !std.mem.eql(u8, call.tail_kind.?, "musttail")) and value == .constant_expr and
                         std.mem.startsWith(u8, value.constant_expr, "getelementptr "))
                     {
                         if (addresses.fromValue(value)) |address| if (address.addend == 0) {

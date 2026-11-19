@@ -95,7 +95,10 @@ fn tryLowerObservedInner(
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     var pending_labels: std.ArrayList([]const ir.BasicBlock) = .empty;
-    var function = source;
+    var function = if (module_context) |ctx|
+        (try @import("generic_cfg/narrow_abi.zig").resolveTailSymbols(arena.allocator(), source, ctx)) orelse source
+    else
+        source;
     var budget: optional.Budget = .{};
     var iterations: u64 = 0;
     while (true) {
