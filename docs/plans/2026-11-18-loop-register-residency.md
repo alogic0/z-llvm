@@ -70,6 +70,24 @@ and mixed driver have different trip histories and loop-header positions
 within a 64-byte line. Each comparison uses equal positions within its own
 driver. See `sample/report.json` and the `control-*` stages in the batch.
 
+**Prototype decision.** In 560 fresh visits, the short MOV version beat
+production in every mixed-input pair. The median paired savings were
+24.69 ms in Fast (MAD 1.55) and 21.76 ms in Small (MAD 2.44), about
+12% and 10% on this host. The zero-trip differences were within dispersion.
+At 64 trips the savings were 284 ms and 272 ms. At 256 trips they grew to
+1,157 ms and 1,120 ms. Over that interval the additional saving per
+iteration was 0.122 ns in Fast and 0.125 ns in Small.
+
+Short LEA and MOV differed in four bytes across the two accumulator-copy
+sites. Their median difference was smaller than the measured dispersion on
+every fixture. Replacing the long LEAs with short LEAs plus padding removed
+the long-trip regression. The reviewer assigned a bounded production
+compiler prototype on `56eb24a6`. A single reusable opportunity to keep a
+value in a register is enough to test. Check the emitted loop through the
+normal compiler entry points, adjacent ineligible shapes and all five
+frozen workloads. The implementer reports the candidate separately from
+the experimental assembly. See `control-sample/report.json`.
+
 ## Decision and follow-through
 
 The implementer reports results to the primary reviewer

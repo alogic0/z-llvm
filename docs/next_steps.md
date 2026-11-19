@@ -1,12 +1,10 @@
 # Next steps
 
-The active milestone measures how much time the x86_64 production loop
-spends moving its accumulator, index and limit through the stack. The
-first register version improved the original driver and slowed the long
-fixed-trip runs. The implementer is measuring two accumulator-copy forms
-against production to explain the reversal. Primary review will use that
-result to direct a bounded compiler prototype or the upstream JSON program
-profile. [Current assignment and decision criteria](plans/2026-11-18-loop-register-residency.md)
+The active milestone is a bounded x86_64 compiler prototype that keeps
+loop state in registers. A matched diagnostic saved 24.69 ms in Fast
+and 21.76 ms in Small on the original driver, with increasing savings at
+64 and 256 trips. The implementer is testing which of those gains normal
+compiler emission can realize. [Current assignment and decision criteria](plans/2026-11-18-loop-register-residency.md)
 
 Both x86_64 loop improvements passed independent review and landed on
 `main`. Forwarding single-use i32 values into their PHI slots
