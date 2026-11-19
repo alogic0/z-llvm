@@ -1,5 +1,10 @@
 # Next steps
 
+The proposed next assignment is to build upstream Zig’s unchanged `cat`
+through its finalized IR builder, `z_llvm` and the native ELF linker. The
+plan defines the evidence needed to move from that program to a shipped
+compiler and a clean self-rebuild. [Queued dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+
 The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
 independent review and selector Tier 2. Keeping the accumulator in R9D saved
 a paired median 36.42 ms (17.0%) in Fast and 38.00 ms (18.0%) in Small on

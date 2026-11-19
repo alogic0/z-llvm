@@ -10,6 +10,11 @@ This is a strategy document, not an active completion checklist. The numbered
 epics in `docs/README.md` carry completion state; this file explains why those
 epics exist and how future work should stay aligned.
 
+The proposed x86_64 Linux ReleaseFast milestone begins with one ordinary
+upstream program compiled through Zig’s finalized IR builder and `z_llvm`.
+It then qualifies the shipped compiler and its clean self-rebuild.
+[Dependency-removal plan and acceptance criteria](../plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+
 ## Direction
 
 Zig's practical LLVM-removal path is:
