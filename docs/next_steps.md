@@ -31,9 +31,11 @@ runtime checks. This package built and installed the G2 helper
 `771baaa8`, which reproduced the full upstream optimizer output
 and passed 1,196 numerical cases on the four original functions.
 The ordinary isolated Zig build also completed, installing compiler
-`f8b24bfd`. The implementer is assembling both tools with the G2 SDK.
-The reviewer will run the complete upstream suite, application, failure
-and runtime checks from the extracted archive and compare both generations.
+`f8b24bfd`. The extracted G2 pair matched all 2,097 ordered upstream
+outcomes and passed both application routes, both failure controls and
+all 17 runtime checks. Its external-provider `cat` matched G1 byte for
+byte. The reviewer is awaiting the full serial preservation run on the
+same G2 helper before publishing the archive.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)

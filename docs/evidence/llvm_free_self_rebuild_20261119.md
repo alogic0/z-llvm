@@ -395,6 +395,41 @@ entry changed from `0x100a000` to `0x12909a0`.
 [Executable sizes, hashes and sections](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-compare/comparison.json)
 · [Complete SDK byte and permission comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/report.json)
 
+### Programs built with the extracted tools
+
+The relocated G2 driver and helper compiled and linked the unchanged
+upstream behavior suite from empty caches. It ran successfully and
+matched every ordered reference entry, with 2,063 passes and 34 skips.
+A second execution under tracing also exited zero. The same qualification
+on G1 had the identical ordered digest `d2f366d3`. The two linked suite
+executables differ (`eac0d1e3` for G1, `69cf6249` for G2).
+[G2 compile, native link and both executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-behavior/result.json)
+· [G1 suite](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-07/result.json)
+
+Exactly two lines differ between the 46,421,094-byte application builder
+modules. The same two differences persist in their 45,448,864-byte
+optimized IR. In the upstream test for compile-time division of zero by
+zero, the f16 quiet NaN passed to `isNan` has bits `0x7e00` on G1 and
+`0xfe00` on G2. The other difference is the generated `builtin.zig`
+cache directory in the debug metadata. Only one byte differs in the
+20,748,816-byte application objects, at offset 11,687,596 in `.text`.
+The runtime members also differ. The mixed G1 driver and G2 helper
+produced the G1 application object and the G2 runtime member.
+[Both IR differences and actual ELF comparisons](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/behavior-result.json)
+
+The external-provider build of upstream `cat` produced the same application
+object (`173ba554`) and complete 6,526,422-byte ELF (`ef08cbf4`) on
+both generations. G2's provider and native routes each passed six I/O
+cases. Its actual runtime member (`3aeac7d9`) passed 17 independent
+numerical checks. A real emitter failure left a missing destination
+absent. A second failure preserved the existing 12,903,512-byte
+executable byte for byte.
+[Provider cat](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-cat-positive/result.json)
+· [Native cat](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-cat-native/result.json)
+· [Actual runtime member](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-runtime/result.json)
+· [Missing destination](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-cat-fault/result.json)
+· [Existing executable](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-cat-fault-existing/result.json)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1

@@ -511,6 +511,15 @@ checked. The original build and archive owners retain their inputs
 through the remaining package consumers.
 [Full assembly comparison and ordering diagnosis](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-install-02/first-assembly-order.json)
 
+The cold G1 and relocated G2 upstream suites produced different
+application objects while matching all 2,097 reference outcomes. Use
+the `behavior` command in `review-generation-differences` to compare
+both captured builder modules, optimized modules, linker-read objects
+and runtime members. Verify their recorded hashes and identify the
+first source difference. Keep the changed lines, section identities
+and counts. Release the original G1 behavior-input workspace when
+the comparisons finish.
+
 The complete trial and ordinary Zig objects have the same size. Their
 first differing byte lies in executable code. The reviewer owns
 `review-zig-trial-object-difference` to compare all bytes, identify the
