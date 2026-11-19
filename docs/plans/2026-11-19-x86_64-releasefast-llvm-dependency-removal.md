@@ -376,14 +376,19 @@ reviewer removed the run's temporary image.
 · [Seed and program loader closure](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/seed-control-01/known-closure.json)
 · [Image release](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/seed-control-01/scratch-image-release.json)
 
-Use the `review-preflight/build-plumbing-01` through `-03` runs for the build-runner source
-review. The existing seed drives a small project using the draft standard
-library. Run an unset and a selected provider, then replace and restore it
-at a path containing spaces. Record the actual compiler arguments, root
-optimizer and emitter executions, diagnostics and installed program
-behavior. The project, cached build runners and temporary copies of the
-provider belong to this one run. The implementer retains the draft source
-through review and transfer to the distribution build.
+The reviewer accepted the build-runner changes on Zig patch `bb2b6f10`
+and backend build-script patch `17abee8f` for the scoped package build.
+Five ordinary installs used the existing seed and draft SDK. With the
+option selected, the actual `build-exe --listen=-` received the whole
+provider path, including spaces, as one argument. The unset route omitted
+it. Replacing the selected executable at its original path triggered the
+real emitter's `UnknownValue` error and preserved the installed `cat`.
+Restoring the bytes reused that executable with zero root provider calls.
+The implementer retains the draft source through transfer to the
+distribution build. [Five ordinary builds](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/build-plumbing-03/summary.json)
+· [Actual compiler and provider arguments](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/build-plumbing-03/transitions.json)
+· [Preserved installed executable](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/build-plumbing-03/changed/oracle.json)
+
 Set `ZIG_GLOBAL_CACHE_DIR` for the host-maker bootstrap and use
 `--cache-dir` for the local directory. The public `zig build` command
 rejects `--global-cache-dir`. Maker supplies that option to its
