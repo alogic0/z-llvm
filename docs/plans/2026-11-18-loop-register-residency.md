@@ -49,6 +49,27 @@ replace all seven hot stack accesses. The independent model reproduced the
 original four route outputs and counts 1,999 iterations per 272 mixed calls.
 See `prepare/images.tsv`, `prepare/layout.tsv` and `review-oracle/model.json`.
 
+**First timing decision.** The register version saved a paired median
+12.39 ms in Fast and 16.32 ms in Small on the original mix. It also won at
+15 trips. On the same fixed-trip executable it lost 325 ms and 314 ms at
+64 trips, then 2,288 ms and 2,217 ms at 256. All twelve 256-trip pairs
+favored the production code in each mode. The reviewer recalculated these
+results from all 392 visits. Two seven-byte LEAs carry the accumulator
+through consecutive loop iterations in the register version.
+
+The reviewer assigned a four-way control on the original mix and fixed
+0, 15, 64 and 256 trips. Compare the production code, the first register
+version, and two register versions with short copies at those sites. One
+uses a base-only LEA, the other a MOV. Each short copy is followed by
+the same five-byte NOP. These two versions have the same instruction
+addresses and count. Time all four in balanced blocks. Compare production
+directly with MOV, short LEA with MOV, and the original long LEA with
+short LEA plus padding. Keep both image pipelines through independent native,
+linked-byte and timing review in `review-copy-control/`. The fixed driver
+and mixed driver have different trip histories and loop-header positions
+within a 64-byte line. Each comparison uses equal positions within its own
+driver. See `sample/report.json` and the `control-*` stages in the batch.
+
 ## Decision and follow-through
 
 The implementer reports results to the primary reviewer
