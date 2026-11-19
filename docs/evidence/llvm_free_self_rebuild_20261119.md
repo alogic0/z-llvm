@@ -278,6 +278,22 @@ helper from the same source on all 45,448,864 bytes.
 · [Intrinsic boundary results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-arithmetic-installed-07/results.json)
 · [Whole-module comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-wide-literals-fixed-07/installed-full-comparison.json)
 
+The G1-07 package compiled the pinned upstream suite from an empty
+cache. Its executable (`eac0d1e3`) matched all 2,097 ordered
+outcomes, with 2,063 passes and 34 skips, and exited successfully
+again under tracing. The reviewer matched eight function bodies
+between the emitted object and the linked executable. Both the
+external-provider and native `cat` passed all six I/O cases. Two
+deliberate emitter failures left a missing destination absent and
+preserved an existing executable byte for byte. The actual linked
+runtime archive passed all 17 numerical cases.
+[Upstream compile, link and executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-07/result.json)
+· [External-provider cat](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-cat-positive-07/result.json)
+· [Native cat](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-cat-native-07/result.json)
+· [Missing destination](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-cat-fault-07/result.json)
+· [Existing destination](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-cat-fault-existing-07/result.json)
+· [Runtime archive](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-runtime-07/result.json)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1

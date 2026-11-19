@@ -26,8 +26,9 @@ upstream outcomes. The combined G1 installation produced helper
 `600cb8c4` and ran all 2,097 upstream cases successfully. A broader
 repository run found two defects. The repair at `8c91f09e` passed
 all 2,472 repository tests. The G1-07 package with helper `f041c1d5`
-is the input to both isolated self-builds. The reviewer will qualify
-that actual package and the extracted G2 archive.
+passed all 2,097 ordered upstream cases, both `cat` routes and the
+runtime checks. Both isolated self-builds use this package. The
+reviewer will repeat qualification on the extracted G2 archive.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
