@@ -121,3 +121,18 @@ matched full backend patch `a54687fa` before and after the run.
 · [Subgate exits and fresh exports](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/distribution-all.log)
 · [Expected canary populations](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/registry-populations.tsv)
 · [Native and reference observations](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/integrated/unchanged-upstream-c/report.json)
+
+## Primary decision
+
+The primary accepted the unchanged-program handoff on November 19. The
+published local revisions are Zig `ac359bdcd1050d0f5b582a9086eacf42995ed4ab`
+and z_llvm `8573a3dff4302de77fbf6e4f2f5ce2015249dcc0`. Their committed
+diffs match the tested patches byte for byte. The Zig commit's full tree
+is `435a6b74`. The backend commit's `src` tree is `d121b0db`, matching
+the independent reconstruction. The five later build-runner edits apply
+to the corrected Zig tree while preserving the exact SDK library used in
+the ordinary install controls, `9087e271`. The second milestone builds
+and tests an installed LLVM-disabled compiler and helper.
+[Source and SDK reconstruction](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-source-reconciliation/report.json)
+· [Local Zig publication](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/source-publication/zig.commit)
+· [Local z_llvm publication](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/source-publication/backend.commit)

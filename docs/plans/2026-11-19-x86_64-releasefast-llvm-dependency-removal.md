@@ -1,9 +1,12 @@
 # Remove the LLVM toolchain dependency from Zig ReleaseFast on x86_64 Linux
 
-**Authorized on November 19, 2026.** The implementer has taken up the first
+**Authorized on November 19, 2026.** The primary accepted the first
 assignment, one ordinary `zig build-exe` of upstream Zig’s `cat` through the
-finalized Zig IR builder, `z_llvm` and Zig’s native ELF linker. The subsequent
-claims cover a shippable compiler and a clean compiler self-rebuild. This
+finalized Zig IR builder, `z_llvm` and Zig’s native ELF linker. The
+implementer landed Zig `ac359bdcd1` and z_llvm `8573a3df` locally.
+The primary compared both committed diffs with the actual build inputs.
+The second assignment is the installed toolchain. The third uses it
+to rebuild both tools and qualify the resulting package. This
 plan covers baseline `x86_64-linux-gnu`, ReleaseFast, pure Zig source and
 the compiler runtime, system libc and CRT inputs identified for that target.
 
@@ -54,6 +57,7 @@ snapshot, `f6779ada`. Three driver source files changed after that
 snapshot. Reapply the five build-runner changes to the tested source and
 compare the resulting installed SDK inputs before using it for a package.
 [Driver build patch and input hashes](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/driver-build-04/inputs.txt)
+· [Independently reconstructed source and SDK trees](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-source-reconciliation/report.json)
 
 Zig's native linker consumed that application object with the known-good
 compiler runtime from the native control. The resulting ELF, `2719a352`,
