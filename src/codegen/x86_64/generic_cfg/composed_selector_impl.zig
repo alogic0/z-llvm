@@ -200,6 +200,7 @@ pub fn tryLowerComposedCfgObserved(
     }
     try selector_state.validateEflagsInstructions(&composed, machine.instructions.items[start_len..], start_len);
     try @import("frame_compaction.zig").compact(&composed, function);
+    if (start_len == 0) @import("loop_word_register.zig").promote(function, machine.instructions.items);
     return .selected;
 }
 

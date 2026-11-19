@@ -1403,7 +1403,7 @@ fn addTypedUse(count: *usize, uses: ir.operands.Uses) bool {
     return count.* <= 1 and uses.types_match and !uses.coverage.has_opaque_references;
 }
 
-fn isLiteralAlignment(attrs: []const u8) bool {
+pub fn isLiteralAlignment(attrs: []const u8) bool {
     const field = std.mem.trim(u8, attrs, " \t");
     const suffix = std.mem.cutPrefix(u8, field, "align ") orelse return false;
     const digits = std.mem.trim(u8, suffix, " \t");

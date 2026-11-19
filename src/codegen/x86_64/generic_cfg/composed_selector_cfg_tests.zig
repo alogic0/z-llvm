@@ -2379,3 +2379,125 @@ test "single-use i32 equality branches on live flags and preserves the materiali
         };
     }
 }
+
+test "private loop word stays in a register through initialization, the latch and all returned values" {
+    var module = try ir.Module.parse(std.testing.allocator, @embedFile("testdata/loop_word_register.ll"));
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        // The separate linked native suite supplies the callee which changes this object.
+        if (std.mem.eql(u8, function.name, "escapes") or function.blocks.items.len == 0) continue;
+        const plain = std.mem.eql(u8, function.name, "fold");
+        const checksum = std.mem.eql(u8, function.name, "checksum");
+        const sixth = std.mem.eql(u8, function.name, "sixth_live");
+        const two_starts = std.mem.eql(u8, function.name, "two_starts");
+        var machine = MachineFunction.init(function.name, .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+        var frame_reads: usize = 0;
+        var frame_writes: usize = 0;
+        var register_reads: usize = 0;
+        var register_writes: usize = 0;
+        var incoming_sixth = false;
+        for (machine.instructions.items) |inst| switch (inst) {
+            .load_stack_disp32_eax, .load_stack_disp8_eax => frame_reads += 1,
+            .store_eax_stack_disp32, .store_eax_stack_disp8 => frame_writes += 1,
+            .mov_arg_eax => |reg| register_reads += @intFromBool(reg == .r9),
+            .mov_eax_to_arg => |reg| register_writes += @intFromBool(reg == .r9),
+            .spill_arg_rsp => |spill| if (spill.reg == .r9) {
+                incoming_sixth = true;
+            },
+            else => {},
+        };
+        if (plain or checksum) {
+            try std.testing.expectEqual(@as(usize, 0), frame_reads + frame_writes);
+            try std.testing.expectEqual(@as(usize, 2), register_reads);
+            try std.testing.expectEqual(@as(usize, 2), register_writes);
+        } else {
+            try std.testing.expect(frame_reads > 0 and frame_writes > 0);
+            if (sixth) try std.testing.expect(incoming_sixth);
+        }
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        for ([_]i32{ std.math.minInt(i32), -19, -1, 0, 3, std.math.maxInt(i32) }) |seed| {
+            for ([_]u32{ 0, 1, 8, 15, 64, 256 }) |limit| {
+                var value: i32 = if (two_starts and seed <= 0) 9 else seed;
+                for (0..limit) |j| {
+                    const i: i32 = @intCast(j);
+                    value = if (checksum) (value +% i) ^ 37 else (value ^ i) +% 7;
+                }
+                const kept = seed ^ -31;
+                if (sixth) {
+                    const call: *const fn (i32, i32, i32, i32, i32, i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+                    try std.testing.expectEqual(value +% kept, call(seed, @intCast(limit), 2, 3, 4, kept));
+                } else {
+                    const call: *const fn (i32, i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+                    try std.testing.expectEqual(if (checksum) value +% seed else value, call(seed, @intCast(limit)));
+                }
+            }
+        }
+    }
+}
+
+test "private loop word declines unproved machine effects before changing any instruction" {
+    const promote = @import("loop_word_register.zig").promote;
+    const Insn = x86_64_machine.Instruction;
+    var module = try ir.Module.parse(std.testing.allocator, @embedFile("testdata/loop_word_register.ll"));
+    defer module.deinit();
+    const fixture = module.functions.items[0];
+    const conflicts = [_]Insn{
+        .{ .mov_eax_to_arg = .r9 },           .{ .mov_arg_eax = .r9 },               .{ .test_arg8 = .r9 },
+        .{ .mov_imm_r9 = 5 },                 .register_snapshot_rdi,                .{ .direct_call = .{ .symbol = "observer", .ret_ty = .void } },
+        .{ .spill_eax_rsp = .{ .slot = 8 } }, .{ .reload_rsp_eax = .{ .slot = 8 } }, .{ .load_stack_disp8_eax = 33 },
+        .{ .sub_rsp_imm8 = 8 },
+    };
+    for (conflicts) |conflict| {
+        const before = [_]Insn{
+            .{ .sub_rsp_imm32 = 64 },         .{ .store_eax_stack_disp32 = 32 }, .{ .label = "loop" },
+            .{ .load_stack_disp32_eax = 32 }, conflict,                          .{ .store_eax_stack_disp32 = 32 },
+            .{ .load_stack_disp32_eax = 32 }, .{ .add_rsp_imm32 = 64 },          .ret,
+        };
+        var after = before;
+        promote(fixture, &after);
+        try std.testing.expectEqualDeep(before, after);
+    }
+}
+
+test "private loop word requires the ordinary register convention and a complete unannotated leaf" {
+    var module = try ir.Module.parse(std.testing.allocator, @embedFile("testdata/loop_word_register.ll"));
+    defer module.deinit();
+    const entry = module.functions.items[0];
+    const Insn = x86_64_machine.Instruction;
+    const original = [_]Insn{
+        .{ .sub_rsp_imm32 = 64 },         .{ .store_eax_stack_disp32 = 32 }, .{ .label = "head" },
+        .{ .load_stack_disp32_eax = 32 }, .{ .add_eax_imm32 = 3 },           .{ .store_eax_stack_disp32 = 32 },
+        .{ .load_stack_disp32_eax = 32 }, .{ .add_rsp_imm32 = 64 },          .ret,
+    };
+    const promote = @import("loop_word_register.zig").promote;
+    for (0..8) |form| {
+        var function = entry;
+        var param_storage = [_]ir.Param{ entry.params.items[0], entry.params.items[1] };
+        function.params.items = &param_storage;
+        switch (form) {
+            0 => {},
+            1 => function.calling_conv = "ccc",
+            2 => function.calling_conv = "coldcc",
+            3 => function.attrs = "\"no_caller_saved_registers\"",
+            4 => function.attrs = "#0",
+            5 => function.ret_attrs = "inreg",
+            6 => param_storage[0].attrs = "inreg",
+            7 => function.is_varargs = true,
+            else => unreachable,
+        }
+        var actual = original;
+        promote(function, &actual);
+        if (form < 2) {
+            try std.testing.expectEqualDeep(Insn{ .mov_eax_to_arg = .r9 }, actual[1]);
+            try std.testing.expectEqualDeep(Insn{ .mov_arg_eax = .r9 }, actual[6]);
+        } else try std.testing.expectEqualDeep(original, actual);
+    }
+}
