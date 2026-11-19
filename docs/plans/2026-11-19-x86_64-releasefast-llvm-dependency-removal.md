@@ -5,8 +5,10 @@ assignment, one ordinary `zig build-exe` of upstream Zig’s `cat` through the
 finalized Zig IR builder, `z_llvm` and Zig’s native ELF linker. The
 implementer landed Zig `ac359bdcd1` and z_llvm `8573a3df` locally.
 The primary compared both committed diffs with the actual build inputs.
-The second assignment is the installed toolchain. The third uses it
-to rebuild both tools and qualify the resulting package. This
+The primary also accepted the installed toolchain on Zig `bd0e36fadb`
+and backend `8f2b12fb` after the isolated application and failure tests
+and both link audits. The third assignment uses that package to rebuild
+both tools and compare their upstream behavior. This
 plan covers baseline `x86_64-linux-gnu`, ReleaseFast, pure Zig source and
 the compiler runtime, system libc and CRT inputs identified for that target.
 
@@ -365,6 +367,15 @@ running both entry points in the isolated environment.
 [Installed compiler](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig-02/build-result.json)
 · [Installed helper and its compiler](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper/entry.json)
 · [Helper installation result](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper/build-result.json)
+
+**Package decision.** Both installed binaries have no interpreter or
+shared-library dependencies. In an empty root, all 43 host dependency
+paths were inaccessible. Both the native and selected builds of unchanged
+`cat` passed all six cases. The two real emitter-failure controls
+preserved their absent or existing destinations. The primary accepted
+this package and assigned both isolated rebuilds to the implementer.
+The primary owns the full behavior comparison for each generation.
+[Installed toolchain and independent execution review](../evidence/llvm_free_zig_toolchain_20261119.md)
 
 ## 3. Rebuild and qualify the compiler in the isolated environment
 
