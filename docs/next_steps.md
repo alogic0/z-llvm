@@ -15,11 +15,14 @@ all 2,097 ordered upstream behavior outcomes for each generation.
 The revised installed helper `b0ac4145` passed the empty-struct test
 that exposed the original parser failure. The reviewed tail-call repair
 landed at `864af769`. The trial emitted all 65,078 Zig compiler functions
-and, with the tail repair, all 7,459 behavior functions. The next
-installed helper must also preserve the full i256 decimal from the
-upstream shift test and emit all four arithmetic functions in its own
-build. The reviewer will repeat the source, package and behavior checks
-on that ordinary installation.
+and, with the tail repair, all 7,459 behavior functions. The wide
+decimal correction landed at `e524d2e3`. The four arithmetic repairs
+landed at `bb4f4c22` after the full helper emitted all 14,820 functions
+and passed 1,196 checks on the original functions. The ordinary
+tail-only installation ran the full suite and exposed the wide shift
+and optimized floating-point failures. The implementer is qualifying
+the combined installation, including native emission of the floating
+correction, before both isolated self-builds.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)

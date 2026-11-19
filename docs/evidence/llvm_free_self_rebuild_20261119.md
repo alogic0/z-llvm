@@ -88,6 +88,15 @@ both matched the reference. The shipped native route missed eight.
 [Overflow threshold observations](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-native-thresholds/diagnosis.json)
 · [Ordinary Zig provider and native executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-user-selected/results.json)
 
+The decimal correction landed at `e524d2e3`. It checks the magnitude
+against the signed i128 limit before multiplying by ten. The reviewer
+compared the full 45,448,870-byte output from the G1-native-built
+trial to the reference and compared all 32 bytes of each of the 21
+values. Both comparisons were exact. The published three-file diff
+matches the tested patch.
+[Full-module replay and native numerical output](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-source-native-02/observed.json)
+· [Published source comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-publication/report.json)
+
 ## Object emission
 
 The frozen parser trial emitted all 65,078 selected functions from the
@@ -131,6 +140,16 @@ and exactly `2^-10` for the strict form.
 [Runtime results and input hashes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-tail-linked-behavior/result.json)
 · [All numbered outcomes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-tail-linked-behavior/execute.stderr)
 
+The same 21 upstream source lines passed on stock LLVM and failed at
+runtime with the installed G1-03 provider. Upstream explicitly skips
+the native Zig backend. In the original full module the revised
+floating trial changes exactly two lines. One reports four skipped
+passes. The other retains the fast result's SSA name and debug
+location and selects the original argument. The strict function's
+instructions are identical.
+[Ordinary source executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-source/result.json)
+· [Revised full optimizer output identity](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/float-behavior-01/result.json)
+
 The ordinary helper self-build emitted 14,816 of 14,820 functions.
 The four remaining functions compute ELF alignment, convert a signed
 timestamp difference to nanoseconds, or perform checked addition and
@@ -155,3 +174,24 @@ maxima with two variable inputs. For every overflow, the local and
 LLVM results matched on both the wrapped 80-bit value and the flag.
 [Original function comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-functions-candidate/summary.json)
 · [Complete intrinsic results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-arithmetic-boundaries/results.json)
+
+The third arithmetic trial also preserves the live register during
+the subsequent frameless XOR. The reviewer reran all four unmodified
+functions with that helper, `7c387128`. Its 1,196 results matched
+both LLVM and the independent expectations.
+[Four-function correction review](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-functions-03/summary.json)
+
+The complete original helper subsequently emitted all 14,820
+functions with that trial. The reviewer verified the 41,481,208-byte
+x86-64 relocatable object, SHA-256 `64e5dcaa4e57525e0c77b4efb864da17940b808bbafd6ccd25db48e9b7c5c913`.
+The reviewed eight-file change landed at `bb4f4c22`.
+[Full helper rebuild input and emission](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/arithmetic-helper-replay-03/result.json)
+
+An ordinary suite run from the tail-only G1 installation compiled
+and executed all 2,097 cases. It passed 2,061, skipped the expected
+34 and failed the two previously isolated cases, optimized floating
+point at row 866 and the i256 shift at row 1098. The first floating
+trial changed the intended instruction but its new constant select
+stopped native object emission at 7,458 of 7,459 functions.
+[Ordinary G1 test output](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-03/execute.stderr)
+· [First floating trial emitter](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/float-behavior-01/object.stderr)

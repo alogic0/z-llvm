@@ -441,6 +441,23 @@ to be skipped. The implementer owns a correction that preserves debug
 values. The reviewer checks the original source, the fast and strict
 binary64 results, and inputs with debug uses of the intermediate and
 final result. The ordinary generation suites must both match all rows.
+
+The decimal repair landed at `e524d2e3`. Its native-built helper
+restored all 45,448,870 reference bytes and all 21 independently
+observed i256 values. The combined G1 build also includes the four
+arithmetic repairs, which landed at `bb4f4c22`. The complete original
+helper now emits all 14,820 functions. The tail-only G1 installation
+compiled and ran all 2,097 upstream cases. Its two failures were the
+wide shift at row 1098 and optimized floating point at row 866.
+
+The first two combined installations are diagnostic builds. Their
+floating correction preserved debug users by emitting a constant
+floating-point select that the native backend could not lower. The
+implementer is building the corrected G1 at `g1-helper-06`. Check
+the chosen operand's bits, rerun the real upstream suite and all
+package checks on that installation, and use its installed binaries
+and SDK for both ordinary G2 builds. Qualify the freshly extracted
+G2 archive in the same way before publishing it.
 [Self-rebuild results and open source failures](../evidence/llvm_free_self_rebuild_20261119.md)
 
 The second ordinary G1 behavior attempt reproduced the single tail-call
@@ -448,11 +465,10 @@ emission failure. Comparing its complete optimized module with the trial
 helper's output uncovered a separate correctness defect. Given identical
 builder bytes, the native-built installed helper changed one i256 argument
 from `340282366920938463463374607431768211461` to `5`. The implementer
-is tracing signed decimal conversion and checked multiplication on the
-native compiler. The reviewer checks positive and negative i256 limits,
-keeps both full outputs and will compare the revised installed optimizer
-against the trial on the same original. Requalify the ordinary install
-before using it to rebuild the tools. [Installed suite attempt](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-02/result.json)
+traced it to checked signed decimal multiplication in the native-built
+helper. The reviewer checked positive and negative i256 limits and
+keeps both full outputs for comparison with the revised installation.
+[Installed suite attempt](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-02/result.json)
 
 Record the seed executable, how it was produced, its libraries and every
 host tool it prebuilds. The seed can build generation one in a separately
