@@ -144,10 +144,33 @@ To isolate the debug-record issue, the reviewer removed only complete
 `llvm.dbg.value` and `llvm.dbg.declare` calls from diagnostic copies of
 the optimized inputs. LLVM verified both copies. The emitter's failure
 count fell from 1,756 to 24 in the application and from 910 to 6 in the
-runtime. The implementer is preserving those records in IR and omitting
-them from native instruction selection. Reassess the remaining pointer
-constants, four scalar shifts and startup on the original inputs.
+runtime.
 [Diagnostic reduction and counts](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-legacy-debug/comparison.json)
+
+The reviewer accepted the metadata repair at patch `d9a92c20`. On
+helper `9a929dad`, both genuine optimized modules kept their original
+hashes and debug records. Their emitter diagnostics now match the
+diagnostic copies byte for byte. All 14 focused tests passed. Four
+independently emitted objects linked and executed, including an ordinary
+call alongside a debug intrinsic. Its side effect occurred exactly once
+for each of six inputs. The implementer owns the remaining pointer
+constants, followed by the four scalar shifts and startup. The pointer
+controls check that a zero-length slice retains its sentinel address 1
+and that a positive offset into an array remains observable.
+[Real module replay](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/codegen-debug-replay/)
+· [Independent native check](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-debug-native/results.json)
+· [Pointer-constant baseline](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-pointer-constants-baseline/local.emit.stderr)
+
+The reviewer repeated the original optimizer failure with the same helper
+and revised driver `5c6c457c`. The working destination kept all 8,119,577
+bytes, its SHA-256 and mode 0775, and passed all six runtime checks after
+the failure. A separate cold run on this driver reached the real
+compiler-runtime object emitter and left its previously absent executable
+path absent. The target-module fault after successful optimization remains
+part of the final handoff check.
+[Existing executable and before/after identities](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-publication-fixed/observed.json)
+· [Post-failure runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-publication-fixed/post-failure-oracle.json)
+· [Absent executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-02/compile-result.json)
 
 Use ordinary `build-exe` for the positive and forced-failure handoffs.
 For the shared-cache test also exercise `zig run` or the build runner’s
