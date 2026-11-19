@@ -307,6 +307,24 @@ as G1-07 and matched all 1,196 native numerical results.
 [Ordinary install](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-helper-04/build-result.json)
 · [Independent whole-module and numerical comparisons](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-helper-first-use/result.json)
 
+The kernel trace connects the project's 86,709,165-byte builder input
+(`3aceca52`) to optimized IR `77ffcfe1` and the actual 41,526,816-byte
+object `0463d451` read by the native linker. The runtime object
+`83ce14c6` matched the archive member the linker read. The reviewer
+checked eight distinct code ranges from each input in the installed
+helper. [Actual provider inputs and outputs](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-helper-04-link/complete-provider-modules.json)
+· [Linker reads, member and executable ranges](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-helper-04-link/actual-link-inputs-and-final-code.json)
+
+In a separate cold build, G1 Zig and its SDK used the G2 helper for
+the entire upstream suite. Only `bin/z_llvm` changed in the 19,503-entry
+installation. All 2,097 ordered outcomes matched, and a second execution
+under tracing also succeeded. The 20,748,816-byte application object
+(`df81a180`) was identical to G1-07's. The runtime builder inputs
+already had different hashes, `9edf7d38` and `c7cc392a`. Their archive
+members and the two complete test executables also differed.
+[Package comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-mixed-g1-zig-g2-helper/pair.json)
+· [G1 Zig and G2 helper compile, link and execution](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-mixed-g1-zig-g2-helper/result.json)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1
