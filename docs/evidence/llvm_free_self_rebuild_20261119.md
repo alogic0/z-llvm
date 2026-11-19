@@ -294,6 +294,19 @@ runtime archive passed all 17 numerical cases.
 · [Existing destination](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-cat-fault-existing-07/result.json)
 · [Runtime archive](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-runtime-07/result.json)
 
+## Ordinary G2 helper build
+
+G1-07 built and installed `z_llvm` from the frozen source and empty
+caches. The ordinary build took 31 minutes. Its 100,034,473-byte static
+executable has SHA-256
+`771baaa8526d927d5f4b2389ec7086f18f1b017110e72865c1012dec02a670a4`.
+It reproduced all 45,448,864 optimized bytes from the upstream suite,
+matching G1-07 and the LLVM-built helper from the same source. On
+the four original helper functions, it emitted the same four objects
+as G1-07 and matched all 1,196 native numerical results.
+[Ordinary install](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-helper-04/build-result.json)
+· [Independent whole-module and numerical comparisons](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-helper-first-use/result.json)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1

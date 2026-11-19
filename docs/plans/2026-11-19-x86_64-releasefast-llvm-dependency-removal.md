@@ -478,12 +478,20 @@ G2-03 launchers were superseded before their compilers started.
 · [Ordinary G1-07 build](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper-07/build-result.json)
 · [Independent G1-07 package results](../evidence/llvm_free_self_rebuild_20261119.md)
 
-When the ordinary G2 helper finishes, use that installed executable
-on the retained upstream IR and four original numerical callers.
-The G1-07 and LLVM comparisons supply the reference output. This
-can expose a failure in the newly built helper while the larger Zig
-build is still running. The ordinary generation runs and relocation
-continue to use the complete installation.
+The ordinary G2 helper installed successfully in 31 minutes. The
+100,034,473-byte executable has SHA-256 beginning `771baaa8`. Use it on the
+retained upstream IR and the four original numerical callers, with
+G1-07 and the LLVM-built helper supplying reference results. Start
+the 17 serial preservation gates on this installed helper while Zig
+builds. Bind their results to the same helper digest in the assembled
+and extracted package. The complete package supplies Zig, its SDK and
+its helper for the final application and upstream checks.
+[G2 helper install and full identity](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-helper-04/build-result.json)
+
+While the compiler builds, also run the cold upstream suite using
+G1 Zig and its SDK with the installed G2 helper. Verify that the helper
+is the only changed package entry. This checks whole-program emission
+early and gives a comparison if the relocated G2 pair behaves differently.
 
 The revised floating trial passed the complete upstream runtime with
 the original G1 suite archive. All 2,097 ordered entries matched the

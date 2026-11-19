@@ -27,8 +27,10 @@ upstream outcomes. The combined G1 installation produced helper
 repository run found two defects. The repair at `8c91f09e` passed
 all 2,472 repository tests. The G1-07 package with helper `f041c1d5`
 passed all 2,097 ordered upstream cases, both `cat` routes and the
-runtime checks. Both isolated self-builds use this package. The
-reviewer will repeat qualification on the extracted G2 archive.
+runtime checks. This package built and installed the G2 helper
+`771baaa8`, which reproduced the full upstream optimizer output
+and passed 1,196 numerical cases on the four original functions. The isolated Zig
+build continues. The reviewer will qualify the extracted G2 pair.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
