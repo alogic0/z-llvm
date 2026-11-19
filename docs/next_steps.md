@@ -13,8 +13,13 @@ Both installed tools passed review in an empty root. The current assignment
 is the isolated generation-two build of both tools and the comparison of
 all 2,097 ordered upstream behavior outcomes for each generation.
 The revised installed helper `b0ac4145` passed the empty-struct test
-that exposed the original parser failure. The implementer is working on
-a mandatory tail transfer and the helper's four remaining functions.
+that exposed the original parser failure. The reviewed tail-call repair
+landed at `864af769`. The trial emitted all 65,078 Zig compiler functions
+and, with the tail repair, all 7,459 behavior functions. The next
+installed helper must also preserve the full i256 decimal from the
+upstream shift test and emit all four arithmetic functions in its own
+build. The reviewer will repeat the source, package and behavior checks
+on that ordinary installation.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)

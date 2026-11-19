@@ -79,6 +79,15 @@ returned 5. The stock LLVM backend reported overflow. In the
 implementer's 2,006 observations per route, this was the only mismatch.
 [Standalone Zig source and backend observations](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-native-origin-01/diagnosis.json)
 
+The failing decimal step multiplies `0x1999999999999999999999999999999a`
+by ten. The low 128 bits are 4 and the multiplication overflows. The
+pinned stock and installed Zig native backends returned the right low
+bits and a clear overflow flag. On 91 focused checks, the shipped Zig
+compiler with the explicit local provider and the stock LLVM route
+both matched the reference. The shipped native route missed eight.
+[Overflow threshold observations](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-native-thresholds/diagnosis.json)
+· [Ordinary Zig provider and native executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/wide-user-selected/results.json)
+
 ## Object emission
 
 The frozen parser trial emitted all 65,078 selected functions from the
@@ -105,6 +114,23 @@ extended the unit tests.
 [Bounded stack and negative cases](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-tail-candidate/result.json)
 · [Machine instructions and relocations](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-tail-candidate/original-local-disasm.stdout)
 
+The reviewed tail change landed at `864af769`. Its committed diff
+matches the tested patch `2e3a6230`. The original optimized behavior
+module then produced a 20,748,816-byte object containing all 7,459
+selected functions. [Complete behavior object](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/tail-behavior-replay-01/result.json)
+
+The reviewer linked that trial object with the compiler-runtime archive
+from the original G1 behavior build and the system C runtime. All
+2,097 test names ran in the empty root. One differed from the ordered
+reference. Row 866, `optimized float mode`, failed, 2,062 passed and
+34 skipped. The input includes both fast and strict versions of
+`(x + 2^40) - 2^40`. Its legacy debug-variable calls caused the
+optimizer to skip five passes, including the existing cancellation
+rule. On input 0.001, upstream expects 0.001 for the optimized form
+and exactly `2^-10` for the strict form.
+[Runtime results and input hashes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-tail-linked-behavior/result.json)
+· [All numbered outcomes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-tail-linked-behavior/execute.stderr)
+
 The ordinary helper self-build emitted 14,816 of 14,820 functions.
 The four remaining functions compute ELF alignment, convert a signed
 timestamp difference to nanoseconds, or perform checked addition and
@@ -119,3 +145,13 @@ addition overflows and 76 multiplication overflows. The tests check the
 error tag and read the payload only on successful operations. Each
 original helper function independently reproduced its whole-module
 emission diagnostic. [Inputs, object results and arithmetic comparisons](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-functions/results.json)
+
+The second arithmetic trial ran the original elapsed-time, addition
+and multiplication functions correctly on all 933 inputs. The
+alignment function still tried to spill a live register without a
+stack frame. Additional native comparisons independently checked 512
+unsigned additions, 512 unsigned multiplications and 512 signed 96-bit
+maxima with two variable inputs. For every overflow, the local and
+LLVM results matched on both the wrapped 80-bit value and the flag.
+[Original function comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-functions-candidate/summary.json)
+· [Complete intrinsic results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-arithmetic-boundaries/results.json)

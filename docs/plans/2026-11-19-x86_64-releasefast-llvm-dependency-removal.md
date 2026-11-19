@@ -426,6 +426,21 @@ fields of the i80 overflow intrinsics and signed i96 maximum on two
 variable operands. The compiler trial subsequently emitted all 65,078
 selected functions. Link and installation will be checked on the fresh
 ordinary self-build.
+
+The tail-call repair landed locally at `864af769`. Its trial emitted
+all 7,459 behavior definitions. The reviewer also links that full trial
+object to the existing G1 runtime to identify runtime failures early.
+The generation qualification uses the actual link from each installed
+toolchain's ordinary `zig test`.
+
+That diagnostic link ran all 2,097 cases and found one additional
+failure, the upstream `optimized float mode` test at row 866. The original
+module contains both strict and fast additions and subtractions of
+`2^40`. Its legacy debug-variable calls caused five optimizer passes
+to be skipped. The implementer owns a correction that preserves debug
+values. The reviewer checks the original source, the fast and strict
+binary64 results, and inputs with debug uses of the intermediate and
+final result. The ordinary generation suites must both match all rows.
 [Self-rebuild results and open source failures](../evidence/llvm_free_self_rebuild_20261119.md)
 
 The second ordinary G1 behavior attempt reproduced the single tail-call
