@@ -2342,3 +2342,40 @@ test "unconditional i32 PHI stores the final index of the aligned production loo
     try std.testing.expect(machine.instructions.items[edge - 2] == .add_eax_imm32);
     try std.testing.expect(machine.instructions.items[edge - 1] == .spill_eax_rsp);
 }
+
+test "single-use i32 equality branches on live flags and preserves the materialized controls" {
+    var module = try ir.Module.parse(std.testing.allocator, @embedFile("testdata/compare_branch.ll"));
+    defer module.deinit();
+    try module.verify();
+    for (module.functions.items) |function| {
+        var machine = MachineFunction.init(function.name, .{ .int = 32 });
+        defer machine.deinit(std.testing.allocator);
+        try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+        try x86_64_verify.verifyFunction(machine);
+
+        const fused = std.mem.eql(u8, function.name, "equal") or std.mem.eql(u8, function.name, "swapped");
+        var adjacent_jump = false;
+        var materialized = false;
+        for (machine.instructions.items, 0..) |inst, i| {
+            if (inst == .je and i > 0 and machine.instructions.items[i - 1] == .cmp_ecx_arg32) adjacent_jump = true;
+            if (inst == .sete_eax) materialized = true;
+        }
+        try std.testing.expectEqual(fused, adjacent_jump);
+        try std.testing.expectEqual(!fused, materialized);
+
+        const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+        defer std.testing.allocator.free(bytes);
+        const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+        defer std.posix.munmap(mapping);
+        @memcpy(mapping, bytes);
+        const call: *const fn (i32, i32) callconv(.c) i32 = @ptrCast(mapping.ptr);
+        const equal_addend: i32 = if (std.mem.eql(u8, function.name, "extra_boolean"))
+            1
+        else if (std.mem.eql(u8, function.name, "edge_phi")) 0 else 7;
+        const values = [_]i32{ std.math.minInt(i32), -7, -1, 0, 3, 7, std.math.maxInt(i32) };
+        for (values) |left| for (values) |right| {
+            const expected = if (left == right) left +% equal_addend else right -% 3;
+            try std.testing.expectEqual(expected, call(left, right));
+        };
+    }
+}

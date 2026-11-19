@@ -280,6 +280,22 @@ pub fn emitReturnEpilogue(selector: *ComposedBlockSelector) !void {
     try selector.machine.instructions.append(selector.allocator, .ret);
 }
 
+fn branchOnFinalI32Equality(selector: *ComposedBlockSelector, block: ir.BasicBlock, condition: ir.Value, target: []const u8) bool {
+    const code = selector.machine.instructions.items;
+    if (code.len < 2 or code[code.len - 2] != .cmp_ecx_arg32 or code[code.len - 1] != .sete_eax) return false;
+    const name = namedValue(condition) orelse return false;
+    var end = block.instructions.items.len;
+    while (end != 0 and block.instructions.items[end - 1].removed) end -= 1;
+    if (end == 0) return false;
+    const producer = block.instructions.items[end - 1];
+    if (producer.kind != .icmp or !std.mem.eql(u8, producer.result orelse return false, name)) return false;
+    const cmp = producer.kind.icmp;
+    if (cmp.predicate != .eq or cmp.samesign or !cmp.operand_ty.eql(.{ .int = 32 }) or
+        cmp.lhs != .named or cmp.rhs != .named) return false;
+    if (!hasSingleTypedUse(selector.function orelse return false, name, .{ .int = 1 })) return false;
+    return selector_state.branchOnFinalEaxEquality(selector, name, target);
+}
+
 pub fn lowerCfgTerminator(
     selector: *ComposedBlockSelector,
     function: ir.Function,
@@ -320,11 +336,15 @@ pub fn lowerCfgTerminator(
             const previous_preserve_current = selector.preserve_current_position_values;
             if (then_has_phi_edge or else_has_phi_edge) selector.preserve_current_position_values = true;
             defer selector.preserve_current_position_values = previous_preserve_current;
-            if (try emitBranchCondition(selector, condbr.cond)) |diagnostic| return diagnostic;
-            if (then_has_phi_edge or else_has_phi_edge) {
-                return try lowerConditionalPhiEdges(selector, function, block_index, then_index, else_index);
+            if (then_has_phi_edge or else_has_phi_edge or
+                !branchOnFinalI32Equality(selector, function.blocks.items[block_index], condbr.cond, condbr.then_target))
+            {
+                if (try emitBranchCondition(selector, condbr.cond)) |diagnostic| return diagnostic;
+                if (then_has_phi_edge or else_has_phi_edge) {
+                    return try lowerConditionalPhiEdges(selector, function, block_index, then_index, else_index);
+                }
+                try selector_state.emitEflagsInstruction(selector, .{ .jne = condbr.then_target }, .use);
             }
-            try selector_state.emitEflagsInstruction(selector, .{ .jne = condbr.then_target }, .use);
             if (else_index != block_index + 1) {
                 try selector.machine.instructions.append(selector.allocator, .{ .jmp = condbr.else_target });
             }

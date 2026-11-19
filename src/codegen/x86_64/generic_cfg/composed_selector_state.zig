@@ -1472,6 +1472,27 @@ pub fn canStoreI32PhiFromRegister(selector: *const ComposedBlockSelector, name: 
     };
 }
 
+/// Replace the recorded comparison consumer at the same instruction index.
+pub fn branchOnFinalEaxEquality(selector: *ComposedBlockSelector, name: []const u8, target: []const u8) bool {
+    const code = selector.machine.instructions.items;
+    const records = selector.eflags_semantics.items;
+    if (code.len < 2 or code[code.len - 2] != .cmp_ecx_arg32 or code[code.len - 1] != .sete_eax or records.len < 2) return false;
+    const definition = records[records.len - 2];
+    const consumer = records[records.len - 1];
+    if (definition.instruction_index != code.len - 2 or definition.effect != .definition or
+        consumer.instruction_index != code.len - 1 or consumer.effect != .use) return false;
+    const binding = selector.values.get(name) orelse return false;
+    const occupant = selector.accumulator_domain.occupantFor(.eax) orelse return false;
+    if (binding.loc != .eax or occupant.logical_bits != 1 or !std.meta.eql(binding, occupant.binding)) return false;
+
+    // JE consumes the same comparison flags as SETE. No Boolean remains
+    // materialized in EAX once its sole branch use has been replaced.
+    code[code.len - 1] = .{ .je = target };
+    _ = removeValueBinding(selector, name);
+    selector.accumulator_domain.invalidate();
+    return true;
+}
+
 pub fn valueBits(selector: *const ComposedBlockSelector, name: []const u8) ?u16 {
     const binding = selector.values.get(name) orelse return null;
     return binding.vreg.bits;
