@@ -1,10 +1,11 @@
 # Next steps
 
-The user authorized two x86_64 selector changes on 2026-11-18. Primary
-review accepted the measured backedge improvement on the production loop
-in both release modes. A qualification test found a new raw register
-lookup. The implementer is correcting the backedge and comparison patches
-to use the selector state owner, then qualifying each corrected source.
+The two x86_64 loop changes now use the selector state owner and pass its
+source guard. Independent review verified that the corrected backedge
+compiler reproduces every timed image, binding the roughly 8% loop gain
+to that source. Its core qualification passed. Against this compiler the
+comparison change saved a further 8.43 ms in Fast and 4.76 ms in Small
+on the production loop. Both changes are in selector qualification.
 [Active plan, measurements and review criteria](plans/2026-11-18-loop-and-bounded-memset.md#loop-backedge-and-compare-follow-ups)
 
 The loop and bounded memset assignments are complete. The primary reviewer

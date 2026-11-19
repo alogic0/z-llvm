@@ -148,6 +148,33 @@ program bytes and their fixed inputs. The scalar-promoted loop trial on
 `8ea76782` saved a paired 55.88 ms in Fast and 57.17 ms in Small.
 See `a2-tier2-core/unit.log` and `review-a2-samples/paired.tsv`.
 
+**Backedge re-review.** Patch `47920913` asks the selector state owner
+whether a named i32 PHI input is available in a register. The corrected
+compiler (`22de6147`) passed its source guard in Debug and ReleaseFast.
+The reviewer rehashed the fresh baseline and candidate outputs for all
+five original workloads and the promoted loop. All 48 object/executable
+pairs matched the arms timed above, along with the inputs, drivers, sizes
+and native results. This binds all 672 recorded visits to the corrected
+candidate. Independent native checks also passed on direct, Fast and
+Small emission. The corrected source passed all 2,449 units, 74 structural
+checks, 60 ABI cases, 38 object cases and 27 executable cases. Debug and
+ReleaseFast reproduced identical objects on all 27 distinct captured
+inputs. See `review-a3/`, `a3-audit/` and `a3-tier2-core/`.
+
+**Comparison performance review.** Incremental patch `47e0f4b0` replaces
+the final SETE with JE when a named-operand i32 equality feeds only the
+branch and the selector can prove which instruction set the flags. Other
+Boolean uses, intervening flag writers and PHI successors use the existing
+path. The production loop now branches directly on CMP. Kernel text fell
+from 119 to 111 bytes and the stripped executable from 237,496 to 237,480
+bytes. The other four workloads produced byte-identical images. Against
+the corrected backedge compiler, twelve fresh pairs saved a median 8.43 ms
+in Fast (MAD 3.13) and 4.76 ms in Small (MAD 2.55). Eleven pairs favored
+the candidate in each mode. One Fast pair differed by 95.35 ms. Excluding
+that pair leaves a median 7.30 ms saving. The reviewer accepted the
+measured tradeoff and assigned full qualification of compiler `8374c281`.
+See `b2-source/`, `b2-controls/` and `b2-sample-original/`.
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local
