@@ -195,3 +195,45 @@ trial changed the intended instruction but its new constant select
 stopped native object emission at 7,458 of 7,459 functions.
 [Ordinary G1 test output](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-03/execute.stderr)
 · [First floating trial emitter](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/float-behavior-01/object.stderr)
+
+The next floating trial, `3c3de95d`, emitted all 7,459 original
+functions. Its 20,748,816-byte object has SHA-256
+`92b7946161f9528cd937e5b1ebc8be09975407a17c6983d8df1d7e066c6d3c68`.
+The reviewer checked 11 inputs for each of eight variants, including
+strict rounding and live debug references to both intermediate values.
+All variants produced the expected bits through LLVM, through the
+local optimizer followed by LLVM object emission, and through the
+local native emitter. In the mixed case with a strict producer and
+a fast consumer, LLVM cancels the two operations. The local rule
+requires both operations to allow reassociation and preserves the
+rounded result. The installed G1-04 optimizer also matched an
+LLVM-built helper from its own frozen source on the complete upstream
+module and preserved the full i256 shift argument.
+[Full floating trial](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/float-behavior-03/result.json)
+· [Independent numerical results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-debug-03/results.json)
+· [Installed optimizer comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-wide-literals-fixed/installed-full-comparison.json)
+
+The reviewer linked that full object with the actual runtime member
+from the original G1 behavior build. All 2,097 names and outcomes
+matched the authenticated reference in order. There were 2,063 passes,
+34 skips and zero failures. Both the optimized floating test and the
+wide shift passed. The ordered digest was
+`d2f366d355bce75fc6b8beccb234f92f48cc07b82f4acdd7607940c1103474ba`.
+The link used the host C driver. Each installed generation must also
+build and run the suite through its own Zig driver and native linker.
+[All numbered outcomes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-linked-behavior-03/execute.stderr)
+· [Object, runtime member and exact ordered comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-linked-behavior-03/result.json)
+
+## Native startup of the original compiler and helper objects
+
+The reviewer passed both original trial objects to the installed G1
+native ELF linker in an isolated root. The respective failed ordinary
+builds supplied their own compiler-runtime archives. For each archive
+the reviewer matched the extracted member to the actual logged input
+object. The resulting static Zig was 224,077,064 bytes and printed
+`0.17.0`. The 99,924,125-byte helper optimized a small module to
+`ret i32 %x` and produced the same bytes as the installed helper.
+The ordinary G2 builds will establish the origin of the packaged
+executables and SDK.
+[Link commands, archived members and execution](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-startup/result.json)
+· [Actual helper output](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-startup/helper-trial.stdout)

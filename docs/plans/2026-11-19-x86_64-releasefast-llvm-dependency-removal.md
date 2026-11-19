@@ -460,6 +460,21 @@ and SDK for both ordinary G2 builds. Qualify the freshly extracted
 G2 archive in the same way before publishing it.
 [Self-rebuild results and open source failures](../evidence/llvm_free_self_rebuild_20261119.md)
 
+The revised floating trial passed the complete upstream runtime with
+the original G1 suite archive. All 2,097 ordered entries matched the
+reference, including both earlier failures. On the corrected test
+source, the implementer ran 576 exact f16, f32 and f64 selections.
+The normal installed G1 and relocated G2 suites use their own cold
+compilations, runtime archives and native links.
+[Exact ordered trial result](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-linked-behavior-03/result.json)
+
+The reviewer linked the two complete trial objects with the runtime
+archives from their respective original isolated builds. Both static
+executables started. Zig printed `0.17.0`, and the helper folded
+`add i32 %x, 0` to `ret i32 %x`. The original producers keep their
+objects and archives for the remaining ordinary-link comparisons.
+[Native link and startup observations](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-startup/result.json)
+
 The second ordinary G1 behavior attempt reproduced the single tail-call
 emission failure. Comparing its complete optimized module with the trial
 helper's output uncovered a separate correctness defect. Given identical
