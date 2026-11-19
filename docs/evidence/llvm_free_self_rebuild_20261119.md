@@ -388,3 +388,24 @@ the proposed change and the controls required to evaluate it.
 [Pointer-view base and traversal](../../src/codegen/x86_64/generic_cfg/aggregate_object.zig)
 · [Frame planning](../../src/codegen/x86_64/generic_cfg/composed_selector_frame.zig)
 · [Byte GEP lowering](../../src/codegen/x86_64/generic_cfg/composed_selector_memory.zig)
+
+The complete ReleaseFast emission also agreed across all three helpers.
+G2 took 212.9 seconds to emit the 240,496-byte object (`23d3baf8`).
+The direct and ReleaseFast selection-owner manifests matched byte for
+byte across providers, as did native output from all six links and the
+Clang control. The command receipts include the original 120-second
+timeout and each measured rerun.
+[Full numerical, ELF and time comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-pointer-comparison/report.json)
+
+Validation commit `69655dc4` makes the native helper deadline
+configurable. The reviewer compared its four-file diff with the frozen
+patch and verified that its compiled product source still matches
+`8c91f09e`. All 52 policy tests passed. Five real CLI runs exercised
+the default, the longer deadline, an environment-selected object, a
+separate provider with its own deadline and a forced one-millisecond
+timeout. The last run reported exit 124 on the actual compiler.
+The fourth full preservation run entered the historical checkout with
+this harness and the installed G2 helper.
+[Published patch, product identity and test receipts](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-deadline-publication/report.json)
+· [CLI command clocks](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-deadline-cli/result.json)
+· [Full-run installed helper](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/installed-input.json)
