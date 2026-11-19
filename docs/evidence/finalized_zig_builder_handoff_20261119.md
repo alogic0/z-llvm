@@ -85,7 +85,7 @@ detach and thread-local storage. The compile invoked two real optimizer
 processes and two real object emitters.
 [Native thread test outcomes](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-thread-runtime/result.json)
 
-The reviewed seed driver is `5c6c457c` on Zig patch `f6779ada`. The
+The reviewed seed driver is `5c6c457c` on Zig patch `a38ad006`. The
 ReleaseFast helper is `e1cfa98f` on backend patch `a54687fa` over
 `3a9b6d8f`. The initial cold run's outer validation returned 1 after the
 program had built and passed its tests. It compared a relative compiler
@@ -93,7 +93,31 @@ argument with an absolute observation. Its successor audit resolved the
 original paths under their recorded working directory and checked all four
 real invocations. Package qualification and two-generation results have
 their own evidence requirements.
-[Frozen driver patch](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/candidate-source-02/initial.patch)
+[Exact driver build patch](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/driver-build-04/driver.patch)
 · [Frozen backend patch](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-source/combined.patch)
 · [Corrected path comparisons](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05-audit/operand-paths.json)
 · [Dependency removal plan](../plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+
+Before publication, the reviewer compared the entire frozen Zig checkout
+diff with the build receipt. The earlier handoff cited the development
+snapshot `f6779ada`. Between that snapshot and the tested build, the
+implementer added rejection of incremental compilation and the new
+linker, updated the command-line diagnostic and renamed the staged ELF
+output handle. The original build script captured the full patch before
+compilation and compared it again after compilation. Its recorded binary
+hash matches the executable used for the cold and failure controls.
+[Build input identities](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/driver-build-04/inputs.txt)
+· [Built driver identity](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/driver-build-04/driver-identity.txt)
+
+## Integration on the frozen backend
+
+All 17 serial distribution gates exited zero. The three fresh AIR exports
+covered ReleaseFast, ReleaseSafe and ReleaseSmall. For each of the 237
+canary populations the reviewer checked the reference and local counts
+against the registry. All three mode rows matched. The integrated
+executable checks used helper `e1cfa98f`. The validation checkout
+matched full backend patch `a54687fa` before and after the run.
+[Terminal validation result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/report.json)
+· [Subgate exits and fresh exports](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/distribution-all.log)
+· [Expected canary populations](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/registry-populations.tsv)
+· [Native and reference observations](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/integrated/unchanged-upstream-c/report.json)

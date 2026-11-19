@@ -20,9 +20,10 @@ six shared-cache transitions passed, as did 75 upstream standard-library
 tests, including join, detach and thread-local storage. After a forced
 target-emitter failure the reviewer ran all six I/O cases on the preserved
 executable. The archive audit traced both native link inputs and located
-the application's `_start` at the final ELF entry point. Serial Tier 3
-has passed its three fresh real-row gates and is running the integrated
-executable tests.
+the application's `_start` at the final ELF entry point. All 17 serial
+Tier 3 gates passed. The reviewer verified fresh exports for all three
+real-input modes and the expected reference and native counts for each
+of the 237 canary populations.
 [Independent handoff review](../evidence/finalized_zig_builder_handoff_20261119.md)
 [Cold driver and executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/compile-result.json)
 · [Six runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/runtime.json)
@@ -31,6 +32,7 @@ executable tests.
 · [Shared-cache transitions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-handoff-cache/observations.json)
 · [Upstream thread tests](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-thread-runtime/result.json)
 · [Complete runtime and application objects](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-replay/)
+· [Serial preservation result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-tier3/report.json)
 
 The first startup revision, `fd145609`, emitted the application while
 four runtime functions still failed. Independent review found that this
@@ -44,6 +46,14 @@ byte-identical across the startup and arithmetic corrections.
 · [Cold driver result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-03/compile-result.json)
 · [Independent startup disassembly and reference execution](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-startup-trap/results.json)
 · [Revised single-block and multi-block executions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-startup-trap-fixed/results.json)
+
+For Zig source promotion and package assembly, use the full patch
+`a38ad006` captured by the build of driver `5c6c457c`. Pre-publication
+review found that the proposed handoff pointed to an earlier development
+snapshot, `f6779ada`. Three driver source files changed after that
+snapshot. Reapply the five build-runner changes to the tested source and
+compare the resulting installed SDK inputs before using it for a package.
+[Driver build patch and input hashes](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/driver-build-04/inputs.txt)
 
 Zig's native linker consumed that application object with the known-good
 compiler runtime from the native control. The resulting ELF, `2719a352`,
@@ -339,6 +349,15 @@ with a different seed is a separate claim. Pinned Zig also has the
 `bootstrap.c` route through a host C compiler, `wasm2c` and the checked-in
 `stage1/zig1.wasm`; that seed and its provenance can be qualified explicitly.
 [Validation tiers](../validation_tiers.md)
+
+The final deliverable includes a relocatable local archive of the accepted
+generation-two installation. The implementer retains that prefix while
+the reviewer makes the archive, extracts it to a new directory and checks
+every installed file and symlink against the original inventory. Use the
+relocated tools for the independent package checks. After acceptance,
+publish the archive to the project's immutable artifact store and record
+its manifest and extraction command. Release the build prefixes once
+their named consumers finish.
 
 ## Evidence ownership
 
