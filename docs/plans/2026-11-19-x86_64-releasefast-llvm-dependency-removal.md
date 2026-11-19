@@ -498,6 +498,27 @@ and record each first difference. Publish after the link audits, these
 package checks and the full serial run have passed.
 [G2 compiler build and version evidence](../evidence/llvm_free_self_rebuild_20261119.md#ordinary-g2-zig-build)
 
+The first assembly compared two different path orderings. Its 19,503
+unique records matched by path, content and mode. `g2-install-02`
+repeated the transfer and verified the original directories and files.
+The reviewer owns `review-generation-differences`. Compare both complete
+inventories by path, report SDK content and mode changes separately, and
+read the actual project objects and archive members captured at each
+G2 native link. Verify the named function bytes at their executable
+addresses in the extracted tools. Keep the small comparison report.
+Release verifier scratch after both executables and ledgers have been
+checked. The original build and archive owners retain their inputs
+through the remaining package consumers.
+[Full assembly comparison and ordering diagnosis](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-install-02/first-assembly-order.json)
+
+The complete trial and ordinary Zig objects have the same size. Their
+first differing byte lies in executable code. The reviewer owns
+`review-zig-trial-object-difference` to compare all bytes, identify the
+affected function and inspect the corresponding instructions. The
+implementer retains the original Zig replay object through this comparison.
+Keep the compact symbol and instruction report. Diagnostic scratch can
+be collected as soon as the comparison completes.
+
 While the compiler builds, also run the cold upstream suite using
 G1 Zig and its SDK with the installed G2 helper. Verify that the helper
 is the only changed package entry. This checks whole-program emission

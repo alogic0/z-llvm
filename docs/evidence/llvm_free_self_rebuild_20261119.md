@@ -341,6 +341,46 @@ for package assembly and review.
 · [Native link and build summary](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04/build.stderr)
 · [Installed version in isolation](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04/installed-version.json)
 
+The G1 helper optimized the 305,089,486-byte compiler module
+(`97e7198d`) to 291,591,339 bytes (`e8ce0490`) and emitted the
+102,792,984-byte compiler object (`0e98008c`). The native linker's
+read of this object was event 1060. Event 1053 records its read of
+the 2,868,548-byte compiler-runtime archive (`02eecbe1`).
+The actual member (`83ce14c6`) contains 2,685,334 executable bytes
+read by the linker. For each G2 executable, the reviewer independently
+located eight project functions and eight runtime functions in the
+descriptor snapshots and at the executable addresses in the extracted
+image. All 32 ranges matched byte for byte.
+[Zig provider events](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04-link/complete-provider-modules.json)
+· [Zig native link and runtime member](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04-link/actual-link-inputs-and-final-code.json)
+· [Independent object symbols, offsets and final bytes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/report.json)
+
+## Extracted G2 package and generation comparison
+
+The first assembly compared filesystem-component order with flat text
+order. Its first mismatch was `lib/zig/c/ctype.zig` versus
+`lib/zig/c.zig`. The full keyed comparison found zero differing paths,
+bytes or modes. A fresh assembly copied both ordinary installs again and
+verified the same 19,503-entry ledger and 1,273 directory modes, including
+the root. The 46,799,505-byte review archive has SHA-256
+`f7f2c83a43475c775e0da17bec9d8fa88a0d2df696ba395240959488a08270c9`.
+Extraction in a new directory reproduced all entries and permissions.
+Both extracted executables are static ELF files with no interpreter or
+dynamic tags.
+[Order diagnosis and repeated transfer](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-install-02/first-assembly-order.json)
+· [Archive and fresh extraction](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-archive/result.json)
+· [Extracted ELF closure](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-elf/elf-closure.json)
+
+All 187,640,571 bytes across the 19,501 SDK files matched between G1
+and G2. Their modes changed from `0664` to `0644`. The 1,272
+subdirectories changed from `0775` to `0755`, and both root directories
+have mode `0775`. Both executable files differ in content. The first
+different byte in each is at offset 24, in the ELF entry-point address.
+Zig's entry changed from `0x1025000` to `0x12909a0`. The helper's
+entry changed from `0x100a000` to `0x12909a0`.
+[Executable sizes, hashes and sections](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-compare/comparison.json)
+· [Complete SDK byte and permission comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/report.json)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1
