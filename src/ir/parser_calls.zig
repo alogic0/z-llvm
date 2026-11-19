@@ -387,8 +387,7 @@ pub fn parseCallArg(text: []const u8) !core.CallArg {
 
     if (!callArgMayContainAttrs(typed.after)) return error.InvalidCall;
 
-    const value_start = findConstantExprValueStart(typed.after) orelse
-        (findTrailingValueStart(typed.after) orelse return error.InvalidCall);
+    const value_start = callArgValueStart(typed.after) orelse return error.InvalidCall;
     if (value_start == 0) return error.InvalidCall;
     const attrs = std.mem.trim(u8, typed.after[0..value_start], " \t");
     const value_text = std.mem.trim(u8, typed.after[value_start..], " \t");
@@ -403,19 +402,6 @@ pub fn parseCallArg(text: []const u8) !core.CallArg {
         .attrs = attrs,
         .value = try parseValue(value_text),
     };
-}
-
-pub fn findConstantExprValueStart(text: []const u8) ?usize {
-    const needles = [_][]const u8{
-        " inttoptr (",
-        " ptrtoint (",
-        " sub (",
-        " getelementptr ",
-    };
-    for (needles) |needle| {
-        if (std.mem.indexOf(u8, text, needle)) |index| return index + 1;
-    }
-    return null;
 }
 
 pub fn callArgRemainderMayBeWholeValue(text: []const u8) bool {
@@ -448,16 +434,19 @@ pub fn callArgMayContainAttrs(text: []const u8) bool {
     return std.mem.indexOfAny(u8, text, " \t") != null;
 }
 
-pub fn findTrailingValueStart(text: []const u8) ?usize {
-    var rest = std.mem.trim(u8, text, " \t");
-    var last: ?usize = null;
+fn callArgValueStart(text: []const u8) ?usize {
+    var rest = text;
     while (rest.len != 0) {
-        last = @intFromPtr(rest.ptr) - @intFromPtr(text.ptr);
+        // An expression may span several tokens and contain other opcodes.
+        // Only look for its start between complete top-level attributes.
+        if (@import("parser_memory.zig").constantExprEnd(rest)) |end| {
+            return if (end == rest.len) text.len - rest.len else null;
+        }
         const end = findTopLevelTokenEnd(rest) orelse return null;
-        if (end == 0) return null;
+        if (end == rest.len) return text.len - rest.len;
         rest = std.mem.trimStart(u8, rest[end..], " \t");
     }
-    return last;
+    return null;
 }
 
 pub fn parseBinaryFlags(parts: *std.mem.TokenIterator(u8, .any)) !core.BinaryFlags {

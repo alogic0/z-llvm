@@ -57,6 +57,34 @@ test "nullable memory attributes retain every function and call boundary" {
     }
 }
 
+test "attributed call arguments preserve the outer constant expression" {
+    const gep = "getelementptr inbounds (i8, ptr inttoptr (i64 1 to ptr), i64 0)";
+    const diff = "sub (i64 ptrtoint (ptr @object to i64), i64 1)";
+    var module = try ir.Module.parse(std.testing.allocator,
+        "@object = global i8 0\n" ++
+            "declare void @use(ptr, i64)\n" ++
+            "define void @caller() {\nentry:\n" ++
+            " call void @use(ptr align 1 readonly nonnull " ++ gep ++ ", i64 noundef " ++ diff ++ ")\n" ++
+            " ret void\n}\n");
+    defer module.deinit();
+    try module.verify();
+    const args = module.functions.items[0].blocks.items[0].instructions.items[0].kind.call.args.items;
+    try std.testing.expect(args[0].ty == .ptr);
+    try std.testing.expectEqualStrings("align 1 readonly nonnull", args[0].attrs.?);
+    try std.testing.expectEqualStrings(gep, args[0].value.constant_expr);
+    try std.testing.expectEqual(@as(u16, 64), args[1].ty.int);
+    try std.testing.expectEqualStrings("noundef", args[1].attrs.?);
+    try std.testing.expectEqualStrings(diff, args[1].value.constant_expr);
+
+    const parseArg = @import("../ir/parser_calls.zig").parseCallArg;
+    const quoted = try parseArg("ptr byval(%\"record inttoptr (payload)\") %\"parameter getelementptr (value)\"");
+    try std.testing.expectEqualStrings("byval(%\"record inttoptr (payload)\")", quoted.attrs.?);
+    try std.testing.expectEqualStrings("\"parameter getelementptr (value)\"", quoted.value.named);
+    try std.testing.expectError(error.InvalidCall, parseArg("ptr nonnull " ++ gep ++ " inttoptr (i64 2 to ptr)"));
+    const misaligned = try parseArg("ptr align 3 " ++ gep);
+    try std.testing.expectError(error.InvalidAlignment, ir.verifyParameterAttrs(misaligned.ty, misaligned.attrs));
+}
+
 test "memory promise payloads and extension attributes reject malformed duplicate and incompatible forms" {
     for ([_][]const u8{ "dereferenceable_or_null()", "dereferenceable_or_null(-1)", "dereferenceable_or_null(+16)", "dereferenceable_or_null(1_6)", "dereferenceable_or_null(0x10)", "dereferenceable_or_null(16)junk", "dereferenceable_or_null(18446744073709551616)", "dereferenceable_or_null(16) dereferenceable_or_null(16)" }) |attrs| {
         try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.ptr, attrs));
