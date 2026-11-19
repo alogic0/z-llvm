@@ -52,6 +52,62 @@ for 5,131,485,184 reclaimed bytes. The final idle sweep found zero eligible
 roots. Both assignments are closed. The loop backedge copies are recorded as
 a possible future optimization.
 
+## Loop backedge and compare follow-ups
+
+On 2026-11-18 the user assigned both changes below to the same implementer
+and primary reviewer. Start from `478a57cc`, whose production compiler source
+is `5d6b921e`. Each candidate has its own diff, disassembly, timing
+comparison and review decision. Continue to the comparison change after the
+backedge decision. Use the accepted backedge change as the second baseline
+if it lands. [Measurements that prompted the work](../evidence/loop_and_bounded_memset_20261118.md#loop-promotion)
+
+1. **Forward the next loop value to its PHI slot.** On the original
+   `loops_memory` backedge, EAX holds the next index. The emitter stores it to
+   a temporary, reloads it and stores it in the header's PHI slot. On an
+   unconditional edge, try storing the register directly in the final slot
+   when the incoming value's uses, other live values and parallel PHI copies
+   allow it. Check zero, one and many trips, wrapping arithmetic, a live
+   neighbor, and a swap between two PHIs that would expose a clobbered
+   source. Inspect the emitted object on both the original IR and the
+   scalar-promoted IR. For each IR form compare current and patched backends
+   with the same driver in ReleaseFast and ReleaseSmall. Base adoption on a
+   repeatable gain on the original production loop. Report the effect on
+   the promoted loop separately.
+2. **Branch on the integer comparison's flags.** For an eligible single-use
+   scalar `icmp` feeding `condbr`, use the comparison flags directly. Start
+   with the existing loop predicate. Prove the flags survive to the jump
+   and that the normal selector preserves any other use of the Boolean.
+   Check both branch outcomes, swapped operands or predicates admitted by
+   the change, intervening flag writers, additional uses, and successor PHIs.
+   Inspect the actual branch in the emitted object. Measure the incremental
+   effect on the original loop and other affected workloads against this
+   candidate's own baseline in both release modes.
+
+Use the existing five-workload driver and balanced measurement protocol
+below. Record correct native outputs, paired medians and dispersion, and
+changes in kernel and stripped executable sizes. Investigate repeatable
+regressions before promotion. The implementer sends each frozen candidate
+and evidence to the reviewer, addresses findings, and reports final results.
+The reviewer verifies the source, native controls, emitted instructions,
+raw measurements and applicable selector gates. Focused selector changes
+use Tier 2. Route any change to shared allocation or frame layout under the
+[validation tiers](../validation_tiers.md). A negative performance result
+closes an experiment with its candidate and evidence identified.
+
+The evidence root for these two assignments is
+`local-state/validations/x86-loop-edges-20261118/batch-01/`. Before producing
+data, record each stage in its `retention.md`. Build baseline and candidate
+compilers and shared driver objects in managed pipelines. Keep compiler
+products through emission and applicable qualification, and the linked
+programs through native controls, inspection and paired timing. Use separate
+checked stages for focused tests and qualification. Maintain frozen patch
+and input identities, commands, native outcomes, disassembly, raw samples,
+size comparisons, review decisions and release receipts. The historical
+loop IR and oracles retain their existing ownership. Record any further
+exception with its path, consumer and end condition. Release each pipeline
+after its last consumer, collect at stage boundaries, and record the final
+receipt and remaining owners. [Development storage contract](../development_storage.md)
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local
