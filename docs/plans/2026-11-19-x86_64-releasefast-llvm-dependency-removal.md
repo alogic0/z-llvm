@@ -21,6 +21,13 @@ bundle and rebuild both generations.
 · [Cold driver result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-03/compile-result.json)
 · [Independent startup disassembly and reference execution](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-startup-trap/results.json)
 
+Zig's native linker consumed that application object with the known-good
+compiler runtime from the native control. The resulting ELF, `2719a352`,
+passed all six byte-for-byte tests. The pending cold build must generate
+its own runtime through the selected provider.
+[Link inputs and executable identity](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-cat-link/result.json)
+· [All six program executions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-cat-link/runtime.json)
+
 The reviewer accepted the pointer-constant fix (`a6d28ef6`). The
 four remaining runtime shifts all hold their left operand in RCX, which
 count staging overwrites. The count occupies a spill slot in `ldexp`
@@ -287,3 +294,15 @@ and link evidence. The stock baseline may retain its compiler-generated IR
 through comparison or diagnosis. Each producer records its own lifetime.
 The shipped-toolchain and self-rebuild batches open after their preceding
 gate passes.
+
+For the arithmetic and startup review, the implementer keeps the
+original module inputs and candidate objects through the fresh driver
+run. The reviewer uses separate temporary workspaces for the numerical
+callers, entry tests and cache comparisons. The replay script now records
+object and optimized-IR hashes in ordinary identity files. The reviewer
+checked all 16 earlier entries against their targets and preserved their
+contents when correcting their filenames. Each run records its exact
+producer version. The explicit workspace release and collection receipts
+go in the batch's storage directory.
+[Original collector finding](../../local-state/retirements/automatic-storage-cleanup/1795084041675785218-849350/pin-references.json)
+· [Reviewed identity transition](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-storage-identities/transition.json)
