@@ -420,8 +420,24 @@ The implementer is repairing the remaining mandatory tail transfer in
 the behavior suite and the four failed helper functions, and classifying
 the full compiler's object results. The reviewer checks the original
 tail-call pair under a bounded stack and exercises the helper arithmetic
-against native LLVM and independent numerical expectations.
+against native LLVM and independent numerical expectations. In
+`review-helper-arithmetic-boundaries`, the reviewer also checks both
+fields of the i80 overflow intrinsics and signed i96 maximum on two
+variable operands. The compiler trial subsequently emitted all 65,078
+selected functions. Link and installation will be checked on the fresh
+ordinary self-build.
 [Self-rebuild results and open source failures](../evidence/llvm_free_self_rebuild_20261119.md)
+
+The second ordinary G1 behavior attempt reproduced the single tail-call
+emission failure. Comparing its complete optimized module with the trial
+helper's output uncovered a separate correctness defect. Given identical
+builder bytes, the native-built installed helper changed one i256 argument
+from `340282366920938463463374607431768211461` to `5`. The implementer
+is tracing signed decimal conversion and checked multiplication on the
+native compiler. The reviewer checks positive and negative i256 limits,
+keeps both full outputs and will compare the revised installed optimizer
+against the trial on the same original. Requalify the ordinary install
+before using it to rebuild the tools. [Installed suite attempt](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-02/result.json)
 
 Record the seed executable, how it was produced, its libraries and every
 host tool it prebuilds. The seed can build generation one in a separately
