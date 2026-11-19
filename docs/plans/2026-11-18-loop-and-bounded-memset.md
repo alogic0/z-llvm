@@ -37,10 +37,20 @@ in both modes. The control takes one extra branch on eligible lengths.
 This qualifies the performance tradeoff on the measured host and driver.
 The reviewer verified the guard results, assembled bytes at all fourteen
 mode/site combinations, 1,176 length-diagnostic visits and the 112
-fixed-layout visits. The core Tier 2 checks passed. The remaining review
-covers integrated native validation, the promoted source and storage closure.
+fixed-layout visits. The core Tier 2 checks passed.
 See `fill-sample/`, `fill-lengths/lengths/`, `fill-controls-02/` and
 `layout-control/` under the batch root below.
+
+**Final review, 2026-11-18.** The reviewer accepted the implementation at
+`5d6b921e` and the [published evidence](../evidence/loop_and_bounded_memset_20261118.md)
+at `d9b9281b`. The committed diff reproduces the frozen patch, and all 679
+source hashes match. The seven integrated executables passed. Across Fast,
+Safe and Small the reviewer checked the original 2,133 executable outputs
+and 1,422 selection-owner manifests against all 237 registered populations.
+All 36 temporary roots were released and collected. Eleven receipts account
+for 5,131,485,184 reclaimed bytes. The final idle sweep found zero eligible
+roots. Both assignments are closed. The loop backedge copies are recorded as
+a possible future optimization.
 
 ## 1. Measure what loop promotion buys on M3
 

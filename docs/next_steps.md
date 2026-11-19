@@ -1,10 +1,12 @@
 # Next steps
 
-The current assignment is the 8–16-byte memset trial on the accepted M3
-backend. The reviewer checked the paired loop measurements. Scalar promotion
-alone slowed both Fast and Small by about 40 ms. The implementer will
-return the fill candidate and its measurements for independent review.
-[Active performance plan](plans/2026-11-18-loop-and-bounded-memset.md)
+The loop and bounded memset assignments are complete. The primary reviewer
+accepted the x86_64 dynamic fill change at `5d6b921e`. The original mixed
+fill benchmark ran about 26% faster in Fast and Small, and the stripped
+executables grew by 288 bytes. Scalar promotion alone slowed the loop by
+about 40 ms in both modes. The extra backedge copies are a future optimization
+candidate. [Plan and final review](plans/2026-11-18-loop-and-bounded-memset.md)
+· [Published measurements and qualification](evidence/loop_and_bounded_memset_20261118.md)
 
 The completed [M1/M2/M3 coordination plan](plans/2026-11-17-preopt-qualification-performance-self-rebuild.md)
 records the preceding milestones.
