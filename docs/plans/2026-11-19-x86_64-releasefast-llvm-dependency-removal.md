@@ -15,13 +15,18 @@ object and compiler-runtime archive. All six I/O cases passed. The first
 run's post-build audit treated a relative path as absolute. The corrected
 audit joined all four recorded paths under the compiler's working
 directory. An independent cold build produced the same executable and
-matched eight distinct application function bodies to its bytes. The
-implementer is running serial Tier 3. Shared-cache transitions and the
-independent existing-destination fault check are in progress.
+matched eight distinct application function bodies to its bytes. All
+six shared-cache transitions passed, as did 75 upstream standard-library
+tests, including join, detach and thread-local storage. After a forced
+target-emitter failure the reviewer ran all six I/O cases on the preserved
+executable. The implementer is finishing serial Tier 3 and the archive audit.
+[Independent handoff review](../evidence/finalized_zig_builder_handoff_20261119.md)
 [Cold driver and executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/compile-result.json)
 · [Six runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/runtime.json)
 · [Reconciled cold audit](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05-audit/report.json)
 · [Function bodies in the independently linked executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-handoff-positive/linked-code.json)
+· [Shared-cache transitions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-handoff-cache/observations.json)
+· [Upstream thread tests](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-thread-runtime/result.json)
 · [Complete runtime and application objects](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-replay/)
 
 The first startup revision, `fd145609`, emitted the application while
@@ -233,8 +238,8 @@ and revised driver `5c6c457c`. The working destination kept all 8,119,577
 bytes, its SHA-256 and mode 0775, and passed all six runtime checks after
 the failure. A separate cold run on this driver reached the real
 compiler-runtime object emitter and left its previously absent executable
-path absent. The target-module fault after successful optimization remains
-part of the final handoff check.
+path absent. The later target-module fault after successful optimization
+also preserved an existing executable and left an absent path absent.
 [Existing executable and before/after identities](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-publication-fixed/observed.json)
 · [Post-failure runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-publication-fixed/post-failure-oracle.json)
 · [Absent executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-02/compile-result.json)
@@ -279,6 +284,18 @@ repeat the first milestone, including the forced failure, using the shipped
 entry points. A passing result requires both a clean link-input audit and a
 successful isolated run. Classify any first dependency by component and
 stage before expanding to a compiler rebuild.
+
+The implementer owns the package build, actual link inputs and the
+build-runner option that forwards the provider to the Zig and helper
+compilation steps. Include that option in the standard library shipped
+with generation one. The reviewer owns the installed-file inventory,
+recursive ELF dependency resolution, child arguments, mapped libraries
+and independent program and failure runs. Start each isolated root empty.
+Mount only the installed package, test inputs, named system libraries,
+test controls and its own fresh workspace. Use an unprivileged mount
+namespace when available. A locally imported empty container image is a
+fallback. Record its unique tag and remove it after the run's last
+consumer. Check actual host LLVM, Clang and LLD paths from inside the root.
 
 ## 3. Rebuild and qualify the compiler in the isolated environment
 
