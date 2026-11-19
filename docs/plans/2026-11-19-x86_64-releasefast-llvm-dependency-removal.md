@@ -520,6 +520,14 @@ first source difference. Keep the changed lines, section identities
 and counts. Release the original G1 behavior-input workspace when
 the comparisons finish.
 
+Record the primary review of both installed generations as the
+`packages` command in `review-final-acceptance` while the serial tier
+runs. It checks the real build, linker input, archive, program, fault
+and numerical receipts. Its scratch expires with the review. The final
+`review` command also requires the serial tier and its binding to the
+extracted helper before the archive can be published.
+[Primary review of both installations and 107 evidence records](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-acceptance/installed-packages.json)
+
 The complete trial and ordinary Zig objects have the same size. Their
 first differing byte lies in executable code. The reviewer owns
 `review-zig-trial-object-difference` to compare all bytes, identify the
