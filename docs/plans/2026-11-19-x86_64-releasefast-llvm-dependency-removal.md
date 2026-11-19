@@ -73,6 +73,37 @@ the first failing module, stage and diagnostic. Repair that boundary and rerun
 the same source before advancing. A successful first assignment leaves the
 seed driver’s own linkage as a separate distribution question.
 
+### First observations on November 19
+
+The pinned stage-4 compiler built the unchanged program with its native and
+LLVM code generators. Each executable passed six byte-for-byte tests,
+including 65,543 bytes of binary stdin, filenames containing spaces and
+repeated reads of stdin. The stock builder route with `-fno-libllvm`
+returned its existing refusal. The historical C++ route called libLLVM’s
+parse and print functions on the same application module in the same
+process. [Stock results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-baseline/)
+· [Observed application-module calls and output](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-boundary-stock-03/observed.json)
+
+The stock builder printed 1,833 definitions. LLVM 22 rejected a duplicate
+separator on 1,444 weighted branches and then a missing `types` field on
+one `DISubroutineType`. Correcting just those two forms in a diagnostic
+copy let the whole module pass the LLVM verifier with empty stderr. The
+implementer is repairing the general printer and tracing the local
+optimizer’s separate `UnsupportedCallAttribute` on the original input.
+The real object emitter rejects the negative control’s undefined value
+with exit 1, `UnknownValue` and zero output bytes. The cold driver build,
+link and propagation of that failure are still open.
+[Verifier result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-stock-metadata/finding.json)
+· [First local optimizer result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/first-boundary/optimizer.stderr)
+
+Use ordinary `build-exe` for the positive and forced-failure handoffs.
+For the shared-cache test also exercise `zig run` or the build runner’s
+`build-exe --listen=-`. Pinned `src/main.zig` gives a direct
+`build-exe -femit-bin=path` a fresh main compilation even when its runtime
+subcompilations use the supplied cache. Verify warm reuse, then change the
+selected provider’s contents at the same path and inspect its actual
+invocations and the cached executable.
+
 ## 2. Qualify the shipped driver and helper
 
 Build a candidate bundle containing Zig and the selected `z_llvm` helper.
