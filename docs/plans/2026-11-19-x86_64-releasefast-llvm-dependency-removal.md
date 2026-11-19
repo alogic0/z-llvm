@@ -63,8 +63,9 @@ requires no case registration, source wrapper or generated program body.
    after a successful optimizer invocation on the same unchanged program.
    Require its specific nonzero diagnostic to reach `zig build-exe`,
    with no final link or executable. Record the injected bytes and the real
-   child’s exit status. This exposes silent fallback even when the two
-   providers produce indistinguishable program output.
+   child’s exit status. Test an absent output path and a separate path
+   containing a working executable. Check existence, mode and bytes after
+   failure, and run the existing executable again.
 
 **Review decision.** Accept the handoff when the independently checked
 hashes connect the builder to the object actually linked, the ordinary program
@@ -87,14 +88,35 @@ process. [Stock results](../../local-state/validations/llvm-dependency-removal-2
 The stock builder printed 1,833 definitions. LLVM 22 rejected a duplicate
 separator on 1,444 weighted branches and then a missing `types` field on
 one `DISubroutineType`. Correcting just those two forms in a diagnostic
-copy let the whole module pass the LLVM verifier with empty stderr. The
-implementer is repairing the general printer and tracing the local
-optimizer’s separate `UnsupportedCallAttribute` on the original input.
+copy let the whole module pass the LLVM verifier with empty stderr. Driver
+`eae25950` incorporates those source repairs. Its newly printed whole
+module passes the verifier and its ordinary LLVM executable passes all
+six byte tests.
 The real object emitter rejects the negative control’s undefined value
 with exit 1, `UnknownValue` and zero output bytes. The cold driver build,
 link and propagation of that failure are still open.
 [Verifier result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-stock-metadata/finding.json)
 · [First local optimizer result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/first-boundary/optimizer.stderr)
+
+The first cold build with that driver and backend `9698153d` reached
+the real optimizer on `compiler_rt`. The builder and child read the same
+9,751,146 bytes. Zig propagated exit 1 and `UnsupportedCallAttribute`.
+The same driver’s native control passed all six tests. Primary review also
+reproduced a publication bug. A failed rebuild truncated a working
+8,119,577-byte `cat` to zero bytes. The implementer is staging the final
+ELF until the native link succeeds. [Cold compiler result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-01/compile-result.json)
+· [Existing destination before and after failure](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-front-failure/observed.json)
+
+The application module exposed a second issue. The parser treated the
+parentheses in two `getelementptr` callees as the call arguments. Review
+covers void and value-returning calls, the seven-argument call to
+`os.linux.x86_64.clone`, and a nonzero offset. On a separately
+LLVM-printed copy the baseline optimizer succeeded and the emitter
+reported five failures among 1,833 functions. These involve startup,
+signal return, thread creation and cleanup, and thread-local storage. The
+ordinary driver run determines which repairs qualify.
+[Application parser diagnostic](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/parse-trace-03/trace.stderr)
+· [Reference emitter diagnostics](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-canonical-reference/emit.stderr)
 
 Use ordinary `build-exe` for the positive and forced-failure handoffs.
 For the shared-cache test also exercise `zig run` or the build runner’s
