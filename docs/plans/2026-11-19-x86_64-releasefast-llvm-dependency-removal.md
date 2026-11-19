@@ -453,12 +453,24 @@ wide shift at row 1098 and optimized floating point at row 866.
 The first two combined installations are diagnostic builds. Their
 floating correction preserved debug users by emitting a constant
 floating-point select that the native backend could not lower. The
-implementer is building the corrected G1 at `g1-helper-06`. Check
-the chosen operand's bits, rerun the real upstream suite and all
-package checks on that installation, and use its installed binaries
-and SDK for both ordinary G2 builds. Qualify the freshly extracted
-G2 archive in the same way before publishing it.
+implementer built the floating correction at `g1-helper-06`. Its
+ordinary installation produced helper `600cb8c4` and Zig `06c09683`.
+The broader repository suite then identified a frozen selector
+inventory violation and a stale capture-attribute test.
 [Self-rebuild results and open source failures](../evidence/llvm_free_self_rebuild_20261119.md)
+
+Use a typed immediate-to-register operation for the frameless
+arithmetic repair. The selector guard must retain its frozen
+inventory. Update the call-attribute test to check the supported
+legacy pointer spelling and three invalid or unsupported cases.
+The implementer owns both repairs and a full repository test run.
+The reviewer checks the source diff, original helper functions and
+numerical boundaries. Build the resulting ordinary G1 at
+`g1-helper-07`, use it in `g2-zig-04` and `g2-helper-04`, then
+test the newly extracted G2 archive before publishing it. Both
+generations require the package, application, runtime and complete
+ordered upstream checks. The G2-03 builds were still waiting for input
+when their launchers were superseded.
 
 The revised floating trial passed the complete upstream runtime with
 the original G1 suite archive. All 2,097 ordered entries matched the

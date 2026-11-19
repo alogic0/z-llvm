@@ -224,6 +224,37 @@ build and run the suite through its own Zig driver and native linker.
 [All numbered outcomes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-linked-behavior-03/execute.stderr)
 · [Object, runtime member and exact ordered comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-linked-behavior-03/result.json)
 
+The reviewed floating change landed at `a55b1313`. The reviewer
+compared its complete five-file patch and the combined sixteen-file
+source change against the frozen inputs. Six operand arrangements
+with a live floating argument gave 96 exact native results on the
+guarded optimizer expression. Three had failed to emit on the old
+helper. A separate, frameless raw select with an unrelated live XMM0
+still fails to emit under both helpers. The complete source tree
+used for G1-06 is `9c1e8029c37872f50461ca1d9561d47d54bf3fba`.
+[Live-argument source comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-float-live-03/results.json)
+· [Six operand arrangements and raw selects](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/live-fp-classification/report.json)
+
+The two earlier diagnostic G1 builds differed in one test expression.
+An independent comparison found one changed installed file,
+`bin/z_llvm`, across 19,503 files. Its first difference was at byte
+6,332,229 in the ELF symbol-name string table. The code section was
+identical. G1-06 received its own package and numerical tests.
+[Complete installation comparison](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/review-package-rebind-05/comparison.json)
+· [ELF section comparison](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-diagnostic-section-rebind/report.json)
+
+G1-06 installed helper `600cb8c4` and Zig `06c09683`. The installed
+helper passed the 1,536 arithmetic and 88 floating-point controls.
+The normal repository suite on its source passed 2,470 of 2,472
+tests. A selector used a general IR operand routine to load a known
+immediate, violating the frozen list of permitted callers. A unit
+test dating from June also expected rejection of the legacy
+`ptr nocapture` spelling, which the verifier now accepts as
+`captures(none)`. The pending G1-07 repair restores the narrower
+operand interface and updates those test expectations.
+[Ordinary install](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper-06/build-result.json)
+· [Full repository test results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/combined-normal-tests-04/output.log)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1
