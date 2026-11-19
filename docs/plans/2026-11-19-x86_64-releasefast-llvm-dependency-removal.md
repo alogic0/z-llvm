@@ -327,6 +327,25 @@ actual files, compare the runtime object with its archive member and
 locate application code in the final executable. Record the same evidence
 for the complete upstream behavior run in each generation.
 
+### First installed-compiler build
+
+The seed started an ordinary native build from the reconciled Zig source
+tree `94993cf8`, with fresh caches. The generated build options set both
+`have_llvm` and `enable_debug_extensions` to false. The compiler build
+exited 1 before installing `bin/zig`. A historical AIR export hook in
+`captureZllvmAirFunction` called `Air.write`, which requires debug
+extensions at compile time. No export had been requested.
+
+The implementer owns a narrowly scoped repair to the optional hook.
+Preserve the release defaults and test both an explicit export request
+on the release compiler and the exporter on a debug-extension build.
+Rebuild the installed compiler from fresh caches and record the updated
+source for both generations. The failed command, generated build options
+and diagnostic remain available through diagnosis and verification.
+[Original compiler command and source tree](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig/entry.json)
+· [Compiler diagnostic](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig/build.stderr)
+· [Install outcome](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig/build-result.json)
+
 ## 3. Rebuild and qualify the compiler in the isolated environment
 
 Record the seed executable, how it was produced, its libraries and every
