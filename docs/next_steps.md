@@ -23,10 +23,11 @@ tail-only installation ran the full suite and exposed the wide shift
 and optimized floating-point failures. The floating correction landed
 at `a55b1313`. The full trial object then matched all 2,097 ordered
 upstream outcomes. The combined G1 installation produced helper
-`600cb8c4`. The implementer is correcting two repository test
-failures before the next G1 package rebuilds both tools in isolation.
-The reviewer will qualify the actual generation binaries and the
-extracted G2 archive.
+`600cb8c4` and ran all 2,097 upstream cases successfully. A broader
+repository run found two defects. The repair at `8c91f09e` passed
+all 2,472 repository tests. The G1-07 package with helper `f041c1d5`
+is the input to both isolated self-builds. The reviewer will qualify
+that actual package and the extracted G2 archive.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)

@@ -463,14 +463,19 @@ Use a typed immediate-to-register operation for the frameless
 arithmetic repair. The selector guard must retain its frozen
 inventory. Update the call-attribute test to check the supported
 legacy pointer spelling and three invalid or unsupported cases.
-The implementer owns both repairs and a full repository test run.
-The reviewer checks the source diff, original helper functions and
-numerical boundaries. Build the resulting ordinary G1 at
-`g1-helper-07`, use it in `g2-zig-04` and `g2-helper-04`, then
+The three-file repair landed at `8c91f09e`. All 35 focused checks
+and all 2,472 repository tests passed. The reviewer compared the
+complete commit and the combined 17-file source diff with the frozen
+build inputs. The resulting ordinary G1 at `g1-helper-07` installed
+helper `f041c1d5`. Check the four original helper functions and
+numerical boundaries on this binary. Use this G1 in both
+`g2-zig-04` and `g2-helper-04`, then
 test the newly extracted G2 archive before publishing it. Both
 generations require the package, application, runtime and complete
 ordered upstream checks. The G2-03 builds were still waiting for input
 when their launchers were superseded.
+[Full repository results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/combined-normal-tests-05/output.log)
+· [Ordinary G1-07 build](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper-07/build-result.json)
 
 The revised floating trial passed the complete upstream runtime with
 the original G1 suite archive. All 2,097 ordered entries matched the

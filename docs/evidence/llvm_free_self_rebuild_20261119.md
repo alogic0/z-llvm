@@ -250,10 +250,33 @@ tests. A selector used a general IR operand routine to load a known
 immediate, violating the frozen list of permitted callers. A unit
 test dating from June also expected rejection of the legacy
 `ptr nocapture` spelling, which the verifier now accepts as
-`captures(none)`. The pending G1-07 repair restores the narrower
-operand interface and updates those test expectations.
+`captures(none)`. The G1-06 installation also compiled and ran
+all 2,097 upstream cases through its own native link and matched
+every reference outcome.
 [Ordinary install](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper-06/build-result.json)
 · [Full repository test results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/combined-normal-tests-04/output.log)
+· [Ordinary G1-06 upstream suite](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g1-behavior-06/ordered-comparison.json)
+
+The implementer restored the typed immediate move and corrected
+the test for pointer capture attributes at `8c91f09e`. All 35
+focused checks and all 2,472 normal repository tests passed. The
+separate ABI comparison matched 60 cases across three optimization
+modes. The reviewer compared the entire commit with its three-file
+patch and all 17 changed source files with the actual build tree.
+The next ordinary installation produced the 110,539,868-byte helper
+`f041c1d52ee2597532c0740f4b6edb45d9fc25f242141d98e4df060161e7bf1d`.
+[Focused source and emitter tests](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/gateway-focused/test.stderr)
+· [Full repository command and results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/combined-normal-tests-05/output.log)
+· [Installed G1-07 helper](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper-07/build-result.json)
+
+The actual G1-07 helper matched all 1,196 numerical checks on the
+four original functions and emitted byte-identical objects to G1-06
+for all four. It also passed the 1,536 intrinsic boundary cases.
+Its complete optimized upstream module matched the LLVM-built
+helper from the same source on all 45,448,864 bytes.
+[Original functions and object comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-functions-installed-07/preceding-emitter-comparison.json)
+· [Intrinsic boundary results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-helper-arithmetic-installed-07/results.json)
+· [Whole-module comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-wide-literals-fixed-07/installed-full-comparison.json)
 
 ## Native startup of the original compiler and helper objects
 
