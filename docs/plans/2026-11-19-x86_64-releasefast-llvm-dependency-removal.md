@@ -7,6 +7,24 @@ claims cover a shippable compiler and a clean compiler self-rebuild. This
 plan covers baseline `x86_64-linux-gnu`, ReleaseFast, pure Zig source and
 the compiler runtime, system libc and CRT inputs identified for that target.
 
+**Current handoff.** The reviewer accepted the pointer-constant fix at
+patch `a6d28ef6`. Helper `0ae2c82f` emits 1,832 of the application's
+1,833 functions and 917 of the runtime's 921 functions on the original
+inputs. Both complete object commands still exit 1. The implementer is
+working on the program entry, `start._start`, then the four rejected
+64-bit shifts. Independent selection diagnostics put the left operand
+in a scratch register in all four functions. The shift count occupies
+a spill slot for `ldexp` and `log_f64`, and RAX for `sqrt_f64` and
+the unsigned-integer-to-double conversion. Recheck the same functions
+on the complete runtime object and run the 17 numerical cases already
+checked against the LLVM reference. The cold executable, dependency
+audit and two-generation rebuild follow in that order.
+[Full-module results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/pointer-replay/)
+· [Independent pointer return and store checks](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-pointer-constants/review.json)
+· [Historical narrow-shift checks](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/pointer-shift-boundary/test.stderr)
+· [Rejected instructions and operands](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-arithmetic-census/selection.jsonl)
+· [Native numerical reference](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-reference/observed.tsv)
+
 ## Starting evidence
 
 M3 built two byte-identical Zig compilers and matched all 2,097 ordered
