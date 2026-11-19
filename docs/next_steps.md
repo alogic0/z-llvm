@@ -1,9 +1,12 @@
 # Next steps
 
-The active assignment is to build upstream Zig’s unchanged `cat`
-through its finalized IR builder, `z_llvm` and the native ELF linker. The
-plan defines the evidence needed to move from that program to a shipped
-compiler and a clean self-rebuild. [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+Two cold builds of upstream Zig’s unchanged `cat` through its finalized
+IR builder, `z_llvm` and the native ELF linker produced the same executable.
+It passed all six I/O tests. The runtime object from the cold archive
+passed a separate 17-case numerical check. The current assignment is to
+finish cache and failure review and serial Tier 3, then qualify a shipped
+compiler and helper without LLVM, Clang or LLD and rebuild both in
+isolation. [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
 
 The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
 independent review and selector Tier 2. Keeping the accumulator in R9D saved

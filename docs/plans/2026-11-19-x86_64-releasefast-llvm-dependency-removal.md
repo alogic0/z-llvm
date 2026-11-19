@@ -12,12 +12,16 @@ exited zero on driver `5c6c457c` and helper `e1cfa98f`. The local
 backend emitted all 1,833 application functions and all 921 compiler
 runtime functions. Zig's native linker listed the local application
 object and compiler-runtime archive. All six I/O cases passed. The first
-run's post-build audit failed to match one logged path. The implementer
-is reconciling its records and running serial Tier 3. The reviewer is
-checking the linked inputs, runtime arithmetic, forced errors and cache
-reuse before promoting this handoff.
+run's post-build audit treated a relative path as absolute. The corrected
+audit joined all four recorded paths under the compiler's working
+directory. An independent cold build produced the same executable and
+matched eight distinct application function bodies to its bytes. The
+implementer is running serial Tier 3. Shared-cache transitions and the
+independent existing-destination fault check are in progress.
 [Cold driver and executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/compile-result.json)
 · [Six runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/runtime.json)
+· [Reconciled cold audit](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05-audit/report.json)
+· [Function bodies in the independently linked executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-handoff-positive/linked-code.json)
 · [Complete runtime and application objects](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-replay/)
 
 The first startup revision, `fd145609`, emitted the application while
@@ -36,10 +40,13 @@ byte-identical across the startup and arithmetic corrections.
 Zig's native linker consumed that application object with the known-good
 compiler runtime from the native control. The resulting ELF, `2719a352`,
 passed all six byte-for-byte tests. It has the same bytes as the fresh
-provider-built executable. A separate application-only link and native
-math calls check the contribution of the runtime.
+provider-built executable. A fresh link with the application as its sole
+input also produced those exact bytes and passed the six tests. The
+runtime archive's own executable coverage comes from separate native
+math calls.
 [Link inputs and executable identity](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-cat-link/result.json)
 · [All six program executions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-cat-link/runtime.json)
+· [Application-only link and runtime archive comparison](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-runtime-contribution/result.json)
 
 The reviewer accepted the pointer-constant fix (`a6d28ef6`). The
 four previously rejected runtime shifts all held their left operand in RCX,
@@ -50,12 +57,20 @@ rollback and historical narrow-shift tests. The original conversion
 routine passed all 4,545 independent numerical comparisons. The original
 input replay produced a 3,061,936-byte runtime object (`b4f14c7a`).
 The cold driver produced a distinct 3,061,992-byte member (`253ddd54`).
-Run the 17 numerical cases against both and compare their results.
+The reviewer extracted that member from the archive named by Zig's
+native linker and linked each object to the same numerical caller. Both
+objects matched the LLVM reference bit for bit on all 17 cases. They differ
+in the ELF symbol and string tables. Their code, data, thread-local data
+and relocation sections have identical bytes.
 [Selection and operand traces](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-trace/census.stderr)
 · [Independent pointer return and store checks](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-pointer-constants/review.json)
 · [Historical narrow-shift checks](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/pointer-shift-boundary/test.stderr)
 · [Rejected instructions and operands](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-arithmetic-census/selection.jsonl)
 · [Native numerical reference](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-reference/observed.tsv)
+· [Replay object results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-runtime/observed.tsv)
+· [Cold archive member](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-cold/archive.json)
+· [Cold member results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-cold/observed.tsv)
+· [Section and IR comparisons](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05-ir-diff/comparison.json)
 · [Reduced conversion and reference results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-conversion-baseline/results.json)
 · [Corrected conversion and 4,545 comparisons](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-conversion-fixed/results.json)
 
