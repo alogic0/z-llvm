@@ -493,6 +493,21 @@ G1 Zig and its SDK with the installed G2 helper. Verify that the helper
 is the only changed package entry. This checks whole-program emission
 early and gives a comparison if the relocated G2 pair behaves differently.
 
+The first preservation run passed its initial gates, including all 146
+integrated preopt cases. The three real-row runs then stopped before
+emission. Their source check reads `/home/oleg/prog/ziglang` directly
+and requires upstream `1c08b09d`. The working checkout has the reviewed
+compiler changes at `bd0e36fa`. Run the complete tier in a new isolated
+environment with a clean `1c08b09d` checkout mounted at that exact path.
+Verify the reference Zig executable, original source blobs and actual
+G2 helper there. The first mount preflight verified the four source
+blobs, then compared the two mount pathnames. The `final-preservation-03`
+preflight verified the shared device and inode, clean historical checkout,
+reference executable `d505fc64` and G2 helper `771baaa8`. The full tier
+started in that environment.
+[First preservation run](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation/checks.json)
+· [Verified inputs to the rerun](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-03/mounted-tools.identities.txt)
+
 The revised floating trial passed the complete upstream runtime with
 the original G1 suite archive. All 2,097 ordered entries matched the
 reference, including both earlier failures. On the corrected test
