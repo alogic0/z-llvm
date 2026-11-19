@@ -38,6 +38,17 @@ contribution of register residency on the existing loop shape.
    or dispersion obscures the decision, isolate it with the smallest
    matched control. [Measurement protocol](2026-11-17-generated-program-performance.md)
 
+**Layout review.** The reviewer verified all 680 compiler source inputs
+against `56eb24a6`. The fresh compiler reproduced the accepted object with
+111 bytes of loop code and the 237,480-byte original-driver executable. The matched
+version changes 28 bytes in nine instructions. The timed executable has
+identical bytes outside the function. Its frame, all instruction start
+addresses, comparison, three jumps and return are preserved. EDI carries
+the accumulator, R10D the index and ESI the limit. Register copies and LEAs
+replace all seven hot stack accesses. The independent model reproduced the
+original four route outputs and counts 1,999 iterations per 272 mixed calls.
+See `prepare/images.tsv`, `prepare/layout.tsv` and `review-oracle/model.json`.
+
 ## Decision and follow-through
 
 The implementer reports results to the primary reviewer
