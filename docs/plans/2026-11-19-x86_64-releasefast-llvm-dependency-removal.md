@@ -346,6 +346,26 @@ and diagnostic remain available through diagnosis and verification.
 · [Compiler diagnostic](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig/build.stderr)
 · [Install outcome](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig/build-result.json)
 
+The three-line change in Zig patch `7582370e` guards the optional
+capture and diagnoses a requested export before opening its path. On
+corrected source tree `60e74519`, the default compiler installed and
+reported version `0.17.0`. It rejected an explicit export with exit 1,
+preserved both existing files and left both absent destinations absent.
+The same source built with debug extensions enabled and reproduced the
+reference's 2,012-byte export exactly.
+[Corrected driver source](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/source-02/zig.incremental.patch)
+· [Enabled and disabled exporter controls](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/air-export-controls/control.json)
+· [Original build and compiler-server exit statuses](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-first-failure-02/failure.json)
+
+The installed driver `06c09683` then built and installed helper
+`a95be5c7` using its own SDK and fresh caches. Both are x86_64 ELF
+executables with no dynamic section. The implementer is tracing their
+actual link inputs. The primary is checking the complete installation and
+running both entry points in the isolated environment.
+[Installed compiler](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-zig-02/build-result.json)
+· [Installed helper and its compiler](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper/entry.json)
+· [Helper installation result](../../local-state/validations/llvm-dependency-removal-20261119/distribution-01/g1-helper/build-result.json)
+
 ## 3. Rebuild and qualify the compiler in the isolated environment
 
 Record the seed executable, how it was produced, its libraries and every

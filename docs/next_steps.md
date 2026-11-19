@@ -7,10 +7,10 @@ passed a separate 17-case numerical check. The reviewer verified all six
 cache transitions and both failure destinations. All 17 serial gates and
 237 native populations passed. The primary accepted the first milestone
 on Zig `ac359bdcd1` and z_llvm `8573a3df`. The implementer now owns
-the installed compiler and helper with LLVM disabled. The first compiler
-build found an optional AIR exporter calling a debug-only printer in the
-release configuration. The implementer is correcting the hook. The reviewer will
-run that package in an empty root. After the package passes, it will
+the installed compiler and helper with LLVM disabled. With the optional
+AIR exporter corrected, the new Zig `06c09683` built helper `a95be5c7`.
+The reviewer is checking the package in an empty root and the implementer
+is auditing its build and link inputs. After the package passes, it will
 rebuild both tools there. [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
 
 The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
