@@ -1,11 +1,12 @@
 # Next steps
 
-The x86_64 compiler prototype keeps the loop accumulator in R9D. On the
-original driver it saved a paired median 36.42 ms in Fast and 38.00 ms
-in Small. Both modes won all twelve pairs. The other four workloads emitted
-identical executables across compiler versions. The focused, native and core
-selector checks passed. The remaining gate runs upstream programs on the
-measured compiler. [Assignment, measurements and review](plans/2026-11-18-loop-register-residency.md)
+The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
+independent review and selector Tier 2. Keeping the accumulator in R9D saved
+a paired median 36.42 ms (17.0%) in Fast and 38.00 ms (18.0%) in Small on
+the original driver. It won all twelve pairs in each mode. The other four
+workloads kept identical executables. The loop index and limit still use the
+frame. [Assignment, measurements and review](plans/2026-11-18-loop-register-residency.md)
+· [Published results](evidence/loop_register_residency_20261118.md)
 
 Both x86_64 loop improvements passed independent review and landed on
 `main`. Forwarding single-use i32 values into their PHI slots

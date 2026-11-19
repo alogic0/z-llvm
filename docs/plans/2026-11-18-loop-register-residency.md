@@ -1,5 +1,9 @@
 # Measure the cost of spilling the x86_64 loop state
 
+The primary reviewer accepted the compiler change on November 19, 2026.
+It landed on `main` at `3a9b6d8f`. The original mixed workload ran about
+17% faster in Fast and 18% faster in Small. [Final review](#final-review)
+
 Oleg authorized the implementer and primary reviewer to run this milestone
 on November 18. Start from production compiler source `56eb24a6`. On the
 original loop, its Fast executable took 212.59 ms. The function carries
@@ -169,3 +173,27 @@ retain their existing owners. Run stages through `tools/run-validation`,
 release each pipeline after its last consumer, and collect at each completed
 boundary. Record the final cleanup receipt, other owners and any continuing
 exception. [Development storage contract](../development_storage.md)
+
+## Final review
+
+The primary reviewer compared the five-file source commit with the frozen
+patch and independently matched all 682 files in the compiler build manifest.
+The measured compiler passed selector Tier 2, including 2,453 unit tests,
+74 structural checks, 60 ABI comparisons, 38 object cases and 27 executable
+cases. All 27 distinct M1 inputs emitted identical objects with the Debug
+and ReleaseFast compilers. Seven integrated executables and seven unchanged
+upstream Zig programs passed. For the 237 native populations in Fast, Safe
+and Small, review matched 2,133 outputs and 1,422 function-selection records.
+
+The production timings apply to the original mixed driver on the recorded
+x86_64 host. The fixed-trip sweep measured the hand-written variants that
+kept all three loop values in registers. The accepted compiler change promotes
+one accumulator in the qualifying leaf loop. The implementer published the
+measurements and qualification in `bb727981`.
+[Published measurements and qualification](../evidence/loop_register_residency_20261118.md)
+
+All 52 temporary workspaces owned by this cycle were removed. The reviewer
+matched their paths and 5,472,280,576 allocated bytes to 11 collector
+receipts. The final idle sweep found zero eligible workspaces. The batch's
+`storage/closure.json` records the receipts and the reasons for 13 roots
+owned by other work. [Storage and preservation](../evidence/loop_register_residency_20261118.md#storage-and-preservation)
