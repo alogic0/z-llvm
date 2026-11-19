@@ -88,6 +88,14 @@ normal compiler entry points, adjacent ineligible shapes and all five
 frozen workloads. The implementer reports the candidate separately from
 the experimental assembly. See `control-sample/report.json`.
 
+The first prototype carries one nonescaping i32 local through an ordinary
+leaf loop in an unused caller-saved register. Prove the initialization
+dominates the loop, keep all reads and exits correct, and reject alternate
+loop entries, escaped or volatile accesses and register conflicts. The
+reviewer will compare independently specified loop variants and fallback
+cases on the baseline and candidate. The production source, native controls,
+benchmarks and qualification each use separately owned managed stages.
+
 ## Decision and follow-through
 
 The implementer reports results to the primary reviewer
