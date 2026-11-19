@@ -2262,25 +2262,29 @@ pub fn phiSourceDiagnostic(selector: *const ComposedBlockSelector, value: ir.Val
     };
 }
 
+pub fn emitImmediateToArgReg(selector: *ComposedBlockSelector, reg: ArgReg, immediate: i64, ignore_name: ?[]const u8) !void {
+    // MOV keeps EFLAGS and the simultaneous accumulator input intact.
+    try clobberArgRegExcept(selector, reg, ignore_name);
+    try selector.machine.instructions.append(selector.allocator, switch (reg) {
+        .rdi => .{ .mov_imm_rdi = immediate },
+        .rsi => .{ .mov_imm_rsi = immediate },
+        .rdx => .{ .mov_imm_rdx = immediate },
+        .rcx => .{ .mov_imm_rcx = immediate },
+        .r8 => .{ .mov_imm_r8 = immediate },
+        .r9 => .{ .mov_imm_r9 = immediate },
+    });
+}
+
 pub fn emitValueIntoScratchExcept(selector: *ComposedBlockSelector, value: ir.Value, reg: ArgReg, bits: u16, ignore_name: ?[]const u8) !void {
     switch (value) {
         .int => |literal| {
             // Validate before preserving or overwriting any live register.
-            // MOV keeps EFLAGS and the simultaneous accumulator input intact.
             const immediate: i64 = switch (bits) {
                 32 => @as(u32, @bitCast(try i32BitPattern(literal))),
                 64 => try i64Value(literal),
                 else => return error.UnsupportedCodegenValue,
             };
-            try clobberArgRegExcept(selector, reg, ignore_name);
-            try selector.machine.instructions.append(selector.allocator, switch (reg) {
-                .rdi => .{ .mov_imm_rdi = immediate },
-                .rsi => .{ .mov_imm_rsi = immediate },
-                .rdx => .{ .mov_imm_rdx = immediate },
-                .rcx => .{ .mov_imm_rcx = immediate },
-                .r8 => .{ .mov_imm_r8 = immediate },
-                .r9 => .{ .mov_imm_r9 = immediate },
-            });
+            try emitImmediateToArgReg(selector, reg, immediate, ignore_name);
         },
         .named => {
             const loc = resolveValue(selector, value) orelse return error.UnsupportedCodegenValue;

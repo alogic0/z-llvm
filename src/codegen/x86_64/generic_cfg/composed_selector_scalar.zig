@@ -573,7 +573,7 @@ fn scalar_immediate_frameless64(
     try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
 
     const scratch = if (bits == 64 and binary.op == .xor) try selector_state.framelessScalarImmediateScratch(selector) else .rcx;
-    try selector_state.emitValueIntoScratch(selector, .{ .int = try i64Value(literal) }, scratch, 64);
+    try selector_state.emitImmediateToArgReg(selector, scratch, try i64Value(literal), null);
     try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{
         .op = switch (binary.op) {
             .@"and" => .@"and",

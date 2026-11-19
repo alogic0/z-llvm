@@ -470,24 +470,30 @@ test "parser rejects malformed call operand bundles" {
     try std.testing.expectError(error.UnsupportedOperandBundle, ir.Module.parse(std.testing.allocator, inputs));
 }
 
-test "verifier rejects unsupported call argument attributes" {
-    const input =
-        \\target triple = "x86_64-unknown-linux-gnu"
-        \\
-        \\declare void @takes_ptr(ptr)
-        \\
-        \\define void @caller(ptr %p) {
-        \\entry:
-        \\  call void @takes_ptr(ptr nocapture %p)
-        \\  ret void
-        \\}
-        \\
-    ;
-
-    var module = try ir.Module.parse(std.testing.allocator, input);
-    defer module.deinit();
-
-    try std.testing.expectError(error.UnsupportedCallAttribute, module.verify());
+test "verifier checks capture attributes at call argument sites" {
+    for ([_]struct { ty: []const u8, attrs: []const u8, valid: bool }{
+        .{ .ty = "ptr", .attrs = "nocapture", .valid = true },
+        .{ .ty = "ptr", .attrs = "swiftself", .valid = false },
+        .{ .ty = "ptr", .attrs = "nocapture captures(none)", .valid = false },
+        .{ .ty = "i32", .attrs = "nocapture", .valid = false },
+    }) |case| {
+        const input = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare void @callee({0s})
+            \\define void @caller({0s} %p) {{
+            \\entry:
+            \\  call void @callee({0s} {1s} %p)
+            \\  ret void
+            \\}}
+        , .{ case.ty, case.attrs });
+        defer std.testing.allocator.free(input);
+        var module = try ir.Module.parse(std.testing.allocator, input);
+        defer module.deinit();
+        if (case.valid) {
+            try module.verify();
+        } else {
+            try std.testing.expectError(error.UnsupportedCallAttribute, module.verify());
+        }
+    }
 }
 
 test "verifier rejects invalid call argument attribute payloads" {
