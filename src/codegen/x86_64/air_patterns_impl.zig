@@ -249,11 +249,15 @@ pub fn lowerFunction(allocator: std.mem.Allocator, triple_text: []const u8, func
 pub fn lowerFunctionWithOptions(
     allocator: std.mem.Allocator,
     triple_text: []const u8,
-    function: ir.Function,
+    source: ir.Function,
     options: CodegenOptions,
 ) !MachineFunction {
     const parsed_triple = try target.Triple.parse(triple_text);
     if (!parsed_triple.isX86_64() or !parsed_triple.isLinux()) return error.UnsupportedTarget;
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const function = try @import("debug_locations.zig").executableView(arena.allocator(), source);
 
     // All local frame paths currently reserve one statically sized object.
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
@@ -266,11 +270,14 @@ pub fn lowerFunctionWithOptions(
     machine.entry_xmm_defined_bits = sysv_abi.entryXmmDefinedBits(function);
     errdefer machine.deinit(allocator);
 
+    if (try @import("linux_runtime_asm.zig").lowerNaked(allocator, &machine, function, options.module_context))
+        return try finishStructuralFallback(&machine);
+
     if (try @import("scalar_compare_wrappers.zig").lower(allocator, &machine, function))
         return try finishStructuralFallback(&machine);
 
     if (options.generic_cfg_selector) {
-        switch (try x86_64_generic_cfg_selector.tryLowerObserved(allocator, &machine, function, options.module_context, options.profile, options.rejection_observer)) {
+        switch (try x86_64_generic_cfg_selector.tryLowerExecutableObserved(allocator, &machine, function, options.module_context, options.profile, options.rejection_observer)) {
             .selected => {
                 machine.codegen_path = .generic_cfg;
                 if (machine.selection_owner == .unassigned) return error.UnassignedSelectionOwner;

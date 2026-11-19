@@ -207,6 +207,8 @@ pub fn encodeFunction(allocator: std.mem.Allocator, function: x86_64.MachineFunc
                 if (count >= 4) try bytes.appendSlice(allocator, &.{ 0x49, 0x89, 0xca });
                 try bytes.appendSlice(allocator, &.{ 0x0f, 0x05 });
             },
+            .read_thread_pointer_rax => try bytes.appendSlice(allocator, &.{ 0x64, 0x48, 0x8b, 0x04, 0x25, 0, 0, 0, 0 }),
+            .linux_clone_trampoline => try bytes.appendSlice(allocator, &@import("../codegen/x86_64/linux_runtime_asm.zig").clone_bytes),
             .register_snapshot_rdi => {
                 for ([_]u8{ 0, 2, 1, 3, 6, 7, 5, 4, 8, 9, 10, 11, 12, 13, 14, 15 }, 0..) |reg, index| {
                     try bytes.appendSlice(allocator, &.{ @as(u8, 0x48) | (if (reg >= 8) @as(u8, 4) else 0), 0x89, 0x47 | ((reg & 7) << 3), @intCast(index * 8) });
@@ -1991,6 +1993,8 @@ fn fcmpResultSize(predicate: ir.FcmpPredicate) u32 {
 pub fn instructionSize(instruction: x86_64.Instruction) u32 {
     return switch (instruction) {
         .linux_syscall => |count| if (count >= 4) 5 else 2,
+        .read_thread_pointer_rax => 9,
+        .linux_clone_trampoline => @import("../codegen/x86_64/linux_runtime_asm.zig").clone_bytes.len,
         .register_snapshot_rdi => 78,
         .cpuid_packed => 18,
         .valgrind_client_request => 19,

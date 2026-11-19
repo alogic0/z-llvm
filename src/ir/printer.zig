@@ -76,6 +76,7 @@ pub fn printWithOptions(module: core.Module, writer: anytype, options: Options) 
             if (index != 0) try writer.writeAll(", ");
             try param.ty.format(writer);
             if (param.attrs) |attrs| try writer.print(" {s}", .{module_names.text(attrs)});
+            if (param.name) |name| try writer.print(" %{s}", .{name});
         }
         if (decl.is_varargs) {
             if (decl.params.items.len != 0) try writer.writeAll(", ");

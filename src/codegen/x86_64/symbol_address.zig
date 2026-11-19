@@ -39,6 +39,7 @@ fn checkedGlobalProperties(global: ir.Global) !GlobalProperties {
     var result: GlobalProperties = .{ .local = global.linkage == .internal or global.linkage == .private };
     switch (global.linkage) {
         .default, .external, .internal, .private => {},
+        .extern_weak => if (global.initializer != .none) return error.UnsupportedGlobalLinkage,
         else => return error.UnsupportedGlobalLinkage,
     }
     var address_attrs = std.mem.tokenizeAny(u8, global.address_attrs orelse "", " \t");
@@ -106,9 +107,10 @@ pub fn fromGep(gep: ir.GepInst) ?Address {
 }
 
 pub fn fromValue(value: ir.Value) ?Address {
-    if (fromDirectValue(value)) |address| return address;
-    if (value != .constant_expr) return null;
-    const text = trim(value.constant_expr);
+    const address = byteAddress(value);
+    if (address.symbolic()) |symbol| return symbol;
+    if (address.offset != 0 or address.base != .constant_expr) return null;
+    const text = trim(address.base.constant_expr);
     const prefix = "inttoptr (i64 ";
     const suffix = " to ptr)";
     if (!std.mem.startsWith(u8, text, prefix) or !std.mem.endsWith(u8, text, suffix)) return null;
@@ -129,8 +131,38 @@ pub fn fromValue(value: ir.Value) ?Address {
     return .{ .symbol = base.symbol, .addend = std.math.cast(i32, result) orelse return null };
 }
 
-fn fromDirectValue(value: ir.Value) ?Address {
-    if (value == .named) return .{ .symbol = symbolName(value.named) orelse return null };
+const ByteAddress = struct {
+    base: ir.Value,
+    offset: i64 = 0,
+
+    fn symbolic(address: ByteAddress) ?Address {
+        if (address.base != .named) return null;
+        return .{
+            .symbol = symbolName(address.base.named) orelse return null,
+            .addend = std.math.cast(i32, address.offset) orelse return null,
+        };
+    }
+};
+
+/// A zero byte index preserves the base on every defined execution. A
+/// nonzero byte index still needs the usual checked symbol relocation.
+fn byteAddress(value: ir.Value) ByteAddress {
+    var base = value;
+    while (byteGep(base)) |gep| {
+        if (gep.offset != 0) return gep;
+        base = gep.base;
+    }
+    return .{ .base = base };
+}
+
+/// A direct symbol or a chain of byte GEPs with zero indexes.
+pub fn zeroOffsetSymbol(value: ir.Value) ?[]const u8 {
+    const address = byteAddress(value);
+    if (address.offset != 0 or address.base != .named) return null;
+    return symbolName(address.base.named);
+}
+
+fn byteGep(value: ir.Value) ?ByteAddress {
     if (value != .constant_expr) return null;
     const text = trim(value.constant_expr);
     if (!std.mem.startsWith(u8, text, "getelementptr ")) return null;
@@ -153,11 +185,16 @@ fn fromDirectValue(value: ir.Value) ?Address {
     const pointer = trim(fields.next() orelse return null);
     const index = trim(fields.next() orelse return null);
     if (fields.next() != null or !std.mem.startsWith(u8, pointer, "ptr ") or !std.mem.startsWith(u8, index, "i64 ")) return null;
+    const typed = @import("../../ir/parser_types_values.zig").parseTypedValue(pointer) catch return null;
+    if (typed.ty != .ptr) return null;
     const bits = i64Bits(std.fmt.parseInt(i128, trim(index[4..]), 10) catch return null) orelse return null;
-    return .{ .symbol = symbolName(pointer[4..]) orelse return null, .addend = std.math.cast(i32, @as(i64, @bitCast(bits))) orelse return null };
+    return .{ .base = typed.value, .offset = @bitCast(bits) };
 }
 
-pub fn pointerBits(value: ir.Value) ?u64 {
+pub fn pointerBits(input: ir.Value) ?u64 {
+    const address = byteAddress(input);
+    if (address.offset != 0) return null;
+    const value = address.base;
     if (value == .null_value or value == .zero_initializer or value == .undef) return 0;
     if (value != .constant_expr) return null;
     const text = trim(value.constant_expr);
@@ -177,7 +214,7 @@ pub fn fromIntegerValue(ty: ir.Type, value: ir.Value) ?Address {
     const suffix = " to i64)";
     if (text.len <= prefix.len + suffix.len or !std.mem.startsWith(u8, text, prefix) or !std.mem.endsWith(u8, text, suffix)) return null;
     const pointer = trim(text[prefix.len .. text.len - suffix.len]);
-    return fromDirectValue(if (std.mem.startsWith(u8, pointer, "@")) .{ .named = pointer } else .{ .constant_expr = pointer });
+    return byteAddress(if (std.mem.startsWith(u8, pointer, "@")) .{ .named = pointer } else .{ .constant_expr = pointer }).symbolic();
 }
 
 pub fn supportsLayout(text: ?[]const u8) bool {
@@ -290,6 +327,42 @@ test "integer symbolic addresses preserve pointer identity and reject other repr
     }) |text| try std.testing.expect(fromIntegerValue(.{ .int = 64 }, .{ .constant_expr = text }) == null);
     for ([_]ir.Value{ .undef, .poison, .null_value, .{ .int = 1 }, .{ .named = "@object" } }) |value|
         try std.testing.expect(fromIntegerValue(.{ .int = 64 }, value) == null);
+}
+
+test "zero byte GEPs keep absolute pointer bits and symbolic byte offsets" {
+    const alloc = std.testing.allocator;
+    for ([_]u64{ 0, 1, 4, 8, 4294967296, std.math.maxInt(u64) }) |bits| {
+        const text = try std.fmt.allocPrint(alloc, "getelementptr inbounds (i8, ptr getelementptr (i8, ptr inttoptr (i64 {d} to ptr), i64 0), i64 0)", .{bits});
+        defer alloc.free(text);
+        const value: ir.Value = .{ .constant_expr = text };
+        try std.testing.expectEqual(bits, pointerBits(value).?);
+        try std.testing.expect(fromValue(value) == null);
+    }
+    for ([_]i32{ -7, 0, 3, std.math.maxInt(i32) }) |offset| {
+        const text = try std.fmt.allocPrint(alloc, "getelementptr inbounds (i8, ptr getelementptr (i8, ptr @\"array,()\", i64 {d}), i64 0)", .{offset});
+        defer alloc.free(text);
+        const address = fromValue(.{ .constant_expr = text }).?;
+        try std.testing.expectEqualStrings("\"array,()\"", address.symbol);
+        try std.testing.expectEqual(offset, address.addend);
+        try std.testing.expect(pointerBits(.{ .constant_expr = text }) == null);
+        const cast = try std.fmt.allocPrint(alloc, "ptrtoint (ptr {s} to i64)", .{text});
+        defer alloc.free(cast);
+        try std.testing.expectEqual(offset, fromIntegerValue(.{ .int = 64 }, .{ .constant_expr = cast }).?.addend);
+    }
+    for ([_][]const u8{
+        "getelementptr (i8, ptr inttoptr (i64 1 to ptr), i64 1)",
+        "getelementptr (i32, ptr inttoptr (i64 1 to ptr), i64 0)",
+        "getelementptr (i8, ptr inttoptr (i32 1 to ptr), i64 0)",
+        "getelementptr (i8, ptr addrspace(1) @global, i64 0)",
+        "getelementptr (i8, ptr %local, i64 0)",
+        "getelementptr (i8, ptr @global, i32 0)",
+        "getelementptr (i8, ptr @global, i64 %index)",
+        "getelementptr (i8, ptr @global, i64 0, i64 0)",
+        "getelementptr (i8, ptr getelementptr (i8, ptr @global, i64 2147483648), i64 0)",
+    }) |text| {
+        try std.testing.expect(pointerBits(.{ .constant_expr = text }) == null);
+        try std.testing.expect(fromValue(.{ .constant_expr = text }) == null);
+    }
 }
 
 test "symbol byte addresses reject unproved sources spaces indexes and ranges" {

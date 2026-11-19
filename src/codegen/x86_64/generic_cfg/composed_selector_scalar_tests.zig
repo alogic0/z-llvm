@@ -2768,3 +2768,88 @@ test "frameless pair OR preserves full accumulator aliases before lane scratch" 
     try machine.instructions.append(std.testing.allocator, .ret);
     try x86_64_verify.verifyFunction(machine);
 }
+
+test "i64 variable shifts preserve the pending RCX operand and surviving aliases" {
+    const a = std.testing.allocator;
+    const Lifetime = enum { last_use, surviving_aliases, used_again };
+    for ([_]ir.BinaryOp{ .shl, .lshr, .ashr }) |op| {
+        for ([_]ValueLoc{ .rax, .{ .spill64 = .slot6 } }) |count_home| {
+            for (std.meta.tags(Lifetime)) |lifetime| {
+                var machine = MachineFunction.init("wide_shift", .void);
+                defer machine.deinit(a);
+                var plan = SelectorAllocationPlan.init(a);
+                defer plan.deinit();
+                const end: usize = if (lifetime == .used_again) 8 else 4;
+                try plan.interval_ends.put("lhs", end);
+                try plan.interval_ends.put("count", end);
+                var selector = ComposedBlockSelector.init(a, &machine);
+                defer selector.deinit();
+                selector.current_position = 4;
+                selector.stack_frame_bytes = 56;
+                selector.allocation_plan = &plan;
+                const lhs_home = ValueLoc{ .scratch64 = .rcx };
+                try selector_state.bindValueLoc(&selector, "lhs", lhs_home);
+                try selector_state.bindValueLoc(&selector, "count", count_home);
+                if (lifetime == .surviving_aliases) {
+                    try plan.interval_ends.put("saved_lhs", 8);
+                    try plan.interval_ends.put("saved_count", 8);
+                    try selector_state.bindValueLoc(&selector, "saved_lhs", lhs_home);
+                    try selector_state.bindValueLoc(&selector, "saved_count", count_home);
+                }
+                try machine.instructions.appendSlice(a, &.{
+                    .sub_rsp_56,
+                    .{ .mov_arg64_arg = .{ .dst = .rcx, .src = .rdi } },
+                    if (count_home == .rax)
+                        .{ .mov_arg_rax = .rsi }
+                    else
+                        .{ .spill_arg64_rsp = .{ .reg = .rsi, .frame_index = count_home.spill64 } },
+                });
+                try std.testing.expect((try selector_scalar.lowerBinary(&selector, "answer", .{
+                    .op = op,
+                    .ty = .{ .int = 64 },
+                    .lhs = .{ .named = "lhs" },
+                    .rhs = .{ .named = "count" },
+                })) == null);
+                try std.testing.expectEqual(ValueLoc.rax, selector_state.valueLoc(&selector, "answer").?);
+                try machine.instructions.append(a, .{ .store_rax_arg_ptr_disp8 = .{ .reg = .rdx, .offset = 8 } });
+                if (lifetime != .last_use) {
+                    selector.current_position += 1;
+                    const saved = if (lifetime == .surviving_aliases)
+                        [2][]const u8{ "saved_lhs", "saved_count" }
+                    else
+                        [2][]const u8{ "lhs", "count" };
+                    for (saved, [_]u8{ 16, 24 }) |name, offset| {
+                        try selector_state.emitValueIntoScratch(&selector, .{ .named = name }, .rdi, 64);
+                        try machine.instructions.append(a, .{ .store_arg64_arg_ptr_disp8 = .{ .ptr_reg = .rdx, .src_reg = .rdi, .offset = offset } });
+                    }
+                }
+                try machine.instructions.appendSlice(a, &.{ .add_rsp_56, .ret });
+                try x86_64_verify.verifyFunction(machine);
+                const bytes = try encoding.encodeFunction(a, machine);
+                defer a.free(bytes);
+                const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+                defer std.posix.munmap(mapping);
+                @memcpy(mapping, bytes);
+                const shift: *const fn (u64, u64, *[5]u64) callconv(.c) void = @ptrCast(mapping.ptr);
+                for ([_]u64{ 1, 0x8000_0000_0000_0000, 0xfedc_ba98_7654_3210 }) |value| {
+                    for ([_]u6{ 0, 1, 17, 63 }) |count| {
+                        const expected: u64 = switch (op) {
+                            .shl => value << count,
+                            .lshr => value >> count,
+                            .ashr => @bitCast(@as(i64, @bitCast(value)) >> count),
+                            else => unreachable,
+                        };
+                        const guard = 0xa5c3_169b_4ef0_872d;
+                        var actual = [5]u64{ guard, guard, guard, guard, guard };
+                        shift(value, count, &actual);
+                        try std.testing.expectEqual([5]u64{
+                            guard,                                       expected,
+                            if (lifetime == .last_use) guard else value, if (lifetime == .last_use) guard else count,
+                            guard,
+                        }, actual);
+                    }
+                }
+            }
+        }
+    }
+}

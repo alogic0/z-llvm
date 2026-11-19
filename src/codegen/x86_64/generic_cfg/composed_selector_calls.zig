@@ -618,6 +618,16 @@ fn lowerFpAbs(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.Ca
 }
 
 fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, call: ir.CallInst, operation: @import("../inline_asm.zig").Operation) !?Diagnostic {
+    if (operation == .read_thread_pointer) {
+        const name = result orelse return .{ .unsupported_value = "inline-asm-result" };
+        var definition = try selector_state.AccumulatorDefinitionTransaction.begin(selector);
+        defer definition.deinit();
+        if (try definition.prepare(.preserve, .spill_live)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .read_thread_pointer_rax);
+        try definition.define(name, .fullRax());
+        try definition.commit();
+        return null;
+    }
     if (operation == .valgrind_client_request) {
         const name = result orelse return .{ .unsupported_value = "inline-asm-result" };
         for (call.args.items) |arg| if (arg.value != .named) return .{ .no_emitter = "inline-asm-client-request-literal" };
@@ -660,7 +670,7 @@ fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, ca
         try selector_state.bindFixedProductResult(selector, name);
         return null;
     }
-    if (operation == .register_snapshot and result != null) return .{ .unsupported_value = "inline-asm-result" };
+    if ((operation == .register_snapshot or operation == .munmap_exit) and result != null) return .{ .unsupported_value = "inline-asm-result" };
     if (operation == .linux_syscall and result == null) return .{ .unsupported_value = "inline-asm-result" };
     var transaction: ?selector_state.AccumulatorDefinitionTransaction = if (result != null)
         try selector_state.AccumulatorDefinitionTransaction.begin(selector)
@@ -672,7 +682,18 @@ fn lowerSystemAssembly(selector: *ComposedBlockSelector, result: ?[]const u8, ca
     } else if (try selector_state.spillLiveCallerClobbersForCall(selector)) |diagnostic| return diagnostic;
     if (try selector_state.preserveFixedCallInputs(selector, call)) |diagnostic| return diagnostic;
     switch (operation) {
-        .unsigned_divide, .valgrind_client_request => unreachable,
+        .unsigned_divide, .valgrind_client_request, .read_thread_pointer => unreachable,
+        .munmap_exit => {
+            for (call.args.items, [_]ArgReg{ .rdi, .rsi }) |arg, reg| {
+                if (try lowerDirectCallArg(selector, arg, reg)) |diagnostic| return diagnostic;
+            }
+            // After munmap, the current stack can no longer be used.
+            try selector.machine.instructions.appendSlice(selector.allocator, &.{
+                .{ .mov_imm_eax = 11 }, .{ .linux_syscall = 2 },
+                .{ .mov_imm_eax = 60 }, .{ .mov_imm_rdi = 0 },
+            });
+            try selector_state.emitEflagsInstruction(selector, .{ .linux_syscall = 1 }, .clobber);
+        },
         .linux_syscall => |count| {
             for (call.args.items[1..], 0..) |arg, index| {
                 if (try lowerDirectCallArg(selector, arg, try ArgReg.fromIndex(index))) |diagnostic| return diagnostic;

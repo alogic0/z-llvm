@@ -747,9 +747,9 @@ test "value-use named scalar request provenance distinguishes lhs and rhs failur
     try std.testing.expect(transaction.failedRequestIs(rhs));
 }
 
-test "value-use narrow shift preserves a current RCX input while staging a spilled count and rolls back" {
+test "value-use shift preserves a current RCX input while staging a spilled count and rolls back" {
     const boundaries = [_]?Transaction.NamedScalarTestFailure{ null, .after_first_operand_staging, .after_accumulator_preparation, .after_second_operand_staging, .after_first_arithmetic_write, .after_result_identity_ownership, .after_result_definition, .after_finalization };
-    for ([_]bool{ false, true }) |initial_preservation| for ([_]u16{ 4, 9, 16 }) |bits| for (boundaries) |boundary| {
+    for ([_]bool{ false, true }) |initial_preservation| for ([_]u16{ 4, 9, 16, 64 }) |bits| for (boundaries) |boundary| {
         var machine = MachineFunction.init("current-shift-input", .{ .int = bits });
         defer machine.deinit(std.testing.allocator);
         var plan = SelectorAllocationPlan.init(std.testing.allocator);
@@ -764,7 +764,8 @@ test "value-use narrow shift preserves a current RCX input while staging a spill
         selector.stack_frame_bytes = 128;
         selector.next_spill_slot = 1;
         selector.preserve_current_position_values = initial_preservation;
-        try selector_state.bindValueLoc(&selector, "lhs", .{ .scratch32 = .rcx });
+        const lhs_home: ValueLoc = if (bits == 64) .{ .scratch64 = .rcx } else .{ .scratch32 = .rcx };
+        try selector_state.bindValueLoc(&selector, "lhs", lhs_home);
         try selector_state.bindValueLoc(&selector, "rhs", .{ .spill64 = .slot0 });
         const saved_lhs = selector.values.get("lhs").?;
         const saved_rhs = selector.values.get("rhs").?;
@@ -777,13 +778,13 @@ test "value-use narrow shift preserves a current RCX input while staging a spill
             defer transaction.deinit();
             transaction.named_scalar_test_failure = boundary;
             const handle = try registerFixture(&transaction, .{
-                .family = .b04,
+                .family = if (bits == 64) .b05 else .b04,
                 .operation = .shl,
                 .bits = bits,
                 .exact_ei = bits < 16,
-                .lhs_loc = .{ .scratch32 = .rcx },
+                .lhs_loc = lhs_home,
                 .rhs_loc = .{ .spill64 = .slot0 },
-                .expected_first = .shl_eax_cl,
+                .expected_first = if (bits == 64) .shl_rax_cl else .shl_eax_cl,
             });
             try transaction.seal();
             try transaction.prepare();

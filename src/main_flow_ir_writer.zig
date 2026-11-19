@@ -523,6 +523,7 @@ pub fn emitCodegenModule(
         .emit_all_globals = options.codegen_reachable,
         .require_resolved_aliases = options.codegen_reachable or assembly_aliases != null,
         .functions = lowering_functions,
+        .attribute_groups = module.attribute_groups.items,
         .declarations = module.declarations.items,
     };
     var required = try @import("codegen/x86_64/direct_callees.zig").Queue.init(allocator, module.functions.items);
@@ -633,6 +634,7 @@ pub fn emitCodegenModule(
     var discard_writer: std.Io.Writer.Discarding = .init(&discard_buffer);
     const stdout = if (options.quiet) &discard_writer.writer else &stdout_writer.interface;
     if (emit == .@"asm") {
+        for (module.globals.items) |global| try mc.assembly.printWeakDeclaration(global, stdout);
         for (machines.items) |machine| try mc.assembly.printFunction(machine, stdout);
     } else {
         const scope = @import("compilation_profile.zig").enter(options.profile, .object_write);

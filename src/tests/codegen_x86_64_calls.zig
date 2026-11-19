@@ -2297,3 +2297,56 @@ test "x86_64 codegen supports five named f32 pass-through call args" {
     try std.testing.expectEqual(codegen.x86_64.Instruction.add_rsp_8, machine.instructions.items[2]);
     try std.testing.expectEqual(codegen.x86_64.Instruction.ret, machine.instructions.items[3]);
 }
+
+test "startup follows only one complete path of empty forwarders to the exact transfer" {
+    const a = std.testing.allocator;
+    const cfi = "  call void asm sideeffect \".cfi_undefined %rip\", \"~{dirflag},~{fpsr},~{flags}\"()\n";
+    const transfer = "  call void asm sideeffect \" xorl %ebp, %ebp\\0A movq %rsp, %rdi\\0A andq $$-16, %rsp\\0A callq ${1:P}\", \"X,X,~{dirflag},~{fpsr},~{flags}\"(";
+    const self = "ptr getelementptr inbounds (i8, ptr @start._start, i64 0), ";
+    const target_arg = "ptr getelementptr inbounds (i8, ptr @host_entry, i64 0))\n";
+    const last = transfer ++ self ++ target_arg ++ "  unreachable\n";
+    const trapped = transfer ++ self ++ target_arg ++ "  call void @llvm.trap()\n  unreachable\n";
+    for ([_]struct { body: []const u8, valid: bool = false, has_trap: bool = false }{
+        .{ .body = cfi ++ trapped, .valid = true, .has_trap = true },
+        .{ .body = cfi ++ "  br label %end\nend:\n" ++ trapped, .valid = true, .has_trap = true },
+        .{ .body = cfi ++ last, .valid = true },
+        .{ .body = cfi ++ "  br label %first\nend:\n" ++ last ++ "first:\n  br label %second\nsecond:\n  br label %end\n", .valid = true },
+        .{ .body = cfi ++ "  br label %hop\nhop:\n  call void @observe()\n  br label %end\nend:\n" ++ last },
+        .{ .body = cfi ++ "  br i1 true, label %hop, label %end\nhop:\n  call void @observe()\n  br label %end\nend:\n" ++ last },
+        .{ .body = cfi ++ "  br label %loop\nloop:\n  br label %loop\nend:\n" ++ last },
+        .{ .body = cfi ++ "  br label %end\nunused:\n  br label %end\nend:\n" ++ last },
+        .{ .body = cfi ++ transfer ++ self ++ "ptr getelementptr (i8, ptr @host_entry, i64 1))\n  unreachable\n" },
+        .{ .body = cfi ++ transfer ++ "ptr @host_entry, " ++ target_arg ++ "  unreachable\n" },
+        .{ .body = cfi ++ transfer ++ self ++ "ptr inttoptr (i64 1 to ptr))\n  unreachable\n" },
+    }) |case| {
+        const input = try std.fmt.allocPrint(a, "declare void @llvm.trap()\ndeclare void @observe()\ndeclare void @host_entry(ptr)\ndefine void @start._start() {{\nentry:\n{s}}}\n", .{case.body});
+        defer a.free(input);
+        var module = try ir.Module.parse(a, input);
+        defer module.deinit();
+        try module.verify();
+        const f = module.functions.items[0];
+        var selected = codegen.x86_64.MachineFunction.init(f.name, f.ret_ty);
+        defer selected.deinit(a);
+        const lowered = @import("../codegen/x86_64/generic_cfg/cabi_boundary_rows.zig").lowerStartTrampoline(a, &selected, f);
+        if (case.valid) {
+            try std.testing.expect(try lowered);
+            try codegen.x86_64.verifyFunction(selected);
+            const instructions = selected.instructions.items;
+            if (case.has_trap) {
+                try std.testing.expectEqualStrings("host_entry", instructions[instructions.len - 2].direct_call.symbol);
+                try std.testing.expect(instructions[instructions.len - 1] == .ud2);
+            } else {
+                try std.testing.expectEqualStrings("host_entry", instructions[instructions.len - 1].noreturn_direct_call);
+            }
+            if (f.blocks.items.len > 1) for (f.blocks.items, 0..) |block, i| {
+                try std.testing.expectEqualStrings(block.name, selected.instructions.items[i].label);
+            };
+        } else {
+            if (lowered) |_| return error.TestUnexpectedResult else |err| switch (err) {
+                error.UnsupportedCodegenControlFlow, error.UnsupportedCodegenInstruction => {},
+                else => return err,
+            }
+            try std.testing.expectEqual(@as(usize, 0), selected.instructions.items.len);
+        }
+    }
+}

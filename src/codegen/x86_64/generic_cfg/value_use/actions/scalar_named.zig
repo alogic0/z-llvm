@@ -117,6 +117,15 @@ pub fn executeNamedScalarBinary(
                 locIsAccumulator(transaction.prepared_views[rhs_index].canonical_source_loc) and
                 !locIsAccumulator(transaction.prepared_views[lhs_index].canonical_source_loc) and
                 !try Authority.mustSurviveInstruction(Authority, transaction, rhs_index);
+            // A count copied into CL overwrites an as-yet unconsumed RCX
+            // operand even when its SSA interval ends at this instruction.
+            const containsReg = @import("../../composed_helpers.zig").locContainsReg;
+            if (plan == .b05_wide_shift and bits == 64 and
+                containsReg(transaction.prepared_views[lhs_index].canonical_source_loc, .rcx) and
+                !containsReg(transaction.prepared_views[rhs_index].canonical_source_loc, .rcx))
+            {
+                try selector_state.spillValueOrError(transaction.selector, lhs_name);
+            }
             {
                 // The shift's LHS is still an input while the count is staged.
                 const previous = transaction.selector.preserve_current_position_values;

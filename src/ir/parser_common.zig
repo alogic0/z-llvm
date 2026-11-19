@@ -478,18 +478,25 @@ pub fn parseDeclParams(allocator: std.mem.Allocator, decl: *core.FunctionDecl, t
             break;
         }
         const parsed_ty = try parseLeadingType(param_text);
-        var parts = std.mem.tokenizeAny(u8, parsed_ty.after, " \t");
-        const attrs_start = if (parts.next()) |part| @intFromPtr(part.ptr) - @intFromPtr(param_text.ptr) else null;
-        if (attrs_start) |start| {
-            try decl.params.append(allocator, .{
-                .ty = parsed_ty.ty,
-                .attrs = std.mem.trim(u8, param_text[start..], " \t"),
-            });
-        } else {
-            try decl.params.append(allocator, .{ .ty = parsed_ty.ty });
-        }
+        try decl.params.append(allocator, try parseDeclParam(parsed_ty.ty, parsed_ty.after));
         rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
     }
+}
+
+fn parseDeclParam(ty: core.Type, text: []const u8) !core.DeclParam {
+    const tail = std.mem.trim(u8, text, " \t");
+    var parts = tail;
+    while (parts.len != 0) {
+        const end = syntax.findTopLevelTokenEnd(parts) orelse return error.InvalidParameter;
+        const token = parts[0..end];
+        if (token[0] == '%') {
+            if (token.len == 1 or end != parts.len) return error.InvalidParameter;
+            const attrs = std.mem.trimEnd(u8, tail[0 .. tail.len - parts.len], " \t");
+            return .{ .ty = ty, .name = token[1..], .attrs = if (attrs.len != 0) attrs else null };
+        }
+        parts = std.mem.trimStart(u8, parts[end..], " \t");
+    }
+    return .{ .ty = ty, .attrs = if (tail.len != 0) tail else null };
 }
 
 pub fn implicitEntryBlockName(module: *core.Module, function: core.Function, first_line: []const u8) ![]const u8 {
@@ -527,25 +534,11 @@ pub fn parseFunctionParams(allocator: std.mem.Allocator, function: *core.Functio
                 return;
             }
             const parsed_ty = try parseLeadingType(param_text);
-            const after_type = std.mem.trim(u8, parsed_ty.after, " \t");
-            var parts = after_type;
-            var param_name_token: ?[]const u8 = null;
-            while (parts.len != 0) {
-                const end = syntax.findTopLevelTokenEnd(parts) orelse return error.InvalidParameter;
-                const part = parts[0..end];
-                parts = std.mem.trimStart(u8, parts[end..], " \t");
-                if (std.mem.startsWith(u8, part, "%")) {
-                    if (part.len == 1 or parts.len != 0) return error.InvalidParameter;
-                    param_name_token = part;
-                    break;
-                }
-            }
-            const param_name = param_name_token orelse return error.InvalidParameter;
-            const param_attrs = std.mem.trim(u8, after_type[0..(@intFromPtr(param_name.ptr) - @intFromPtr(after_type.ptr))], " \t");
+            const param = try parseDeclParam(parsed_ty.ty, parsed_ty.after);
             try function.params.append(allocator, .{
-                .ty = parsed_ty.ty,
-                .attrs = if (param_attrs.len == 0) null else param_attrs,
-                .name = param_name[1..],
+                .ty = param.ty,
+                .name = param.name orelse return error.InvalidParameter,
+                .attrs = param.attrs,
             });
             rest = if (comma) |index| std.mem.trim(u8, rest[index + 1 ..], " \t") else "";
         }

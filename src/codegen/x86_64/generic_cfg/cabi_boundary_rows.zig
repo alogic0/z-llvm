@@ -558,24 +558,54 @@ pub fn lowerStartTrampoline(allocator: std.mem.Allocator, machine: *MachineFunct
     if (!std.mem.eql(u8, function.name, "start._start")) return false;
     if (function.ret_ty != .void) return false;
     if (function.params.items.len != 0) return false;
-    if (function.blocks.items.len != 1) return error.UnsupportedCodegenControlFlow;
+    const body = try startTrampolineBody(allocator, function);
+    if (body.len != 1 and body.len != 2) return error.UnsupportedCodegenControlFlow;
+    const call_target = try validateStartTrampolineInlineAsm(body[0]);
+    if (body.len == 2) try validateTrapCall(body[1]);
 
-    const block = function.blocks.items[0];
-    const terminator = block.terminator orelse return error.BlockWithoutTerminator;
-    switch (terminator) {
-        .@"unreachable" => {},
-        .ret, .br, .condbr, .@"switch", .indirectbr => return error.UnsupportedCodegenControlFlow,
+    // CFI and empty forwarding blocks have no executable instructions. Keep
+    // their source labels at the first byte of the trampoline for blockaddress.
+    if (function.blocks.items.len > 1) {
+        for (function.blocks.items) |block|
+            try machine.instructions.append(allocator, .{ .label = block.name });
     }
-    if (block.instructions.items.len != 2 and block.instructions.items.len != 3) return error.UnsupportedCodegenControlFlow;
-    try validateStartCfiInlineAsm(block.instructions.items[0]);
-    const call_target = try validateStartTrampolineInlineAsm(block.instructions.items[1]);
-    if (block.instructions.items.len == 3) try validateTrapCall(block.instructions.items[2]);
-
     try machine.instructions.append(allocator, .xor_ebp_ebp);
     try machine.instructions.append(allocator, .mov_rsp_rdi);
     try machine.instructions.append(allocator, .and_rsp_neg16);
-    try machine.instructions.append(allocator, .{ .noreturn_direct_call = call_target });
+    if (body.len == 2) {
+        try machine.instructions.append(allocator, .{ .direct_call = .{ .symbol = call_target, .ret_ty = .void } });
+        try machine.instructions.append(allocator, .ud2);
+    } else {
+        try machine.instructions.append(allocator, .{ .noreturn_direct_call = call_target });
+    }
     return true;
+}
+
+/// Follow the entry edges. A total visit count proves the terminal path
+/// covers every block; a cycle exhausts the bound without reaching it.
+fn startTrampolineBody(allocator: std.mem.Allocator, function: ir.Function) ![]const ir.Instruction {
+    const blocks = function.blocks.items;
+    if (blocks.len == 0 or blocks[0].instructions.items.len == 0) return error.UnsupportedCodegenControlFlow;
+    try validateStartCfiInlineAsm(blocks[0].instructions.items[0]);
+    var graph = try @import("../../../analysis/cfg.zig").Graph.build(allocator, function);
+    defer graph.deinit();
+    var index: usize = 0;
+    for (0..blocks.len) |visited| {
+        const block = blocks[index];
+        const instructions = if (visited == 0) block.instructions.items[1..] else block.instructions.items;
+        switch (block.terminator orelse return error.BlockWithoutTerminator) {
+            .br => {
+                if (instructions.len != 0) return error.UnsupportedCodegenInstruction;
+                index = graph.successors(index)[0];
+            },
+            .@"unreachable" => {
+                if (visited + 1 != blocks.len) return error.UnsupportedCodegenControlFlow;
+                return instructions;
+            },
+            else => return error.UnsupportedCodegenControlFlow,
+        }
+    }
+    return error.UnsupportedCodegenControlFlow;
 }
 
 pub fn validateStartCfiInlineAsm(instruction: ir.Instruction) !void {
@@ -613,16 +643,12 @@ pub fn validateStartTrampolineInlineAsm(instruction: ir.Instruction) ![]const u8
     if (!std.mem.eql(u8, inline_asm.constraints, "X,X,~{dirflag},~{fpsr},~{flags}")) return error.UnsupportedCodegenInstruction;
 
     const self_arg = call.args.items[0];
-    if (self_arg.ty != .ptr or !isNamed(self_arg.value, "@start._start")) return error.UnsupportedCodegenInstruction;
-
     const target_arg = call.args.items[1];
-    if (target_arg.ty != .ptr) return error.UnsupportedCodegenInstruction;
-    const call_target = switch (target_arg.value) {
-        .named => |name| name,
-        .int, .fp, .undef, .poison, .null_value, .zero_initializer, .vector, .constant_expr => return error.UnsupportedCodegenInstruction,
-    };
-    if (!std.mem.startsWith(u8, call_target, "@")) return error.UnsupportedCodegenInstruction;
-    return call_target[1..];
+    if (self_arg.ty != .ptr or target_arg.ty != .ptr) return error.UnsupportedCodegenInstruction;
+    const addresses = @import("../symbol_address.zig");
+    const self = addresses.zeroOffsetSymbol(self_arg.value) orelse return error.UnsupportedCodegenInstruction;
+    if (!ir.identifiers.eql(self, "start._start")) return error.UnsupportedCodegenInstruction;
+    return addresses.zeroOffsetSymbol(target_arg.value) orelse error.UnsupportedCodegenInstruction;
 }
 
 pub fn lowerSelectedInfiniteLoop(allocator: std.mem.Allocator, machine: *MachineFunction, function: ir.Function) !bool {

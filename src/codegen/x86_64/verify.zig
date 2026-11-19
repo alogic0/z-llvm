@@ -15,7 +15,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             for (jump.targets) |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget;
         },
         .linux_syscall => |count| if (count > 6) return error.UnsupportedCodegenInstruction,
-        .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax, .valgrind_client_request => {},
+        .read_thread_pointer_rax, .linux_clone_trampoline, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax, .valgrind_client_request => {},
         .je, .jne, .jo, .jc, .jp, .js, .jae, .jle, .jmp => |target_name| if (!hasLabel(function, target_name)) return error.InvalidBranchTarget,
         .push_byval_tail_arg_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
         .push_byval_tail_stack_ptr => |copy| try validateByvalTail(copy.offset, copy.len),
@@ -512,7 +512,7 @@ pub fn verifyFunction(function: MachineFunction) !void {
             .i80_rax_rdx_st0 => {},
             .x87_st0_i80_rax_rdx => eax_defined = true,
             .x87_binary_pop, .x87_sqrt_st0 => {},
-            .linux_syscall, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax => eax_defined = true,
+            .read_thread_pointer_rax, .linux_clone_trampoline, .linux_syscall, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax => eax_defined = true,
             .valgrind_client_request => {},
             .indirect_jump => saw_terminator = true,
             .label => |label| {
@@ -889,7 +889,7 @@ fn recordXmmDefinitions(instruction: machine_ir.Instruction, defined_bits: *[8]u
 
 fn hasLabel(function: MachineFunction, name: []const u8) bool {
     for (function.instructions.items) |instruction| switch (instruction) {
-        .linux_syscall, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax, .valgrind_client_request, .indirect_jump => {},
+        .read_thread_pointer_rax, .linux_clone_trampoline, .linux_syscall, .register_snapshot_rdi, .cpuid_packed, .xgetbv_eax, .valgrind_client_request, .indirect_jump => {},
         .label => |label_name| if (std.mem.eql(u8, label_name, name)) return true,
         .mov_imm_eax,
         .mov_imm_rax,

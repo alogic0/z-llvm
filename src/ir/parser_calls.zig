@@ -51,8 +51,14 @@ pub fn parseCall(allocator: std.mem.Allocator, result: ?[]const u8, text: []cons
         break :blk function_ty;
     } else null;
 
-    const open_paren = findOpenParenOutsideString(rest, 0) orelse return error.InvalidCall;
-    const close_paren = findMatchingParen(rest, open_paren) orelse return error.InvalidCall;
+    var open_paren = findOpenParenOutsideString(rest, 0) orelse return error.InvalidCall;
+    var close_paren = findMatchingParen(rest, open_paren) orelse return error.InvalidCall;
+    // A constant-expression callee has its own parentheses before the arguments.
+    if (isSupportedConstantExpr(rest[0 .. close_paren + 1])) {
+        const arguments = std.mem.trimStart(u8, rest[close_paren + 1 ..], " \t");
+        open_paren = rest.len - arguments.len;
+        close_paren = findMatchingParen(rest, open_paren) orelse return error.InvalidCall;
+    }
     const callee_text = std.mem.trim(u8, rest[0..open_paren], " \t");
     const inline_asm = if (std.mem.startsWith(u8, callee_text, "asm "))
         try parseInlineAsm(callee_text)

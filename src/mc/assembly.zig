@@ -3,6 +3,26 @@ const ir = @import("../ir.zig");
 const x86_64 = @import("../codegen/x86_64.zig");
 const selector_bytes = @import("../codegen/x86_64/selector_bytes.zig");
 
+pub fn printWeakDeclaration(global: ir.Global, writer: anytype) !void {
+    if (global.linkage != .extern_weak) return;
+    if (global.initializer != .none) return error.UnsupportedGlobalLinkage;
+    // Instruction operands use this same assembler symbol spelling. An LLVM
+    // hexadecimal escape or a GAS expression needs a distinct quoting policy.
+    const name = global.name;
+    if (name.len == 0 or std.ascii.isDigit(name[0])) return error.UnsupportedAssemblySymbolName;
+    for (name) |byte| if (!std.ascii.isAlphanumeric(byte) and byte != '_' and byte != '.' and byte != '$')
+        return error.UnsupportedAssemblySymbolName;
+    if (name[0] == '$') return error.UnsupportedAssemblySymbolName;
+    const props = try @import("../codegen/x86_64/symbol_address.zig").globalProperties(global);
+    try writer.print("\t.weak {s}\n\t.type {s}, @{s}\n", .{ name, name, if (props.tls) "tls_object" else "object" });
+    switch (props.visibility) {
+        0 => {},
+        2 => try writer.print("\t.hidden {s}\n", .{name}),
+        3 => try writer.print("\t.protected {s}\n", .{name}),
+        else => return error.UnsupportedGlobalVisibility,
+    }
+}
+
 pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
     try @import("../codegen/x86_64/function_alignment.zig").validate(function.symbol_alignment);
     try writer.writeAll("\t.text\n");
@@ -46,6 +66,8 @@ pub fn printFunction(function: x86_64.MachineFunction, writer: anytype) !void {
                 if (count >= 4) try writer.writeAll("\tmovq %rcx, %r10\n");
                 try writer.writeAll("\tsyscall\n");
             },
+            .read_thread_pointer_rax => try writer.writeAll("\tmovq %fs:0, %rax\n"),
+            .linux_clone_trampoline => try writer.writeAll(@import("../codegen/x86_64/linux_runtime_asm.zig").clone_text),
             .register_snapshot_rdi => {
                 for ([_][]const u8{ "rax", "rdx", "rcx", "rbx", "rsi", "rdi", "rbp", "rsp", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" }, 0..) |reg, index|
                     try writer.print("\tmovq %{s}, {d}(%rdi)\n", .{ reg, index * 8 });

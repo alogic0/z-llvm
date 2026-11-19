@@ -68,6 +68,7 @@ pub fn inspectFunctionWithContext(function: ir.Function, context: ?*const x86_64
 }
 
 fn inspectInstruction(instruction: ir.Instruction, context: ?*const x86_64_types.ReadOnlyModuleContext) ?Diagnostic {
+    if (@import("../debug_locations.zig").isLocation(instruction)) return null;
     return switch (instruction.kind) {
         .binary => |binary| inspectBinary(binary),
         .cast => |cast| inspectCast(cast),
@@ -352,7 +353,6 @@ fn inspectCall(call: ir.CallInst) ?Diagnostic {
             return .{ .unsupported_value = "indirect-call" };
     }
     if (call.raw_args != null) return .{ .unsupported_instruction = "raw-call-args" };
-    if (call.isDebugVariableLocation()) return null;
     if (std.mem.eql(u8, call.callee, "llvm.experimental.noalias.scope.decl"))
         return if (intrinsic_attrs.isNoAliasScopeDecl(call)) null else .{ .unsupported_instruction = "llvm.experimental.noalias.scope.decl" };
     if (std.mem.eql(u8, call.callee, "llvm.assume")) {

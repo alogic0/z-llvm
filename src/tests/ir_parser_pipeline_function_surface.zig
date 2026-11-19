@@ -27,6 +27,13 @@ const instcombine = ir_common.instcombine;
 const zig_air_export = ir_common.zig_air_export;
 const zig_air_lowering = ir_common.zig_air_lowering;
 
+test "legacy nocapture shares the verified pointer capture set" {
+    try ir.verifyParameterAttrs(.ptr, "noalias nocapture writeonly");
+    try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.{ .int = 64 }, "nocapture"));
+    for ([_][]const u8{ "nocapture nocapture", "captures(none) nocapture", "nocapture captures(address)" }) |attrs|
+        try std.testing.expectError(error.UnsupportedCallAttribute, ir.verifyParameterAttrs(.ptr, attrs));
+}
+
 test "nullable memory attributes retain every function and call boundary" {
     for ([_][]const u8{ "dereferenceable_or_null(0)", "dereferenceable_or_null(16)", "noundef align 8 dereferenceable_or_null(140)", "dereferenceable(8) dereferenceable_or_null(16)" }) |attrs| {
         const text = try std.fmt.allocPrint(std.testing.allocator,
@@ -1036,4 +1043,16 @@ test "verifier accepts dead_on_unwind on pointer parameters and rejects invalid 
     var bad_dup_module = try ir.Module.parse(std.testing.allocator, bad_duplicate);
     defer bad_dup_module.deinit();
     try std.testing.expectError(error.UnsupportedCallAttribute, bad_dup_module.verify());
+}
+
+test "naked function attributes are complete tokens across group references" {
+    const attrs = @import("../ir/function_attributes.zig");
+    const groups = [_][]const u8{
+        "attributes #0 = { nounwind \"note\"=\"not naked\" }",
+        "attributes #1 = { naked noreturn nounwind }",
+    };
+    try std.testing.expect(attrs.contains("#0 #1", &groups, "naked"));
+    try std.testing.expect(attrs.contains("#0 naked", &groups, "naked"));
+    try std.testing.expect(!attrs.contains("#0", &groups, "naked"));
+    try std.testing.expect(!attrs.contains("\"naked\"=\"yes\"", &groups, "naked"));
 }

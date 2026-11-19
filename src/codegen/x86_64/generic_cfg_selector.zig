@@ -55,6 +55,21 @@ pub fn tryLowerObserved(
     profile: ?*@import("../../compilation_profile.zig").Profile,
     observer: ?*Observer,
 ) !SelectionResult {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const function = try @import("debug_locations.zig").executableView(arena.allocator(), source);
+    return tryLowerExecutableObserved(allocator, machine, function, module_context, profile, observer);
+}
+
+/// The caller has already removed debug-only records from its private view.
+pub fn tryLowerExecutableObserved(
+    allocator: std.mem.Allocator,
+    machine: *MachineFunction,
+    source: ir.Function,
+    module_context: ?*const x86_64_machine.ReadOnlyModuleContext,
+    profile: ?*@import("../../compilation_profile.zig").Profile,
+    observer: ?*Observer,
+) !SelectionResult {
     return tryLowerObservedInner(allocator, machine, source, module_context, profile, observer) catch |err| {
         if (err != error.ValueUseIdentityTooLong) return err;
         // Composed lowering has already rolled back its failed transaction.

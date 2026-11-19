@@ -13,6 +13,7 @@ pub const ReadOnlyModuleContext = struct {
     emit_all_globals: bool = false,
     require_resolved_aliases: bool = false,
     functions: []const ir.Function = &.{},
+    attribute_groups: []const []const u8 = &.{},
     declarations: []const ir.FunctionDecl = &.{},
     aliases: []const ir.GlobalAlias = &.{},
 

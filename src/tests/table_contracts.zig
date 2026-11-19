@@ -280,3 +280,34 @@ test "constant table independent objects keep private and internal storage local
         }
     }
 }
+
+test "constant function pointer call normalization preserves arity and nonzero offsets" {
+    const a = std.testing.allocator;
+    var module = try ir.Module.parse(a,
+        \\declare i64 @callee(i64, i64)
+        \\
+        \\define i64 @caller(i64 %a, i64 %b) {
+        \\entry:
+        \\  %r = call i64 getelementptr inbounds (i8, ptr @callee, i64 0)(i64 %a, i64 %b)
+        \\  %s = call i64 getelementptr (i8, ptr @callee, i64 7)(i64 %r, i64 %b)
+        \\  ret i64 %s
+        \\}
+        \\
+    );
+    defer module.deinit();
+    try module.verify();
+    var temp = std.heap.ArenaAllocator.init(a);
+    defer temp.deinit();
+    var call_context = context(&module);
+    call_context.declarations = module.declarations.items;
+    const selected = (try pointers.legalize(temp.allocator(), module.functions.items[0], &call_context)).?;
+    const direct = selected.blocks.items[0].instructions.items[0].kind.call;
+    try std.testing.expectEqualStrings("callee", direct.callee);
+    try std.testing.expect(direct.callee_value == null and direct.args.items.len == 2);
+    try std.testing.expectEqualStrings("a", direct.args.items[0].value.named);
+    try std.testing.expectEqualStrings("b", direct.args.items[1].value.named);
+    const offset = selected.blocks.items[0].instructions.items[1].kind.call;
+    try std.testing.expectEqualStrings("getelementptr (i8, ptr @callee, i64 7)", offset.callee_value.?.constant_expr);
+    try std.testing.expect(offset.callee.len == 0 and offset.args.items.len == 2);
+    try std.testing.expect(module.functions.items[0].blocks.items[0].instructions.items[0].kind.call.callee_value != null);
+}

@@ -776,7 +776,7 @@ pub fn pointerCallAttrsAreAdvisory(attrs: []const u8) bool {
         if (std.mem.eql(u8, token, "noalias")) continue;
         if (std.mem.eql(u8, token, "allocptr")) continue;
         if (std.mem.eql(u8, token, "dead_on_unwind")) continue;
-        if (std.mem.eql(u8, token, "captures(none)")) continue;
+        if (std.mem.eql(u8, token, "captures(none)") or std.mem.eql(u8, token, "nocapture")) continue;
         if (std.mem.eql(u8, token, "captures(address)")) continue;
         if (std.mem.eql(u8, token, "captures(address_is_null)")) continue;
         if (initializesAttrSupported(token)) {

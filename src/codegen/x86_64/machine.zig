@@ -16,6 +16,10 @@ pub const Instruction = union(enum) {
     // homes; encoding moves the fourth from RCX to R10. RCX/R11/flags and
     // memory are clobbered. R10 is also written when arguments >= 4.
     linux_syscall: u3,
+    /// Load the first thread-control-block word using FS.
+    read_thread_pointer_rax,
+    /// A naked SysV clone entry saves the seventh argument before changing stacks.
+    linux_clone_trampoline,
     // Reads all GPRs, writes 17 words through RDI (DWARF register order),
     // and defines RAX with the captured instruction pointer.
     register_snapshot_rdi,

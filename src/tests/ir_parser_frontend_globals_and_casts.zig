@@ -545,6 +545,61 @@ test "parser preserves indirect call form conservatively" {
     try std.testing.expectEqualStrings(indirect, output.writer.buffered());
 }
 
+test "declaration parameter names are independent of attributes and nested type names" {
+    const text =
+        \\%T = type { i32 }
+        \\
+        \\declare void @f(ptr sret(%T) %"result slot", i32 zeroext %0, i64, ptr align 2)
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const params = module.declarations.items[0].params.items;
+    try std.testing.expectEqualStrings("sret(%T)", params[0].attrs.?);
+    try std.testing.expectEqualStrings("\"result slot\"", params[0].name.?);
+    try std.testing.expectEqualStrings("0", params[1].name.?);
+    try std.testing.expect(params[2].attrs == null and params[2].name == null);
+    try std.testing.expectEqualStrings("align 2", params[3].attrs.?);
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(text, output.writer.buffered());
+}
+
+test "call argument lists follow the whole constant-expression callee" {
+    const input =
+        \\declare void @callee(ptr %p)
+        \\
+        \\define i32 @caller(ptr %p) {
+        \\entry:
+        \\  call void getelementptr inbounds (i8, ptr @callee, i64 0)(ptr %p)
+        \\  %r = call i32 getelementptr (i8, ptr @callee, i64 7)(ptr %p)
+        \\  ret i32 %r
+        \\}
+        \\
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+
+    const instructions = module.functions.items[0].blocks.items[0].instructions.items;
+    const expected = [_][]const u8{
+        "getelementptr inbounds (i8, ptr @callee, i64 0)",
+        "getelementptr (i8, ptr @callee, i64 7)",
+    };
+    for (instructions, expected) |instruction, expr| {
+        const call = instruction.kind.call;
+        try std.testing.expectEqualStrings(expr, call.callee_value.?.constant_expr);
+        try std.testing.expectEqual(@as(usize, 1), call.args.items.len);
+        try std.testing.expectEqualStrings("p", call.args.items[0].value.named);
+    }
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try module.print(&output.writer);
+    try std.testing.expectEqualStrings(input, output.writer.buffered());
+}
+
 test "parser rejects unsupported control-flow call forms" {
     const invoke =
         \\define i32 @caller(i32 %a) {

@@ -479,6 +479,89 @@ test "parser preserves debug declare intrinsics as variable-location boundary" {
     try std.testing.expectEqualStrings(input, output.writer.buffered());
 }
 
+test "instruction selection preserves printed variable locations and ordinary call diagnostics" {
+    const alloc = std.testing.allocator;
+    const x86 = codegen.x86_64;
+    const triple = "x86_64-unknown-linux-gnu";
+    const input =
+        \\declare void @llvm.dbg.value(metadata, metadata, metadata)
+        \\declare void @llvm.dbg.declare(metadata, metadata, metadata)
+        \\declare void @ordinary()
+        \\
+        \\define i32 @locations(i32 %a) !dbg !4 {
+        \\entry:
+        \\  call void @llvm.dbg.declare(metadata ptr undef, metadata !9, metadata !DIExpression()), !dbg !8
+        \\  %sum = add i32 %a, 3
+        \\  call void @llvm.dbg.value(metadata i32 %sum, metadata !9, metadata !DIExpression()), !dbg !8
+        \\  ret i32 %sum
+        \\}
+        \\
+        \\define i32 @reference(i32 %a) {
+        \\entry:
+        \\  %sum = add i32 %a, 3
+        \\  ret i32 %sum
+        \\}
+        \\
+        \\define void @unsupported() !dbg !11 {
+        \\entry:
+        \\  call void @llvm.dbg.value(metadata i32 0, metadata !13, metadata !DIExpression()), !dbg !12
+        \\  call void @ordinary() [ "deopt"() ], !dbg !12
+        \\  ret void
+        \\}
+        \\
+        \\!llvm.dbg.cu = !{!0}
+        \\!llvm.module.flags = !{!1}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!1 = !{i32 2, !"Debug Info Version", i32 3}
+        \\!2 = !DIFile(filename: "locations.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "locations", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!8 = !DILocation(line: 1, column: 1, scope: !4)
+        \\!9 = !DILocalVariable(name: "a", scope: !4, file: !2, line: 1, type: !10)
+        \\!10 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
+        \\!11 = distinct !DISubprogram(name: "unsupported", scope: !2, file: !2, line: 2, type: !5, scopeLine: 2, spFlags: DISPFlagDefinition, unit: !0)
+        \\!12 = !DILocation(line: 2, column: 1, scope: !11)
+        \\!13 = !DILocalVariable(name: "b", scope: !11, file: !2, line: 2, type: !10)
+        \\
+    ;
+    var module = try ir.Module.parse(alloc, input);
+    defer module.deinit();
+    try module.verify();
+    var before: std.Io.Writer.Allocating = .init(alloc);
+    defer before.deinit();
+    try module.print(&before.writer);
+    for ([_]bool{ false, true }) |generic| {
+        const options: x86.CodegenOptions = .{ .generic_cfg_selector = generic };
+        var with_locations = try x86.lowerFunctionWithOptions(alloc, triple, module.functions.items[0], options);
+        defer with_locations.deinit(alloc);
+        var reference = try x86.lowerFunctionWithOptions(alloc, triple, module.functions.items[1], options);
+        defer reference.deinit(alloc);
+        const bytes = try mc.encoding.encodeFunction(alloc, with_locations);
+        defer alloc.free(bytes);
+        const expected = try mc.encoding.encodeFunction(alloc, reference);
+        defer alloc.free(expected);
+        try std.testing.expect(expected.len > 0);
+        try std.testing.expectEqual(reference.selection_owner, with_locations.selection_owner);
+        try std.testing.expectEqualSlices(u8, expected, bytes);
+    }
+
+    const selector = @import("../codegen/x86_64/generic_cfg_selector.zig");
+    const unsupported = module.functions.items[2];
+    var machine = x86.MachineFunction.init(unsupported.name, unsupported.ret_ty);
+    defer machine.deinit(alloc);
+    const selected = try selector.tryLower(alloc, &machine, unsupported);
+    try std.testing.expectEqualStrings("operand-bundle-call", selected.unsupported.detail());
+    try std.testing.expectEqualStrings("operand-bundle-call", selector.inspectFunction(unsupported).unsupported.detail());
+
+    var printed: std.Io.Writer.Allocating = .init(alloc);
+    defer printed.deinit();
+    try module.print(&printed.writer);
+    try std.testing.expectEqualStrings(before.writer.buffered(), printed.writer.buffered());
+    try std.testing.expect(std.mem.indexOf(u8, printed.writer.buffered(), "call void @llvm.dbg.declare(metadata ptr undef,") != null);
+    try std.testing.expect(std.mem.indexOf(u8, printed.writer.buffered(), "call void @llvm.dbg.value(metadata i32 %sum,") != null);
+}
+
 test "parser rejects unsupported debug assign intrinsic" {
     const input =
         \\declare void @llvm.dbg.assign(metadata, metadata, metadata, metadata, metadata, metadata)

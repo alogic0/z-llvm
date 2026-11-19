@@ -341,6 +341,7 @@ pub const Param = struct {
 
 pub const DeclParam = struct {
     ty: Type,
+    name: ?[]const u8 = null,
     attrs: ?[]const u8 = null,
 };
 

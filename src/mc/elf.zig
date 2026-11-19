@@ -437,9 +437,8 @@ fn appendReachableGlobals(
         };
         if (global.initializer == .none) {
             const properties = try symbol_address.globalProperties(global);
-            if (properties.tls) {
-                try symbols.append(allocator, .{ .name = global.name, .value = 0, .size = 0, .section_index = 0, .info = 0x16, .other = properties.visibility });
-                try indices.put(global.name, @intCast(symbols.items.len));
+            if (properties.tls or global.linkage == .extern_weak) {
+                try appendUndefinedDataSymbol(allocator, symbols, indices, global, properties);
             }
             continue;
         }
@@ -655,6 +654,19 @@ fn orderLocalSymbols(allocator: std.mem.Allocator, symbols: *std.ArrayList(Symbo
     return count + 1;
 }
 
+fn appendUndefinedDataSymbol(
+    allocator: std.mem.Allocator,
+    symbols: *std.ArrayList(Symbol),
+    indices: *symbol_names.Index,
+    global: ir.Global,
+    properties: symbol_address.GlobalProperties,
+) !void {
+    const binding: u8 = if (global.linkage == .extern_weak) 0x20 else 0x10;
+    const kind: u8 = if (properties.tls) 6 else 1;
+    try symbols.append(allocator, .{ .name = global.name, .value = 0, .size = 0, .section_index = 0, .info = binding | kind, .other = properties.visibility });
+    try indices.put(global.name, @intCast(symbols.items.len));
+}
+
 fn appendSupportedGlobals(
     allocator: std.mem.Allocator,
     data: *std.ArrayList(u8),
@@ -665,6 +677,11 @@ fn appendSupportedGlobals(
 ) !void {
     for (globals) |global| {
         if (symbol_indices.contains(global.name)) continue;
+        if (global.linkage == .extern_weak) {
+            const properties = try symbol_address.globalProperties(global);
+            try appendUndefinedDataSymbol(allocator, symbols, symbol_indices, global, properties);
+            continue;
+        }
         if (symbol_address.globalProperties(global) catch null) |properties| {
             if (properties.read_only_section) return error.UnsupportedGlobalData;
         }

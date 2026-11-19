@@ -6,6 +6,8 @@ const sysv = @import("sysv_abi.zig");
 
 pub const Operation = union(enum) {
     linux_syscall: u3,
+    read_thread_pointer,
+    munmap_exit,
     register_snapshot,
     unsigned_divide,
     valgrind_client_request,
@@ -52,6 +54,21 @@ pub fn classify(call: ir.CallInst) ?Operation {
     if (clientRequest(call)) return .valgrind_client_request;
     if (unsignedDivide(call)) return .unsigned_divide;
     const asm_value = call.inline_asm orelse return null;
+    const runtime = @import("linux_runtime_asm.zig");
+    if (runtime.plain(call)) {
+        if (!asm_value.sideeffect and call.ret_ty.eql(.{ .int = 64 }) and call.args.items.len == 0 and
+            std.mem.eql(u8, asm_value.template, runtime.tls_read) and
+            std.mem.eql(u8, asm_value.constraints, "=r,~{dirflag},~{fpsr},~{flags}")) return .read_thread_pointer;
+        if (asm_value.sideeffect and call.ret_ty == .void and call.args.items.len == 2 and
+            std.mem.eql(u8, asm_value.template, runtime.munmap_exit) and
+            std.mem.eql(u8, asm_value.constraints, "{rdi},{rsi},~{dirflag},~{fpsr},~{flags}"))
+        {
+            for (call.args.items) |arg| {
+                if (!arg.ty.eql(.{ .int = 64 }) or arg.attrs != null or arg.abi_x87_memory or arg.abi_split_integer) return null;
+            }
+            return .munmap_exit;
+        }
+    }
     if (!asm_value.sideeffect or call.callee_value != null or call.callee_function_ty != null or
         call.calling_conv != null or
         call.raw_args != null or call.operand_bundle != null) return null;
