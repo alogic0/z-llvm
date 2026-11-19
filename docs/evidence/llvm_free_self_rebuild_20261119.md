@@ -355,6 +355,20 @@ image. All 32 ranges matched byte for byte.
 · [Zig native link and runtime member](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04-link/actual-link-inputs-and-final-code.json)
 · [Independent object symbols, offsets and final bytes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/report.json)
 
+The earlier diagnostic and the ordinary compiler build consumed identical
+builder and optimized IR. Their 102,792,984-byte objects differ in eight
+bytes, starting at offset 75,465,341. Four bytes change the upper half
+of an RSI immediate in `Progress.Node.end`, and four change the same
+part in `Progress.serialize`. Both functions perform 32-bit atomic AND
+operations, with masks `-127` and `-126`. Both encodings give the same
+32-bit value to `and ecx,esi` before the locked compare-and-exchange.
+All other object bytes match. On a two-operation reproduction the G1 and
+G2 helpers produced identical objects, and the LLVM-built helper produced
+the zero-extended encoding. Each of these three objects and a Clang
+control passed 140 native checks of the old word, new word and neighbors.
+[Complete object comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-zig-trial-object-difference/report.json)
+· [Original IR, machine instructions and native results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-zig-trial-object-difference/context-result.json)
+
 ## Extracted G2 package and generation comparison
 
 The first assembly compared filesystem-component order with flat text

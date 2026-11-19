@@ -519,6 +519,14 @@ implementer retains the original Zig replay object through this comparison.
 Keep the compact symbol and instruction report. Diagnostic scratch can
 be collected as soon as the comparison completes.
 
+The differences affect two 32-bit atomic AND masks in Zig's progress
+reporting. The same run's `context` check reads the ordinary optimizer
+input and verifies the instructions around both masks. Run a native caller
+on the two original atomic operations with G1, G2, the same-source
+LLVM-built helper and Clang. Compare the returned old words, new stored
+words and neighboring memory. All small objects and executables are
+temporary until their numerical results have been recorded.
+
 While the compiler builds, also run the cold upstream suite using
 G1 Zig and its SDK with the installed G2 helper. Verify that the helper
 is the only changed package entry. This checks whole-program emission
