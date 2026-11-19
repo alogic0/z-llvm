@@ -7,41 +7,57 @@ claims cover a shippable compiler and a clean compiler self-rebuild. This
 plan covers baseline `x86_64-linux-gnu`, ReleaseFast, pure Zig source and
 the compiler runtime, system libc and CRT inputs identified for that target.
 
-**Current handoff.** All 1,833 functions of the unchanged application
-emitted into a 3,009,064-byte ELF object on the first startup revision,
-`fd145609`. The runtime emitted 917 of 921 functions and returned an
-error; the cold driver left its new executable path absent. Independent
-review also found that this startup revision omitted an explicit trap
+**Current handoff.** An ordinary cold build of unchanged upstream `cat`
+exited zero on driver `5c6c457c` and helper `e1cfa98f`. The local
+backend emitted all 1,833 application functions and all 921 compiler
+runtime functions. Zig's native linker listed the local application
+object and compiler-runtime archive. All six I/O cases passed. The first
+run's post-build audit failed to match one logged path. The implementer
+is reconciling its records and running serial Tier 3. The reviewer is
+checking the linked inputs, runtime arithmetic, forced errors and cache
+reuse before promoting this handoff.
+[Cold driver and executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/compile-result.json)
+· [Six runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/runtime.json)
+· [Complete runtime and application objects](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-replay/)
+
+The first startup revision, `fd145609`, emitted the application while
+four runtime functions still failed. Independent review found that this
+startup revision also omitted an explicit trap
 after a returning call in both the one-block and multi-block forms.
-The implementer has revised the startup patch (`0cc47bcb`). Run its
-returning-callee tests and recheck both complete modules on the combined
-source. Then build and execute the cold program, qualify the shipped
-bundle and rebuild both generations.
+The reviewer accepted the revised startup patch (`0cc47bcb`). The
+same returning C target reached the explicit trap in all six LLVM and
+local executions. The genuine 3,009,064-byte application object remained
+byte-identical across the startup and arithmetic corrections.
 [First whole application object and runtime selection](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-replay/)
 · [Cold driver result](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-03/compile-result.json)
 · [Independent startup disassembly and reference execution](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-startup-trap/results.json)
+· [Revised single-block and multi-block executions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-startup-trap-fixed/results.json)
 
 Zig's native linker consumed that application object with the known-good
 compiler runtime from the native control. The resulting ELF, `2719a352`,
-passed all six byte-for-byte tests. The pending cold build must generate
-its own runtime through the selected provider.
+passed all six byte-for-byte tests. It has the same bytes as the fresh
+provider-built executable. A separate application-only link and native
+math calls check the contribution of the runtime.
 [Link inputs and executable identity](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-cat-link/result.json)
 · [All six program executions](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/startup-cat-link/runtime.json)
 
 The reviewer accepted the pointer-constant fix (`a6d28ef6`). The
-four remaining runtime shifts all hold their left operand in RCX, which
-count staging overwrites. The count occupies a spill slot in `ldexp`
+four previously rejected runtime shifts all held their left operand in RCX,
+which loading the count overwrote. The count occupied a spill slot in `ldexp`
 and `log_f64`, and RAX in `sqrt_f64` and the unsigned-to-double
-conversion. The implementer owns the general 64-bit correction and the
-historical narrow-shift boundaries. The reviewer will run 17 numerical
-cases against the whole runtime and compare the original conversion
-routine against 4,545 native rounding and boundary inputs.
+conversion. The 64-bit correction, `de5b293d`, passed its alias,
+rollback and historical narrow-shift tests. The original conversion
+routine passed all 4,545 independent numerical comparisons. The original
+input replay produced a 3,061,936-byte runtime object (`b4f14c7a`).
+The cold driver produced a distinct 3,061,992-byte member (`253ddd54`).
+Run the 17 numerical cases against both and compare their results.
 [Selection and operand traces](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-trace/census.stderr)
 · [Independent pointer return and store checks](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-pointer-constants/review.json)
 · [Historical narrow-shift checks](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/pointer-shift-boundary/test.stderr)
 · [Rejected instructions and operands](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-arithmetic-census/selection.jsonl)
 · [Native numerical reference](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-reference/observed.tsv)
 · [Reduced conversion and reference results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-conversion-baseline/results.json)
+· [Corrected conversion and 4,545 comparisons](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-conversion-fixed/results.json)
 
 ## Starting evidence
 
@@ -256,7 +272,11 @@ host tool it prebuilds. The seed can build generation one in a separately
 recorded environment. Then let generation one build generation two from
 the pinned sources with fresh caches and install prefix, using the shipped
 provider and native linker. Build the helper too for a self-rebuilding bundle
-claim. Attribute every build runner, generated tool, compiler object,
+claim. Pinned Zig's build script sets `exe.use_llvm`; inspect how the
+build runner passes the provider to the actual compiler and helper builds.
+Add the corresponding native build option if needed. Check the selected
+provider in each child command and match the emitted object to its link.
+Attribute every build runner, generated tool, compiler object,
 compiler-rt object and final link. A required warmup belongs to the
 generation that performs it, with its own input and output identities.
 
