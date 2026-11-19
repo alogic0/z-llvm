@@ -96,6 +96,34 @@ reviewer will compare independently specified loop variants and fallback
 cases on the baseline and candidate. The production source, native controls,
 benchmarks and qualification each use separately owned managed stages.
 
+**Production candidate.** The five-file patch `cccbc336` built compiler
+`33ee3c18` from 682 verified source inputs. It keeps the accumulator in R9D
+on the original loop. The index and limit still use their frame slots. The
+function shrank from 111 to 95 bytes, with one fewer stack read and one
+fewer write per trip. The 280-byte frame and the loop's two branches remain.
+
+Primary review found that using an otherwise idle R9 would violate the
+callee's register-preservation contract on some calling conventions. The
+implemented guard admits unannotated, nonvariadic functions using the
+ordinary C convention and i32 values. The native caller observed the new
+register use on implicit and explicit C. On `coldcc` and on both inline
+and grouped `"no_caller_saved_registers"`, all nine direct, Fast and Small
+objects matched production byte for byte and preserved the full R9 sentinel.
+A deliberately clobbering callee triggered the check.
+
+The reviewer also ran 490 inputs on each of five separately written loop
+variants. Direct, Fast and Small each matched the C oracle and LLVM reference
+on all 2,450 cases. The renamed arithmetic recurrence used R9D. Tests covered
+an argument used after the loop, two entry values, an external writer and a
+volatile local. See `review-prototype/` and `review-prototype-abi/`.
+
+On the original mixed driver, the candidate won all twelve measured pairs
+in each mode. Median paired savings were 36.42 ms in Fast (17.02%, MAD
+4.43 ms) and 38.00 ms in Small (17.96%, MAD 4.39 ms). The linked image
+shrank from 237,480 to 237,464 bytes. The other four workloads produced
+identical executable bytes across both compiler versions. The reviewer
+authorized selector Tier 2 on the measured candidate.
+
 ## Decision and follow-through
 
 The implementer reports results to the primary reviewer

@@ -1,10 +1,11 @@
 # Next steps
 
-The active milestone is a bounded x86_64 compiler prototype that keeps
-loop state in registers. A matched diagnostic saved 24.69 ms in Fast
-and 21.76 ms in Small on the original driver, with increasing savings at
-64 and 256 trips. The implementer is testing which of those gains normal
-compiler emission can realize. [Current assignment and decision criteria](plans/2026-11-18-loop-register-residency.md)
+The x86_64 compiler prototype keeps the loop accumulator in R9D. On the
+original driver it saved a paired median 36.42 ms in Fast and 38.00 ms
+in Small. Both modes won all twelve pairs. The other four workloads emitted
+identical executables across compiler versions. The focused, native and core
+selector checks passed. The remaining gate runs upstream programs on the
+measured compiler. [Assignment, measurements and review](plans/2026-11-18-loop-register-residency.md)
 
 Both x86_64 loop improvements passed independent review and landed on
 `main`. Forwarding single-use i32 values into their PHI slots
