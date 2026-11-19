@@ -2,6 +2,7 @@ const std = @import("std");
 const ir = @import("../ir.zig");
 const pm = @import("../pass_manager.zig");
 const instcombine = @import("../passes/instcombine.zig");
+const pipelines = @import("../pipelines.zig");
 
 fn combine(module: *ir.Module) !pm.PassResult {
     var context: pm.Context = .{ .allocator = std.testing.allocator };
@@ -101,4 +102,99 @@ test "floating cancellation retains a shared producer and rewrites later block u
     try std.testing.expectEqualStrings("first", function.blocks.items[0].instructions.items[1].kind.store.value.named);
     try std.testing.expectEqualStrings("x", function.blocks.items[1].terminator.?.ret.value.?.named);
     try std.testing.expectEqual(pm.PassResult.unchanged, try combine(&module));
+}
+
+test "floating cancellation in the release pipeline preserves observed SSA results and debug locations" {
+    const observed =
+        \\declare void @llvm.dbg.value(metadata, metadata, metadata)
+        \\define double @observed(double %x) !dbg !4 {
+        \\entry:
+        \\  %intermediate = fadd fast double %x, 0x4270000000000000, !dbg !8
+        \\  call void @llvm.dbg.value(metadata double %intermediate, metadata !9, metadata !DIExpression()), !dbg !8
+        \\  %result = fsub fast double %intermediate, 0x4270000000000000, !dbg !11
+        \\  call void @llvm.dbg.value(metadata double %result, metadata !12, metadata !DIExpression()), !dbg !11
+        \\  ret double %result
+        \\}
+        \\
+    ;
+    const math_format =
+        \\define double @math(double %x) {{
+        \\entry:
+        \\  %first = fadd {s} double %x, 0x4270000000000000
+        \\  %second = fsub {s} double %first, {s}
+        \\  ret double %second
+        \\}}
+        \\
+    ;
+    const unrelated =
+        \\define i32 @unrelated(i32 %v) !dbg !13 {
+        \\entry:
+        \\  %identity = add i32 %v, 0
+        \\  call void @llvm.dbg.value(metadata i32 %identity, metadata !15, metadata !DIExpression()), !dbg !14
+        \\  ret i32 %identity
+        \\}
+        \\!llvm.dbg.cu = !{!0}
+        \\!0 = distinct !DICompileUnit(language: DW_LANG_Zig, file: !2, producer: "zig", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)
+        \\!2 = !DIFile(filename: "debug_float.zig", directory: ".")
+        \\!4 = distinct !DISubprogram(name: "observed", scope: !2, file: !2, line: 1, type: !5, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)
+        \\!5 = !DISubroutineType(types: !6)
+        \\!6 = !{}
+        \\!8 = !DILocation(line: 2, column: 5, scope: !4)
+        \\!9 = !DILocalVariable(name: "intermediate", scope: !4, file: !2, line: 2, type: !10)
+        \\!10 = !DIBasicType(name: "f64", size: 64, encoding: DW_ATE_float)
+        \\!11 = !DILocation(line: 3, column: 5, scope: !4)
+        \\!12 = !DILocalVariable(name: "result", scope: !4, file: !2, line: 3, type: !10)
+        \\!13 = distinct !DISubprogram(name: "unrelated", scope: !2, file: !2, line: 6, type: !5, scopeLine: 6, spFlags: DISPFlagDefinition, unit: !0)
+        \\!14 = !DILocation(line: 7, column: 5, scope: !13)
+        \\!15 = !DILocalVariable(name: "identity", scope: !13, file: !2, line: 7, type: !16)
+        \\!16 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_signed)
+        \\
+    ;
+    for ([_]struct { first: []const u8, second: []const u8, constant: []const u8 = "0x4270000000000000", fold: bool = false }{
+        .{ .first = "fast", .second = "fast", .fold = true },
+        .{ .first = "reassoc nnan ninf nsz", .second = "reassoc nnan ninf nsz", .fold = true },
+        .{ .first = "", .second = "" },
+        .{ .first = "fast", .second = "reassoc nnan ninf" },
+        .{ .first = "reassoc nnan nsz", .second = "fast" },
+        .{ .first = "fast", .second = "fast", .constant = "0x4260000000000000" },
+    }) |case| {
+        const math = try std.fmt.allocPrint(std.testing.allocator, math_format, .{ case.first, case.second, case.constant });
+        defer std.testing.allocator.free(math);
+        const text = try std.mem.concat(std.testing.allocator, u8, &.{ observed, math, unrelated });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var manager = pm.ModulePassManager.init(std.testing.allocator);
+        defer manager.deinit();
+        try pipelines.addPasses(&manager, "zig-release-fast-accepted");
+        var context: pm.Context = .{ .allocator = std.testing.allocator };
+        var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        defer output.deinit();
+        try std.testing.expectEqual(pm.PassResult.changed, try manager.runWithOptions(&module, &context, &output.writer, .{}));
+        try std.testing.expectEqual(@as(usize, 1), context.debug_variable_location_scan_count);
+        for (module.functions.items) |function| {
+            if (std.mem.eql(u8, function.name, "observed")) {
+                const instructions = function.blocks.items[0].instructions.items;
+                try std.testing.expectEqual(@as(usize, 4), instructions.len);
+                try std.testing.expect(instructions[0].kind == .binary and instructions[2].kind == .select);
+                try std.testing.expectEqualStrings("!dbg !8", instructions[0].metadata.?);
+                try std.testing.expectEqualStrings("!dbg !11", instructions[2].metadata.?);
+                try std.testing.expectEqualStrings("x", instructions[2].kind.select.true_value.named);
+                try std.testing.expectEqualStrings("x", instructions[2].kind.select.false_value.named);
+            } else if (std.mem.eql(u8, function.name, "math")) {
+                try std.testing.expectEqual(@as(usize, if (case.fold) 1 else 2), liveBinaries(function));
+                try std.testing.expectEqualStrings("second", function.blocks.items[0].terminator.?.ret.value.?.named);
+            }
+        }
+        try module.print(&output.writer);
+        for ([_][]const u8{
+            "metadata double %intermediate, metadata !9, metadata !DIExpression()), !dbg !8",
+            "metadata double %result, metadata !12, metadata !DIExpression()), !dbg !11",
+            "ret double %result",
+            "%identity = add i32 %v, 0",
+            "metadata i32 %identity, metadata !15, metadata !DIExpression()), !dbg !14",
+        }) |kept| try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), kept) != null);
+        try std.testing.expectEqual(pm.PassResult.unchanged, try manager.runWithOptions(&module, &context, &output.writer, .{}));
+    }
 }

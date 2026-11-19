@@ -1030,6 +1030,53 @@ test "composed selector preserves scalar FP select values exactly" {
     }
 }
 
+test "floating cancellation constant selects forward exactly the chosen operand bits" {
+    inline for (.{ f16, f32, f64 }) |Float| {
+        const Bits = @Int(.unsigned, @bitSizeOf(Float));
+        const ty = switch (Float) {
+            f16 => "half",
+            f32 => "float",
+            f64 => "double",
+            else => unreachable,
+        };
+        const patterns: [8]Bits = switch (Float) {
+            f16 => .{ 0, 0x8000, 1, 0x3c00, 0x7c00, 0xfc00, 0xfe45, 0x7c21 },
+            f32 => .{ 0, 0x80000000, 1, 0x3f800000, 0x7f800000, 0xff800000, 0xffc12345, 0x7f800021 },
+            f64 => .{ 0, 0x8000000000000000, 1, 0x3ff0000000000000, 0x7ff0000000000000, 0xfff0000000000000, 0xfff8123456789abc, 0x7ff0000000000021 },
+            else => unreachable,
+        };
+        for ([_][]const u8{ "false", "true", "-1" }, 0..) |condition, index| {
+            const text = try std.fmt.allocPrint(std.testing.allocator,
+                \\define {0s} @choose({0s} %a, {0s} %b) {{
+                \\entry:
+                \\  %result = select i1 {1s}, {0s} %a, {0s} %b
+                \\  ret {0s} %result
+                \\}}
+            , .{ ty, condition });
+            defer std.testing.allocator.free(text);
+            var module = try ir.Module.parse(std.testing.allocator, text);
+            defer module.deinit();
+            try module.verify();
+            const function = module.functions.items[0];
+            var machine = MachineFunction.init(function.name, function.ret_ty);
+            defer machine.deinit(std.testing.allocator);
+            try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, function));
+            try x86_64_verify.verifyFunction(machine);
+            for (machine.instructions.items) |instruction| try std.testing.expect(instruction != .je);
+            const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+            defer std.testing.allocator.free(bytes);
+            const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+            defer std.posix.munmap(mapping);
+            @memcpy(mapping, bytes);
+            const run: *const fn (Float, Float) callconv(.c) Float = @ptrCast(mapping.ptr);
+            for (patterns) |a| for (patterns) |b| {
+                const actual: Bits = @bitCast(run(@bitCast(a), @bitCast(b)));
+                try std.testing.expectEqual(if (index == 0) b else a, actual);
+            };
+        }
+    }
+}
+
 test "composed selector executes exact i64 immediate select values" {
     const input =
         \\define i64 @select_i64_immediate(i32 %flag) {

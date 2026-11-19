@@ -63,6 +63,8 @@ pub const ModulePass = struct {
     target_status: []const u8 = "LLVM-shaped algorithm subset",
     upstream_owner: []const u8 = "",
     run: *const fn (*ir.Module, *Context) anyerror!PassResult,
+    /// Optional subset that preserves the original SSA definitions and debug locations.
+    run_preserving_debug_locations: ?*const fn (*ir.Module, *Context) anyerror!PassResult = null,
 };
 
 pub const RunOptions = struct {
@@ -110,10 +112,24 @@ pub const ModulePassManager = struct {
                 try module.print(writer);
             }
             if (has_debug_variable_locations and isTransformPass(pass.category)) {
+                const preserved: PassResult = if (pass.run_preserving_debug_locations) |run_preserving| blk: {
+                    const start = timestamp(context);
+                    const outcome = try run_preserving(module, context);
+                    if (options.timing) try writer.print("; time {s} (preserving debug locations): {} ns\n", .{ pass.name, elapsedNanoseconds(start, timestamp(context)) });
+                    break :blk outcome;
+                } else .unchanged;
                 if (options.verify_each_pass) try module.verify();
-                if (options.trace) try writer.print("; skipped {s}: debug variable-location salvage is not modeled\n", .{pass.name});
-                skipped_transform_passes += 1;
-                context.skipped_transform_passes += 1;
+                if (preserved == .changed) {
+                    result = .changed;
+                    if (options.trace) {
+                        try writer.print("; after {s}: changed with debug locations preserved\n", .{pass.name});
+                        try module.print(writer);
+                    }
+                } else {
+                    if (options.trace) try writer.print("; skipped {s}: debug variable-location salvage is not modeled\n", .{pass.name});
+                    skipped_transform_passes += 1;
+                    context.skipped_transform_passes += 1;
+                }
                 executed += 1;
                 continue;
             }

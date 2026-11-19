@@ -154,16 +154,24 @@ fn emitScalarSelectValue(selector: *ComposedBlockSelector, value: ir.Value, bits
 
 fn lowerFpSelect(selector: *ComposedBlockSelector, result_name: []const u8, select: ir.SelectInst) !?Diagnostic {
     const bits: u16 = if (select.ty == .half) 16 else if (select.ty == .float) 32 else if (select.ty == .double) 64 else return .{ .no_emitter = "composed-block-select-type" };
-    if (try emitBranchCondition(selector, select.cond)) |diagnostic| return diagnostic;
+    const constant: ?bool = if (select.cond == .int and select.cond.int >= -1 and select.cond.int <= 1) select.cond.int != 0 else null;
+    if (constant == null) {
+        if (try emitBranchCondition(selector, select.cond)) |diagnostic| return diagnostic;
+    }
 
     const true_reg = fpValueReg(selector, select.true_value, bits);
     const false_reg = fpValueReg(selector, select.false_value, bits);
     const dst = fpSelectScratch(true_reg, false_reg);
-    if (try selector_fp.materializeFpValue(selector, select.false_value, dst, bits)) |diagnostic| return diagnostic;
-    const end_label = try ownedSelectEndLabel(selector);
-    try selector_state.emitEflagsInstruction(selector, .{ .je = end_label }, .use);
-    if (try selector_fp.materializeFpValue(selector, select.true_value, dst, bits)) |diagnostic| return diagnostic;
-    try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
+    if (constant) |take_true| {
+        const selected = if (take_true) select.true_value else select.false_value;
+        if (try selector_fp.materializeFpValue(selector, selected, dst, bits)) |diagnostic| return diagnostic;
+    } else {
+        if (try selector_fp.materializeFpValue(selector, select.false_value, dst, bits)) |diagnostic| return diagnostic;
+        const end_label = try ownedSelectEndLabel(selector);
+        try selector_state.emitEflagsInstruction(selector, .{ .je = end_label }, .use);
+        if (try selector_fp.materializeFpValue(selector, select.true_value, dst, bits)) |diagnostic| return diagnostic;
+        try selector.machine.instructions.append(selector.allocator, .{ .label = end_label });
+    }
     try selector_state.bindResultLoc(selector, result_name, .{ .xmm = .{ .reg = dst, .bits = bits } });
     return null;
 }

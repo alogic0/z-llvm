@@ -13,6 +13,7 @@ pub const pass: pass_manager.ModulePass = .{
     .target_status = "fixture-equivalent for listed fixtures",
     .upstream_owner = "llvm/lib/Transforms/InstCombine/",
     .run = run,
+    .run_preserving_debug_locations = runPreservingDebugLocations,
 };
 
 const InsertRecord = struct {
@@ -77,13 +78,8 @@ fn run(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
                         });
                     }
                 }
-                if (!instruction.removed and instruction.result != null and instruction.kind == .binary) {
-                    const binary = instruction.kind.binary;
-                    if ((binary.op == .fadd or binary.op == .fsub) and
-                        (binary.ty == .float or binary.ty == .double) and
-                        allowsFloatingCancellation(binary.fp_flags))
-                        try floating_binaries.put(instruction.result.?, binary);
-                }
+                if (floatingProducer(instruction.*)) |binary|
+                    try floating_binaries.put(instruction.result.?, binary);
             }
 
             if (block.terminator) |*terminator| switch (terminator.*) {
@@ -271,6 +267,37 @@ fn fold(instruction: ir.Instruction) ?ir.Value {
 
 fn allowsFloatingCancellation(flags: ir.FastMathFlags) bool {
     return flags.fast or (flags.reassoc and flags.nsz and flags.nnan and flags.ninf);
+}
+
+fn floatingProducer(instruction: ir.Instruction) ?ir.BinaryInst {
+    if (instruction.removed or instruction.result == null or instruction.kind != .binary) return null;
+    const binary = instruction.kind.binary;
+    if ((binary.op != .fadd and binary.op != .fsub) or
+        (binary.ty != .float and binary.ty != .double) or !allowsFloatingCancellation(binary.fp_flags)) return null;
+    return binary;
+}
+
+fn runPreservingDebugLocations(module: *ir.Module, _: *pass_manager.Context) !pass_manager.PassResult {
+    var producers = std.StringHashMap(ir.BinaryInst).init(module.allocator);
+    defer producers.deinit();
+    var result: pass_manager.PassResult = .unchanged;
+    for (module.functions.items) |function| for (function.blocks.items) |block| {
+        producers.clearRetainingCapacity();
+        for (block.instructions.items) |*instruction| {
+            const binary = floatingProducer(instruction.*) orelse continue;
+            if (foldFloatingCancellation(instruction.*, producers)) |value| {
+                if (instruction.metadata) |metadata| {
+                    const location = debugMetadata(metadata) orelse continue;
+                    if (!std.mem.eql(u8, std.mem.trim(u8, metadata, " \t"), location)) continue;
+                }
+                // Debug locations may refer to either result through raw metadata.
+                // Keep both SSA definitions and their exact instruction locations.
+                instruction.kind = .{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = .{ .int = 1 }, .ty = binary.ty, .true_value = value, .false_value = value } };
+                result = .changed;
+            } else try producers.put(instruction.result.?, binary);
+        }
+    };
+    return result;
 }
 
 fn finiteFloatingConstant(ty: ir.Type, value: ir.Value) ?u128 {
