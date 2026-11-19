@@ -1355,7 +1355,71 @@ fn xmmPhiSnapshot(snapshots: *const std.ArrayList(XmmPhiSnapshot), result_name: 
     return null;
 }
 
+fn hasSingleTypedUse(function: *const ir.Function, name: []const u8, ty: ir.Type) bool {
+    var count: usize = 0;
+    for (function.blocks.items) |block| {
+        for (block.instructions.items) |inst| {
+            if (inst.removed) continue;
+            var view = inst;
+            // The operand walker treats raw alloca attributes as opaque.
+            // A single literal alignment cannot name an SSA value. Keep the
+            // structured count, instruction metadata and all other attributes.
+            if (view.kind == .alloca) {
+                if (view.kind.alloca.attrs) |attrs| {
+                    if (isLiteralAlignment(attrs)) view.kind.alloca.attrs = null;
+                }
+            }
+            if (!addTypedUse(&count, ir.operands.instructionUses(&view, name, ty))) return false;
+        }
+        if (block.terminator) |term| {
+            if (!addTypedUse(&count, ir.operands.terminatorUses(&term, name, ty))) return false;
+        }
+    }
+    return count == 1;
+}
+
+fn addTypedUse(count: *usize, uses: ir.operands.Uses) bool {
+    count.* += uses.occurrences;
+    return count.* <= 1 and uses.types_match and !uses.coverage.has_opaque_references;
+}
+
+fn isLiteralAlignment(attrs: []const u8) bool {
+    const field = std.mem.trim(u8, attrs, " \t");
+    const suffix = std.mem.cutPrefix(u8, field, "align ") orelse return false;
+    const digits = std.mem.trim(u8, suffix, " \t");
+    if (digits.len == 0) return false;
+    for (digits) |c| if (!std.ascii.isDigit(c)) return false;
+    return selector_frame.allocaAlignment(field, 1) != null;
+}
+
+// When every incoming value is consumed by this edge, register-to-slot
+// stores cannot destroy another source. A mixed edge needs its snapshots.
+fn canStorePhiRegistersDirectly(selector: *const ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) bool {
+    if (selector.stack_frame_bytes == 0) return false;
+    const function = selector.function orelse return false;
+    const pred_index = blockIndex(selector, function.*, predecessor) orelse return false;
+    const terminator = function.blocks.items[pred_index].terminator orelse return false;
+    if (terminator != .br or !std.mem.eql(u8, terminator.br.target, target.name)) return false;
+
+    for (target.instructions.items) |instruction| {
+        if (instruction.removed) continue;
+        if (instruction.kind != .phi) break;
+        const phi = instruction.kind.phi;
+        if (!phi.ty.eql(.{ .int = 32 })) return false;
+        const destination = selector.phi_destinations.get(instruction.result orelse return false) orelse return false;
+        if (destination != .spill64) return false;
+        const incoming = phiIncomingFrom(phi, predecessor) orelse return false;
+        const name = namedValue(incoming.value) orelse return false;
+        // Binding a PHI result must not rebind a later source in this batch.
+        if (selector.phi_results.contains(name)) return false;
+        if (!selector_state.canStoreI32PhiFromRegister(selector, name)) return false;
+        if (!hasSingleTypedUse(function, name, phi.ty)) return false;
+    }
+    return true;
+}
+
 fn stabilizePhiEdgeSources(selector: *ComposedBlockSelector, target: ir.BasicBlock, predecessor: []const u8) !?Diagnostic {
+    if (canStorePhiRegistersDirectly(selector, target, predecessor)) return null;
     for (target.instructions.items) |instruction| {
         if (instruction.removed) continue;
         const phi = switch (instruction.kind) {
@@ -1503,4 +1567,34 @@ fn branchConditionValueUseDiagnostic(err: anyerror) ?Diagnostic {
         => .{ .no_emitter = "stage2-cond-loc" },
         else => null,
     };
+}
+
+test "unconditional i32 PHI single use counts aligned alloca operands and opaque text" {
+    const input =
+        \\define i32 @use(i32 %x) {
+        \\entry:
+        \\  %slot = alloca i32, align 4
+        \\  br label %end
+        \\end:
+        \\  %p = phi i32 [ %x, %entry ]
+        \\  ret i32 %p
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    const function = &module.functions.items[0];
+    const slot = &function.blocks.items[0].instructions.items[0];
+    const i32_ty: ir.Type = .{ .int = 32 };
+    try std.testing.expect(hasSingleTypedUse(function, "x", i32_ty));
+    slot.kind.alloca.attrs = "align 4, addrspace(3)";
+    try std.testing.expect(!hasSingleTypedUse(function, "x", i32_ty));
+    slot.kind.alloca.attrs = "align 4";
+    slot.metadata = "!annotation !0";
+    try std.testing.expect(!hasSingleTypedUse(function, "x", i32_ty));
+    slot.metadata = null;
+    slot.kind.alloca.count = .{ .ty = i32_ty, .value = .{ .named = "x" } };
+    try std.testing.expect(!hasSingleTypedUse(function, "x", i32_ty));
+    slot.kind.alloca.count.?.value = .{ .constant_expr = "ptrtoint (ptr @anchor to i32)" };
+    try std.testing.expect(!hasSingleTypedUse(function, "x", i32_ty));
 }

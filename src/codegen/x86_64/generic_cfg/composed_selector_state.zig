@@ -1462,6 +1462,16 @@ pub fn valueLoc(selector: *const ComposedBlockSelector, name: []const u8) ?Value
     return binding.loc;
 }
 
+/// These three source homes each emit one register-to-slot store without
+/// a scratch register. Keep the choice of physical home inside the selector.
+pub fn canStoreI32PhiFromRegister(selector: *const ComposedBlockSelector, name: []const u8) bool {
+    const binding = selector.values.get(name) orelse return false;
+    return switch (binding.loc) {
+        .eax, .arg32, .scratch32 => true,
+        else => false,
+    };
+}
+
 pub fn valueBits(selector: *const ComposedBlockSelector, name: []const u8) ?u16 {
     const binding = selector.values.get(name) orelse return null;
     return binding.vreg.bits;

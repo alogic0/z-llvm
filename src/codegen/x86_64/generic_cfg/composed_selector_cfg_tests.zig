@@ -1,6 +1,7 @@
 const std = @import("std");
 const ir = @import("../../../ir.zig");
 const x86_64_machine = @import("../machine.zig");
+const FrameIndex = @import("../types.zig").FrameIndex;
 const x86_64_verify = @import("../verify.zig");
 const encoding = @import("../../../mc/encoding.zig");
 const selector_types = @import("selector_types.zig");
@@ -2244,4 +2245,100 @@ test "generic cfg selector preserves same-block FP results across framed phi edg
     const zero: f32 = @bitCast(@as(u32, 0));
     try std.testing.expectEqual(@as(u32, 0xff80_0000), @as(u32, @bitCast(choose(zero, 1))));
     try std.testing.expectEqual(@as(u32, 0x4000_0000), @as(u32, @bitCast(choose(zero, 0))));
+}
+
+test "unconditional i32 PHI edge stores both final registers without a reload" {
+    const input =
+        \\define i32 @carry(i32 %seed, i32 %limit) {
+        \\entry:
+        \\  br label %loop
+        \\loop:
+        \\  %sum = phi i32 [ %seed, %entry ], [ %sum.next, %body ]
+        \\  %i = phi i32 [ 0, %entry ], [ %i.next, %body ]
+        \\  %done = icmp eq i32 %i, %limit
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %mix = xor i32 %sum, %i
+        \\  %sum.next = add i32 %mix, 7
+        \\  %i.next = add i32 %i, 1
+        \\  br label %loop
+        \\exit:
+        \\  %result = xor i32 %sum, %seed
+        \\  ret i32 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("carry", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+
+    const body_end = for (machine.instructions.items, 0..) |inst, i| {
+        if (inst == .jmp and std.mem.eql(u8, inst.jmp, "loop")) break i;
+    } else return error.ExpectedBackedge;
+    try std.testing.expect(body_end >= 2);
+    var homes: [2]FrameIndex = undefined;
+    for (machine.instructions.items[body_end - 2 .. body_end], &homes) |store, *home| {
+        home.* = switch (store) {
+            .spill_eax_rsp => |frame| frame,
+            .spill_arg_rsp => |arg| arg.frame_index,
+            else => return error.ExpectedDirectPhiStore,
+        };
+    }
+    try std.testing.expect(!homes[0].eql(homes[1]));
+
+    const bytes = try encoding.encodeFunction(std.testing.allocator, machine);
+    defer std.testing.allocator.free(bytes);
+    const mapping = try std.posix.mmap(null, bytes.len, .{ .READ = true, .WRITE = true, .EXEC = true }, .{ .TYPE = .PRIVATE, .ANONYMOUS = true }, -1, 0);
+    defer std.posix.munmap(mapping);
+    @memcpy(mapping, bytes);
+    const carry: *const fn (u32, u32) callconv(.c) u32 = @ptrCast(mapping.ptr);
+    for ([_]u32{ 0, 17, 0x7fffffff, 0xfffffffe }) |seed| {
+        for ([_]u32{ 0, 1, 2, 17, 64 }) |limit| {
+            var expected = seed;
+            var i: u32 = 0;
+            while (i < limit) : (i += 1) expected = (expected ^ i) +% 7;
+            try std.testing.expectEqual(expected ^ seed, carry(seed, limit));
+        }
+    }
+}
+
+test "unconditional i32 PHI stores the final index of the aligned production loop" {
+    const input =
+        \\define i32 @probe(i32 %x, i32 %y) {
+        \\entry:
+        \\  %slot = alloca [1 x i32], align 4
+        \\  store i32 %x, ptr %slot, align 4
+        \\  br label %loop
+        \\loop:
+        \\  %i = phi i32 [ 0, %entry ], [ %next, %body ]
+        \\  %done = icmp eq i32 %i, %y
+        \\  br i1 %done, label %exit, label %body
+        \\body:
+        \\  %old = load i32, ptr %slot, align 4
+        \\  %mixed = xor i32 %old, %i
+        \\  %new = add i32 %mixed, 7
+        \\  store i32 %new, ptr %slot, align 4
+        \\  %next = add i32 %i, 1
+        \\  br label %loop
+        \\exit:
+        \\  %result = load i32, ptr %slot, align 4
+        \\  ret i32 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, input);
+    defer module.deinit();
+    try module.verify();
+    var machine = MachineFunction.init("probe", .{ .int = 32 });
+    defer machine.deinit(std.testing.allocator);
+    try std.testing.expectEqual(impl.SelectionResult.selected, try impl.tryLowerComposedCfg(std.testing.allocator, &machine, module.functions.items[0]));
+    try x86_64_verify.verifyFunction(machine);
+    const edge = for (machine.instructions.items, 0..) |inst, i| {
+        if (inst == .jmp and std.mem.eql(u8, inst.jmp, "loop")) break i;
+    } else return error.ExpectedBackedge;
+    try std.testing.expect(edge >= 2);
+    try std.testing.expect(machine.instructions.items[edge - 2] == .add_eax_imm32);
+    try std.testing.expect(machine.instructions.items[edge - 1] == .spill_eax_rsp);
 }
