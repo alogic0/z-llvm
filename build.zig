@@ -56,6 +56,13 @@ pub fn build(b: *std.Build) void {
             .omit_frame_pointer = b.option(bool, "omit-frame-pointer", "Omit compiler frame pointers"),
         }),
     });
+    if (b.option(std.Build.LazyPath, "zllvm-object-provider", "Use this z_llvm executable to emit the z_llvm compiler object")) |provider| {
+        if (@hasDecl(std.Build.Step.Compile, "setZllvmObjectProvider")) {
+            exe.setZllvmObjectProvider(provider);
+        } else {
+            exe.step.dependOn(&b.addFail("-Dzllvm-object-provider requires a Zig build runner with object-provider support").step);
+        }
+    }
     b.installArtifact(exe);
 
     const profile_probe = b.addExecutable(.{ .name = "profile-events-probe", .root_module = b.createModule(.{
