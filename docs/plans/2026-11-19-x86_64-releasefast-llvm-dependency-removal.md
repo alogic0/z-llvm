@@ -19,7 +19,10 @@ matched eight distinct application function bodies to its bytes. All
 six shared-cache transitions passed, as did 75 upstream standard-library
 tests, including join, detach and thread-local storage. After a forced
 target-emitter failure the reviewer ran all six I/O cases on the preserved
-executable. The implementer is finishing serial Tier 3 and the archive audit.
+executable. The archive audit traced both native link inputs and located
+the application's `_start` at the final ELF entry point. Serial Tier 3
+has passed its three fresh real-row gates and is running the integrated
+executable tests.
 [Independent handoff review](../evidence/finalized_zig_builder_handoff_20261119.md)
 [Cold driver and executable](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/compile-result.json)
 · [Six runtime cases](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05/runtime.json)
@@ -288,7 +291,12 @@ stage before expanding to a compiler rebuild.
 The implementer owns the package build, actual link inputs and the
 build-runner option that forwards the provider to the Zig and helper
 compilation steps. Include that option in the standard library shipped
-with generation one. The reviewer owns the installed-file inventory,
+with generation one. Both generations will report the SDK compatibility
+version `0.17.0` required by the backend project's existing exact
+`.zigversion` check. Record the upstream development version
+`0.17.0-dev.11+1c08b09d1`, published source revisions and actual
+binary identities separately. Use the default release settings for
+debug extensions. The reviewer owns the installed-file inventory,
 recursive ELF dependency resolution, child arguments, mapped libraries
 and independent program and failure runs. Start each isolated root empty.
 Mount only the installed package, test inputs, named system libraries,
@@ -346,6 +354,40 @@ and link evidence. The stock baseline may retain its compiler-generated IR
 through comparison or diagnosis. Each producer records its own lifetime.
 The shipped-toolchain and self-rebuild batches open after their preceding
 gate passes.
+
+The independent reviewer checked the isolation procedure with the host's
+small `true` executable while first-milestone preservation was running.
+The local mount-namespace tool could not initialize loopback. The empty
+Docker root ran the control and denied all 43 host LLVM, Clang and LLD
+paths tested. Ordinary tracing recorded the child and its libc mapping.
+The reviewer removed the temporary local image. The same stage reproduced
+the archived behavior reference's ordered digest for all 2,097 cases.
+The shipping review repeats the isolation checks with the actual package.
+[Isolation method and control](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/isolation-01/preflight.json)
+· [Discarded temporary image](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/isolation-01/scratch-image-release.json)
+· [Ordered reference calibration](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/isolation-01/ordered-comparison.json)
+
+Under the same file restrictions, the first-milestone driver's
+`zig version` exited 127 at the missing `libclang-cpp.so.22.1`.
+Its ELF also directly requires `libLLVM.so.22.1`. The actual static
+`cat` from that driver passed all six cases in the same root. The
+reviewer removed the run's temporary image.
+[Known-dependent seed and independent program](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/seed-control-01/result.json)
+· [Seed and program loader closure](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/seed-control-01/known-closure.json)
+· [Image release](../../local-state/validations/llvm-dependency-removal-20261119/review-preflight/seed-control-01/scratch-image-release.json)
+
+Use the `review-preflight/build-plumbing-01` through `-03` runs for the build-runner source
+review. The existing seed drives a small project using the draft standard
+library. Run an unset and a selected provider, then replace and restore it
+at a path containing spaces. Record the actual compiler arguments, root
+optimizer and emitter executions, diagnostics and installed program
+behavior. The project, cached build runners and temporary copies of the
+provider belong to this one run. The implementer retains the draft source
+through review and transfer to the distribution build.
+Set `ZIG_GLOBAL_CACHE_DIR` for the host-maker bootstrap and use
+`--cache-dir` for the local directory. The public `zig build` command
+rejects `--global-cache-dir`. Maker supplies that option to its
+`build-exe` children after it has received the intended global root.
 
 For the arithmetic and startup review, the implementer keeps the
 original module inputs and candidate objects through the fresh driver

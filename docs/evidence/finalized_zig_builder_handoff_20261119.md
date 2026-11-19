@@ -33,6 +33,10 @@ The link used Zig's native ELF implementation.
 
 The native link named the application object and an archive with SHA-256
 `f9610227de4ccd6b5a0f6fecc070f56fb46daa492f149241aeafc3043227314a`.
+The native archiver read the runtime object, and the native linker read
+the archive and application object. The application's `_start` corresponds
+to the ELF entry address `0x1001000`. The executable is static and the
+link had no external libc or CRT inputs.
 Eight uniquely occurring function bodies from the application object match
 bytes in the executable. The archive has one member, whose bytes match the
 actual runtime emitter output. An application-only link produced the exact
@@ -42,6 +46,7 @@ outcomes. Their code, data, thread-local data and relocations are identical.
 The independently reduced unsigned-to-double routine matched 4,545 reference
 conversions.
 [Linked function bodies](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-handoff-positive/linked-code.json)
+· [Native archive, link inputs and executable entry](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/runtime-shifts-02-link-02/report.json)
 · [Actual archive member](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-numeric-cold/archive.json)
 · [Application-only link](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-runtime-contribution/result.json)
 · [Runtime section comparison](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/cold-app-05-ir-diff/comparison.json)
