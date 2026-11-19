@@ -305,6 +305,14 @@ namespace when available. A locally imported empty container image is a
 fallback. Record its unique tag and remove it after the run's last
 consumer. Check actual host LLVM, Clang and LLD paths from inside the root.
 
+For each package, the reviewer traces the real optimizer and emitter
+arguments and exits and the native linker's input paths. Keep read-only
+descriptors for the fresh driver-owned IR and object files through the
+link. Zig removes some of those paths after a successful build. Hash the
+actual files, compare the runtime object with its archive member and
+locate application code in the final executable. Record the same evidence
+for the complete upstream behavior run in each generation.
+
 ## 3. Rebuild and qualify the compiler in the isolated environment
 
 Record the seed executable, how it was produced, its libraries and every

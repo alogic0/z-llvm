@@ -3,10 +3,11 @@
 Two cold builds of upstream Zig’s unchanged `cat` through its finalized
 IR builder, `z_llvm` and the native ELF linker produced the same executable.
 It passed all six I/O tests. The runtime object from the cold archive
-passed a separate 17-case numerical check. The current assignment is to
-finish cache and failure review and serial Tier 3, then qualify a shipped
-compiler and helper without LLVM, Clang or LLD and rebuild both in
-isolation. [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+passed a separate 17-case numerical check. The reviewer verified all six
+cache transitions and both failure destinations. The implementer is
+finishing serial Tier 3. The next assignments are to qualify the installed
+compiler and helper without LLVM, Clang or LLD, then use that package to
+rebuild both tools in isolation. [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
 
 The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
 independent review and selector Tier 2. Keeping the accumulator in R9D saved
