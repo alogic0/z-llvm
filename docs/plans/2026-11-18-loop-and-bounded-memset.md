@@ -136,6 +136,18 @@ result and assigned the comparison change against compiler `f5cb5493`.
 Source promotion awaits the selector qualification. See `a-diagnosis-02/`,
 `a2-original/`, `a2-sample-original/` and `review-a2/` in the batch.
 
+**Selector qualification finding.** All 74 structural checks and 2,448
+of 2,449 unit tests passed on `8ea76782`. The remaining test enforces
+the inventory of raw register-location lookups. The PHI eligibility
+check introduced such a lookup outside its owning function. Review found
+the same pattern in the first comparison patch, `980cc818`. Both changes
+were returned to the implementer to use the selector state owner and run
+the source guard early. The corrected sources need new build identities
+and qualification. Reuse of timings requires matching the measured
+program bytes and their fixed inputs. The scalar-promoted loop trial on
+`8ea76782` saved a paired 55.88 ms in Fast and 57.17 ms in Small.
+See `a2-tier2-core/unit.log` and `review-a2-samples/paired.tsv`.
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local

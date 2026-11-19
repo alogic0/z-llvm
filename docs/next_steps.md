@@ -2,9 +2,9 @@
 
 The user authorized two x86_64 selector changes on 2026-11-18. Primary
 review accepted the measured backedge improvement on the production loop
-in both release modes. The implementer is qualifying that patch and
-implementing the single-use integer comparison feeding its conditional
-branch, measured against the corrected backedge compiler `f5cb5493`.
+in both release modes. A qualification test found a new raw register
+lookup. The implementer is correcting the backedge and comparison patches
+to use the selector state owner, then qualifying each corrected source.
 [Active plan, measurements and review criteria](plans/2026-11-18-loop-and-bounded-memset.md#loop-backedge-and-compare-follow-ups)
 
 The loop and bounded memset assignments are complete. The primary reviewer
