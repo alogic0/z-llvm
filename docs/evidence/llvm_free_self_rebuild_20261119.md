@@ -325,6 +325,22 @@ members and the two complete test executables also differed.
 [Package comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-mixed-g1-zig-g2-helper/pair.json)
 · [G1 Zig and G2 helper compile, link and execution](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-mixed-g1-zig-g2-helper/result.json)
 
+## Ordinary G2 Zig build
+
+G1-07 built the complete Zig compiler from the reviewed `bd0e36fa`
+source tree (`60e74519`) with empty caches and `-Denable-llvm=false`.
+The actual install passed all five build steps. The checked command
+took 3 hours 46 minutes. The installed compiler has 224,077,070 bytes
+and SHA-256 `f8b24bfd4613325a9b25abd6d912c6174ae3d341a3d1722bdf835cd7f66f39f4`.
+It printed `0.17.0` in the same isolated environment. The regular native
+link command names the emitted compiler object and its runtime archive.
+Together with the ordinary G2 helper, this supplies both executables
+for package assembly and review.
+[Build arguments, original seed and source tree](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04/entry.json)
+· [Compiler install](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04/build-result.json)
+· [Native link and build summary](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04/build.stderr)
+· [Installed version in isolation](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-zig-04/installed-version.json)
+
 ## Native startup of the original compiler and helper objects
 
 The reviewer passed both original trial objects to the installed G1

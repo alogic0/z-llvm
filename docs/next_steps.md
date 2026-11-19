@@ -29,8 +29,11 @@ all 2,472 repository tests. The G1-07 package with helper `f041c1d5`
 passed all 2,097 ordered upstream cases, both `cat` routes and the
 runtime checks. This package built and installed the G2 helper
 `771baaa8`, which reproduced the full upstream optimizer output
-and passed 1,196 numerical cases on the four original functions. The isolated Zig
-build continues. The reviewer will qualify the extracted G2 pair.
+and passed 1,196 numerical cases on the four original functions.
+The ordinary isolated Zig build also completed, installing compiler
+`f8b24bfd`. The implementer is assembling both tools with the G2 SDK.
+The reviewer will run the complete upstream suite, application, failure
+and runtime checks from the extracted archive and compare both generations.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
 · [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)

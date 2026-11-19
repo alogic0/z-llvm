@@ -488,6 +488,16 @@ and extracted package. The complete package supplies Zig, its SDK and
 its helper for the final application and upstream checks.
 [G2 helper install and full identity](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/g2-helper-04/build-result.json)
 
+The separate ordinary G2 Zig install passed all five steps in 3 hours
+46 minutes. Its compiler (`f8b24bfd`) prints `0.17.0` in the empty
+root. Assemble that install and the ordinary G2 helper (`771baaa8`).
+Use the extracted package for the full 2,097-case behavior run, both
+`cat` routes, both failure destinations and the 17 linked-runtime
+cases. Compare the G1 and G2 package inventories and executable bytes
+and record each first difference. Publish after the link audits, these
+package checks and the full serial run have passed.
+[G2 compiler build and version evidence](../evidence/llvm_free_self_rebuild_20261119.md#ordinary-g2-zig-build)
+
 While the compiler builds, also run the cold upstream suite using
 G1 Zig and its SDK with the installed G2 helper. Verify that the helper
 is the only changed package entry. This checks whole-program emission
