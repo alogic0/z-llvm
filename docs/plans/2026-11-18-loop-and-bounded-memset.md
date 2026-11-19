@@ -108,6 +108,18 @@ exception with its path, consumer and end condition. Release each pipeline
 after its last consumer, collect at stage boundaries, and record the final
 receipt and remaining owners. [Development storage contract](../development_storage.md)
 
+**First backedge review.** The candidate patch `45fc57ad` passed the
+focused Debug and ReleaseFast test on a two-PHI loop. Primary review bound
+the compiler to all 679 frozen source members and verified that the 20
+baseline workload/route images reproduced the previous accepted images.
+On the original loop the candidate still emitted the temporary store and
+reload, yielding the identical 127-byte object text and identical
+executable. On the scalar-promoted form it emitted the two direct stores,
+reducing text from 125 to 109 bytes. The reviewer returned the candidate
+for diagnosis on the original input and an aligned-alloca regression test.
+The first freeze and both disassemblies are retained in `a-source/`,
+`a-original/` and `a-promoted/` in the follow-up batch.
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local
