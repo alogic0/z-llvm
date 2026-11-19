@@ -1,7 +1,7 @@
 # Remove the LLVM toolchain dependency from Zig ReleaseFast on x86_64 Linux
 
-**Proposed on November 19, 2026.** The first assignment in the implementation
-queue is one ordinary `zig build-exe` of upstream Zig’s `cat` through the
+**Authorized on November 19, 2026.** The implementer has taken up the first
+assignment, one ordinary `zig build-exe` of upstream Zig’s `cat` through the
 finalized Zig IR builder, `z_llvm` and Zig’s native ELF linker. The subsequent
 claims cover a shippable compiler and a clean compiler self-rebuild. This
 plan covers baseline `x86_64-linux-gnu`, ReleaseFast, pure Zig source and
@@ -142,3 +142,12 @@ audit results and cleanup receipts. Keep a first failing input under an
 explicit investigation until disposition. Release each completed pipeline,
 collect at its boundary, and account for remaining roots.
 [Development storage contract](../development_storage.md)
+
+Milestone 1 uses `handoff-01/`. The implementer owns the separate source,
+compiler, candidate, native-link and fault-test stages. The primary reviewer
+owns `review-baseline/` for the independent program oracle and stock-Zig
+controls, and subsequent `review-*` stages for the frozen candidate, cache
+and link evidence. The stock baseline may retain its compiler-generated IR
+through comparison or diagnosis. Each producer records its own lifetime.
+The shipped-toolchain and self-rebuild batches open after their preceding
+gate passes.
