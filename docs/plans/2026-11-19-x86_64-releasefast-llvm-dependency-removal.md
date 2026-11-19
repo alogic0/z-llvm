@@ -492,6 +492,12 @@ While the compiler builds, also run the cold upstream suite using
 G1 Zig and its SDK with the installed G2 helper. Verify that the helper
 is the only changed package entry. This checks whole-program emission
 early and gives a comparison if the relocated G2 pair behaves differently.
+The reviewer relinked the previously reviewed trial compiler from
+its retained object and original runtime. Its full digest matched
+`2f16bb32`. With the genuine G2 helper, that driver built upstream
+`cat` and passed all six cases. Both the application object and the
+complete linked executable matched ordinary G1-07 byte for byte.
+[Trial frontend, native link and I/O](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-driver-cat/result.json)
 
 The first preservation run passed its initial gates, including all 146
 integrated preopt cases. The three real-row runs then stopped before

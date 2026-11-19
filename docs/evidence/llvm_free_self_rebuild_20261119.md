@@ -338,3 +338,14 @@ The ordinary G2 builds will establish the origin of the packaged
 executables and SDK.
 [Link commands, archived members and execution](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-startup/result.json)
 · [Actual helper output](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-startup/helper-trial.stdout)
+
+The reviewer later relinked the same Zig object and original runtime
+archive and verified the full trial executable digest `2f16bb32`.
+With the installed G2 helper, that driver compiled unchanged upstream
+`cat` from empty caches and linked it with its native ELF linker.
+All six I/O cases passed. The application object `173ba554` and the
+entire 6,526,422-byte executable `ef08cbf4` matched the ordinary G1-07
+result. The comparison used a trial driver reconstructed from its known
+inputs. The ordinary G2 compiler build was still running.
+[Trial driver and genuine helper identities](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-driver-cat/pair.json)
+· [Provider processes, native link and six executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-driver-cat/result.json)
