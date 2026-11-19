@@ -349,3 +349,42 @@ result. The comparison used a trial driver reconstructed from its known
 inputs. The ordinary G2 compiler build was still running.
 [Trial driver and genuine helper identities](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-driver-cat/pair.json)
 · [Provider processes, native link and six executions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-trial-driver-cat/result.json)
+
+## Pointer-constants emission time
+
+The third preservation run passed all three fresh 100-row historical
+exports and all seven unchanged Zig programs. In the upstream C suite,
+the compiler watchdog terminated G2 after 120.005 seconds on the direct
+32-definition pointer-constants module. With a longer deadline, the
+same uninstrumented invocation finished in 209.2 seconds. G1-07 took
+19.1 seconds and an LLVM-built helper from the same source took 1.42.
+All three emitted identical 240,912-byte objects (`c90d49e2`), and each
+linked C driver passed all 10,240 observations.
+[Original timeout and preceding commands](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-03/integrated/unchanged-upstream-c/commands.json)
+· [G2 rerun](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-pointer-timeout-g2/commands.json)
+· [G1 comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-pointer-timeout-g1/commands.json)
+· [LLVM-built comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-pointer-timeout-llvm/commands.json)
+
+In independent samples of complete emissions, G2 spent 1,885 of 2,117
+samples inside `mem.eqlBytes`, compared with 93 of 210 for G1. All 400
+verified G2 call chains in a separate bounded run came from
+`aggregate_object.pointerViewDepth` through `findInstruction` and the
+slice-equality wrapper. The compared SSA names included
+`__zllvm_scalar_form_30` and `__zllvm_scalar_form_56`.
+The two 64-lane pairs accounted for 202.6 seconds across separate G2
+emissions. The other 14 pairs took 14.3 seconds together. All 16 objects
+matched their G1 counterparts.
+[Complete G2 profile](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-pointer-constants-profile/g2.json)
+· [G1 profile](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-pointer-constants-profile/g1.json)
+· [Verified call sites and slice lengths](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-pointer-constants-callers/result.json)
+· [Three return addresses and sampled names](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-pointer-constants-call-chain/report.json)
+· [All 16 separate emissions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-pointer-constants-subsets/results.json)
+
+The selector searches for an originating `{float,float}` stack allocation
+on each qualifying byte GEP. This input contains zero `alloca` instructions.
+Frame planning already visits eligible allocations, giving a place to
+record when the search can succeed. The dependency-removal plan records
+the proposed change and the controls required to evaluate it.
+[Pointer-view base and traversal](../../src/codegen/x86_64/generic_cfg/aggregate_object.zig)
+· [Frame planning](../../src/codegen/x86_64/generic_cfg/composed_selector_frame.zig)
+· [Byte GEP lowering](../../src/codegen/x86_64/generic_cfg/composed_selector_memory.zig)

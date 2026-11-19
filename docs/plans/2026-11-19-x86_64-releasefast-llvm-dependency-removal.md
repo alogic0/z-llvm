@@ -514,6 +514,51 @@ started in that environment.
 [First preservation run](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation/checks.json)
 · [Verified inputs to the rerun](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-03/mounted-tools.identities.txt)
 
+All three historical real-row gates then passed on fresh exports. Each
+lowered and linked 100 functions and ran the 12 registered programs.
+Seven unchanged Zig programs also passed. In the upstream C suite,
+the per-command watchdog terminated the actual G2 helper after 120.005
+seconds while emitting the direct pointer-constants object. The command
+receipt records SIGTERM and empty stderr. Reproduce that exact invocation
+with a measured deadline, compare its complete object and numerical output,
+and repeat the full serial tier after resolving the cause.
+[Fresh real rows](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-03/distribution-all.log)
+· [Actual command sequence and timeout](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-03/integrated/unchanged-upstream-c/commands.json)
+
+The implementer owns uninstrumented full-input comparisons on G1-07, G2
+and the LLVM-built helper. The reviewer samples the same G1 and G2
+emission in `review-pointer-constants-profile` and times the original
+16 body/probe pairs in `review-pointer-constants-subsets`. Use
+`review-pointer-constants-callers` to resolve sampled calls to
+`mem.eqlBytes` against the actual executable and saved slice lengths.
+In `review-pointer-constants-call-chain` verify the three return
+addresses and the short SSA names against the installed binary.
+Save symbol counts and numerical results. Release raw samples, extracted IR and
+temporary objects when the comparison and diagnosis finish. Keep the
+original timed-out command with its actual budget and termination.
+
+The three helpers emitted identical direct objects. The ordinary G2
+helper took 209.2 seconds, G1-07 took 19.1 seconds and the LLVM-built
+reference took 1.42 seconds. Each linked C driver passed all 10,240 checks.
+Run the entire tier from the start in `final-preservation-04` with a
+1,200-second budget for the native canary compiler processes. The default
+remains 120 seconds. Check the default, override, explicit provider and
+one-millisecond negative control on the real CLI. Record the validation
+patch separately from the product source and bind the completed tier to
+the helper in both the assembled installation and the extracted archive.
+[CLI controls and recorded deadlines](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-deadline-cli/result.json)
+
+After the package review, try recording whether each function contains
+an eligible `{float,float}` stack allocation during frame planning.
+Every successful aggregate pointer view terminates at such an allocation.
+On functions without one, test skipping the repeated definition scan when
+lowering byte GEPs. Verify positive GEP and PHI views, including named
+aggregate types, offsets and rejected inputs. Compare the whole
+pointer-constants objects, owner manifests and C results, and time the
+same 16 pairs with the same three providers. Record the full compiler
+time if the change proceeds to a new self-build.
+[Measured call path and original workload](../evidence/llvm_free_self_rebuild_20261119.md#pointer-constants-emission-time)
+
 The revised floating trial passed the complete upstream runtime with
 the original G1 suite archive. All 2,097 ordered entries matched the
 reference, including both earlier failures. On the corrected test
