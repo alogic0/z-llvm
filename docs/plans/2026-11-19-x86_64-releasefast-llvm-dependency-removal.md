@@ -414,6 +414,15 @@ the nested form. Both rejected alignment 3.
 · [Ten-line Zig test and three compiler routes](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-empty-struct-source/result.json)
 · [Independent LLVM, positive and malformed IR controls](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-behavior-attribute-oracles/result.json)
 
+The primary accepted the parser correction after the revised installed
+helper ran the original test. All three original modules now optimize.
+The implementer is repairing the remaining mandatory tail transfer in
+the behavior suite and the four failed helper functions, and classifying
+the full compiler's object results. The reviewer checks the original
+tail-call pair under a bounded stack and exercises the helper arithmetic
+against native LLVM and independent numerical expectations.
+[Self-rebuild results and open source failures](../evidence/llvm_free_self_rebuild_20261119.md)
+
 Record the seed executable, how it was produced, its libraries and every
 host tool it prebuilds. The seed can build generation one in a separately
 recorded environment. Then let generation one build generation two from

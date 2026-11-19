@@ -12,7 +12,11 @@ AIR exporter corrected, the new Zig `06c09683` built helper `a95be5c7`.
 Both installed tools passed review in an empty root. The current assignment
 is the isolated generation-two build of both tools and the comparison of
 all 2,097 ordered upstream behavior outcomes for each generation.
+The revised installed helper `b0ac4145` passed the empty-struct test
+that exposed the original parser failure. The implementer is working on
+a mandatory tail transfer and the helper's four remaining functions.
 [Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
+· [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
 · [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
 
 The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
