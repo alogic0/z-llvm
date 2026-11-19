@@ -791,17 +791,18 @@ fn executeImmediateR04R06(
         fitsI32(action.literal) and
         (action.operation != .sub or action.literal != std.math.minInt(i32)))
     {
+        const destination = try selector_state.framelessScalarImmediateScratch(transaction.selector);
         try selector_state.emitValueIntoScratch(
             transaction.selector,
             .{ .named = source_name },
-            .rcx,
+            destination,
             64,
         );
         try failImmediateScalarForTest(transaction, .after_rcx_staging);
         const immediate: i32 = @intCast(action.literal);
-        if (immediate != 0) try selector_state.clobberArgReg(transaction.selector, .rcx);
+        if (immediate != 0) try selector_state.clobberArgReg(transaction.selector, destination);
         try emitImmediateWrite(transaction, .{ .add_arg64_imm32 = .{
-            .reg = .rcx,
+            .reg = destination,
             .imm = if (action.operation == .sub) -immediate else immediate,
         } });
         try failImmediateScalarForTest(transaction, .after_first_instruction);
@@ -810,7 +811,7 @@ fn executeImmediateR04R06(
             transaction,
             source_index,
             action.result,
-            .rcx,
+            destination,
             64,
         );
         return;

@@ -572,8 +572,8 @@ fn scalar_immediate_frameless64(
     if (try transaction.prepare(.preserve, try accumulatorArithmeticDisplacement(selector, binary.lhs, .scratch_preferred))) |diagnostic| return diagnostic;
     try transaction.materialize(binary.lhs, accumulatorDefinition(bits));
 
-    try selector_state.clobberArgReg(selector, .rcx);
-    try selector.machine.instructions.append(selector.allocator, .{ .mov_imm_rcx = try i64Value(literal) });
+    const scratch = if (bits == 64 and binary.op == .xor) try selector_state.framelessScalarImmediateScratch(selector) else .rcx;
+    try selector_state.emitValueIntoScratch(selector, .{ .int = try i64Value(literal) }, scratch, 64);
     try emitArithmeticWrite(selector, .{ .binary_arg_rax = .{
         .op = switch (binary.op) {
             .@"and" => .@"and",
@@ -583,7 +583,7 @@ fn scalar_immediate_frameless64(
             .sub => .sub,
             else => unreachable,
         },
-        .reg = .rcx,
+        .reg = scratch,
     } });
 
     try finishArithmeticResult(&transaction, result_name, bits);

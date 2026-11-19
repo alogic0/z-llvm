@@ -16,7 +16,7 @@ fn operation(call: ir.CallInst) ?Operation {
         call.inline_asm != null or call.raw_args != null or call.operand_bundle != null or call.callee_function_ty != null or
         call.calling_conv != null or call.ret_attrs != null or call.args.items.len != 2) return null;
     const ty = call.args.items[0].ty;
-    if (ty != .int or ty.int == 0 or (ty.int > 65 and ty.int != 96 and ty.int != 128)) return null;
+    if (ty != .int or ty.int == 0 or (ty.int > 65 and ty.int != 80 and ty.int != 96 and ty.int != 128)) return null;
     var buffer: [80]u8 = undefined;
     const pair = std.fmt.bufPrint(&buffer, "{{i{d},i1}}", .{ty.int}) catch return null;
     if (!pairs.spelling(call.ret_ty.aggregate, pair)) return null;
@@ -32,13 +32,16 @@ fn operation(call: ir.CallInst) ?Operation {
         const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.with.overflow.i{d}", .{ name, ty.int }) catch return null;
         if (std.mem.eql(u8, call.callee, spelling)) {
             const signed = name[0] == 's';
+            if (ty.int == 80 and (signed or (op != .add and op != .mul))) return null;
             if (ty.int >= 64 and op == .mul) {
-                // A positive constant divisor allows an exact round-trip
-                // overflow check after wrapping multiplication. General wide
-                // products still require an independently lowered high half.
+                // Unsigned wide products can divide their wrapped result by a
+                // guarded divisor. Signed i128 supports a positive constant.
                 const rhs = call.args.items[1].value;
-                if (!(ty.int == 128 and !signed) and
-                    (ty.int != 128 or rhs != .int or rhs.int < 1 or rhs.int > std.math.maxInt(u32))) return null;
+                switch (ty.int) {
+                    80 => {},
+                    128 => if (signed and (rhs != .int or rhs.int < 1 or rhs.int > std.math.maxInt(u32))) return null,
+                    else => return null,
+                }
             }
             return .{ .op = op, .signed = signed, .bits = ty.int };
         }
@@ -79,12 +82,17 @@ const Builder = struct {
         return result;
     }
 
+    fn unsignedProductOverflow(self: Builder, result: []const u8, lhs: ir.Value, rhs: ir.Value, wrapped: ir.Value) !void {
+        const nonzero = try self.emit(.{ .icmp = .{ .predicate = .ne, .operand_ty = self.carrier, .lhs = rhs, .rhs = .{ .int = 0 } } });
+        const safe = try self.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = nonzero, .ty = self.carrier, .true_value = rhs, .false_value = .{ .int = 1 } } });
+        const quotient = try self.emit(.{ .binary = .{ .op = .udiv, .ty = self.carrier, .lhs = wrapped, .rhs = safe } });
+        const changed = try self.emit(.{ .icmp = .{ .predicate = .ne, .operand_ty = self.carrier, .lhs = quotient, .rhs = lhs } });
+        try self.block.instructions.append(self.allocator, .{ .result = result, .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 1 }, .lhs = nonzero, .rhs = changed } } });
+    }
+
     fn narrowPair(self: Builder, inst: ir.Instruction, entry: Entry) !void {
         const lhs = try self.extend(entry.operation, inst.kind.call.args.items[0].value);
         const rhs = try self.extend(entry.operation, inst.kind.call.args.items[1].value);
-        // Products through i32 fit in i64, and products through i63 plus
-        // i65/i96 sums and differences fit in i128. Unsigned subtraction wraps
-        // only below zero, so a narrow round trip detects every overflow.
         const full = try self.emit(.{ .binary = .{ .op = entry.operation.op, .ty = self.carrier, .lhs = lhs, .rhs = rhs } });
         try self.block.instructions.append(self.allocator, .{ .result = entry.wrapped, .metadata = inst.metadata, .kind = .{ .cast = .{
             .op = .trunc,
@@ -93,6 +101,10 @@ const Builder = struct {
             .to_ty = .{ .int = entry.operation.bits },
         } } });
         const round_trip = try self.extend(entry.operation, .{ .named = entry.wrapped });
+        // An i80 product can wrap even in the i128 carrier. For a positive
+        // divisor, the wrapped product then has a quotient strictly below lhs.
+        if (entry.operation.bits == 80 and entry.operation.op == .mul)
+            return self.unsignedProductOverflow(entry.overflow, lhs, rhs, round_trip);
         try self.block.instructions.append(self.allocator, .{ .result = entry.overflow, .kind = .{ .icmp = .{
             .predicate = .ne,
             .operand_ty = self.carrier,
@@ -113,7 +125,7 @@ pub fn legalizeWithContext(allocator: std.mem.Allocator, function: ir.Function, 
     for (function.blocks.items) |block| for (block.instructions.items) |inst| {
         if (inst.removed or inst.result == null or inst.kind != .call) continue;
         const op = operation(inst.kind.call) orelse continue;
-        if (op.bits == 128 and op.op == .mul and !op.signed and
+        if ((op.bits == 80 or op.bits == 128) and op.op == .mul and !op.signed and
             @import("extended_math_intrinsics.zig").recursive(function, "__udivti3", context)) continue;
         try names.put(inst.result.?, .{
             .operation = op,
@@ -183,11 +195,7 @@ pub fn legalizeWithContext(allocator: std.mem.Allocator, function: ir.Function, 
                         if (entry.operation.op == .mul and entry.operation.bits == 128 and !entry.operation.signed and
                             !(original_rhs == .int and original_rhs.int >= 1 and original_rhs.int <= std.math.maxInt(u32)))
                         {
-                            const nonzero = try builder.emit(.{ .icmp = .{ .predicate = .ne, .operand_ty = full, .lhs = rhs, .rhs = .{ .int = 0 } } });
-                            const safe = try builder.emit(.{ .select = .{ .cond_ty = .{ .int = 1 }, .cond = nonzero, .ty = full, .true_value = rhs, .false_value = .{ .int = 1 } } });
-                            const round_trip = try builder.emit(.{ .binary = .{ .op = .udiv, .ty = full, .lhs = .{ .named = entry.wrapped }, .rhs = safe } });
-                            const changed = try builder.emit(.{ .icmp = .{ .predicate = .ne, .operand_ty = full, .lhs = round_trip, .rhs = lhs } });
-                            try block.instructions.append(allocator, .{ .result = entry.overflow, .kind = .{ .binary = .{ .op = .@"and", .ty = .{ .int = 1 }, .lhs = nonzero, .rhs = changed } } });
+                            try builder.unsignedProductOverflow(entry.overflow, lhs, rhs, .{ .named = entry.wrapped });
                         } else if (entry.operation.op == .mul) {
                             const round_trip = try builder.emit(.{ .binary = .{
                                 .op = if (entry.operation.signed) .sdiv else .udiv,

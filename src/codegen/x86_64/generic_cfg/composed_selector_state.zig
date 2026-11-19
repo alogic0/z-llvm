@@ -2124,6 +2124,15 @@ pub fn preserveCurrentRaxIntoScratch(selector: *ComposedBlockSelector) !?Diagnos
     return null;
 }
 
+pub fn framelessScalarImmediateScratch(selector: *const ComposedBlockSelector) !ArgReg {
+    if (selector.stack_frame_bytes == 0 and try liveScalarNameInReg(selector, .rcx) != null) {
+        for (selector_allocatable_regs) |reg| {
+            if (scratchRegIsProvenFree(selector, reg)) return reg;
+        }
+    }
+    return .rcx;
+}
+
 pub fn scratchRegIsProvenFree(selector: *const ComposedBlockSelector, reg: ArgReg) bool {
     var it = selector.values.iterator();
     while (it.next()) |entry| {

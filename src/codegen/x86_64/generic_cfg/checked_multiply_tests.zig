@@ -215,3 +215,65 @@ test "integer boundary unsigned pair multiply retains low words and every overfl
         for (guarded[2..]) |byte| try std.testing.expectEqual(@as(u8, 0xa7), byte);
     };
 }
+
+test "self-build arithmetic preserves the wrapped i80 value and independent overflow flag" {
+    const samples = [_]u80{ 0, 1, 2, (1 << 40) - 1, 1 << 40, (1 << 64) - 1, 1 << 64, (1 << 64) + 1, 1 << 79, std.math.maxInt(u80) };
+    for ([_][]const u8{ "uadd", "umul" }, 0..) |name, operation| {
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare {{ i80, i1 }} @llvm.{0s}.with.overflow.i80(i80, i80)
+            \\define i128 @checked(i128 %aa, i128 %bb, ptr %flag) {{
+            \\entry:
+            \\ %a = trunc i128 %aa to i80
+            \\ %b = trunc i128 %bb to i80
+            \\ %pair = call {{ i80, i1 }} @llvm.{0s}.with.overflow.i80(i80 %a, i80 %b)
+            \\ %value = extractvalue {{ i80, i1 }} %pair, 0
+            \\ %carry = extractvalue {{ i80, i1 }} %pair, 1
+            \\ %byte = zext i1 %carry to i8
+            \\ store i8 %byte, ptr %flag, align 1
+            \\ %wide = zext i80 %value to i128
+            \\ ret i128 %wide
+            \\}}
+        , .{name});
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        const function = module.functions.items[0];
+        var output = machine.MachineFunction.init(function.name, function.ret_ty);
+        defer output.deinit(std.testing.allocator);
+        try std.testing.expectEqual(selector.SelectionResult.selected, try selector.tryLower(std.testing.allocator, &output, function));
+        const code = try executable(output);
+        defer std.posix.munmap(code);
+        const run: *const fn (u128, u128, *u8) callconv(.c) u128 = @ptrCast(code.ptr);
+        for (samples) |a| for (samples) |b| {
+            const exact = if (operation == 0) @as(u160, a) + b else @as(u160, a) * b;
+            const wrapped: u80 = @truncate(exact);
+            var guard = [_]u8{ 0xa7, 0xa7, 0xa7 };
+            try std.testing.expectEqual(@as(u128, wrapped), run(a, b, &guard[1]));
+            try std.testing.expectEqual([3]u8{ 0xa7, @intFromBool(exact > std.math.maxInt(u80)), 0xa7 }, guard);
+        };
+    }
+}
+
+test "self-build arithmetic keeps unsupported i80 checked operations and recursive division closed" {
+    const operations = [_][]const u8{ "usub", "sadd", "ssub", "smul", "umul" };
+    for (operations) |name| {
+        const function_name = if (std.mem.eql(u8, name, "umul")) "__udivti3" else "probe";
+        const text = try std.fmt.allocPrint(std.testing.allocator,
+            \\declare {{ i80, i1 }} @llvm.{0s}.with.overflow.i80(i80, i80)
+            \\define i1 @{1s}(i80 %a, i80 %b) {{
+            \\entry:
+            \\ %pair = call {{ i80, i1 }} @llvm.{0s}.with.overflow.i80(i80 %a, i80 %b)
+            \\ %flag = extractvalue {{ i80, i1 }} %pair, 1
+            \\ ret i1 %flag
+            \\}}
+        , .{ name, function_name });
+        defer std.testing.allocator.free(text);
+        var module = try ir.Module.parse(std.testing.allocator, text);
+        defer module.deinit();
+        try module.verify();
+        var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena.deinit();
+        try std.testing.expect(try @import("overflow_values.zig").legalize(arena.allocator(), module.functions.items[0]) == null);
+    }
+}

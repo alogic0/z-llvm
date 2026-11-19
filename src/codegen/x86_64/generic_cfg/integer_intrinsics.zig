@@ -193,7 +193,8 @@ fn operation(call: ir.CallInst) ?Operation {
     for ([_][]const u8{ "uadd.sat", "usub.sat", "ushl.sat", "sadd.sat", "ssub.sat", "scmp.i32", "bitreverse", "umin", "umax", "smin", "smax" }, [_]Operation{ .uadd_sat, .usub_sat, .ushl_one, .sadd_sat, .ssub_sat, .scmp, .reverse, .umin, .umax, .smin, .smax }) |name, op| {
         const spelling = std.fmt.bufPrint(&buffer, "llvm.{s}.i{d}", .{ name, bits }) catch return null;
         if (!std.mem.eql(u8, call.callee, spelling)) continue;
-        if (bits > 64 and op != .sadd_sat and op != .ssub_sat and !(bits == 128 and (op == .umin or op == .umax))) return null;
+        if (bits > 64 and op != .sadd_sat and op != .ssub_sat and
+            !(bits == 96 and op == .smax) and !(bits == 128 and (op == .umin or op == .umax))) return null;
         if (op == .reverse) {
             if (bits == 64 or call.args.items.len != 1) return null;
         } else if (op == .ushl_one) {
@@ -276,7 +277,7 @@ pub fn legalize(allocator: std.mem.Allocator, function: ir.Function) !?ir.Functi
                 const call = inst.kind.call;
                 const bits = call.ret_ty.int;
                 if (minimumMaximum(op)) {
-                    const wide: ir.Type = .{ .int = if (bits < 32) 32 else if (bits == 128) 128 else 64 };
+                    const wide: ir.Type = .{ .int = if (bits < 32) 32 else if (bits > 64) 128 else 64 };
                     const lhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[0].value);
                     const rhs = try extend(allocator, function, &block, &serial, call.ret_ty, wide, call.args.items[1].value);
                     var compare_lhs = lhs;

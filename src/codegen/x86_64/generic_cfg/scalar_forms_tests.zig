@@ -1320,3 +1320,28 @@ test "native literal integer floating bitcasts retain exact payloads stores and 
         };
     }
 }
+
+test "self-build arithmetic keeps the first i64 subtraction live through a second subtraction and xor" {
+    const text =
+        \\define i64 @mask(i64 %value, i64 %alignment) {
+        \\entry:
+        \\ %sum = add i64 %value, %alignment
+        \\ %rounded = sub i64 %sum, 1
+        \\ %low = sub i64 %alignment, 1
+        \\ %mask = xor i64 %low, -1
+        \\ %result = and i64 %rounded, %mask
+        \\ ret i64 %result
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (u64, u64) callconv(.c) u64 = @ptrCast(code.ptr);
+    const samples = [_]u64{ 0, 1, 2, 3, 1 << 32, (1 << 48) + 7, 1 << 63, std.math.maxInt(u64) };
+    for (samples) |value| for (samples) |alignment| {
+        const low = alignment -% 1;
+        try std.testing.expectEqual((value +% low) & ~low, run(value, alignment));
+    };
+}

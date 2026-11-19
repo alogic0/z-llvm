@@ -713,3 +713,27 @@ test "pair fixed multiply formerly closed literal form executes its exact result
     try std.testing.expectEqual(@as(i128, 2), run());
     try module.verify();
 }
+
+test "self-build arithmetic compares the sign and high limb of i96 smax" {
+    const text =
+        \\declare i96 @llvm.smax.i96(i96, i96)
+        \\define i128 @maximum(i128 %aa, i128 %bb) {
+        \\entry:
+        \\ %a = trunc i128 %aa to i96
+        \\ %b = trunc i128 %bb to i96
+        \\ %value = call i96 @llvm.smax.i96(i96 %a, i96 %b)
+        \\ %out = sext i96 %value to i128
+        \\ ret i128 %out
+        \\}
+    ;
+    var module = try ir.Module.parse(std.testing.allocator, text);
+    defer module.deinit();
+    try module.verify();
+    const code = try executable(module);
+    defer std.posix.munmap(code);
+    const run: *const fn (i128, i128) callconv(.c) i128 = @ptrCast(code.ptr);
+    const samples = [_]i96{ std.math.minInt(i96), -(1 << 64), -1, 0, 1, 1 << 64, (1 << 64) + 1, std.math.maxInt(i96) };
+    for (samples) |a| for (samples) |b| {
+        try std.testing.expectEqual(@as(i128, @max(a, b)), run(a, b));
+    };
+}
