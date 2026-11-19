@@ -118,6 +118,37 @@ ordinary driver run determines which repairs qualify.
 [Application parser diagnostic](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/parse-trace-03/trace.stderr)
 · [Reference emitter diagnostics](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-canonical-reference/emit.stderr)
 
+Independent review compared the fixed printer with the same compilation's
+own Zig bitcode. After removing debug information and local names and
+omitting the generated module-ID comment, both modules were 6,856,433
+bytes and had identical contents across all 1,833 functions. The reviewer
+accepted the printer for this application. The parser now also handles
+intrinsic declaration parameter names and the legacy pointer attribute
+`nocapture`. Both complete inputs, `cat` and `compiler_rt`, passed the local
+parser and verifier. [Printer comparison](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-printer-equivalence/comparison.json)
+· [Parser tests and full-module results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/native-focused-01/)
+
+Helper `0b3a9cf7` passed the independent zero-offset callee test. The void
+and value-returning calls produced 40, and a C callee observing all seven
+arguments returned the expected weighted sum of 303. A nonzero offset
+survived optimization and the emitter diagnosed an unsupported indirect
+call without writing an object. On the two complete modules both local
+optimizer runs succeeded and LLVM verified both outputs. Emission still
+failed on legacy debug intrinsic calls and the application startup
+sequence. Repeat the unchanged cold driver after those repairs and run the
+standard library thread tests against the resulting code.
+[Independent callee controls](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-gep-callee-02/observed.json)
+· [Complete-module emitter results](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/actual-replay-01/)
+
+To isolate the debug-record issue, the reviewer removed only complete
+`llvm.dbg.value` and `llvm.dbg.declare` calls from diagnostic copies of
+the optimized inputs. LLVM verified both copies. The emitter's failure
+count fell from 1,756 to 24 in the application and from 910 to 6 in the
+runtime. The implementer is preserving those records in IR and omitting
+them from native instruction selection. Reassess the remaining pointer
+constants, four scalar shifts and startup on the original inputs.
+[Diagnostic reduction and counts](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-legacy-debug/comparison.json)
+
 Use ordinary `build-exe` for the positive and forced-failure handoffs.
 For the shared-cache test also exercise `zig run` or the build runner’s
 `build-exe --listen=-`. Pinned `src/main.zig` gives a direct
