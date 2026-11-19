@@ -1,12 +1,14 @@
 # Next steps
 
-The two x86_64 loop changes now use the selector state owner and pass its
-source guard. Independent review verified that the corrected backedge
-compiler reproduces every timed image, binding the roughly 8% loop gain
-to that source. Its core qualification passed. Against this compiler the
-comparison change saved a further 8.43 ms in Fast and 4.76 ms in Small
-on the production loop. Both changes are in selector qualification.
-[Active plan, measurements and review criteria](plans/2026-11-18-loop-and-bounded-memset.md#loop-backedge-and-compare-follow-ups)
+Both x86_64 loop improvements passed independent review and landed on
+`main`. Forwarding single-use i32 values into their PHI slots
+(`60e4263a`) saved a paired median 18.29 ms in Fast and 18.76 ms in
+Small on the production loop. Branching directly on a single-use i32
+equality (`56eb24a6`) saved a further 8.43 ms and 4.76 ms against the
+first change. Loop text fell from 127 to 119 to 111 bytes. Both
+compilers passed selector Tier 2.
+[Plan and independent review](plans/2026-11-18-loop-and-bounded-memset.md#loop-backedge-and-compare-follow-ups)
+· [Measurements and qualification](evidence/x86_loop_edges_20261118.md)
 
 The loop and bounded memset assignments are complete. The primary reviewer
 accepted the x86_64 dynamic fill change at `5d6b921e`. The original mixed

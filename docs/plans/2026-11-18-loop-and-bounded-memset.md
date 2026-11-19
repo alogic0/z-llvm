@@ -175,6 +175,34 @@ that pair leaves a median 7.30 ms saving. The reviewer accepted the
 measured tradeoff and assigned full qualification of compiler `8374c281`.
 See `b2-source/`, `b2-controls/` and `b2-sample-original/`.
 
+**Final source review, 2026-11-18.** The primary reviewer accepted the
+backedge change at `60e4263a` and the incremental comparison change at
+`56eb24a6`. Each public commit reproduces its frozen patch exactly.
+All 679 compiler source inputs matched for the first commit and all 680
+for the second. Each compiler passed selector Tier 2, including 74
+structural checks, 60 ABI cases, 38 captured object cases, 27 executable
+cases and seven integrated executables. The backedge compiler passed
+2,449 units and the comparison compiler passed 2,450.
+
+For each compiler the reviewer checked the seven upstream Zig results,
+all 2,133 reference and local outputs, and all 1,422 selection-owner
+manifests for the 237 registered C test groups across Fast, Safe and
+Small. Both runs passed 22,788 behavior observations and 54 negative
+controls. The comparison runner matched all 1,822 harness files against
+the public checkout. Both integrated runs preserved the list of top-level
+entries in the legacy temporary directory. The implementer received both
+source decisions.
+See `review-a3-qualification/`, `review-b2-qualification/`,
+`a3-promotion/` and `b2-promotion/`.
+
+**Closure.** The reviewer matched all 97 temporary workspaces to removal
+records in eleven collector transactions. The transactions reclaimed
+12,328,628,224 bytes. The final idle sweep found zero eligible roots.
+The thirteen remaining entries elsewhere have their owners or retention
+reasons recorded in `storage/other-owners.jsonl`. The implementer published
+the results at `29919cbf`. Both assignments are closed.
+[Published measurements, qualification and storage receipts](../evidence/x86_loop_edges_20261118.md)
+
 ## 1. Measure what loop promotion buys on M3
 
 The M2 loop took 230 ms locally and 80 ms with LLVM O3. An older local
