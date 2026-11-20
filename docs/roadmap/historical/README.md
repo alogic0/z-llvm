@@ -3,8 +3,10 @@
 These roadmap files are retained for context, but they are no longer the main
 implementation path.
 
-The active roadmap starts at `../../README.md`. Future cycle files should live
-directly in `../` only after they become active work.
+The [current proposal](../../next_steps.md) links to its plan and acceptance
+criteria. The [compiler development handoffs through November 19, 2026](handoffs-through-2026-11-19.md)
+record earlier decisions and measurements. Future cycle files belong directly
+in `../` once they become active work.
 
 Completed numbered epics from the first Zig LLVM removal roadmap live in
 `completed_epics/`.

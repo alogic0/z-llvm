@@ -376,7 +376,7 @@ All 36 core records preserve selected objects, descriptors, observations and
 linked sizes; wrapper metadata is reviewed separately. The twelve-function
 cohort, 100-row prefix and ratchet 130 remain intact. All source, compiler,
 frontend, input and scratch checks verify; the manifest seals 602 artifacts.
-See [the handoff](next_steps.md) for remaining groups. No complete compiler or
+See the [archived handoff](roadmap/historical/handoffs-through-2026-11-19.md#preceding-checkpoints) for the remaining groups at this checkpoint. No complete compiler or
 runtime object, startup or self-rebuild is claimed.
 
 The preceding [checked-multiply operand slice](evidence/checked_multiply_operands.md) is
@@ -402,7 +402,7 @@ All 36 core records preserve selected objects, descriptors, observations and
 linked sizes. Wrapper metadata differences are recorded separately. The
 twelve-function execution cohort, 100-row prefix and ratchet 130 remain intact.
 All source, compiler, frontend, original-input and scratch hashes verify; the
-manifest seals 461 retained artifacts. See [the handoff](next_steps.md) for the
+manifest seals 461 retained artifacts. See the [archived handoff](roadmap/historical/handoffs-through-2026-11-19.md#preceding-checkpoints) for the
 remaining classified groups. Whole-compiler object emission and self-rebuild
 remain unsupported.
 
@@ -1128,4 +1128,4 @@ and larger switches are accepted, including unchanged Fast/Small execution.
 Continue the authorized plan through the remaining Safe code-generation forms,
 the real compiler runtime link and unchanged Safe execution. Add a permanent
 three-mode regression before final full integration acceptance. See
-[next steps](next_steps.md) for the full acceptance condition.
+the [archived Fibonacci handoff](roadmap/historical/handoffs-through-2026-11-19.md#historical-checkpoints) for the full acceptance condition.

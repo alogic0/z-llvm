@@ -7,13 +7,17 @@ compile pure Zig and its compiler runtime in **ReleaseFast for baseline
 Programs that need the system C library or startup objects still use those
 system inputs. [Architecture](docs/architecture.md)
 
+If you have the SDK archive, [compile a Zig program](#use-the-packaged-compiler).
+From a fresh clone, [build the standalone optimizer](#build-the-standalone-optimizer).
+
 ## Use the packaged compiler
 
 The accepted second-generation (G2) archive is stored in the release
 workstation's `local-state/` directory. A fresh Git checkout contains the
 source and the [package manifest](docs/evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json).
-From the repository root on that workstation, extract the archive to a new
-directory, keeping `bin/zig`, `bin/z_llvm` and `lib/zig` together.
+From the repository root, extract the archive to a new directory, keeping
+`bin/zig`, `bin/z_llvm` and `lib/zig` together. If you copied the archive
+from the release workstation, set `archive` to your copy.
 
 ```sh
 archive=local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-publication/zig-z_llvm-0.17.0-x86_64-linux-gnu.tar.zst
@@ -22,56 +26,77 @@ mkdir "$sdk" && tar --zstd --no-same-owner --same-permissions --delay-directory-
   -xf "$archive" -C "$sdk"
 ```
 
-To compile your own `main.zig` with that SDK, use the packaged driver and
-select its object provider explicitly.
+With the SDK extracted, set `sdk` to its directory and run the following
+from the repository root. The example compiles the checked-in hello program
+and runs the resulting executable.
 
 ```sh
-"$sdk/bin/zig" build-exe main.zig -O ReleaseFast -target x86_64-linux-gnu -mcpu=baseline \
-  -fllvm -fno-libllvm -fno-lld --zllvm-object-provider "$sdk/bin/z_llvm"
+"$sdk/bin/zig" build-exe test/zig/integrated/std_debug_hello.zig \
+  -O ReleaseFast -target x86_64-linux-gnu -mcpu=baseline \
+  -fllvm -fno-libllvm -fno-lld --zllvm-object-provider "$sdk/bin/z_llvm" \
+  -femit-bin=./hello && ./hello
 ```
 
-Here `-fllvm` selects Zig's LLVM IR builder. Zig writes the finalized module
-as text, `z_llvm` optimizes it and emits a native object, and `-fno-lld`
-selects Zig's native ELF linker. The package guide includes the archive
-checksum and the exact invocation used to build upstream Zig's `cat`.
-[Package guide and tested example](docs/evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
+The program prints `hello` to standard error. To compile your own program,
+replace the fixture path with your `main.zig`. The `-fllvm` flag selects
+Zig's IR builder. The explicit provider optimizes the IR and emits the object,
+and `-fno-lld` selects Zig's native ELF linker.
+[Hello source](test/zig/integrated/std_debug_hello.zig) · [Package checksum and recorded upstream `cat` example](docs/evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
 
-## Status
+## Build the standalone optimizer
 
-On November 19, 2026, the first installed generation (G1) rebuilt both G2
-executables from empty caches with host LLVM, Clang and LLD excluded. The
-initial bootstrap used LLVM and Clang. Both installed generations matched all
-2,097 ordered upstream ReleaseFast behavior outcomes (2,063 passes and 34
-skips) and produced byte-identical `cat` executables. The packaged helper
-also passed all 17 integration gates, including 237 native regression cases
-in each of ReleaseFast, ReleaseSafe and ReleaseSmall.
-[Self-rebuild evidence](docs/evidence/llvm_free_self_rebuild_20261119.md) · [Current state and earlier qualifications](docs/current_state.md)
-
-The next proposed experiment targets **compiler time** on
-`pointer_constants.ll`. Direct emission of the same object took 209.2 seconds
-with G2, 19.1 seconds with G1 and 1.42 seconds with an LLVM-built copy of the
-same helper source. The first goal is to bring G2 below 120 seconds while
-preserving the object bytes and all 10,240 observed results.
-[Compile-time plan](docs/plans/2026-11-20-x86_64-pointer-constants-compile-time.md)
-
-For **generated-program performance**, the project measured five workloads
-against LLVM. Two later changes reduced median paired ReleaseFast runtime by
-36.42 ms on the loop benchmark and 21.37 ms on the memory-fill benchmark,
-each against its preceding local version.
-[Five-workload comparison](docs/evidence/generated_program_performance_20261117.md) · [Loop results](docs/evidence/loop_register_residency_20261118.md) · [Memory-fill results](docs/evidence/loop_and_bounded_memset_20261118.md)
-
-## Build and isolated tests
-
-To build the standalone `z_llvm` helper from source, use `zig build`. It installs
-`zig-out/bin/z_llvm`. The tested development platform is **Linux x86-64**,
-with Ubuntu 24.04 used in CI.
-Use [**Zig 0.17.0**](https://ziglang.org/download/0.17.0/), pinned in
-[`.zigversion`](.zigversion). If PATH selects another compiler,
-invoke the 0.17.0 executable explicitly. Build-tool subprocesses inherit that
-same compiler; the patched integration emitter is selected separately.
+From a fresh clone on x86-64 Linux, use Zig 0.17.0 to build `z_llvm` and
+optimize a small LLVM IR file. This requires no separate LLVM installation.
+[Pinned Zig version](.zigversion) · [Zig 0.17.0 download](https://ziglang.org/download/0.17.0/)
 
 ```sh
 zig build
+./zig-out/bin/z_llvm --emit=ir --passes=instcombine test/opt/inputs/instcombine.ll
+```
+
+The input adds zero and multiplies by one. The optimized function returns
+its argument directly. [Input IR](test/opt/inputs/instcombine.ll) · [Expected IR](test/opt/expected/z_llvm/instcombine.ll)
+
+```llvm
+define i32 @instcombine(i32 %a) {
+entry:
+  ret i32 %a
+}
+```
+
+## Do I need LLVM?
+
+| Task | Host LLVM or Clang needed? | Tools used |
+| --- | --- | --- |
+| Compile pure Zig in ReleaseFast on baseline `x86_64-linux-gnu` | No | Packaged `bin/zig`, `bin/z_llvm` and SDK. Zig links the result with its native ELF linker. |
+| Build the standalone optimizer from a clone | No separate installation | Zig 0.17.0 builds `zig-out/bin/z_llvm`. |
+| Rebuild Zig and `z_llvm` with the installed toolchain | No | The first installed generation rebuilt both second-generation executables with host LLVM, Clang and LLD excluded. |
+| Bootstrap the original compiler from source | Yes for the recorded bootstrap | The initial compiler (G0) used LLVM and Clang to seed the first installed generation (G1). |
+| Run comparisons against LLVM | Yes | The development suites use reference tools such as `clang-22` and `opt-22`. |
+
+[Toolchain and bootstrap evidence](docs/evidence/llvm_free_self_rebuild_20261119.md#accepted-g2-package) · [Development environment and comparison tools](docs/environment.md)
+
+## Status
+
+For the November 19, 2026 release, G1 and G2 each matched all 2,097 ordered
+upstream ReleaseFast behavior outcomes (2,063 passes and 34 skips) and
+produced byte-identical `cat` executables. Separately, the packaged `z_llvm`
+helper passed all 17 integration gates, including 237 native regression
+cases in each of ReleaseFast, ReleaseSafe and ReleaseSmall.
+[Self-rebuild evidence](docs/evidence/llvm_free_self_rebuild_20261119.md) · [Current state and earlier qualifications](docs/current_state.md)
+
+For compiler time, generated-program runtime and binary sizes, see the
+[performance comparisons](docs/performance.md). The [next experiment](docs/next_steps.md)
+targets slow object emission in the self-built helper.
+
+## Build and isolated tests
+
+CI uses Ubuntu 24.04 x86-64. If PATH selects another compiler, invoke the
+Zig 0.17.0 executable explicitly. Build-tool subprocesses inherit that
+compiler. The development integration checks select their fixture emitter
+separately.
+
+```sh
 zig build test-unit
 zig build test-unit -Dtest-filter=verifier
 zig build structural-smoke artifact-store-test
@@ -80,16 +105,6 @@ zig build test-tool-regex -Doptimize=ReleaseSafe
 zig build check-docs
 zig build run -- --help
 ```
-
-For a small optimization example, build and run:
-
-```sh
-zig build -Doptimize=ReleaseSafe
-./zig-out/bin/z_llvm --emit=ir --passes=instcombine test/opt/inputs/instcombine.ll
-```
-
-This folds the redundant add and multiply into a direct return of the argument.
-Use `./zig-out/bin/z_llvm --help` to inspect the available input and output modes.
 
 Native tool regex assertions use the public `zig-regex` package source, pinned
 with per-file digests. See [tool dependency provenance](tools/vendor/README.md).

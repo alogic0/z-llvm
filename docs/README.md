@@ -1,15 +1,14 @@
-# Zig LLVM Removal Roadmap
+# z_llvm documentation
 
-The November 19 package pairs a patched Zig 0.17.0 compiler with `z_llvm`
-for pure Zig and its compiler runtime in ReleaseFast on baseline
-`x86_64-linux-gnu`. The first installed generation rebuilt both tools
-without host LLVM, Clang or LLD. [Extract and use the compiler](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
-· [Package manifest](evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
+| I want to… | Start here |
+| --- | --- |
+| Use the compiler | [Compile the hello program with the SDK](../README.md#use-the-packaged-compiler), or [build the optimizer from a fresh clone](../README.md#build-the-standalone-optimizer). Check [which tasks need LLVM](../README.md#do-i-need-llvm). |
+| Understand the architecture | [Follow the IR from the Zig driver to the native ELF linker](architecture.md). See [current state](current_state.md) for the target, modes and test coverage. |
+| Compare results with LLVM | [Compare compiler time, generated-program runtime and binary size](performance.md). Each result links to the workload and its baseline. |
+| Contribute | [Set up a development checkout](../CONTRIBUTING.md), [choose the checks for a change](validation_tiers.md) and [read the current proposal](next_steps.md). |
 
-For the compiler and backend responsibilities, see the [architecture](architecture.md).
-For qualification results, see [current state](current_state.md). The next
-proposed experiment targets slow object emission in the self-built helper.
-[Compile-time plan](plans/2026-11-20-x86_64-pointer-constants-compile-time.md) · [Next steps](next_steps.md)
+<details>
+<summary>Historical LLVM-removal roadmap and completed milestones</summary>
 
 ## Earlier milestones
 
@@ -279,3 +278,5 @@ Every optimizer pass should carry one status:
 For each pass, record LLVM source files, entry points/classes, required
 analyses, core data structures, unsupported LLVM behavior, and exact fixtures
 compared with `opt-22`.
+
+</details>
