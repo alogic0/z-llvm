@@ -1,0 +1,61 @@
+# Scalar Integer-To-FP Acceptance
+
+schema_version: 1
+directive: `INBOX-29`
+target: `x86_64-linux-gnu`
+validation_tier: 3
+result: pass
+
+`INBOX-29` is acknowledged by id. The accepted baseline is commit
+`bdb36f25`, captured IR md5 `b0eda7a6427c3084fdf096a68696f19c`,
+and stage4 pin `bdee02bc0c7f227c0f11bc9a449df673fe803540`. The staged source diff used
+for validation has sha256
+`15b57e50bd303addcc26747d08c0505cc85fc28b8ed96501acada4c6ffbc8edf`;
+the isolated current-source z_llvm has sha256
+`e60c160aaf9197d2c4e409b855b0d7f82452352024032de0f405a698118e7e40`.
+
+The composed selector now admits typed scalar `sitofp` and `uitofp` from
+integer widths i8 through i64 to float or double. Narrow and odd signed
+widths are sign-normalized before signed SSE conversion; unsigned widths
+through i63 are zero-normalized and converted through a proven nonnegative
+i64 value. Unsigned i64 uses the standard high-half correction
+`2 * ((x >> 1) | (x & 1))`, so high-bit inputs are never silently treated as
+signed. Wider, narrower, vector, half-destination, and unrelated casts remain
+fail-closed.
+
+The executable matrix checks 27 input cases and both destinations exactly:
+signed minima/maxima across i8, i12, i16, i32, i33, i63, and i64; unsigned
+maxima across i8, i12, i16, i31, i32, i33, and i63; zero plus both sides of
+the u64 high-bit boundary and u64 maximum; and i64 values around the double
+mantissa rounding boundary. All 54 result bit patterns match precomputed
+literals. Four negative-shape checks preserve fail-closed behavior.
+
+Fresh report-all remains 443 selected / 202 emitting / 241 failing, with no
+row closure or collateral emission. Nine log-family rows advance past their
+concrete casts: three half wrappers reach scalar half `fcmp`; four float or
+double rows reach integer `icmp`; `compiler_rt.log10.log10` reaches the
+cross-input `<0, 3>` shuffle; and `compiler_rt.log.log` reaches a global-table
+GEP source form.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=202 failed_functions=241 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
+focused tests: unit=908/908 conversion_cases=27/27 exact_results=54/54 unsupported_shapes=4/4
+tier2: pass; steps=24/24 tests=916/916 structural=8/8 assembly/encoding/object inspection=pass selected object/executable modes=pass integrated_executable=5/5
+tier3: pass after one interrupted full invocation plus narrow unchanged-input recovery; all 17 subgates accounted for
+```
+
+Commands:
+
+```text
+zig build test --summary all
+zig build test structural-smoke compare-codegen-asm compare-codegen-objdump compare-codegen-readelf distribution-object distribution-executable distribution-debug-object distribution-debug-executable distribution-releasesafe-object distribution-zig-integrated-exe --summary all
+zig build install -Doptimize=ReleaseFast --cache-dir tmp/inbox29_zig_cache --prefix tmp/inbox29_install
+tmp/inbox29_install/bin/z_llvm --emit=obj --target=x86_64-linux --passes=zig-debug-accepted --input-limit=67108864 --report-all-codegen-failures --generic-cfg-selector tmp/udivmoddi4_ptr_null_cache/o/8c6b4a5e45095cb98b30ca8d3f251feb/libcompiler_rt_zcu.o.zllvm.ll
+```
+
+Logs: `tmp/inbox29_int_to_fp_tier2.log` (sha256
+`755dd9d6ce07058d20311010fe4ace51962b390f4e585038eda5984983bd1fbb`)
+and `tmp/inbox29_int_to_fp_report.log` (sha256
+`22d0bfcfd2880ebc4573b485487d14628fff2f7c9d0c963f603d74b62fa0013a`).
+Tier 3 preface, recovery details, and final subgate summaries are recorded in
+`docs/evidence/distribution_all_after_inbox29_int_to_fp.summary.md`.

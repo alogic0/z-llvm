@@ -52,7 +52,7 @@ current-action entry.
   summary lines, first failure line, ratchet metadata); backfill summaries
   for currently cited logs that still exist under `tmp/`.
 
-  Closed by `docs/evidence/frontier_packed_call_arg_finish.md`, which
+  Closed by `docs/evidence/frontier_packed_call_arg_finish.summary.md`, which
   validates the tool on the completed Cycle A frontier gate. Legacy gate-log
   summaries for checklist-cited `tmp/` logs that still existed and contained
   `summary ...` lines were backfilled under `docs/evidence/`.
@@ -60,8 +60,8 @@ current-action entry.
   plus stage4 emitter check against the pin; mismatch path validated via a
   temporary override or fixture pin, tracked pin untouched.
 
-  Closed by `docs/evidence/ziglang_pin_stage4_check.md`; the mismatch
-  path is recorded in `docs/evidence/ziglang_pin_stage4_mismatch.md`.
+  Closed by `docs/evidence/ziglang_pin_stage4_check.summary.md`; the mismatch
+  path is recorded in `docs/evidence/ziglang_pin_stage4_mismatch.summary.md`.
 - [x] 4. Close the interrupted vector-family inventory refresh
   (ReleaseFast compiler-core-module) and check off the last vector item in
   the family checklist.
@@ -81,12 +81,12 @@ current-action entry.
   conservative marks allowed, `proven_unharnessable` distinguished from
   `not_yet_analyzed`; first candidate file committed as evidence.
 
-  Closed by `docs/evidence/real_candidates_releasefast_v1.md`, with
+  Closed by `docs/evidence/real_candidates_releasefast_v1.summary.md`, with
   candidate rows in `docs/evidence/real_candidates_releasefast_v1.tsv`.
 - [x] 6. `distribution-real-rows --limit=1` gate exists and is wired into
   `distribution-all`, reporting the staged `real_*` counters.
 
-  Closed by `docs/evidence/real_rows_limit1.md`, which validates rank
+  Closed by `docs/evidence/real_rows_limit1.summary.md`, which validates rank
   1 (`../ziglang/src/main.zig/math.raiseInvalid`) through typed lowering,
   x86_64 object emission, and native link in ReleaseFast, ReleaseSafe, and
   ReleaseSmall. Execution is skipped for this row because the candidate is
@@ -95,14 +95,14 @@ current-action entry.
   stages in all three release modes (expect multiple fix cycles; each fix
   cycle is its own commit, this box closes on the first green run).
 
-  Closed by `docs/evidence/real_rows_strict_limit1.md`, which confirms
+  Closed by `docs/evidence/real_rows_strict_limit1.summary.md`, which confirms
   the rank-1 real row stays strict-green in ReleaseFast, ReleaseSafe, and
   ReleaseSmall with counters unchanged at `1/1/1/0/0`. The ratchet value did
   not move; enforcement did, by wiring `distribution-all` to
   `distribution-real-rows --strict --limit=1`.
 - [x] 8. Ratchet to `--limit=10`, green in all three release modes.
 
-  Closed by `docs/evidence/real_rows_strict_limit10.md`, which confirms
+  Closed by `docs/evidence/real_rows_strict_limit10.summary.md`, which confirms
   ranks 1-10 stay strict-green in ReleaseFast, ReleaseSafe, and ReleaseSmall
   with counters `10/10/10/0/0`. The ratchet values moved upward for lowering,
   object emission, and native link; `real_executed` and `real_programs_ok`
@@ -117,12 +117,12 @@ current-action entry.
   read. The cache lives under `tmp/` (speedup, not evidence). Validate by
   proving a cached run and a fresh-export run produce identical gate
   summary lines; record both timings in
-  `docs/evidence/real_rows_export_cache.md`. Rationale: at
+  `docs/evidence/real_rows_export_cache.summary.md`. Rationale: at
   `--limit=10` each fix cycle spent hours re-exporting; at 25 and 100 the
   export dominates wall-clock entirely. While iterating on fixes, run
   single-mode (ReleaseFast) gates; all three modes at cycle close only.
 
-  Closed by `docs/evidence/real_rows_export_cache.md`, which compares
+  Closed by `docs/evidence/real_rows_export_cache.summary.md`, which compares
   a fresh strict `--limit=10` export run with a cached strict `--limit=10`
   run and records `comparison_summary_lines_match=true` plus fresh and
   cached timings for ReleaseFast, ReleaseSafe, and ReleaseSmall.
@@ -143,10 +143,10 @@ current-action entry.
   recheck — reproduce it once with the cache bypassed to rule the cache
   in or out) and close the strict `--limit=25` ratchet.
 
-  Closed by `docs/evidence/real_rows_strict_limit25_v2.md`, which
+  Closed by `docs/evidence/real_rows_strict_limit25_v2.summary.md`, which
   confirms selector-v2 ranks 1-25 stay strict-green in ReleaseFast,
   ReleaseSafe, and ReleaseSmall with counters `25/25/25/0/0`.
-  `docs/evidence/real_candidates_release_v2.md` records the denominator
+  `docs/evidence/real_candidates_release_v2.summary.md` records the denominator
   migration from v1 hash
   `eb59ef565de222a4b9dafd8ef7da21e37021e6a602889a60d0d597af1466a204`
   to v2 hash
@@ -167,7 +167,7 @@ current-action entry.
   green rows beyond the prefix. Re-cluster from a fresh discovery whenever
   the current cluster list is exhausted or stale.
 
-  Closed by `docs/evidence/real_rows_releasefast_limit200_discovery.md`,
+  Closed by `docs/evidence/real_rows_releasefast_limit200_discovery.summary.md`,
   which records ReleaseFast report-mode `--limit=200` counts at
   `42/33/33/0/0` and groups the 167 failing rows into three clusters.
   Follow-on real-row fix cycles target the largest remaining open cluster.
@@ -176,7 +176,7 @@ current-action entry.
   `distribution-all`), reached by cluster-order fixing per item 9a.
 
   Closed by
-  `docs/evidence/real_rows_strict_limit100_after_intcast_safe.md`, which
+  `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary.md`, which
   records strict `--limit=100` green in ReleaseFast, ReleaseSafe, and
   ReleaseSmall with counters `100/100/100/0/0`. `distribution-all` now
   enforces `distribution-real-rows --strict --limit=100`. The denominator is
@@ -192,7 +192,7 @@ current-action entry.
   (`distribution-zig-integrated-exe`) runs the binary and checks stdout and
   exit code. Includes the budgeted minimal inline-asm `syscall` form.
 
-  Closed by `docs/evidence/zig_integrated_exe_syscall_hello.md`, which
+  Closed by `docs/evidence/zig_integrated_exe_syscall_hello.summary.md`, which
   confirms patched Zig plus z_llvm object emission and Zig native
   `build-exe -fno-lld` produce a no-std `_start` executable in ReleaseFast,
   ReleaseSafe, and ReleaseSmall; each binary prints `hello\n` and exits 0.
@@ -246,7 +246,7 @@ current-action entry.
   2026-07-04 reclaimed ~61 GB, most of it old-pin cache generations; every
   hook-contract pin bump recreates the problem.
 
-  Closed by `docs/evidence/clean_tmp.md`, which records a fixture
+  Closed by `docs/evidence/clean_tmp.summary.md`, which records a fixture
   dry-run/delete pair: dry-run reported one old-pin cache pair and one
   scratch directory with zero deletions, while `--delete` removed both and
   preserved the current-pin cache pair plus `*.log` file. The real-row export
@@ -271,7 +271,7 @@ current-action entry.
   hit and a fresh export produce identical gate summary lines (same
   standard as item 8a) and record the evidence summary.
 
-  Closed by `docs/evidence/real_rows_cache_rekey.md`: schema-2 cache
+  Closed by `docs/evidence/real_rows_cache_rekey.summary.md`: schema-2 cache
   storage is keyed only by Zig pin, exporter-relevant z_llvm state, and
   release mode; selector version, candidate-file hash, limit, and slice
   checks remain read-layer validation. The fresh-export strict limit-100
@@ -420,10 +420,10 @@ changes the counts; cite the discovery/fix evidence summary.
 
 | Mode | Limit | Lowered | Objects | Linked | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.md` |
-| ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.md` |
-| ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.md` |
-| Debug compiler_rt | std-hello | 443 selected | 248 emitting | 195 failures | `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.md` |
+| ReleaseFast | 200 | 200 | 200 | 200 | `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary.md` |
+| ReleaseSafe | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary.md` |
+| ReleaseSmall | 100 | 100 | 100 | 100 | `docs/evidence/real_rows_strict_limit100_after_intcast_safe.summary.md` |
+| Debug compiler_rt | std-hello | 443 selected | 248 emitting | 195 failures | `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary.md` |
 
 ## Cluster Board (item 9a onward)
 
@@ -433,9 +433,9 @@ count that turned green when the fix landed.
 
 | Cluster (stage + diagnostic) | Size | Status | Rows unlocked | Fix commit / evidence |
 | --- | ---: | --- | ---: | --- |
-| `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 0 | Closed | 146 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`; sub-byte unsigned greater-than-zero bool returns unlocked rank 183 `link.Diags.Flags.anySet`; model-owned `i16` masked equality bool returns unlocked ranks 186-187 `unicode.utf16Is*Surrogate`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_i16_masked_cmp.md` |
-| `typed-lowering unsupported:function_type:function-type` | 0 | Closed | 157 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`; opaque nominal `bitcast` + `intcast` scalar inference unlocked ranks 191-200 `InternPool.*`/related optional-index wrappers; hook-contract v1 aggregate-layout facts for optional payload/slice fields plus fact-owned sret aggregate field-wrapper lowering/emission unlocked rank 190 `Build.Cache.Path.fmtEscapeString`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.md` |
-| `typed-lowering unsupported:instruction_type:lowering` | 0 | Closed | 1 | Fact-owned pointer register-aggregate construction from `ret_ptr` field-store/`ret_load` plus x86_64 pointer aggregate return emission unlocked rank 188 `Air.Liveness.fmtInstSet`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.md` |
+| `object-emission x86_64-lower:UnsupportedCodegenInstruction` | 0 | Closed | 146 | Opaque-bitcast typed lowering moved 16 rows into emitted/linked status; i8 unsigned less-than return emission unlocked rank 36 `ascii.isAscii`; i64 terminal shifts with model-owned extended shift-count constants unlocked ranks 39-43 `bit_set.*.maskIndex`; narrow enum `zext` emission unlocked rank 59 `Air.VectorCmp.encodeOp`; nominal enum bool less-than returns unlocked ranks 61-62 `codegen.*.bits.FrameIndex.isNamed`, ranks 66-182 `hash_map.*.Metadata.*`, and rank 184 `os.linux.W.IFEXITED`; sub-byte unsigned greater-than-zero bool returns unlocked rank 183 `link.Diags.Flags.anySet`; model-owned `i16` masked equality bool returns unlocked ranks 186-187 `unicode.utf16Is*Surrogate`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_i16_masked_cmp.summary.md` |
+| `typed-lowering unsupported:function_type:function-type` | 0 | Closed | 157 | Opaque nominal type-surface parsing now accepts pointer sigils inside balanced generic argument lists, so existing typed-bitcast inference unlocked ranks 63-65 `hash_map.*.Metadata.*`; preserving module aggregate-layout facts in real-row slices plus direct `aggregate_init` register-aggregate lowering unlocked rank 185 `sort.block.Range.init`; fact-owned `Air.ShuffleTwoMask` u32 nominal enum parsing unlocked rank 189 `Air.ShuffleTwoMask.aElem`; opaque nominal `bitcast` + `intcast` scalar inference unlocked ranks 191-200 `InternPool.*`/related optional-index wrappers; hook-contract v1 aggregate-layout facts for optional payload/slice fields plus fact-owned sret aggregate field-wrapper lowering/emission unlocked rank 190 `Build.Cache.Path.fmtEscapeString`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_optional_layout.summary.md` |
+| `typed-lowering unsupported:instruction_type:lowering` | 0 | Closed | 1 | Fact-owned pointer register-aggregate construction from `ret_ptr` field-store/`ret_load` plus x86_64 pointer aggregate return emission unlocked rank 188 `Air.Liveness.fmtInstSet`. Evidence `docs/evidence/real_rows_releasefast_limit200_after_ptr_aggregate.summary.md` |
 | `real-program object-emission compiler_rt parser:UnsupportedGlobalVariable weak_odr hidden alias` | 0 | Closed | 479 | Item 12 std-hello Debug discovery moved past compiler_rt `weak_odr hidden alias` declarations by parsing alias visibility as model IR and preserving ELF symbol visibility; the next open cluster is `UnsupportedInstruction` on `fneg x86_fp80`. Evidence `tmp/std_debug_hello_debug_build_after_alias_visibility.log` |
 | `real-program object-emission compiler_rt parser:UnsupportedInstruction fneg` | 0 | Closed | 76 | Item 12 std-hello Debug discovery now parses LLVM `fneg` as a model-owned `fsub` from negative zero, preserving fast-math flags; the next open cluster is `InvalidFunctionHeader` on `define internal half @compiler_rt.__neghf2(...)`. Evidence `tmp/std_debug_hello_debug_build_after_fneg_parse.log` |
 | `real-program object-emission compiler_rt parser:InvalidFunctionHeader half` | 0 | Closed | 55 | Item 12 std-hello Debug discovery now models LLVM `half` as a first-class scalar type with parser, verifier, layout, and fail-closed lowering support; the next open cluster is `UnsupportedType` while parsing `<4 x half>` vector elements in compiler_rt complex half multiplication. Evidence `tmp/std_debug_hello_debug_build_after_half_type.log` |
@@ -489,10 +489,10 @@ count that turned green when the fix landed.
 | `real-program object-emission compiler_rt atomics:variable store` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned variable-size spinlocked store wrapper used by compiler_rt `atomics.__atomic_store`: the matcher validates the size-to-spinlock slot derivation, acquire loop, desired-to-object replacement copy, release store, and `void` result before emitting a symbol-relocated x86_64 primitive. The next open cluster is object-emission `UnsupportedCodegenInstruction` in `compiler_rt.clear_cache.clear_cache`. Evidence `tmp/std_debug_hello_debug_build_atomic_store_after.log` |
 | `real-program object-emission compiler_rt cfg:valgrind discard-translations client request` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned Valgrind discard-translations client-request block reached through compiler_rt `clear_cache`: the matcher validates the two `usize` parameters, request-block alloca, length subtraction, six-word request payload, exact side-effecting client-request inline-asm template/constraints, lifetime calls, and `ret void`, then emits a no-op return for the x86_64 cache-clear path without function-name admission. `distribution-all` now enforces strict real-row limit 100 through explicit ReleaseFast, ReleaseSafe, and ReleaseSmall invocations, avoiding the quiet implicit all-mode runner stall while preserving the same three-mode coverage. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__abs_limb64`. Evidence `tmp/std_debug_hello_debug_build_clear_cache_after.log`; `tmp/distribution_all_after_clear_cache.log` |
 | `real-program object-emission compiler_rt cfg:limb64 abs twos-complement body` | 0 | Closed | 1 | Item 12 std-hello Debug discovery now lowers the model-owned limb64 absolute-value body used by compiler_rt `limb64.__abs_limb64`: the matcher validates the limb count derived from the bit count, high-limb sign test, positive memcpy path, and negative xor-plus-carry loop with separate overflow and carry byte slots, then emits a qword copy/two's-complement loop without function-name admission. The next open cluster is object-emission `UnsupportedCodegenControlFlow` in `compiler_rt.limb64.__mulo_limb64`. Evidence `tmp/std_debug_hello_debug_build_abs_limb64_after.log`; `tmp/distribution_all_after_abs_limb64.log` |
-| `real-program object-emission compiler_rt soft-float/libm/conversion selector candidates` | 228 | Open | 9 | Report-all object emission on the current Debug std-hello compiler_rt module found the largest remaining selector/codegen bucket in soft-float, libm-style, complex-float, comparison, and float/int conversion helpers after separating advisory call-marker rows. Type-driven half and double truncation cycles close `compiler_rt.trunc.__trunch` and `compiler_rt.trunc.trunc`; the double-width forms also make `compiler_rt.extendhfdf2.__extendhfdf2` and `compiler_rt.extendsfdf2.__extendsfdf2` emit without nominal admission. Scalar SSE direct-call ABI support closes `compiler_rt.tan.tanh`; scalar widening/narrowing/multiplication, subtraction/division, predicate-complete comparison, bounded f64x2/f32x2 packed shapes, and typed FP stack memory then advance the trig and log families without nominal admission. Scalar float/double selects and source-safe FP phi edges close `compiler_rt.tan.tanf`; eight precomputed exact native cases cover zeros, minimum subnormals, and finite polynomial/range branches without calling the controlled reducer. Exact named ABI pointer provenance now permits scalar FP stores through direct or spilled pointer parameters, advancing `sincosf`; `sinf`, `cosf`, and `sincosf` all stop at unsupported switch terminators. Fresh report-all is 199 emitting / 244 failing. `compiler_rt.fma.fmaf`, four round-family rows, `compiler_rt.int.__udivdi3`, `compiler_rt.floatunsidf.__floatunsidf`, and scalar `fmin`/`fmax` emissions remain collateral without separate semantic claims. `truncl`, `truncq`, `__truncx`, unbounded vector forms, switch lowering, derived/unproven external FP stores, and wider-format rows remain explicit boundaries. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.md`, `docs/evidence/std_debug_hello_trunch_acceptance.md`, `docs/evidence/std_debug_hello_trunc_acceptance.md`, `docs/evidence/std_debug_hello_tanh_call_abi_acceptance.md`, `docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.md`, `docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.md`, `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.md`, `docs/evidence/std_debug_hello_vector_f64x2_acceptance.md`, `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.md`, `docs/evidence/std_debug_hello_vector_f32x2_acceptance.md`, `docs/evidence/std_debug_hello_scalar_fp_select_phi_acceptance.md`, and `docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.md`; full log `tmp/inbox26_fp_pointer_store_report.log` |
-| `real-program object-emission compiler_rt integer helper selector candidates` | 0 | Closed | 43 | Report-all object emission found the integer helper selector/codegen bucket after separating 21 tail-call ABI rows from the historical 66-row integer helper cluster. Composed-selection proofs now emit all three parity rows, `compiler_rt.parity.__paritysi2`, `compiler_rt.parity.__paritydi2`, `compiler_rt.parity.__parityti2`, `compiler_rt.mulo.__mulosi4`, `compiler_rt.int.__umoddi3`, `compiler_rt.int.__moddi3`, `compiler_rt.udivmod.__umodti3`, `compiler_rt.udivmod.__modti3`, `compiler_rt.mulXi3.__mulsi3`, and `compiler_rt.mulXi3.__multi3` through block-local per-instruction selection with explicit operand and register assignment. `compiler_rt.udivmodei4.__udivei5` and `compiler_rt.udivmodei4.__umodei4` now close as the eleventh and twelfth composed-selection rows; no stage-two pressure boundary remains. The first allocator acceptance row, `__multi3`, established that INBOX-4 identified the executable failure as a frame-layout collision, and the composed selector now assigns non-overlapping 8-byte spill slots under one frame authority so the z_llvm-emitted `__multi3`/`__modti3` object computes correct results in the integrated executable proof. INBOX-5 then hardened the same proof by adding disp32 frame-slot encodings for offsets past 127, correcting high-register instruction-size accounting so ELF relocations target the actual call immediate, making integrated-exe exit-code mismatches fail closed, and clobbering `rcx` before RHS spill64 reloads from the single value-location map. INBOX-6 is acknowledged by generalizing machine frame indexes from a fixed enum namespace into data slots while keeping spill objects inside the same frame authority as LLVM RegAllocFast `StackSlotForVirtReg` / `MFI->CreateSpillStackObject`. INBOX-7 is acknowledged by materializing scalar spill locations at operand use for 32-bit and 64-bit operands through that same single value-location map. The proof prebuilds the no-std `_start` harness as a normal patched-Zig object and links it with selector-emitted compiler_rt objects, keeping the row closure on the composed compiler_rt bodies rather than a wrapper CFG dependency. The parked `__udivei5` retry now uses the corrected 32-slot frame envelope, pointer-phi support, `llvm.assume` no-op lowering, exact `tail fastcc i16 @zig.target.intByteSize(i16 ...)` helper-call lowering, data-backed frame indexes, allocation-plan-sized spill reservation, scalar spill-location consumption, narrow-to-i64 zext lowering through a 32-bit accumulator write, dynamic byte-pointer GEP lowering, i64 immediate AND lowering through RCX and RAX, nonzero i64 equality-immediate lowering, named i64 equality lowering, width-correct i16 inequality-with-zero lowering, dynamic `[4 x i8]` GEP lowering for i32 element pointers, i32 loads through argument or scratch pointer registers, named pointer equality, i32 loads through spilled pointers, CFG-edge-aware phi incoming intervals, named i64 unsigned-greater comparison, signed i6 nonnegative comparison, i64 immediate unsigned-greater comparison, signed i64 less-than-zero comparison, i64 inequality with zero, exact `llvm.ctlz.i32` lowering, wrapping i6 immediate-lhs subtraction, and spill64 branch-condition consumption; Debug compiler_rt report-all now emits 154 functions with 289 failures, and the global first failure is `compiler_rt.trunc.__trunch` at `unsupported_type` / `unsupported-return-type`; continue the separately tracked integer-helper bucket by rank. Continue the integer-helper bucket in rank order while keeping intervening tail-call rows in the separate ABI family and recording each row's envelope fit or live-value count. Current item-15 accounting is composed-selection rows 43, terminal-template rows 17 (15 limb64 plus `__udivei4` and `__umodei5`), stage-two-boundary rows 0, allocator-acceptance rows 0 pending, and open integer-helper fallback candidates 0. The 45-row non-tail integer bucket is closed; remaining integer-family failures belong to the separate tail-call ABI family. Evidence `docs/evidence/std_debug_hello_udivei5_pressure.tsv`; `docs/evidence/std_debug_hello_umodei4_pressure.tsv`; `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.md`; `docs/evidence/std_debug_hello_umodti3_composed.md`; `docs/evidence/std_debug_hello_modti3_composed.md`; `docs/evidence/std_debug_hello_mulsi3_composed.md`; `docs/evidence/std_debug_hello_multi3_pressure.tsv`; `docs/evidence/std_debug_hello_multi3_gap_inventory.tsv`; `docs/evidence/zig_integrated_exe_i128_arithmetic.md`; `docs/evidence/distribution_all_after_multi3_single_frame.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox5.md`; `docs/evidence/distribution_all_after_inbox5.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.md`; `docs/evidence/distribution_all_after_inbox7.md`; `docs/evidence/std_debug_hello_udivei5_zext_width.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_zext_width.md`; `docs/evidence/distribution_all_after_zext_width.md`; `docs/evidence/std_debug_hello_udivei5_gep_source.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_source.md`; `docs/evidence/distribution_all_after_gep_source.md`; `docs/evidence/std_debug_hello_udivei5_and64_imm.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_and64_imm.md`; `docs/evidence/distribution_all_after_and64_imm.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_imm.md`; `docs/evidence/distribution_all_after_icmp_eq_imm.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_values.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_values.md`; `docs/evidence/distribution_all_after_icmp_eq_values.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_zero.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_zero.md`; `docs/evidence/distribution_all_after_icmp_ne_zero.md`; `docs/evidence/std_debug_hello_udivei5_gep_i32_source.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_i32_source.md`; `docs/evidence/distribution_all_after_gep_i32_source.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_ptr.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_ptr.md`; `docs/evidence/selector_tier2_load_i32_ptr.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ptr_eq.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ptr_eq.md`; `docs/evidence/selector_tier2_icmp_ptr_eq.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_spill_ptr.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_spill_ptr.md`; `docs/evidence/selector_tier2_load_i32_spill_ptr.md`; `docs/evidence/std_debug_hello_udivei5_phi_edge_liveness.md`; `docs/evidence/zig_integrated_exe_phi_edge_liveness.md`; `docs/evidence/distribution_all_after_phi_edge_liveness.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_values.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_values.md`; `docs/evidence/selector_tier2_icmp_ugt_values.md`; `docs/evidence/std_debug_hello_udivei5_icmp_sgt_i6.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_sgt_i6.md`; `docs/evidence/selector_tier2_icmp_sgt_i6.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_imm.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_imm.md`; `docs/evidence/selector_tier2_icmp_ugt_imm.md`; `docs/evidence/std_debug_hello_udivei5_icmp_slt_zero.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_slt_zero.md`; `docs/evidence/selector_tier2_icmp_slt_zero.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_i64_zero.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_i64_zero.md`; `docs/evidence/selector_tier2_icmp_ne_i64_zero.md`; `docs/evidence/std_debug_hello_udivei5_ctlz_i32.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_ctlz_i32.md`; `docs/evidence/selector_tier2_ctlz_i32.md`; `docs/evidence/std_debug_hello_udivei5_sub_i6.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_sub_i6.md`; `docs/evidence/selector_tier2_sub_i6.md`; `docs/evidence/std_debug_hello_udivei5_spill_cond.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_spill_cond.md`; `docs/evidence/selector_tier2_spill_cond.md` Acceptance evidence `docs/evidence/std_debug_hello_udivei5_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_udivei5_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_udivei5_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_udivei5_acceptance.md`. Acceptance evidence `docs/evidence/std_debug_hello_umodei4_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_umodei4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_umodei4_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_umodei4_acceptance.md`. Acceptance evidence `docs/evidence/std_debug_hello_divei4_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_divei4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_divei4_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_divei4_acceptance.md`. Acceptance evidence `docs/evidence/std_debug_hello_modei4_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_modei4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_modei4_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_modei4_acceptance.md`. Acceptance evidence `docs/evidence/std_debug_hello_modei5_divei5_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_modei5_acceptance_pressure.tsv` and `docs/evidence/std_debug_hello_divei5_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_modei5_divei5_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_modei5_divei5_acceptance.md`. `compiler_rt.mulo.__muloti4` now closes as the seventeenth composed row with exact native-link, executable signed-overflow, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_muloti4_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_muloti4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_muloti4_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_muloti4_acceptance.md`. `compiler_rt.mulo.__mulodi4` now closes as the eighteenth composed row with exact native-link, executable signed-overflow, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_mulodi4_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_mulodi4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_mulodi4_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_mulodi4_acceptance.md`. `compiler_rt.mulvsi3.__mulvsi3` now closes as the nineteenth composed row with exact native-link, executable normal/trap paths, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_mulvsi3_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_mulvsi3_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_mulvsi3_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_mulvsi3_acceptance.md`. Generic multi-use accumulator relocation closes `compiler_rt.subvdi3.__subvdi3`, `compiler_rt.subvsi3.__subvsi3`, `compiler_rt.addvdi3.__addvdi3`, and `compiler_rt.addvsi3.__addvsi3` as composed rows 20-23. Acceptance evidence `docs/evidence/std_debug_hello_overflow_addsub_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_subvdi3_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_overflow_addsub_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_overflow_addsub_acceptance.md`. `compiler_rt.negv.__negvsi2` now closes as the twenty-fourth composed row with exact native-link, executable positive/negative negation, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_negvsi2_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_negvsi2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_negvsi2_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_negvsi2_acceptance.md`. Zero-left i128 subtraction and framed terminal-trap verification close `compiler_rt.negv.__negvti2` and `compiler_rt.absvti2.__absvti2` as composed rows 25-26. Acceptance evidence `docs/evidence/std_debug_hello_negvti2_absvti2_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_negvti2_acceptance_pressure.tsv` and `docs/evidence/std_debug_hello_absvti2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_negvti2_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_negvti2_acceptance.md`. Immediate-left i64 subtraction and live-RAX preservation close `compiler_rt.negv.__negvdi2` and `compiler_rt.absvdi2.__absvdi2` as composed rows 27-28. Acceptance evidence `docs/evidence/std_debug_hello_negvdi2_absvdi2_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_negvdi2_acceptance_pressure.tsv` and `docs/evidence/std_debug_hello_absvdi2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_negvdi2_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_negvdi2_acceptance.md`. Width-correct i32 absolute value and live-EAX preservation close `compiler_rt.absvsi2.__absvsi2` as composed row 29. Acceptance evidence `docs/evidence/std_debug_hello_absvsi2_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_absvsi2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_absvsi2_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_absvsi2_acceptance.md`. Named i32 multiplication and generalized EAX preservation close `compiler_rt.mulXi3.__muldi3` as composed row 30. Acceptance evidence `docs/evidence/std_debug_hello_muldi3_acceptance.md`; pressure evidence `docs/evidence/std_debug_hello_muldi3_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_muldi3_acceptance.md`; Tier 3 evidence `docs/evidence/distribution_all_after_muldi3_acceptance.md`. i32 zero-inequality plus allocator/frame hardening close `compiler_rt.int.__udivmodsi4`, `compiler_rt.int.__udivsi3`, and `compiler_rt.int.__umodsi3`; acceptance evidence `docs/evidence/std_debug_hello_udivmodsi4_acceptance.md`, pressure evidence `docs/evidence/std_debug_hello_udivmodsi4_acceptance_pressure.tsv`, executable evidence `docs/evidence/zig_integrated_exe_udivmodsi4_acceptance.md`, and Tier 3 evidence `docs/evidence/distribution_all_after_udivmodsi4_acceptance.md`. |
-| `real-program object-emission compiler_rt stage-two pressure boundary rows` | 0 | Closed | 2 | Both parked pressure-boundary rows are closed through composed selection and native-link acceptance: `compiler_rt.udivmodei4.__udivei5` and `compiler_rt.udivmodei4.__umodei4`. The corrected frame authority made the stage-two spill envelope allocation-plan-sized while preserving the historical 32-slot floor for existing stack-array rows. The closed rows pass the old pressure gate, pointer phi binding, well-formed `llvm.assume` calls, the exact `tail fastcc i16 @zig.target.intByteSize(i16 ...)` helper call, the old fixed frame-slot namespace cap, scalar spill-location consumption, narrow-to-i64 zext lowering, dynamic byte-pointer GEP lowering, i64 immediate AND lowering, nonzero i64 equality-immediate lowering, named i64 equality lowering, width-correct i16 inequality-with-zero lowering, dynamic `[4 x i8]` GEP lowering for i32 element pointers, i32 loads through argument or scratch pointer registers, named pointer equality, i32 loads through spilled pointers, CFG-edge-aware phi incoming intervals, named i64 unsigned-greater comparison, signed i6 nonnegative comparison, i64 immediate unsigned-greater comparison, signed i64 less-than-zero comparison, i64 inequality with zero, exact `llvm.ctlz.i32` lowering, wrapping i6 immediate-lhs subtraction, and spill64 branch-condition consumption, then clears selection after trunc location classes are narrowed correctly and framed multi-block returns share one epilogue. Fresh 32-slot acceptance diagnostics report `__udivei5` at max live values `19` / spill slots `13` and `__umodei4` at max live values `24` / spill slots `18`; both have zero over-envelope slots and no first exceedance. Saved old pressure data remains useful as the historical six-slot boundary: `__udivei5` max live values `16`, old spill slots needed `10`, first six-slot-envelope exceedance `Then8.prol` / `live_out` at live values `13`; `__umodei4` max live values `21`, old spill slots needed `15`, first six-slot-envelope exceedance `Then9.prol` / `live_out` at live values `13`. Evidence `docs/evidence/std_debug_hello_udivei5_pressure.tsv`; `docs/evidence/std_debug_hello_umodei4_pressure.tsv`; `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.md`; `docs/evidence/std_debug_hello_udivei5_zext_width.md`; `docs/evidence/std_debug_hello_udivei5_gep_source.md`; `docs/evidence/std_debug_hello_udivei5_and64_imm.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_values.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_zero.md`; `docs/evidence/std_debug_hello_udivei5_gep_i32_source.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_ptr.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ptr_eq.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_spill_ptr.md`; `docs/evidence/std_debug_hello_udivei5_phi_edge_liveness.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_values.md`; `docs/evidence/std_debug_hello_udivei5_icmp_sgt_i6.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_imm.md`; `docs/evidence/std_debug_hello_udivei5_icmp_slt_zero.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_i64_zero.md`; `docs/evidence/std_debug_hello_udivei5_ctlz_i32.md`; `docs/evidence/std_debug_hello_udivei5_sub_i6.md`; `docs/evidence/std_debug_hello_udivei5_spill_cond.md` Acceptance evidence `docs/evidence/std_debug_hello_udivei5_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_udivei5_acceptance_pressure.tsv`. Acceptance evidence `docs/evidence/std_debug_hello_umodei4_acceptance.md`; fresh pressure evidence `docs/evidence/std_debug_hello_umodei4_acceptance_pressure.tsv`. |
-| `real-program object-emission compiler_rt advisory tail-marker inventory` | 32 | Open | 10 | The fresh INBOX-19 baseline has 42 unique `UnsupportedTailCallAbi` rows, correcting the older 44-row estimate. Captured-IR inspection classifies all 42 as advisory `tail` rows and finds zero tracked `notail` or genuine `musttail` rows. INBOX-20 lowers advisory `tail` and `notail` as ordinary calls while keeping `musttail` fail-closed. Ten tracked rows now emit as ordinary calls and 32 expose their actual ABI, type, frame, or selector frontier; this does not implement tail-call ABI and the ten emissions are not separate semantic acceptance claims. Evidence `docs/evidence/std_debug_hello_tail_marker_inventory_inbox20.tsv` and `docs/evidence/std_debug_hello_tanh_call_abi_acceptance.md`; full logs `tmp/inbox19_trunc_final_report.log` and `tmp/inbox20_tanh_final_report.log` |
+| `real-program object-emission compiler_rt soft-float/libm/conversion selector candidates` | 228 | Open | 9 | Report-all object emission on the current Debug std-hello compiler_rt module found the largest remaining selector/codegen bucket in soft-float, libm-style, complex-float, comparison, and float/int conversion helpers after separating advisory call-marker rows. Type-driven half and double truncation cycles close `compiler_rt.trunc.__trunch` and `compiler_rt.trunc.trunc`; the double-width forms also make `compiler_rt.extendhfdf2.__extendhfdf2` and `compiler_rt.extendsfdf2.__extendsfdf2` emit without nominal admission. Scalar SSE direct-call ABI support closes `compiler_rt.tan.tanh`; scalar widening/narrowing/multiplication, subtraction/division, predicate-complete comparison, bounded f64x2/f32x2 packed shapes, and typed FP stack memory then advance the trig and log families without nominal admission. Scalar float/double selects and source-safe FP phi edges close `compiler_rt.tan.tanf`; eight precomputed exact native cases cover zeros, minimum subnormals, and finite polynomial/range branches without calling the controlled reducer. Exact named ABI pointer provenance now permits scalar FP stores through direct or spilled pointer parameters, advancing `sincosf`; `sinf`, `cosf`, and `sincosf` all stop at unsupported switch terminators. Fresh report-all is 199 emitting / 244 failing. `compiler_rt.fma.fmaf`, four round-family rows, `compiler_rt.int.__udivdi3`, `compiler_rt.floatunsidf.__floatunsidf`, and scalar `fmin`/`fmax` emissions remain collateral without separate semantic claims. `truncl`, `truncq`, `__truncx`, unbounded vector forms, switch lowering, derived/unproven external FP stores, and wider-format rows remain explicit boundaries. Evidence `docs/evidence/std_debug_hello_compiler_rt_report_all.summary.md`, `docs/evidence/std_debug_hello_trunch_acceptance.summary.md`, `docs/evidence/std_debug_hello_trunc_acceptance.summary.md`, `docs/evidence/std_debug_hello_tanh_call_abi_acceptance.summary.md`, `docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.summary.md`, `docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.summary.md`, `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.summary.md`, `docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary.md`, `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary.md`, `docs/evidence/std_debug_hello_vector_f32x2_acceptance.summary.md`, `docs/evidence/std_debug_hello_scalar_fp_select_phi_acceptance.summary.md`, and `docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.summary.md`; full log `tmp/inbox26_fp_pointer_store_report.log` |
+| `real-program object-emission compiler_rt integer helper selector candidates` | 0 | Closed | 43 | Report-all object emission found the integer helper selector/codegen bucket after separating 21 tail-call ABI rows from the historical 66-row integer helper cluster. Composed-selection proofs now emit all three parity rows, `compiler_rt.parity.__paritysi2`, `compiler_rt.parity.__paritydi2`, `compiler_rt.parity.__parityti2`, `compiler_rt.mulo.__mulosi4`, `compiler_rt.int.__umoddi3`, `compiler_rt.int.__moddi3`, `compiler_rt.udivmod.__umodti3`, `compiler_rt.udivmod.__modti3`, `compiler_rt.mulXi3.__mulsi3`, and `compiler_rt.mulXi3.__multi3` through block-local per-instruction selection with explicit operand and register assignment. `compiler_rt.udivmodei4.__udivei5` and `compiler_rt.udivmodei4.__umodei4` now close as the eleventh and twelfth composed-selection rows; no stage-two pressure boundary remains. The first allocator acceptance row, `__multi3`, established that INBOX-4 identified the executable failure as a frame-layout collision, and the composed selector now assigns non-overlapping 8-byte spill slots under one frame authority so the z_llvm-emitted `__multi3`/`__modti3` object computes correct results in the integrated executable proof. INBOX-5 then hardened the same proof by adding disp32 frame-slot encodings for offsets past 127, correcting high-register instruction-size accounting so ELF relocations target the actual call immediate, making integrated-exe exit-code mismatches fail closed, and clobbering `rcx` before RHS spill64 reloads from the single value-location map. INBOX-6 is acknowledged by generalizing machine frame indexes from a fixed enum namespace into data slots while keeping spill objects inside the same frame authority as LLVM RegAllocFast `StackSlotForVirtReg` / `MFI->CreateSpillStackObject`. INBOX-7 is acknowledged by materializing scalar spill locations at operand use for 32-bit and 64-bit operands through that same single value-location map. The proof prebuilds the no-std `_start` harness as a normal patched-Zig object and links it with selector-emitted compiler_rt objects, keeping the row closure on the composed compiler_rt bodies rather than a wrapper CFG dependency. The parked `__udivei5` retry now uses the corrected 32-slot frame envelope, pointer-phi support, `llvm.assume` no-op lowering, exact `tail fastcc i16 @zig.target.intByteSize(i16 ...)` helper-call lowering, data-backed frame indexes, allocation-plan-sized spill reservation, scalar spill-location consumption, narrow-to-i64 zext lowering through a 32-bit accumulator write, dynamic byte-pointer GEP lowering, i64 immediate AND lowering through RCX and RAX, nonzero i64 equality-immediate lowering, named i64 equality lowering, width-correct i16 inequality-with-zero lowering, dynamic `[4 x i8]` GEP lowering for i32 element pointers, i32 loads through argument or scratch pointer registers, named pointer equality, i32 loads through spilled pointers, CFG-edge-aware phi incoming intervals, named i64 unsigned-greater comparison, signed i6 nonnegative comparison, i64 immediate unsigned-greater comparison, signed i64 less-than-zero comparison, i64 inequality with zero, exact `llvm.ctlz.i32` lowering, wrapping i6 immediate-lhs subtraction, and spill64 branch-condition consumption; Debug compiler_rt report-all now emits 154 functions with 289 failures, and the global first failure is `compiler_rt.trunc.__trunch` at `unsupported_type` / `unsupported-return-type`; continue the separately tracked integer-helper bucket by rank. Continue the integer-helper bucket in rank order while keeping intervening tail-call rows in the separate ABI family and recording each row's envelope fit or live-value count. Current item-15 accounting is composed-selection rows 43, terminal-template rows 17 (15 limb64 plus `__udivei4` and `__umodei5`), stage-two-boundary rows 0, allocator-acceptance rows 0 pending, and open integer-helper fallback candidates 0. The 45-row non-tail integer bucket is closed; remaining integer-family failures belong to the separate tail-call ABI family. Evidence `docs/evidence/std_debug_hello_udivei5_pressure.tsv`; `docs/evidence/std_debug_hello_umodei4_pressure.tsv`; `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary.md`; `docs/evidence/std_debug_hello_umodti3_composed.summary.md`; `docs/evidence/std_debug_hello_modti3_composed.summary.md`; `docs/evidence/std_debug_hello_mulsi3_composed.summary.md`; `docs/evidence/std_debug_hello_multi3_pressure.tsv`; `docs/evidence/std_debug_hello_multi3_gap_inventory.tsv`; `docs/evidence/zig_integrated_exe_i128_arithmetic.summary.md`; `docs/evidence/distribution_all_after_multi3_single_frame.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox5.summary.md`; `docs/evidence/distribution_all_after_inbox5.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.summary.md`; `docs/evidence/distribution_all_after_inbox7.summary.md`; `docs/evidence/std_debug_hello_udivei5_zext_width.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_zext_width.summary.md`; `docs/evidence/distribution_all_after_zext_width.summary.md`; `docs/evidence/std_debug_hello_udivei5_gep_source.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_source.summary.md`; `docs/evidence/distribution_all_after_gep_source.summary.md`; `docs/evidence/std_debug_hello_udivei5_and64_imm.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_and64_imm.summary.md`; `docs/evidence/distribution_all_after_and64_imm.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_imm.summary.md`; `docs/evidence/distribution_all_after_icmp_eq_imm.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_values.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_values.summary.md`; `docs/evidence/distribution_all_after_icmp_eq_values.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_zero.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_zero.summary.md`; `docs/evidence/distribution_all_after_icmp_ne_zero.summary.md`; `docs/evidence/std_debug_hello_udivei5_gep_i32_source.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_i32_source.summary.md`; `docs/evidence/distribution_all_after_gep_i32_source.summary.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_ptr.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_ptr.summary.md`; `docs/evidence/selector_tier2_load_i32_ptr.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ptr_eq.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ptr_eq.summary.md`; `docs/evidence/selector_tier2_icmp_ptr_eq.summary.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_spill_ptr.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_spill_ptr.summary.md`; `docs/evidence/selector_tier2_load_i32_spill_ptr.summary.md`; `docs/evidence/std_debug_hello_udivei5_phi_edge_liveness.summary.md`; `docs/evidence/zig_integrated_exe_phi_edge_liveness.summary.md`; `docs/evidence/distribution_all_after_phi_edge_liveness.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_values.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_values.summary.md`; `docs/evidence/selector_tier2_icmp_ugt_values.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_sgt_i6.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_sgt_i6.summary.md`; `docs/evidence/selector_tier2_icmp_sgt_i6.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_imm.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_imm.summary.md`; `docs/evidence/selector_tier2_icmp_ugt_imm.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_slt_zero.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_slt_zero.summary.md`; `docs/evidence/selector_tier2_icmp_slt_zero.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_i64_zero.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_i64_zero.summary.md`; `docs/evidence/selector_tier2_icmp_ne_i64_zero.summary.md`; `docs/evidence/std_debug_hello_udivei5_ctlz_i32.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_ctlz_i32.summary.md`; `docs/evidence/selector_tier2_ctlz_i32.summary.md`; `docs/evidence/std_debug_hello_udivei5_sub_i6.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_sub_i6.summary.md`; `docs/evidence/selector_tier2_sub_i6.summary.md`; `docs/evidence/std_debug_hello_udivei5_spill_cond.summary.md`; `docs/evidence/zig_integrated_exe_i128_arithmetic_spill_cond.summary.md`; `docs/evidence/selector_tier2_spill_cond.summary.md` Acceptance evidence `docs/evidence/std_debug_hello_udivei5_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_udivei5_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_udivei5_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_udivei5_acceptance.summary.md`. Acceptance evidence `docs/evidence/std_debug_hello_umodei4_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_umodei4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_umodei4_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_umodei4_acceptance.summary.md`. Acceptance evidence `docs/evidence/std_debug_hello_divei4_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_divei4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_divei4_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_divei4_acceptance.summary.md`. Acceptance evidence `docs/evidence/std_debug_hello_modei4_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_modei4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_modei4_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_modei4_acceptance.summary.md`. Acceptance evidence `docs/evidence/std_debug_hello_modei5_divei5_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_modei5_acceptance_pressure.tsv` and `docs/evidence/std_debug_hello_divei5_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_modei5_divei5_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_modei5_divei5_acceptance.summary.md`. `compiler_rt.mulo.__muloti4` now closes as the seventeenth composed row with exact native-link, executable signed-overflow, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_muloti4_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_muloti4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_muloti4_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_muloti4_acceptance.summary.md`. `compiler_rt.mulo.__mulodi4` now closes as the eighteenth composed row with exact native-link, executable signed-overflow, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_mulodi4_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_mulodi4_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_mulodi4_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_mulodi4_acceptance.summary.md`. `compiler_rt.mulvsi3.__mulvsi3` now closes as the nineteenth composed row with exact native-link, executable normal/trap paths, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_mulvsi3_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_mulvsi3_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_mulvsi3_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_mulvsi3_acceptance.summary.md`. Generic multi-use accumulator relocation closes `compiler_rt.subvdi3.__subvdi3`, `compiler_rt.subvsi3.__subvsi3`, `compiler_rt.addvdi3.__addvdi3`, and `compiler_rt.addvsi3.__addvsi3` as composed rows 20-23. Acceptance evidence `docs/evidence/std_debug_hello_overflow_addsub_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_subvdi3_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_overflow_addsub_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_overflow_addsub_acceptance.summary.md`. `compiler_rt.negv.__negvsi2` now closes as the twenty-fourth composed row with exact native-link, executable positive/negative negation, and pressure acceptance. Acceptance evidence `docs/evidence/std_debug_hello_negvsi2_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_negvsi2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_negvsi2_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_negvsi2_acceptance.summary.md`. Zero-left i128 subtraction and framed terminal-trap verification close `compiler_rt.negv.__negvti2` and `compiler_rt.absvti2.__absvti2` as composed rows 25-26. Acceptance evidence `docs/evidence/std_debug_hello_negvti2_absvti2_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_negvti2_acceptance_pressure.tsv` and `docs/evidence/std_debug_hello_absvti2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_negvti2_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_negvti2_acceptance.summary.md`. Immediate-left i64 subtraction and live-RAX preservation close `compiler_rt.negv.__negvdi2` and `compiler_rt.absvdi2.__absvdi2` as composed rows 27-28. Acceptance evidence `docs/evidence/std_debug_hello_negvdi2_absvdi2_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_negvdi2_acceptance_pressure.tsv` and `docs/evidence/std_debug_hello_absvdi2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_negvdi2_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_negvdi2_acceptance.summary.md`. Width-correct i32 absolute value and live-EAX preservation close `compiler_rt.absvsi2.__absvsi2` as composed row 29. Acceptance evidence `docs/evidence/std_debug_hello_absvsi2_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_absvsi2_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_absvsi2_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_absvsi2_acceptance.summary.md`. Named i32 multiplication and generalized EAX preservation close `compiler_rt.mulXi3.__muldi3` as composed row 30. Acceptance evidence `docs/evidence/std_debug_hello_muldi3_acceptance.summary.md`; pressure evidence `docs/evidence/std_debug_hello_muldi3_acceptance_pressure.tsv`; executable proof `docs/evidence/zig_integrated_exe_muldi3_acceptance.summary.md`; Tier 3 evidence `docs/evidence/distribution_all_after_muldi3_acceptance.summary.md`. i32 zero-inequality plus allocator/frame hardening close `compiler_rt.int.__udivmodsi4`, `compiler_rt.int.__udivsi3`, and `compiler_rt.int.__umodsi3`; acceptance evidence `docs/evidence/std_debug_hello_udivmodsi4_acceptance.summary.md`, pressure evidence `docs/evidence/std_debug_hello_udivmodsi4_acceptance_pressure.tsv`, executable evidence `docs/evidence/zig_integrated_exe_udivmodsi4_acceptance.summary.md`, and Tier 3 evidence `docs/evidence/distribution_all_after_udivmodsi4_acceptance.summary.md`. |
+| `real-program object-emission compiler_rt stage-two pressure boundary rows` | 0 | Closed | 2 | Both parked pressure-boundary rows are closed through composed selection and native-link acceptance: `compiler_rt.udivmodei4.__udivei5` and `compiler_rt.udivmodei4.__umodei4`. The corrected frame authority made the stage-two spill envelope allocation-plan-sized while preserving the historical 32-slot floor for existing stack-array rows. The closed rows pass the old pressure gate, pointer phi binding, well-formed `llvm.assume` calls, the exact `tail fastcc i16 @zig.target.intByteSize(i16 ...)` helper call, the old fixed frame-slot namespace cap, scalar spill-location consumption, narrow-to-i64 zext lowering, dynamic byte-pointer GEP lowering, i64 immediate AND lowering, nonzero i64 equality-immediate lowering, named i64 equality lowering, width-correct i16 inequality-with-zero lowering, dynamic `[4 x i8]` GEP lowering for i32 element pointers, i32 loads through argument or scratch pointer registers, named pointer equality, i32 loads through spilled pointers, CFG-edge-aware phi incoming intervals, named i64 unsigned-greater comparison, signed i6 nonnegative comparison, i64 immediate unsigned-greater comparison, signed i64 less-than-zero comparison, i64 inequality with zero, exact `llvm.ctlz.i32` lowering, wrapping i6 immediate-lhs subtraction, and spill64 branch-condition consumption, then clears selection after trunc location classes are narrowed correctly and framed multi-block returns share one epilogue. Fresh 32-slot acceptance diagnostics report `__udivei5` at max live values `19` / spill slots `13` and `__umodei4` at max live values `24` / spill slots `18`; both have zero over-envelope slots and no first exceedance. Saved old pressure data remains useful as the historical six-slot boundary: `__udivei5` max live values `16`, old spill slots needed `10`, first six-slot-envelope exceedance `Then8.prol` / `live_out` at live values `13`; `__umodei4` max live values `21`, old spill slots needed `15`, first six-slot-envelope exceedance `Then9.prol` / `live_out` at live values `13`. Evidence `docs/evidence/std_debug_hello_udivei5_pressure.tsv`; `docs/evidence/std_debug_hello_umodei4_pressure.tsv`; `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary.md`; `docs/evidence/std_debug_hello_udivei5_zext_width.summary.md`; `docs/evidence/std_debug_hello_udivei5_gep_source.summary.md`; `docs/evidence/std_debug_hello_udivei5_and64_imm.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_eq_values.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_zero.summary.md`; `docs/evidence/std_debug_hello_udivei5_gep_i32_source.summary.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_ptr.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ptr_eq.summary.md`; `docs/evidence/std_debug_hello_udivei5_load_i32_spill_ptr.summary.md`; `docs/evidence/std_debug_hello_udivei5_phi_edge_liveness.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_values.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_sgt_i6.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ugt_imm.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_slt_zero.summary.md`; `docs/evidence/std_debug_hello_udivei5_icmp_ne_i64_zero.summary.md`; `docs/evidence/std_debug_hello_udivei5_ctlz_i32.summary.md`; `docs/evidence/std_debug_hello_udivei5_sub_i6.summary.md`; `docs/evidence/std_debug_hello_udivei5_spill_cond.summary.md` Acceptance evidence `docs/evidence/std_debug_hello_udivei5_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_udivei5_acceptance_pressure.tsv`. Acceptance evidence `docs/evidence/std_debug_hello_umodei4_acceptance.summary.md`; fresh pressure evidence `docs/evidence/std_debug_hello_umodei4_acceptance_pressure.tsv`. |
+| `real-program object-emission compiler_rt advisory tail-marker inventory` | 32 | Open | 10 | The fresh INBOX-19 baseline has 42 unique `UnsupportedTailCallAbi` rows, correcting the older 44-row estimate. Captured-IR inspection classifies all 42 as advisory `tail` rows and finds zero tracked `notail` or genuine `musttail` rows. INBOX-20 lowers advisory `tail` and `notail` as ordinary calls while keeping `musttail` fail-closed. Ten tracked rows now emit as ordinary calls and 32 expose their actual ABI, type, frame, or selector frontier; this does not implement tail-call ABI and the ten emissions are not separate semantic acceptance claims. Evidence `docs/evidence/std_debug_hello_tail_marker_inventory_inbox20.tsv` and `docs/evidence/std_debug_hello_tanh_call_abi_acceptance.summary.md`; full logs `tmp/inbox19_trunc_final_report.log` and `tmp/inbox20_tanh_final_report.log` |
 | `real-program object-emission compiler_rt limb64 loops` | 0 | Closed | 15 | Item 15 stage-one selector emission now lowers all 15 model-owned limb64 loop envelopes through the opt-in selector path without function-name admission: multiply, byte-swap/reverse, arithmetic right shift, bit reverse, population count, trailing-zero count, leading-zero count, shift-left-with-overflow, unary not, operation-parametric binary bitwise (`xor`/`or`/`and`), signed/unsigned compare, and operation-parametric add/sub overflow. The terminal selector primitives validate the real IR envelopes and emit call-free, relocation-free x86_64 routines for their SysV ABIs. Stage-one checkpoint: limb64 selector coverage is 15/15; report-all selected functions stayed 443 while emitting functions moved to 118 and remaining failures moved to 325; the next selector bucket starts at `compiler_rt.udivmodei4.__udivei4`; no no-spill envelope rejections were introduced because the limb64 proofs use terminal selector routines; recognizer fallback remains untouched. Evidence `tmp/std_debug_hello_debug_mulo_selector_after.log`; `tmp/std_debug_hello_debug_byteswap_selector_after.log`; `tmp/std_debug_hello_debug_shr_selector_after.log`; `tmp/std_debug_hello_debug_bitreverse_selector_after.log`; `tmp/std_debug_hello_debug_popcount_selector_after.log`; `tmp/std_debug_hello_debug_ctz_selector_after.log`; `tmp/std_debug_hello_debug_clz_selector_after.log`; `tmp/std_debug_hello_debug_shlo_selector_after_clean.log`; `tmp/std_debug_hello_debug_not_selector_after.log`; `tmp/std_debug_hello_debug_bitwise_selector_after.log`; `tmp/std_debug_hello_debug_cmp_selector_after.log`; `tmp/std_debug_hello_debug_addsub_selector_after.log` |
 | `real-program object-emission compiler_rt udivmodei4 quotient selector` | 0 | Closed | 1 | Item 15 integer-helper selector bucket now lowers the model-owned unsigned extended-int quotient envelope used by `compiler_rt.udivmodei4.__udivei4`: the matcher validates the four-argument void ABI, exactly the two scratch quotient/divisor i32 array allocas, the `zig.target.intByteSize` and `llvm.ctlz.i32` calls, quotient-only `i16` limb-count and `i64` byte-count derivations, and unsigned i64 divide/remainder operations before emitting the split terminal selector routine with relocatable calls to `zig.target.intByteSize` and `memset`. At closure time the related remainder and signed rows stayed fail-closed and the next open integer-helper failure was `compiler_rt.udivmodei4.__umodei5`. Evidence `tmp/std_debug_hello_debug_udivei4_selector_after.log`; `tmp/distribution_all_after_udivei4_selector.log` |
 | `real-program object-emission compiler_rt udivmodei4 remainder terminal-template selector` | 0 | Closed | 1 | Item 15 integer-helper selector bucket now lowers the model-owned unsigned extended-int remainder envelope used by `compiler_rt.udivmodei4.__umodei5`: the matcher validates the five-argument void ABI, exactly the two scratch quotient/divisor i32 array allocas, the `zig.target.intByteSize`, `llvm.ctlz.i32`, and inline-memcpy calls, remainder-only absence of the quotient-form `i16` limb-count shift, and unsigned i64 divide/remainder operations before emitting the split terminal selector routine with relocatable calls to `zig.target.intByteSize`, `memset`, and the embedded tail jump to `memcpy`. This is an honest terminal-template closure from the interrupted cycle, not the block-local composed-selection proof; the related quotient-five and signed rows stay fail-closed, and the next open integer-helper failure is `compiler_rt.udivmodei4.__udivei5`. Evidence `tmp/std_debug_hello_debug_umodei5_selector_after.log`; `tmp/distribution_all_after_umodei5_selector_rerun.log` |
@@ -639,7 +639,7 @@ One line per completed cycle, append-only, newest last. This is the
 - 2026-07-04 (this commit) Docs-only ratchet bookkeeping: `real_programs_ok`
   is raised from 0 to 1 for the syscall-hello executable milestone, enforced
   by `distribution-zig-integrated-exe` and evidenced by
-  `docs/evidence/zig_integrated_exe_syscall_hello.md`. Real-row strict
+  `docs/evidence/zig_integrated_exe_syscall_hello.summary.md`. Real-row strict
   counters stay at `100/100/100/0`; recognizer count still 1.
 - 2026-07-04 (this commit) Item 12 std-hello discovery fix: compiler_rt
   `weak_odr hidden alias` declarations now parse as model-owned global
@@ -858,7 +858,7 @@ One line per completed cycle, append-only, newest last. This is the
   current-pin cache entries plus `*.log`/`*.txt` files, and reports per-item
   sizes plus reclaimed bytes. `distribution-real-rows` now self-prunes
   old-pin cache generations after a fail-closed cache miss; fixture evidence
-  is `docs/evidence/clean_tmp.md`. Strict real-row enforcement remains
+  is `docs/evidence/clean_tmp.summary.md`. Strict real-row enforcement remains
   at 100. Recognizer count still 1 (no recognizer reorder or pre-pass).
 - 2026-07-05 (this commit) Item 12 std-hello discovery fix: generic CFG now
   lowers the model-owned checked string append shape used by compiler_rt
@@ -1360,7 +1360,7 @@ One line per completed cycle, append-only, newest last. This is the
   timings of 15686/17114/12541 ms for ReleaseFast/ReleaseSafe/ReleaseSmall.
   `clean-tmp --keep-newest-per-mode --delete` removed 10 duplicate current-pin
   cache pairs and left exactly one cache entry per mode. Evidence
-  `docs/evidence/real_rows_cache_rekey.md`.
+  `docs/evidence/real_rows_cache_rekey.summary.md`.
 - 2026-07-08 (this commit) Item 15 integer-helper selector slice: the opt-in
   selector now admits and emits the real unsigned extended-int quotient
   envelope for `compiler_rt.udivmodei4.__udivei4` through model-owned
@@ -1662,7 +1662,7 @@ One line per completed cycle, append-only, newest last. This is the
   composed-selection rows 6, terminal-template rows 17, and open integer-helper
   fallback candidates 37. Recognizer count still 1 (no new recognizer reorder
   or pre-pass); `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/std_debug_hello_selector_udiv.md`.
+  `docs/evidence/std_debug_hello_selector_udiv.summary.md`.
 - 2026-07-09 (this commit) Item 15 stage-two pressure accounting slice: the
   stage-two liveness preflight now excludes frame-resident `alloca` values and
   stack-derived GEP names from the register-pressure budget, with a unit test
@@ -1674,7 +1674,7 @@ One line per completed cycle, append-only, newest last. This is the
   rows 6, terminal-template rows 17, and open integer-helper fallback
   candidates 37. Recognizer count still 1 (no new recognizer reorder or
   pre-pass); `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/std_debug_hello_stage2_pressure_exempt.md`.
+  `docs/evidence/std_debug_hello_stage2_pressure_exempt.summary.md`.
 - 2026-07-09 (this commit) Item 15 stage-two spill-frame envelope slice: the
   composed selector now models a bounded six-slot 64-bit spill area for
   stage-two frames and reserves that area before stack-array payloads so spills
@@ -1689,7 +1689,7 @@ One line per completed cycle, append-only, newest last. This is the
   terminal-template rows 17, and open integer-helper fallback candidates 37.
   Recognizer count still 1 (no new recognizer reorder or pre-pass);
   `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/std_debug_hello_stage2_spill_frame.md`.
+  `docs/evidence/std_debug_hello_stage2_spill_frame.summary.md`.
 - 2026-07-09 (this commit) Item 15 stage-two pressure diagnostic slice: the
   selector now reports the max pressure point and first six-slot-envelope
   exceedance for stage-two rows. The real `compiler_rt.udivmodei4.__udivei5`
@@ -1737,7 +1737,7 @@ One line per completed cycle, append-only, newest last. This is the
   terminal-template rows 17, stage-two-boundary rows 2, and open integer-helper
   fallback candidates 35. Recognizer count still 1 (no new recognizer reorder
   or pre-pass); `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/std_debug_hello_umodti3_composed.md`.
+  `docs/evidence/std_debug_hello_umodti3_composed.summary.md`.
 - 2026-07-09 (this commit) Item 15 composed signed i128 remainder slice: the
   block-local selector now closes `compiler_rt.udivmod.__modti3` through
   composed selection, not a terminal template. The selector owns i128 sign-mask
@@ -1754,7 +1754,7 @@ One line per completed cycle, append-only, newest last. This is the
   composed-selection rows 8, terminal-template rows 17, stage-two-boundary rows
   2, and open integer-helper fallback candidates 34. Recognizer count still 1
   (no new recognizer reorder or pre-pass); `shape_recognizer_functions` is
-  unchanged. Evidence `docs/evidence/std_debug_hello_modti3_composed.md`.
+  unchanged. Evidence `docs/evidence/std_debug_hello_modti3_composed.summary.md`.
 - 2026-07-09 (this commit) Item 15 composed i32 multiply-loop slice: the
   block-local selector now closes `compiler_rt.mulXi3.__mulsi3` through
   composed selection, not a terminal template. The selector owns the generic
@@ -1772,7 +1772,7 @@ One line per completed cycle, append-only, newest last. This is the
   rows 9, terminal-template rows 17, stage-two-boundary rows 2, and open
   integer-helper fallback candidates 33. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_mulsi3_composed.md`.
+  Evidence `docs/evidence/std_debug_hello_mulsi3_composed.summary.md`.
 - 2026-07-09 (this commit) Item 15 pressure diagnostic slice: stage-two
   pressure accounting now includes intra-block live values, so single-block
   integer helpers no longer report zero pressure merely because they have no
@@ -2080,8 +2080,8 @@ One line per completed cycle, append-only, newest last. This is the
   fallback candidates 32, and no allocator acceptance row pending. Recognizer
   count still 1 (no new recognizer reorder or pre-pass);
   `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/zig_integrated_exe_i128_arithmetic.md`; distribution-all
-  proof `docs/evidence/distribution_all_after_multi3_single_frame.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic.summary.md`; distribution-all
+  proof `docs/evidence/distribution_all_after_multi3_single_frame.summary.md`.
 - 2026-07-10 (this commit; acknowledges INBOX-5 with INBOX-4) Item 15
   follow-up hardening: x86_64 frame-slot spill/reload encodings now use disp32
   for offsets past 127 while preserving the compact slot0 form, high-register
@@ -2093,8 +2093,8 @@ One line per completed cycle, append-only, newest last. This is the
   17, stage-two-boundary rows 2, open integer-helper fallback candidates 32,
   and no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox5.md`;
-  distribution-all proof `docs/evidence/distribution_all_after_inbox5.md`.
+  Evidence `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox5.summary.md`;
+  distribution-all proof `docs/evidence/distribution_all_after_inbox5.summary.md`.
 - 2026-07-10 (this commit; acknowledges INBOX-5 with INBOX-4) Item 15
   parked-boundary retry: the stage-two pressure envelope now follows the
   single 32-slot frame authority, and phi result binding uses selector scalar
@@ -2107,7 +2107,7 @@ One line per completed cycle, append-only, newest last. This is the
   17, stage-two-boundary rows 2, open integer-helper fallback candidates 32,
   and no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.md`.
+  Evidence `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary.md`.
 - 2026-07-10 (this commit; acknowledges INBOX-5 with INBOX-4) Item 15
   parked-boundary retry: the composed selector now ignores well-formed
   `llvm.assume` calls and lowers the exact `tail fastcc i16
@@ -2120,7 +2120,7 @@ One line per completed cycle, append-only, newest last. This is the
   17, stage-two-boundary rows 2, open integer-helper fallback candidates 32,
   and no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.md`.
+  Evidence `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary.md`.
 - 2026-07-10 (this commit; acknowledges INBOX-6 with INBOX-4) Item 15
   parked-boundary retry: x86_64 `FrameIndex` is now a data-backed frame slot
   instead of a fixed enum namespace, frame-slot printing/encoding derives RSP
@@ -2136,7 +2136,7 @@ One line per completed cycle, append-only, newest last. This is the
   rows 2, open integer-helper fallback candidates 32, and no allocator
   acceptance row pending. Recognizer count still 1 (no new recognizer reorder
   or pre-pass); `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.md`.
+  `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary.md`.
 - 2026-07-10 (this commit; acknowledges INBOX-7 with INBOX-4) Item 15
   parked-boundary retry: scalar spill locations now materialize at point of
   use for 32-bit and 64-bit operands through the single value-location map,
@@ -2150,11 +2150,11 @@ One line per completed cycle, append-only, newest last. This is the
   stage-two-boundary rows 2, open integer-helper fallback candidates 32, and
   no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_frame32_pointer_phi.summary.md`;
   integrated-exe proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_inbox7.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_inbox7.md`.
+  `docs/evidence/distribution_all_after_inbox7.summary.md`.
 
 - 2026-07-10 (this commit; acknowledges INBOX-8) Item 15 parked-boundary
   retry: the composed selector now lowers zero-extension from integer widths
@@ -2168,11 +2168,11 @@ One line per completed cycle, append-only, newest last. This is the
   stage-two-boundary rows 2, open integer-helper fallback candidates 32, and
   no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_zext_width.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_zext_width.summary.md`;
   integrated-exe proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_zext_width.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_zext_width.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_zext_width.md`.
+  `docs/evidence/distribution_all_after_zext_width.summary.md`.
 
 - 2026-07-10 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers one-index `getelementptr i8` forms over ABI pointers,
@@ -2186,11 +2186,11 @@ One line per completed cycle, append-only, newest last. This is the
   stage-two-boundary rows 2, open integer-helper fallback candidates 32, and
   no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_gep_source.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_gep_source.summary.md`;
   integrated-exe proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_source.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_source.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_gep_source.md`.
+  `docs/evidence/distribution_all_after_gep_source.summary.md`.
 
 - 2026-07-10 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers i64 immediate AND forms by materializing the mask in RCX
@@ -2204,11 +2204,11 @@ One line per completed cycle, append-only, newest last. This is the
   stage-two-boundary rows 2, open integer-helper fallback candidates 32, and
   no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_and64_imm.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_and64_imm.summary.md`;
   integrated-exe proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_and64_imm.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_and64_imm.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_and64_imm.md`.
+  `docs/evidence/distribution_all_after_and64_imm.summary.md`.
 
 - 2026-07-10 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers nonzero i64 equality-immediate comparisons through the
@@ -2222,11 +2222,11 @@ One line per completed cycle, append-only, newest last. This is the
   integer-helper fallback candidates 32, and no allocator acceptance row
   pending. Recognizer count still 1 (no new recognizer reorder or pre-pass);
   `shape_recognizer_functions` is unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.md`;
+  `docs/evidence/std_debug_hello_udivei5_icmp_eq_imm.summary.md`;
   integrated-exe proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_imm.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_imm.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_icmp_eq_imm.md`.
+  `docs/evidence/distribution_all_after_icmp_eq_imm.summary.md`.
 
 - 2026-07-10 (this commit; acknowledges INBOX-9) Item 15
   parked-boundary retry: the composed selector now lowers equality between two
@@ -2240,11 +2240,11 @@ One line per completed cycle, append-only, newest last. This is the
   stage-two-boundary rows 2, open integer-helper fallback candidates 32, and
   no allocator acceptance row pending. Recognizer count still 1 (no new
   recognizer reorder or pre-pass); `shape_recognizer_functions` is unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_icmp_eq_values.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_icmp_eq_values.summary.md`;
   integrated-exe proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_values.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_eq_values.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_icmp_eq_values.md`.
+  `docs/evidence/distribution_all_after_icmp_eq_values.summary.md`.
 
 - 2026-07-11 (this commit; acknowledges INBOX-10) P0 x86_64 MC correctness:
   fused `setb_eax`, `sete_eax`, and `setne_eax` now execute setcc before
@@ -2256,8 +2256,8 @@ One line per completed cycle, append-only, newest last. This is the
   result changes the process exit status. The integrated executable gate now
   passes 5/5 rows, and strict all-mode distribution remains green. No selector
   form, report count, or ratchet counter changes in this correction slice.
-  Evidence `docs/evidence/zig_integrated_exe_setcc_correctness.md`;
-  `docs/evidence/distribution_all_after_setcc_correctness.md`.
+  Evidence `docs/evidence/zig_integrated_exe_setcc_correctness.summary.md`;
+  `docs/evidence/distribution_all_after_setcc_correctness.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers i16 inequality with zero through a width-specific
@@ -2270,11 +2270,11 @@ One line per completed cycle, append-only, newest last. This is the
   failed. Item-15 accounting remains composed-selection rows 10,
   terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
   fallback candidates 32, and no allocator acceptance row pending. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_ne_zero.md`;
+  `docs/evidence/std_debug_hello_udivei5_icmp_ne_zero.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_zero.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_zero.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_icmp_ne_zero.md`.
+  `docs/evidence/distribution_all_after_icmp_ne_zero.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers a dynamic single-index `[4 x i8]` GEP as an i32
@@ -2287,11 +2287,11 @@ One line per completed cycle, append-only, newest last. This is the
   failed. Item-15 accounting remains composed-selection rows 10,
   terminal-template rows 17, stage-two-boundary rows 2, open integer-helper
   fallback candidates 32, and no allocator acceptance row pending. Evidence
-  `docs/evidence/std_debug_hello_udivei5_gep_i32_source.md`;
+  `docs/evidence/std_debug_hello_udivei5_gep_i32_source.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_i32_source.md`;
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_gep_i32_source.summary.md`;
   distribution-all proof
-  `docs/evidence/distribution_all_after_gep_i32_source.md`.
+  `docs/evidence/distribution_all_after_gep_i32_source.summary.md`.
 
 - 2026-07-11 (this commit; acknowledges INBOX-11) Item 15
   parked-boundary retry: the composed selector now lowers i32 loads through
@@ -2306,10 +2306,10 @@ One line per completed cycle, append-only, newest last. This is the
   object rows, permanent executable canaries, focused frontier, and boundary
   gates are green; Tier 3 `distribution-all` is deferred until acceptance
   close or another Tier 3 trigger. Item-15 accounting remains unchanged.
-  Evidence `docs/evidence/std_debug_hello_udivei5_load_i32_ptr.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_load_i32_ptr.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_ptr.md`;
-  Tier 2 record `docs/evidence/selector_tier2_load_i32_ptr.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_ptr.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_load_i32_ptr.summary.md`.
 
 - 2026-07-11 (this commit; acknowledges INBOX-12) Tier 3 gate
   infrastructure Phase 0: `distribution-all` now reports per-subgate duration
@@ -2322,7 +2322,7 @@ One line per completed cycle, append-only, newest last. This is the
   repeated tool compilation/startup at the required ten percent of cached
   wall time. No ratchet moves; capability work resumes at the `__udivei5`
   `composed-block-icmp-type` frontier. Evidence
-  `docs/evidence/distribution_all_phase0_timing_baseline.md`.
+  `docs/evidence/distribution_all_phase0_timing_baseline.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers equality between two named opaque pointers by
@@ -2333,9 +2333,9 @@ One line per completed cycle, append-only, newest last. This is the
   `no_emitter` / `composed-block-load-ptr`. Debug compiler_rt report-all
   remains 443 selected, 130 emitted, and 313 failed. Tier 2 selector
   validation is green; item-15 accounting remains unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_ptr_eq.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ptr_eq.md`;
-  Tier 2 record `docs/evidence/selector_tier2_icmp_ptr_eq.md`.
+  `docs/evidence/std_debug_hello_udivei5_icmp_ptr_eq.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ptr_eq.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_icmp_ptr_eq.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now reloads a spilled 64-bit pointer through the clobber-aware RCX
@@ -2347,10 +2347,10 @@ One line per completed cycle, append-only, newest last. This is the
   Debug compiler_rt report-all remains 443 selected, 130 emitted, and 313
   failed. Tier 2 selector validation is green; item-15 accounting remains
   unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivei5_load_i32_spill_ptr.md`;
+  `docs/evidence/std_debug_hello_udivei5_load_i32_spill_ptr.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_spill_ptr.md`;
-  Tier 2 record `docs/evidence/selector_tier2_load_i32_spill_ptr.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_load_i32_spill_ptr.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_load_i32_spill_ptr.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 allocation correctness: selector interval
   construction now records each phi incoming use at its predecessor
@@ -2362,9 +2362,9 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-icmp-form`, with report-all unchanged at 443 selected, 130
   emitted, and 313 failed. Tier 3 is green because shared allocation planning
   changed; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_phi_edge_liveness.md`;
-  executable proof `docs/evidence/zig_integrated_exe_phi_edge_liveness.md`;
-  Tier 3 record `docs/evidence/distribution_all_after_phi_edge_liveness.md`.
+  `docs/evidence/std_debug_hello_udivei5_phi_edge_liveness.summary.md`;
+  executable proof `docs/evidence/zig_integrated_exe_phi_edge_liveness.summary.md`;
+  Tier 3 record `docs/evidence/distribution_all_after_phi_edge_liveness.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers unsigned-greater comparisons between named i64 values
@@ -2374,10 +2374,10 @@ One line per completed cycle, append-only, newest last. This is the
   first named `ugt` and reaches a later `no_emitter` /
   `composed-block-icmp-form`; report-all remains 443 selected, 130 emitted,
   and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_ugt_values.md`;
+  `docs/evidence/std_debug_hello_udivei5_icmp_ugt_values.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_values.md`;
-  Tier 2 record `docs/evidence/selector_tier2_icmp_ugt_values.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_values.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_icmp_ugt_values.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers `sgt i6 value, -1` by isolating bit 5 in EAX and using
@@ -2385,9 +2385,9 @@ One line per completed cycle, append-only, newest last. This is the
   boundary. The focused `__udivei5` retry clears this form and reaches a later
   `no_emitter` / `composed-block-icmp-form`; report-all remains 443 selected,
   130 emitted, and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_sgt_i6.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_sgt_i6.md`;
-  Tier 2 record `docs/evidence/selector_tier2_icmp_sgt_i6.md`.
+  `docs/evidence/std_debug_hello_udivei5_icmp_sgt_i6.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_sgt_i6.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_icmp_sgt_i6.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers `ugt i64 value, immediate` by materializing LHS in RCX
@@ -2396,9 +2396,9 @@ One line per completed cycle, append-only, newest last. This is the
   focused `__udivei5` retry reaches a later `no_emitter` /
   `composed-block-icmp-form`; report-all remains 443 selected, 130 emitted,
   and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_ugt_imm.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_imm.md`;
-  Tier 2 record `docs/evidence/selector_tier2_icmp_ugt_imm.md`.
+  `docs/evidence/std_debug_hello_udivei5_icmp_ugt_imm.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ugt_imm.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_icmp_ugt_imm.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers `slt i64 value, 0` by shifting RAX's sign bit into bit
@@ -2406,9 +2406,9 @@ One line per completed cycle, append-only, newest last. This is the
   `__udivei5` retry reaches a later `no_emitter` /
   `composed-block-icmp-form`; report-all remains 443 selected, 130 emitted,
   and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_slt_zero.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_slt_zero.md`;
-  Tier 2 record `docs/evidence/selector_tier2_icmp_slt_zero.md`.
+  `docs/evidence/std_debug_hello_udivei5_icmp_slt_zero.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_slt_zero.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_icmp_slt_zero.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers `ne i64 value, 0` through a 64-bit compare and corrected
@@ -2417,10 +2417,10 @@ One line per completed cycle, append-only, newest last. This is the
   retry advances to `no_emitter` / `composed-block-call-form`; report-all
   remains 443 selected, 130 emitted, and 313 failed. Tier 2 is green; no
   ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_icmp_ne_i64_zero.md`;
+  `docs/evidence/std_debug_hello_udivei5_icmp_ne_i64_zero.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_i64_zero.md`;
-  Tier 2 record `docs/evidence/selector_tier2_icmp_ne_i64_zero.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_icmp_ne_i64_zero.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_icmp_ne_i64_zero.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers the exact `llvm.ctlz.i32(value, true)` intrinsic through
@@ -2429,9 +2429,9 @@ One line per completed cycle, append-only, newest last. This is the
   focused `__udivei5` retry advances to `no_emitter` /
   `composed-block-binary-width`; report-all remains 443 selected, 130 emitted,
   and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_ctlz_i32.md`; executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_ctlz_i32.md`; Tier 2
-  record `docs/evidence/selector_tier2_ctlz_i32.md`.
+  `docs/evidence/std_debug_hello_udivei5_ctlz_i32.summary.md`; executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_ctlz_i32.summary.md`; Tier 2
+  record `docs/evidence/selector_tier2_ctlz_i32.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers the exact wrapping i6 form `sub i6 -32, value` through
@@ -2440,9 +2440,9 @@ One line per completed cycle, append-only, newest last. This is the
   The focused `__udivei5` retry advances to `no_emitter` /
   `stage2-cond-loc`; report-all remains 443 selected, 130 emitted, and 313
   failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_sub_i6.md`; executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_sub_i6.md`; Tier 2
-  record `docs/evidence/selector_tier2_sub_i6.md`.
+  `docs/evidence/std_debug_hello_udivei5_sub_i6.summary.md`; executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_sub_i6.summary.md`; Tier 2
+  record `docs/evidence/selector_tier2_sub_i6.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: stage-two branch
   emission now reloads spill64 i1 conditions through the clobber-aware RCX
@@ -2451,9 +2451,9 @@ One line per completed cycle, append-only, newest last. This is the
   focused `__udivei5` retry advances to `no_emitter` /
   `composed-block-binary-op`; report-all remains 443 selected, 130 emitted,
   and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_spill_cond.md`; executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_spill_cond.md`; Tier 2
-  record `docs/evidence/selector_tier2_spill_cond.md`.
+  `docs/evidence/std_debug_hello_udivei5_spill_cond.summary.md`; executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_spill_cond.summary.md`; Tier 2
+  record `docs/evidence/selector_tier2_spill_cond.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: the composed
   selector now lowers variable i32 left and logical-right shifts through the
@@ -2462,10 +2462,10 @@ One line per completed cycle, append-only, newest last. This is the
   focused `__udivei5` retry clears `composed-block-binary-op` and advances to
   `unsupported_value` / `composed-block-unknown-gep-ptr`; report-all remains
   443 selected, 130 emitted, and 313 failed. Tier 2 is green; no ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_udivei5_variable_i32_shifts.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_variable_i32_shifts.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_variable_i32_shifts.md`;
-  Tier 2 record `docs/evidence/selector_tier2_variable_i32_shifts.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_variable_i32_shifts.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_variable_i32_shifts.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: local i32 stack
   pointers now compose constant byte offsets, direct optimized `[4 x i8]`
@@ -2476,9 +2476,9 @@ One line per completed cycle, append-only, newest last. This is the
   `__udivei5` retry advances from the GEP cluster to `no_emitter` /
   `stage2-phi-dst-loc`; report-all remains 443 selected, 130 emitted, and 313
   failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_local_stack_gep.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_local_stack_gep.md`;
-  Tier 2 record `docs/evidence/selector_tier2_local_stack_gep.md`.
+  `docs/evidence/std_debug_hello_udivei5_local_stack_gep.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_local_stack_gep.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_local_stack_gep.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: stage-two PHIs now
   retain stable register destinations across loop iterations while temporary
@@ -2490,9 +2490,9 @@ One line per completed cycle, append-only, newest last. This is the
   `stage2-phi-dst-loc` to `no_emitter` / `composed-block-store-ptr`;
   report-all remains 443 selected, 130 emitted, and 313 failed. Tier 2 is
   green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_phi_stable_dest.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_phi_stable_dest.md`;
-  Tier 2 record `docs/evidence/selector_tier2_phi_stable_dest.md`.
+  `docs/evidence/std_debug_hello_udivei5_phi_stable_dest.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_phi_stable_dest.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_phi_stable_dest.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: composed i32 stores
   now consume spilled external pointers through the clobber-aware `%rcx`
@@ -2502,9 +2502,9 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-store-ptr` to `unsupported_value` /
   `stage2-unsupported-value`; report-all remains 443 selected, 130 emitted,
   and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_store_ptr_forms.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_store_ptr_forms.md`;
-  Tier 2 record `docs/evidence/selector_tier2_store_ptr_forms.md`.
+  `docs/evidence/std_debug_hello_udivei5_store_ptr_forms.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_store_ptr_forms.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_store_ptr_forms.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: composed selects now
   preserve accumulator-resident true operands before materializing the false
@@ -2515,9 +2515,9 @@ One line per completed cycle, append-only, newest last. This is the
   retry advances from opaque `stage2-unsupported-value` to `no_emitter` /
   `composed-block-binary-imm-rhs-width`; report-all remains 443 selected, 130
   emitted, and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_select_preserve.md`; executable
-  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_select_preserve.md`;
-  Tier 2 record `docs/evidence/selector_tier2_select_preserve.md`.
+  `docs/evidence/std_debug_hello_udivei5_select_preserve.summary.md`; executable
+  proof `docs/evidence/zig_integrated_exe_i128_arithmetic_select_preserve.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_select_preserve.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: composed i64
   immediate OR now preserves destructive `%rax`, materializes the full
@@ -2526,9 +2526,9 @@ One line per completed cycle, append-only, newest last. This is the
   advances from `composed-block-binary-imm-rhs-width` to
   `unsupported_value` / `stage2-store-value`; report-all remains 443 selected,
   130 emitted, and 313 failed. Tier 2 is green; no ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_udivei5_or64_imm.md`; executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_or64_imm.md`; Tier 2
-  record `docs/evidence/selector_tier2_or64_imm.md`.
+  `docs/evidence/std_debug_hello_udivei5_or64_imm.summary.md`; executable proof
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_or64_imm.summary.md`; Tier 2
+  record `docs/evidence/selector_tier2_or64_imm.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: value liveness now
   includes index and addend SSA dependencies retained by live local stack
@@ -2539,10 +2539,10 @@ One line per completed cycle, append-only, newest last. This is the
   `stage2-store-value` to `no_spill_envelope` /
   `composed-block-two-address-rhs-accumulator`; report-all remains 443
   selected, 130 emitted, and 313 failed. Tier 2 is green; no ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_udivei5_stack_index_liveness.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_stack_index_liveness.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_index_liveness.md`;
-  Tier 2 record `docs/evidence/selector_tier2_stack_index_liveness.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_index_liveness.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_stack_index_liveness.summary.md`.
 
 - 2026-07-11 (this commit) Item 15 parked-boundary retry: noncommutative
   binaries now preserve an accumulator RHS in a nonconflicting scratch before
@@ -2553,10 +2553,10 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-two-address-rhs-accumulator` through repeated unrolled alias
   conflicts to `no_emitter` / `composed-block-rhs-width`; report-all remains
   443 selected, 130 emitted, and 313 failed. Tier 2 is green; no ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_udivei5_accumulator_aliases.md`;
+  Evidence `docs/evidence/std_debug_hello_udivei5_accumulator_aliases.summary.md`;
   executable proof
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_accumulator_aliases.md`;
-  Tier 2 record `docs/evidence/selector_tier2_accumulator_aliases.md`.
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_accumulator_aliases.summary.md`;
+  Tier 2 record `docs/evidence/selector_tier2_accumulator_aliases.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 parked-boundary
   acceptance: trunc results now carry their narrowed register class, and
@@ -2570,10 +2570,10 @@ One line per completed cycle, append-only, newest last. This is the
   Tier 3 is green across 17 subgates. Item-15 accounting is now 11 composed
   rows, 17 terminal-template rows, one stage-two boundary row, and 32 open
   integer-helper fallback candidates. Evidence
-  `docs/evidence/std_debug_hello_udivei5_acceptance.md`,
+  `docs/evidence/std_debug_hello_udivei5_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_udivei5_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_udivei5_acceptance.md`, and
-  `docs/evidence/distribution_all_after_udivei5_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_udivei5_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_udivei5_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
   retry: the bounded stage-two CFG tier now admits up to 128 blocks while
@@ -2583,9 +2583,9 @@ One line per completed cycle, append-only, newest last. This is the
   passes. The focused retry advances from `stage2-block-count` to
   `no_emitter` / `composed-block-call-form`; report-all remains 443 selected,
   131 emitted, and 312 failed. Tier 2 is green; no tracker or ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_umodei4_block_count.md`,
-  `docs/evidence/zig_integrated_exe_umodei4_block_count.md`, and
-  `docs/evidence/selector_tier2_umodei4_block_count.md`.
+  Evidence `docs/evidence/std_debug_hello_umodei4_block_count.summary.md`,
+  `docs/evidence/zig_integrated_exe_umodei4_block_count.summary.md`, and
+  `docs/evidence/selector_tier2_umodei4_block_count.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
   retry: the composed selector now lowers the nonvolatile tail
@@ -2595,9 +2595,9 @@ One line per completed cycle, append-only, newest last. This is the
   advances from `composed-block-call-form` to `no_emitter` /
   `composed-block-cast-width`; report-all remains 443 selected, 131 emitted,
   and 312 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_umodei4_inline_memcpy.md`,
-  `docs/evidence/zig_integrated_exe_umodei4_inline_memcpy.md`, and
-  `docs/evidence/selector_tier2_umodei4_inline_memcpy.md`.
+  `docs/evidence/std_debug_hello_umodei4_inline_memcpy.summary.md`,
+  `docs/evidence/zig_integrated_exe_umodei4_inline_memcpy.summary.md`, and
+  `docs/evidence/selector_tier2_umodei4_inline_memcpy.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
   retry: no-op trunc and integer bitcast operations now preserve spill-backed
@@ -2607,9 +2607,9 @@ One line per completed cycle, append-only, newest last. This is the
   The focused `__umodei4` retry advances from `composed-block-cast-width` to
   `no_emitter` / `composed-block-load-ptr`; report-all remains 443 selected,
   131 emitted, and 312 failed. Tier 2 is green; no tracker or ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_umodei4_spilled_trunc.md`,
-  `docs/evidence/zig_integrated_exe_umodei4_spilled_trunc.md`, and
-  `docs/evidence/selector_tier2_umodei4_spilled_trunc.md`.
+  Evidence `docs/evidence/std_debug_hello_umodei4_spilled_trunc.summary.md`,
+  `docs/evidence/zig_integrated_exe_umodei4_spilled_trunc.summary.md`, and
+  `docs/evidence/selector_tier2_umodei4_spilled_trunc.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
   retry: i32 loads may now address element zero directly through a local
@@ -2620,9 +2620,9 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-two-address-rhs-accumulator`; report-all remains 443
   selected, 131 emitted, and 312 failed. Tier 2 is green; no tracker or
   ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_umodei4_stack_array_load.md`,
-  `docs/evidence/zig_integrated_exe_umodei4_stack_array_load.md`, and
-  `docs/evidence/selector_tier2_umodei4_stack_array_load.md`.
+  `docs/evidence/std_debug_hello_umodei4_stack_array_load.summary.md`,
+  `docs/evidence/zig_integrated_exe_umodei4_stack_array_load.summary.md`, and
+  `docs/evidence/selector_tier2_umodei4_stack_array_load.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 remaining-boundary
   acceptance: when both operands are live aliases of the accumulator, the
@@ -2635,10 +2635,10 @@ One line per completed cycle, append-only, newest last. This is the
   132 emitted and 311 failed. Tier 3 is green across 17 subgates. Item-15
   accounting is now 12 composed rows, 17 terminal-template rows, zero
   stage-two boundary rows, and 32 open integer-helper fallback candidates.
-  Evidence `docs/evidence/std_debug_hello_umodei4_acceptance.md`,
+  Evidence `docs/evidence/std_debug_hello_umodei4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_umodei4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_umodei4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_umodei4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_umodei4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_umodei4_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 integer-helper
   retry: the composed selector now lowers the exact
@@ -2650,9 +2650,9 @@ One line per completed cycle, append-only, newest last. This is the
   `no_emitter` / `composed-block-alloca-form`; report-all remains 443
   selected, 132 emitted, and 311 failed. Tier 2 is green; no tracker or
   ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_divei4_uadd_overflow.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_uadd_overflow.md`,
-  and `docs/evidence/selector_tier2_divei4_uadd_overflow.md`.
+  `docs/evidence/std_debug_hello_divei4_uadd_overflow.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_uadd_overflow.summary.md`,
+  and `docs/evidence/selector_tier2_divei4_uadd_overflow.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-12) Item 15 integer-helper
   retry: the single composed frame authority now lays out multiple typed
@@ -2663,9 +2663,9 @@ One line per completed cycle, append-only, newest last. This is the
   later `composed-block-icmp-form`; report-all remains 443 selected, 132
   emitted, and 311 failed. Tier 3 is green across 17 subgates; no tracker or
   ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_divei4_mixed_frame.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_mixed_frame.md`, and
-  `docs/evidence/distribution_all_after_divei4_mixed_frame.md`.
+  `docs/evidence/std_debug_hello_divei4_mixed_frame.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_mixed_frame.summary.md`, and
+  `docs/evidence/distribution_all_after_divei4_mixed_frame.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: signed i32 less-than-zero comparisons now lower through a bit-31
@@ -2673,9 +2673,9 @@ One line per completed cycle, append-only, newest last. This is the
   retry advances from `composed-block-icmp-form` to
   `composed-block-store-width`; report-all remains 443 selected, 132 emitted,
   and 311 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_divei4_slt_i32.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_slt_i32.md`, and
-  `docs/evidence/selector_tier2_divei4_slt_i32.md`.
+  `docs/evidence/std_debug_hello_divei4_slt_i32.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_slt_i32.summary.md`, and
+  `docs/evidence/selector_tier2_divei4_slt_i32.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: typed 8-bit frame objects now support byte-precise i1 stores and
@@ -2685,9 +2685,9 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-store-width` to `composed-block-binary-imm-rhs`; report-all
   remains 443 selected, 132 emitted, and 311 failed. Tier 2 is green; no
   tracker or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_divei4_stack_i1.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_i1.md`, and
-  `docs/evidence/selector_tier2_divei4_stack_i1.md`.
+  `docs/evidence/std_debug_hello_divei4_stack_i1.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_stack_i1.summary.md`, and
+  `docs/evidence/selector_tier2_divei4_stack_i1.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: i32 XOR with an immediate now lowers through the existing register
@@ -2696,9 +2696,9 @@ One line per completed cycle, append-only, newest last. This is the
   `__divei4` retry advances from `composed-block-binary-imm-rhs` to
   `composed-block-binary-width`; report-all remains 443 selected, 132 emitted,
   and 311 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_divei4_xor_i32.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_xor_i32.md`, and
-  `docs/evidence/selector_tier2_divei4_xor_i32.md`.
+  `docs/evidence/std_debug_hello_divei4_xor_i32.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_xor_i32.summary.md`, and
+  `docs/evidence/selector_tier2_divei4_xor_i32.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   acceptance: the composed selector now admits only the exact i8 immediate-AND
@@ -2711,10 +2711,10 @@ One line per completed cycle, append-only, newest last. This is the
   310 failed. Tier 3 is green across 17 subgates. Item-15 accounting is now 13
   composed rows, 17 terminal-template rows, zero stage-two boundary rows, and
   31 open integer-helper fallback candidates. Evidence
-  `docs/evidence/std_debug_hello_divei4_acceptance.md`,
+  `docs/evidence/std_debug_hello_divei4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_divei4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_divei4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_divei4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_divei4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_divei4_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: one-index `[1 x i8]` GEPs now reuse byte-pointer arithmetic. The
@@ -2724,9 +2724,9 @@ One line per completed cycle, append-only, newest last. This is the
   retry advances from `composed-block-gep-source` to
   `composed-block-icmp-form`; report-all remains 443 selected, 133 emitted, and
   310 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_modei5_gep_source.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_modei5_gep_source.md`,
-  and `docs/evidence/selector_tier2_modei5_gep_source.md`.
+  `docs/evidence/std_debug_hello_modei5_gep_source.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_modei5_gep_source.summary.md`,
+  and `docs/evidence/selector_tier2_modei5_gep_source.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   acceptance: signed i32 nonnegative comparisons now lower through a sign-bit
@@ -2739,10 +2739,10 @@ One line per completed cycle, append-only, newest last. This is the
   and 309 failed. Tier 3 is green across 17 subgates. Item-15 accounting is now
   14 composed rows, 17 terminal-template rows, zero stage-two boundary rows,
   and 30 open integer-helper fallback candidates. Evidence
-  `docs/evidence/std_debug_hello_modei4_acceptance.md`,
+  `docs/evidence/std_debug_hello_modei4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_modei4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_modei4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_modei4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_modei4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_modei4_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   acceptance: pointer selects now use the existing 64-bit location-select path,
@@ -2755,11 +2755,11 @@ One line per completed cycle, append-only, newest last. This is the
   across 17 subgates. Item-15 accounting is now 16 composed rows, 17
   terminal-template rows, zero stage-two boundary rows, and 28 open
   integer-helper fallback candidates. Evidence
-  `docs/evidence/std_debug_hello_modei5_divei5_acceptance.md`,
+  `docs/evidence/std_debug_hello_modei5_divei5_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_modei5_acceptance_pressure.tsv`,
   `docs/evidence/std_debug_hello_divei5_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_modei5_divei5_acceptance.md`, and
-  `docs/evidence/distribution_all_after_modei5_divei5_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_modei5_divei5_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_modei5_divei5_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: generic CFG inspection now recognizes the exact i128 signed-multiply
@@ -2768,7 +2768,7 @@ One line per completed cycle, append-only, newest last. This is the
   `unsupported_type/call-ret` to `unsupported_value/stage2-unsupported-value`;
   report-all remains 443 selected, 136 emitted, and 307 failed. Tier 1 unit
   validation is green; no capability, tracker, or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_muloti4_overflow_inspection.md`.
+  `docs/evidence/std_debug_hello_muloti4_overflow_inspection.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: stage-two planning now pressure-exempts the exact i128 signed-multiply
@@ -2778,7 +2778,7 @@ One line per completed cycle, append-only, newest last. This is the
   `no_emitter/composed-block-freeze-width`; report-all remains 443 selected,
   136 emitted, and 307 failed. Tier 1 unit validation is green; no arithmetic
   capability, tracker, or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_muloti4_overflow_planning.md`.
+  `docs/evidence/std_debug_hello_muloti4_overflow_planning.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-13) Item 15 integer-helper
   retry: i128 freeze now preserves proven pair-valued register, stack-value,
@@ -2787,9 +2787,9 @@ One line per completed cycle, append-only, newest last. This is the
   `__muloti4` row advances from `composed-block-freeze-width` to
   `composed-block-call-form`; report-all remains 443 selected, 136 emitted, and
   307 failed. Tier 2 is green; no tracker or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_muloti4_freeze_i128.md`,
-  `docs/evidence/zig_integrated_exe_i128_arithmetic_freeze_i128.md`, and
-  `docs/evidence/selector_tier2_muloti4_freeze_i128.md`.
+  `docs/evidence/std_debug_hello_muloti4_freeze_i128.summary.md`,
+  `docs/evidence/zig_integrated_exe_i128_arithmetic_freeze_i128.summary.md`, and
+  `docs/evidence/selector_tier2_muloti4_freeze_i128.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   foundation: the machine and encoder layers now provide general one-operand
@@ -2801,7 +2801,7 @@ One line per completed cycle, append-only, newest last. This is the
   The focused `__muloti4` row remains at `no_emitter/composed-block-call-form`;
   report-all remains 443 selected, 136 emitted, and 307 failed. No tracker or
   ratchet moves. Evidence
-  `docs/evidence/x86_64_full_product_machine_ops.md`.
+  `docs/evidence/x86_64_full_product_machine_ops.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   allocation foundation: the composed selector now displaces live RAX/RDX
@@ -2813,7 +2813,7 @@ One line per completed cycle, append-only, newest last. This is the
   focused `__muloti4` row remains at `no_emitter/composed-block-call-form`;
   report-all remains 443 selected, 136 emitted, and 307 failed. No tracker or
   ratchet moves. Evidence
-  `docs/evidence/x86_64_full_product_binding.md`.
+  `docs/evidence/x86_64_full_product_binding.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   arithmetic foundation: the machine and encoder layers now provide
@@ -2823,7 +2823,7 @@ One line per completed cycle, append-only, newest last. This is the
   and boundary gates. The focused `__muloti4` row remains at
   `no_emitter/composed-block-call-form`; report-all remains 443 selected, 136
   emitted, and 307 failed. No tracker or ratchet moves. Evidence
-  `docs/evidence/x86_64_adc_rax_imm0.md`.
+  `docs/evidence/x86_64_adc_rax_imm0.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: the exact `llvm.smul.with.overflow.i128` intrinsic now expands into
@@ -2835,7 +2835,7 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-icmp-form`; report-all remains 443 selected, 136 emitted,
   and 307 failed. Tier 3 is green across 17 subgates and all three strict
   100-row modes. No tracker or ratchet moves. Evidence
-  `docs/evidence/x86_64_smul_i128_overflow_expansion.md`.
+  `docs/evidence/x86_64_smul_i128_overflow_expansion.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: signed i128 less-than-zero comparisons now read the high-limb sign
@@ -2844,7 +2844,7 @@ One line per completed cycle, append-only, newest last. This is the
   advances from `composed-block-icmp-form` to
   `unsupported_value/stage2-icmp-value`; report-all remains 443 selected, 136
   emitted, and 307 failed. Tier 2 is green; no tracker or ratchet moves.
-  Evidence `docs/evidence/x86_64_icmp_slt_i128_zero.md`.
+  Evidence `docs/evidence/x86_64_icmp_slt_i128_zero.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: i128 minimum-value equality now compares both limbs through a
@@ -2852,7 +2852,7 @@ One line per completed cycle, append-only, newest last. This is the
   cases are green. The focused `__muloti4` row advances from
   `stage2-icmp-value` to `composed-block-binary-width`; report-all remains 443
   selected, 136 emitted, and 307 failed. Tier 2 is green; no tracker or
-  ratchet moves. Evidence `docs/evidence/x86_64_icmp_eq_min_i128.md`.
+  ratchet moves. Evidence `docs/evidence/x86_64_icmp_eq_min_i128.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: named boolean conjunction now composes i128 predicate results,
@@ -2864,10 +2864,10 @@ One line per completed cycle, append-only, newest last. This is the
   continues at `compiler_rt.mulo.__mulodi4`. Tier 3 is green across 17
   subgates. Item-15 accounting is now 17 composed rows, 17 terminal-template
   rows, zero stage-two boundary rows, and 27 open integer-helper fallback
-  candidates. Evidence `docs/evidence/std_debug_hello_muloti4_acceptance.md`,
+  candidates. Evidence `docs/evidence/std_debug_hello_muloti4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_muloti4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_muloti4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_muloti4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_muloti4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_muloti4_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: generic CFG inspection now recognizes the exact i64 signed-multiply
@@ -2877,7 +2877,7 @@ One line per completed cycle, append-only, newest last. This is the
   `unsupported_value/stage2-unsupported-value`; report-all remains 443
   selected, 137 emitted, and 306 failed. Tier 1 unit validation is green; no
   capability, tracker, or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_mulodi4_overflow_inspection.md`.
+  `docs/evidence/std_debug_hello_mulodi4_overflow_inspection.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: stage-two planning now pressure-exempts the exact i64 signed-multiply
@@ -2886,7 +2886,7 @@ One line per completed cycle, append-only, newest last. This is the
   `no_emitter/composed-block-call-form`; report-all remains 443 selected, 137
   emitted, and 306 failed. Tier 1 unit validation is green; no arithmetic
   capability, tracker, or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_mulodi4_overflow_planning.md`.
+  `docs/evidence/std_debug_hello_mulodi4_overflow_planning.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: i64 signed multiply overflow now uses the fixed RDX:RAX full
@@ -2898,10 +2898,10 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.mulvsi3.__mulvsi3`. Tier 3 is green across 17 subgates. Item-15
   accounting is now 18 composed rows, 17 terminal-template rows, zero
   stage-two boundary rows, and 26 open integer-helper fallback candidates.
-  Evidence `docs/evidence/std_debug_hello_mulodi4_acceptance.md`,
+  Evidence `docs/evidence/std_debug_hello_mulodi4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_mulodi4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_mulodi4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_mulodi4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_mulodi4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_mulodi4_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: inspection and composed assume lowering now admit only the empty cold
@@ -2911,7 +2911,7 @@ One line per completed cycle, append-only, newest last. This is the
   `unsupported_value/stage2-binary-value`; report-all remains 443 selected,
   138 emitted, and 305 failed. Tier 1 unit validation is green; no arithmetic
   capability, tracker, or ratchet moves. Evidence
-  `docs/evidence/std_debug_hello_mulvsi3_cold_assume.md`.
+  `docs/evidence/std_debug_hello_mulvsi3_cold_assume.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: large i64 immediate adds now materialize constants outside signed
@@ -2920,7 +2920,7 @@ One line per completed cycle, append-only, newest last. This is the
   The focused `__mulvsi3` row advances from `stage2-binary-value` to
   `no_emitter/composed-block-call-form`; report-all remains 443 selected, 138
   emitted, and 305 failed. Tier 2 is green; no tracker or ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_mulvsi3_add_i64_large.md`.
+  Evidence `docs/evidence/std_debug_hello_mulvsi3_add_i64_large.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: exact zero-argument `llvm.trap` calls now emit `ud2`, and
@@ -2931,10 +2931,10 @@ One line per completed cycle, append-only, newest last. This is the
   candidate is `compiler_rt.subvdi3.__subvdi3`. Tier 3 is green across 17
   subgates. Item-15 accounting is now 19 composed rows, 17 terminal-template
   rows, zero stage-two boundary rows, and 25 open integer-helper fallback
-  candidates. Evidence `docs/evidence/std_debug_hello_mulvsi3_acceptance.md`,
+  candidates. Evidence `docs/evidence/std_debug_hello_mulvsi3_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_mulvsi3_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_mulvsi3_acceptance.md`, and
-  `docs/evidence/distribution_all_after_mulvsi3_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_mulvsi3_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_mulvsi3_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: live accumulator-backed binary operands now relocate to free
@@ -2948,10 +2948,10 @@ One line per completed cycle, append-only, newest last. This is the
   Tier 3 is green across 17 subgates. Item-15 accounting is now 23 composed
   rows, 17 terminal-template rows, zero stage-two boundary rows, and 21 open
   integer-helper fallback candidates. Evidence
-  `docs/evidence/std_debug_hello_overflow_addsub_acceptance.md`,
+  `docs/evidence/std_debug_hello_overflow_addsub_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_subvdi3_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_overflow_addsub_acceptance.md`, and
-  `docs/evidence/distribution_all_after_overflow_addsub_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_overflow_addsub_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_overflow_addsub_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   retry: nonzero immediate equality now lowers for integer widths up to 32 via
@@ -2959,7 +2959,7 @@ One line per completed cycle, append-only, newest last. This is the
   `__negvsi2` row advances from `composed-block-icmp-eq-rhs` to
   `composed-block-binary-imm-lhs`; report-all remains 443 selected, 143
   emitted, and 300 failed. Tier 2 is green; no tracker or ratchet moves.
-  Evidence `docs/evidence/std_debug_hello_negvsi2_eq_min.md`.
+  Evidence `docs/evidence/std_debug_hello_negvsi2_eq_min.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: immediate-left subtraction now lowers for integer widths through
@@ -2970,10 +2970,10 @@ One line per completed cycle, append-only, newest last. This is the
   is green across 17 subgates. Item-15 accounting is now 24 composed rows, 17
   terminal-template rows, zero stage-two boundary rows, and 20 open
   integer-helper fallback candidates. Evidence
-  `docs/evidence/std_debug_hello_negvsi2_acceptance.md`,
+  `docs/evidence/std_debug_hello_negvsi2_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_negvsi2_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_negvsi2_acceptance.md`, and
-  `docs/evidence/distribution_all_after_negvsi2_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_negvsi2_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_negvsi2_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: zero-left i128 subtraction now uses the established low-limb
@@ -2987,11 +2987,11 @@ One line per completed cycle, append-only, newest last. This is the
   17 subgates. Item-15 accounting is now 26 composed rows, 17 terminal-template
   rows, zero stage-two boundary rows, and 18 open integer-helper fallback
   candidates. Evidence
-  `docs/evidence/std_debug_hello_negvti2_absvti2_acceptance.md`,
+  `docs/evidence/std_debug_hello_negvti2_absvti2_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_negvti2_acceptance_pressure.tsv`,
   `docs/evidence/std_debug_hello_absvti2_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_negvti2_acceptance.md`, and
-  `docs/evidence/distribution_all_after_negvti2_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_negvti2_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_negvti2_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: immediate-left i64 subtraction closes `__negvdi2`, while
@@ -3004,11 +3004,11 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.absvsi2.__absvsi2`. Tier 3 is green across 17 subgates.
   Item-15 accounting is now 28 composed rows, 17 terminal-template rows, zero
   stage-two boundary rows, and 16 open integer-helper fallback candidates.
-  Evidence `docs/evidence/std_debug_hello_negvdi2_absvdi2_acceptance.md`,
+  Evidence `docs/evidence/std_debug_hello_negvdi2_absvdi2_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_negvdi2_acceptance_pressure.tsv`,
   `docs/evidence/std_debug_hello_absvdi2_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_negvdi2_acceptance.md`, and
-  `docs/evidence/distribution_all_after_negvdi2_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_negvdi2_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_negvdi2_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: the machine and encoder layers now provide width-correct i32
@@ -3021,10 +3021,10 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.mulXi3.__muldi3`. Tier 3 is green across 17 subgates. Item-15
   accounting is now 29 composed rows, 17 terminal-template rows, zero
   stage-two boundary rows, and 15 open integer-helper fallback candidates.
-  Evidence `docs/evidence/std_debug_hello_absvsi2_acceptance.md`,
+  Evidence `docs/evidence/std_debug_hello_absvsi2_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_absvsi2_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_absvsi2_acceptance.md`, and
-  `docs/evidence/distribution_all_after_absvsi2_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_absvsi2_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_absvsi2_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: named i32 multiplication now has a width-correct machine and
@@ -3038,10 +3038,10 @@ One line per completed cycle, append-only, newest last. This is the
   subgates. Item-15 accounting is now 30 composed rows, 17 terminal-template
   rows, zero stage-two boundary rows, and 14 open integer-helper fallback
   candidates. Evidence
-  `docs/evidence/std_debug_hello_muldi3_acceptance.md`,
+  `docs/evidence/std_debug_hello_muldi3_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_muldi3_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_muldi3_acceptance.md`, and
-  `docs/evidence/distribution_all_after_muldi3_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_muldi3_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_muldi3_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: phi blocks with more than three scalar results now place excess
@@ -3052,8 +3052,8 @@ One line per completed cycle, append-only, newest last. This is the
   from `stage2-phi-registers` to `composed-block-select-width`; report-all
   remains 150 emitted and 293 failed, so item-15 accounting remains 30
   composed rows and 14 open integer-helper candidates. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_phi_spill.md` and
-  `docs/evidence/selector_tier2_udivmodsi4_phi_spill.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_phi_spill.summary.md` and
+  `docs/evidence/selector_tier2_udivmodsi4_phi_spill.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: scalar selects from i1 through i32 now use the existing EAX
@@ -3061,8 +3061,8 @@ One line per completed cycle, append-only, newest last. This is the
   outcomes. The exact `compiler_rt.int.__udivmodsi4` row advances from
   `composed-block-select-width` to `composed-block-ctlz-args`; report-all and
   item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_select_i1.md` and
-  `docs/evidence/selector_tier2_udivmodsi4_select_i1.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_select_i1.summary.md` and
+  `docs/evidence/selector_tier2_udivmodsi4_select_i1.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: `llvm.ctlz.i32` now accepts both legal zero flags, backed by the
@@ -3070,8 +3070,8 @@ One line per completed cycle, append-only, newest last. This is the
   cover zero and nonzero inputs. The exact `compiler_rt.int.__udivmodsi4` row
   advances from `composed-block-ctlz-args` to `composed-block-icmp-form`;
   report-all and item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_ctlz_defined.md` and
-  `docs/evidence/selector_tier2_udivmodsi4_ctlz_defined.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_ctlz_defined.summary.md` and
+  `docs/evidence/selector_tier2_udivmodsi4_ctlz_defined.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: i32 unsigned-greater comparisons against immediates now use the
@@ -3080,8 +3080,8 @@ One line per completed cycle, append-only, newest last. This is the
   reuse of the compared value. The exact `compiler_rt.int.__udivmodsi4` row
   advances from `composed-block-icmp-form` to `composed-block-icmp-rhs`;
   report-all and item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_ugt_i32.md` and
-  `docs/evidence/selector_tier2_udivmodsi4_ugt_i32.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_ugt_i32.summary.md` and
+  `docs/evidence/selector_tier2_udivmodsi4_ugt_i32.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: named scalar equality now supports widths through i32 using the
@@ -3090,8 +3090,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmodsi4` row advances from `composed-block-icmp-rhs`
   to `composed-block-call-form` at `llvm.fshl.i32`; report-all and item-15
   counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_eq_i32.md` and
-  `docs/evidence/selector_tier2_udivmodsi4_eq_i32.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_eq_i32.summary.md` and
+  `docs/evidence/selector_tier2_udivmodsi4_eq_i32.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: i32 funnel shifts now map to a general x86 `shldl` machine form
@@ -3100,8 +3100,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmodsi4` row advances through all `llvm.fshl.i32`
   calls to `stage2-phi-src-spill64`; report-all and item-15 counts remain
   unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_fshl_i32.md` and
-  `docs/evidence/selector_tier2_udivmodsi4_fshl_i32.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_fshl_i32.summary.md` and
+  `docs/evidence/selector_tier2_udivmodsi4_fshl_i32.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: spill materialization now validates each concrete frame index
@@ -3112,8 +3112,8 @@ One line per completed cycle, append-only, newest last. This is the
   `stage2-phi-src-spill64` to `composed-block-icmp-form`; report-all and
   item-15 counts remain unchanged. Tier 3 is green across 17 subgates because
   this changes spill/frame acceptance. Evidence
-  `docs/evidence/std_debug_hello_udivmodsi4_phi_spill_frame.md` and
-  `docs/evidence/distribution_all_after_udivmodsi4_phi_spill_frame.md`.
+  `docs/evidence/std_debug_hello_udivmodsi4_phi_spill_frame.summary.md` and
+  `docs/evidence/distribution_all_after_udivmodsi4_phi_spill_frame.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   acceptance: i32 inequality against zero clears the final selector form, and
@@ -3128,10 +3128,10 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmoddi4`. Tier 3 is green across 17 subgates. Item-15
   accounting is now 33 composed rows, 17 terminal-template rows, zero
   stage-two boundary rows, and 11 open integer-helper fallback candidates.
-  Evidence `docs/evidence/std_debug_hello_udivmodsi4_acceptance.md`,
+  Evidence `docs/evidence/std_debug_hello_udivmodsi4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_udivmodsi4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_udivmodsi4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_udivmodsi4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_udivmodsi4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_udivmodsi4_acceptance.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: `llvm.usub.with.overflow.i32` aggregate results now follow the
@@ -3140,8 +3140,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmoddi4` row advances from the generic
   `stage2-unsupported-value` planner failure to `stage2-phi-restore-loc`;
   report-all and item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_usub_tuple.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_usub_tuple.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_usub_tuple.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_usub_tuple.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: framed composed functions now reserve the 32-slot emergency
@@ -3151,8 +3151,8 @@ One line per completed cycle, append-only, newest last. This is the
   advances from exhausted `stage2-phi-restore-loc` to
   `composed-block-icmp-rhs`; report-all and item-15 counts remain unchanged.
   Tier 3 is green across 17 subgates because frame behavior changed. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_frame_homes.md` and
-  `docs/evidence/distribution_all_after_udivmoddi4_frame_homes.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_frame_homes.summary.md` and
+  `docs/evidence/distribution_all_after_udivmoddi4_frame_homes.summary.md`.
 
 - 2026-07-11 (this commit, INBOX-9 and INBOX-14) Item 15 integer-helper
   capability: pointer equality with null now lowers through a 64-bit test and
@@ -3160,8 +3160,8 @@ One line per completed cycle, append-only, newest last. This is the
   non-null pointers. The exact `compiler_rt.int.__udivmoddi4` row advances
   from `composed-block-icmp-rhs` to `composed-block-store-width`; report-all
   and item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_ptr_null.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_ptr_null.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_ptr_null.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_ptr_null.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9 and INBOX-15) Item 15 integer-helper
   capability: composed memory lowering now stores named i64 values through
@@ -3171,8 +3171,8 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-store-width` to `composed-block-icmp-form`; report-all and
   item-15 counts remain unchanged. Tier 2 is green at 820 unit tests, 146
   integrated objects, and five executable canaries. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_store_i64.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_store_i64.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_store_i64.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_store_i64.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-15) Generic-selector architecture closure:
   `composed_selector_impl.zig` is now a 297-line dispatch facade over explicit
@@ -3182,7 +3182,7 @@ One line per completed cycle, append-only, newest last. This is the
   three 146-row captured-object pipelines, 100 source-owned objects, strict
   100-row ReleaseFast/ReleaseSafe/ReleaseSmall prefixes, and five executable
   canaries. No capability or ratchet counter moves. Evidence
-  `docs/evidence/distribution_all_after_inbox15_selector_split.md`.
+  `docs/evidence/distribution_all_after_inbox15_selector_split.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
   i32 unsigned less-than now materializes lhs in R8D and rhs in ECX so the
@@ -3192,8 +3192,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmoddi4` row advances from
   `composed-block-icmp-form` to `composed-block-binary-op`; report-all and
   item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_ult_i32_named.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_ult_i32_named.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_ult_i32_named.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_ult_i32_named.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: the
   selector's fixed RDX:RAX unsigned division/remainder protocol is now
@@ -3203,8 +3203,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmoddi4` row advances from
   `composed-block-binary-op` to a later `composed-block-icmp-form`;
   report-all and item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_udiv_urem_i32.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_udiv_urem_i32.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_udiv_urem_i32.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_udiv_urem_i32.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
   unsigned greater-than now shares one i32/i64 selector branch with explicit
@@ -3213,8 +3213,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.int.__udivmoddi4` row advances from the later
   `composed-block-icmp-form` to `composed-block-call-form`; report-all and
   item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_ugt_i32_named.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_ugt_i32_named.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_ugt_i32_named.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_ugt_i32_named.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper emission:
   `llvm.uadd.with.overflow.i32` and `llvm.usub.with.overflow.i32` now share
@@ -3223,8 +3223,8 @@ One line per completed cycle, append-only, newest last. This is the
   checks cover non-borrowing, wrapping, and high-bit unsigned subtraction.
   `compiler_rt.int.__udivmoddi4` now emits; report-all advances to 154 emitted
   and 289 failed. Acceptance and item-15 accounting remain pending. Evidence
-  `docs/evidence/std_debug_hello_udivmoddi4_usub_overflow_i32.md` and
-  `docs/evidence/selector_tier2_udivmoddi4_usub_overflow_i32.md`.
+  `docs/evidence/std_debug_hello_udivmoddi4_usub_overflow_i32.summary.md` and
+  `docs/evidence/selector_tier2_udivmoddi4_usub_overflow_i32.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9 and INBOX-16) Item 15 integer-helper
   acceptance: checked lifetime markers clear exact linking, while CFG live-out
@@ -3234,10 +3234,10 @@ One line per completed cycle, append-only, newest last. This is the
   17 live values and 11 required spill slots. Report-all remains 154 emitted
   and 289 failed; item-15 accounting advances to 34 composed rows and 10 open
   integer-helper fallback candidates. Tier 3 is green across 17 subgates.
-  Evidence `docs/evidence/std_debug_hello_udivmoddi4_acceptance.md`,
+  Evidence `docs/evidence/std_debug_hello_udivmoddi4_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_udivmoddi4_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_udivmoddi4_acceptance.md`, and
-  `docs/evidence/distribution_all_after_udivmoddi4_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_udivmoddi4_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_udivmoddi4_acceptance.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: signed
   i32 greater-than against an immediate now uses `cmpl` plus flag-preserving
@@ -3245,8 +3245,8 @@ One line per completed cycle, append-only, newest last. This is the
   negative, equal-boundary, and greater values. The exact
   `compiler_rt.shift.__ashlsi3` row advances to a later
   `composed-block-icmp-form`; report-all and item-15 counts remain unchanged.
-  Evidence `docs/evidence/std_debug_hello_ashlsi3_sgt_i32_imm.md` and
-  `docs/evidence/selector_tier2_ashlsi3_sgt_i32_imm.md`.
+  Evidence `docs/evidence/std_debug_hello_ashlsi3_sgt_i32_imm.summary.md` and
+  `docs/evidence/selector_tier2_ashlsi3_sgt_i32_imm.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability:
   unsigned i32 less-than against an immediate now uses width-correct `cmpl`
@@ -3254,8 +3254,8 @@ One line per completed cycle, append-only, newest last. This is the
   The exact `compiler_rt.shift.__ashlsi3` row advances from
   `composed-block-icmp-form` to `composed-block-binary-op`; report-all and
   item-15 counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_ashlsi3_ult_i32_imm.md` and
-  `docs/evidence/selector_tier2_ashlsi3_ult_i32_imm.md`.
+  `docs/evidence/std_debug_hello_ashlsi3_ult_i32_imm.summary.md` and
+  `docs/evidence/selector_tier2_ashlsi3_ult_i32_imm.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: the
   EAX/CL variable-shift path now lowers i16 `shl` and `lshr` in addition to
@@ -3263,8 +3263,8 @@ One line per completed cycle, append-only, newest last. This is the
   `compiler_rt.shift.__ashlsi3` row advances from `composed-block-binary-op`
   to `unsupported_value/stage2-phi-src-unknown`; report-all and item-15 counts
   remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_ashlsi3_variable_i16_shifts.md` and
-  `docs/evidence/selector_tier2_ashlsi3_variable_i16_shifts.md`.
+  `docs/evidence/std_debug_hello_ashlsi3_variable_i16_shifts.summary.md` and
+  `docs/evidence/selector_tier2_ashlsi3_variable_i16_shifts.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper acceptance:
   accumulator clobbering now honors current-position preservation during
@@ -3274,10 +3274,10 @@ One line per completed cycle, append-only, newest last. This is the
   closes `__lshrsi3`, `__lshrdi3`, and `__ashldi3`; report-all advances to 158
   emitted and 285 failed. Item-15 accounting is 38 composed rows and six open
   integer-helper candidates. Tier 3 is green across 17 subgates. Evidence
-  `docs/evidence/std_debug_hello_ashlsi3_phi_acceptance.md`,
+  `docs/evidence/std_debug_hello_ashlsi3_phi_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_ashlsi3_acceptance_pressure.tsv`,
-  `docs/evidence/zig_integrated_exe_ashlsi3_phi_acceptance.md`, and
-  `docs/evidence/distribution_all_after_ashlsi3_phi_acceptance.md`.
+  `docs/evidence/zig_integrated_exe_ashlsi3_phi_acceptance.summary.md`, and
+  `docs/evidence/distribution_all_after_ashlsi3_phi_acceptance.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper acceptance: verified
   i32 immediate and CL-variable `sarl` forms close `__ashrdi3` and sibling
@@ -3285,9 +3285,9 @@ One line per completed cycle, append-only, newest last. This is the
   values and no spill demand. Report-all advances to 160 emitted / 283 failed;
   item-15 accounting reaches 40 composed rows and four open integer helpers.
   Tier 3 is green across 17 subgates. Evidence
-  `docs/evidence/std_debug_hello_ashrdi3_acceptance.md`,
+  `docs/evidence/std_debug_hello_ashrdi3_acceptance.summary.md`,
   `docs/evidence/std_debug_hello_ashrdi3_acceptance_pressure.tsv`, and
-  `docs/evidence/distribution_all_after_ashrdi3_acceptance.md`.
+  `docs/evidence/distribution_all_after_ashrdi3_acceptance.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability:
   i128 phi results now use frame-backed pair destinations, with named pair
@@ -3297,16 +3297,16 @@ One line per completed cycle, append-only, newest last. This is the
   `__lshrti3`, `__ashrti3`, and `__ashlti3` rows advance from
   `stage2-phi-width` to `composed-block-binary-op`; report-all and item-15
   counts remain unchanged. Evidence
-  `docs/evidence/std_debug_hello_lshrti3_i128_phi.md` and
-  `docs/evidence/selector_tier2_lshrti3_i128_phi.md`.
+  `docs/evidence/std_debug_hello_lshrti3_i128_phi.summary.md` and
+  `docs/evidence/selector_tier2_lshrti3_i128_phi.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
   i64 logical-right shift counts now lower through a verified
   `shrq %cl, %rax` machine form, with executable high-bit checks. The exact
   i128 shift rows clear this limb operation but remain fail-closed at a later
   `composed-block-binary-op`; report-all and item-15 counts remain unchanged.
-  Evidence `docs/evidence/std_debug_hello_lshrti3_variable_lshr_i64.md`
-  and `docs/evidence/selector_tier2_lshrti3_variable_lshr_i64.md`.
+  Evidence `docs/evidence/std_debug_hello_lshrti3_variable_lshr_i64.summary.md`
+  and `docs/evidence/selector_tier2_lshrti3_variable_lshr_i64.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper capability: named
   i64 left-shift counts now lower through a verified `shlq %cl, %rax` machine
@@ -3314,8 +3314,8 @@ One line per completed cycle, append-only, newest last. This is the
   162 emitted / 281 failed as `__lshrti3` and `__ashlti3` begin emitting;
   exact acceptance and item-15 accounting remain pending, while `__ashrti3`
   stays fail-closed at a later `composed-block-binary-op`. Evidence
-  `docs/evidence/std_debug_hello_lshrti3_variable_shl_i64.md` and
-  `docs/evidence/selector_tier2_lshrti3_variable_shl_i64.md`.
+  `docs/evidence/std_debug_hello_lshrti3_variable_shl_i64.summary.md` and
+  `docs/evidence/selector_tier2_lshrti3_variable_shl_i64.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper emission: named
   i64 arithmetic-right shift counts now lower through a verified
@@ -3323,8 +3323,8 @@ One line per completed cycle, append-only, newest last. This is the
   `__ashrti3` joins `__lshrti3` and `__ashlti3` in emitting; fresh report-all
   reaches 163 emitted / 280 failed. Exact native execution, pressure
   diagnostics, Tier 3, and item-15 accounting remain pending. Evidence
-  `docs/evidence/std_debug_hello_ashrti3_variable_ashr_i64.md` and
-  `docs/evidence/selector_tier2_ashrti3_variable_ashr_i64.md`.
+  `docs/evidence/std_debug_hello_ashrti3_variable_ashr_i64.summary.md` and
+  `docs/evidence/selector_tier2_ashrti3_variable_ashr_i64.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-9) Item 15 integer-helper acceptance:
   parallel phi-edge moves now stabilize all named incoming sources before
@@ -3334,8 +3334,8 @@ One line per completed cycle, append-only, newest last. This is the
   demand. `__lshrti3`, `__ashrti3`, and `__ashlti3` close; report-all remains
   163 emitted / 280 failed, while item-15 accounting advances to 43 composed
   rows and one open integer-helper fallback candidate. Tier 3 is green across
-  17 subgates. See the [i128 shift acceptance](../evidence/std_debug_hello_i128_shift_acceptance.md)
-  and [full integration results](../evidence/distribution_all_after_i128_shift_acceptance.md).
+  17 subgates. See the [i128 shift acceptance](../evidence/std_debug_hello_i128_shift_acceptance.summary.md)
+  and [full integration results](../evidence/distribution_all_after_i128_shift_acceptance.summary.md).
 
 - 2026-07-12 (this commit, INBOX-9 and INBOX-16) Item 15 integer-helper bucket
   closure: fresh report-all contains no non-tail, non-soft-float selector
@@ -3346,7 +3346,7 @@ One line per completed cycle, append-only, newest last. This is the
   ABI family. The next selector frontier is soft-float
   `compiler_rt.trunc.__trunch`; stop for user direction before crossing it.
   Evidence
-  `docs/evidence/std_debug_hello_integer_helper_bucket_closure.md`.
+  `docs/evidence/std_debug_hello_integer_helper_bucket_closure.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-18) Item 12 soft-float capability: type-driven
   half extension/truncation libcalls, exact FP/integer bitcasts, scalar float
@@ -3356,7 +3356,7 @@ One line per completed cycle, append-only, newest last. This is the
   bit-exact native half cases. Report-all advances from 163 emitted / 280
   failed to 170 emitted / 273 failed. The next non-tail soft-float frontier is
   `compiler_rt.trunc.trunc` at typed `fadd`. Tier 2 is green. Evidence
-  `docs/evidence/std_debug_hello_trunch_acceptance.md`.
+  `docs/evidence/std_debug_hello_trunch_acceptance.summary.md`.
 
 - 2026-07-12 (this commit, INBOX-19) Item 12 double truncation canary:
   width-driven double/i64 bitcasts, `addsd`, float/double barriers, variable
@@ -3366,7 +3366,7 @@ One line per completed cycle, append-only, newest last. This is the
   273 failed to 173 emitted / 270 failed, including two collateral typed-form
   emissions. The next non-tail frontier is `compiler_rt.tan.tanh`; wider trunc
   forms remain untouched. Tier 2 is green. Evidence
-  `docs/evidence/std_debug_hello_trunc_acceptance.md`.
+  `docs/evidence/std_debug_hello_trunc_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-20) Item 12 scalar SSE direct-call boundary:
   the SysV planner now drives independent GPR/XMM argument placement, parallel
@@ -3379,7 +3379,7 @@ One line per completed cycle, append-only, newest last. This is the
   advisory `tail` rows: 10 emit ordinarily and 32 expose non-tail frontiers;
   no tracked `musttail` row exists in this corpus. Tier 3 passes all 17
   subgates. Evidence
-  `docs/evidence/std_debug_hello_tanh_call_abi_acceptance.md`.
+  `docs/evidence/std_debug_hello_tanh_call_abi_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-21) Item 12 scalar FP operation boundary:
   type-driven float-to-double widening, double-to-float narrowing, and scalar
@@ -3390,7 +3390,7 @@ One line per completed cycle, append-only, newest last. This is the
   emitted / 254 failed to 190 emitted / 253 failed; the newly emitting
   `compiler_rt.fma.fmaf` row is collateral and has no separate semantic claim.
   Tier 2 passes all 21 steps. Evidence
-  `docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.md`.
+  `docs/evidence/std_debug_hello_tanf_scalar_fp_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-23) Item 12 scalar FP arithmetic capability:
   type-driven float/double subtraction and division now use register-parametric
@@ -3399,7 +3399,7 @@ One line per completed cycle, append-only, newest last. This is the
   `fsub`/`fdiv` to `insertelement`; fresh report-all remains 190 emitted / 253
   failed with no collateral emission or regression. Tier 2 passes all 21
   steps. Evidence
-  `docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.md`.
+  `docs/evidence/std_debug_hello_scalar_fsub_fdiv_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-23 successor) Item 12 scalar FP comparison
   capability: all 16 float/double `fcmp` predicates now use parametric
@@ -3409,7 +3409,7 @@ One line per completed cycle, append-only, newest last. This is the
   251 failed through two collateral round-family emissions without separate
   rounding-semantic claims. Tier 2 passes all 21 steps. The pre-authorized
   one-cycle pipeline is now exhausted. Evidence
-  `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.md`.
+  `docs/evidence/std_debug_hello_scalar_fcmp_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-24) Item 12 Phase D vector capability: the
   existing XMM register bank now owns a typed `<2 x double>` packed shape with
@@ -3421,7 +3421,7 @@ One line per completed cycle, append-only, newest last. This is the
   their next scalar, memory, CFG, non-splat, or excluded-type frontiers. Tier 2
   is green and final Tier 3 acceptance is recorded in the evidence summary.
   Stop for the plan's periodic review; no successor is authorized. Evidence
-  `docs/evidence/std_debug_hello_vector_f64x2_acceptance.md`.
+  `docs/evidence/std_debug_hello_vector_f64x2_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-25) Item 12 scalar FP stack-memory and
   out-parameter capability: typed float/double frame objects, exact local
@@ -3434,7 +3434,7 @@ One line per completed cycle, append-only, newest last. This is the
   advances to 193 emitting / 250 failing through one unrelated collateral
   integer emission. Tier 2 is green; no directed trig row closes, so Tier 3 is
   not triggered. Evidence
-  `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.md`.
+  `docs/evidence/std_debug_hello_scalar_fp_stack_memory_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-25 pre-authorized successor) Item 12 packed
   float vector capability: one shared typed fixed-vector constant parser and
@@ -3447,8 +3447,8 @@ One line per completed cycle, append-only, newest last. This is the
   `__unordsf2` to vector `fabs`; report-all remains 193 emitting / 250 failing.
   Tier 2 and the policy-triggered Tier 3 are green. No third cycle is
   authorized; stop for review. Evidence
-  `docs/evidence/std_debug_hello_vector_f32x2_acceptance.md` and
-  `docs/evidence/distribution_all_after_f32x2.md`.
+  `docs/evidence/std_debug_hello_vector_f32x2_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_f32x2.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-26) Item 12 scalar FP CFG capability:
   type-driven float/double selects preserve exact source bits, FP constants
@@ -3460,8 +3460,8 @@ One line per completed cycle, append-only, newest last. This is the
   unsupported switch terminators. Report-all advances to 199 emitting / 244
   failing; five non-directed emissions are collateral without semantic claims.
   Tier 2 and the row-closure Tier 3 are green. Evidence
-  `docs/evidence/std_debug_hello_scalar_fp_select_phi_acceptance.md` and
-  `docs/evidence/distribution_all_after_scalar_fp_select_phi.md`.
+  `docs/evidence/std_debug_hello_scalar_fp_select_phi_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_scalar_fp_select_phi.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-26 pre-authorized successor) Item 12 scalar
   FP pointer-store capability: the selector now proves exact named ABI pointer
@@ -3472,7 +3472,7 @@ One line per completed cycle, append-only, newest last. This is the
   report-all remains 199 emitting / 244 failing with no collateral emissions.
   Tier 2 is green; no row closes, so Tier 3 is not triggered. The one-cycle
   pipeline is exhausted and work stops for review. Evidence
-  `docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.md`.
+  `docs/evidence/std_debug_hello_scalar_fp_pointer_store_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-27 Part 1) Standalone frame correctness
   repair: every alloca-bearing composed-selector function now reserves the
@@ -3486,8 +3486,8 @@ One line per completed cycle, append-only, newest last. This is the
   stream separates the payload at displacement 256 from spill slots 0/2/4.
   Tier 2 and the shared-frame-layout Tier 3 are green; report counters are not
   moved by this correctness-only cycle. Evidence
-  `docs/evidence/std_debug_hello_alloca_spill_collision_repair.md` and
-  `docs/evidence/distribution_all_after_inbox27_alloca_spill_collision.md`.
+  `docs/evidence/std_debug_hello_alloca_spill_collision_repair.summary.md` and
+  `docs/evidence/distribution_all_after_inbox27_alloca_spill_collision.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-27 fix-forward) The permanent composed-selector
   executable canary now re-proves `compiler_rt.int.__moddi3` after the frame
@@ -3497,7 +3497,7 @@ One line per completed cycle, append-only, newest last. This is the
   dividend/divisor sign combination. Repository tests and all five permanent
   integrated executable canaries pass; report counters remain unchanged.
   Evidence
-  `docs/evidence/zig_integrated_exe_moddi3_umoddi3_closure_reproof.md`.
+  `docs/evidence/zig_integrated_exe_moddi3_umoddi3_closure_reproof.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-27 Part 2) Item 12 typed integer switch
   capability: bounded i1-through-i32 compare chains normalize narrow
@@ -3511,8 +3511,8 @@ One line per completed cycle, append-only, newest last. This is the
   241 failing. One fma row and twelve conversion rows advance collaterally
   without semantic claims. Tier 2 and the row-closure Tier 3 are green. No
   third capability is authorized; stop for periodic review. Evidence
-  `docs/evidence/std_debug_hello_typed_switch_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox27_typed_switch.md`.
+  `docs/evidence/std_debug_hello_typed_switch_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox27_typed_switch.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-28) Item 12 packed lane-shift capability:
   the shared typed shuffle classifier admits exact `<1, poison>` masks for
@@ -3524,7 +3524,7 @@ One line per completed cycle, append-only, newest last. This is the
   advance to concrete scalar `sitofp`; double `log` remains at packed `fsub`.
   Report-all therefore remains 443 selected / 202 emitting / 241 failing.
   Tier 2 is green and no Tier 3 trigger occurs. Evidence
-  `docs/evidence/std_debug_hello_vector_lane_shift_acceptance.md`.
+  `docs/evidence/std_debug_hello_vector_lane_shift_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-28 pre-authorized successor) Item 12 packed
   FP subtraction capability: register-parametric `subps`/`subpd` machine forms
@@ -3536,7 +3536,7 @@ One line per completed cycle, append-only, newest last. This is the
   without closing, so report-all remains 443 selected / 202 emitting / 241
   failing. Tier 2 is green and no Tier 3 trigger occurs. The one-cycle
   pipeline is exhausted; stop for periodic review. Evidence
-  `docs/evidence/std_debug_hello_packed_fsub_acceptance.md`.
+  `docs/evidence/std_debug_hello_packed_fsub_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-29) Item 12 scalar integer-to-FP capability:
   typed `sitofp`/`uitofp` from i8 through i64 to float or double now normalize
@@ -3549,8 +3549,8 @@ One line per completed cycle, append-only, newest last. This is the
   shared frame-reservation trigger required Tier 3; one infrastructure-hung
   full invocation plus narrow unchanged-input recovery accounts for all 17
   green subgates. Evidence
-  `docs/evidence/std_debug_hello_scalar_int_to_fp_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox29_int_to_fp.md`.
+  `docs/evidence/std_debug_hello_scalar_int_to_fp_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox29_int_to_fp.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-29 pre-authorized successor) Item 12 scalar
   comparison capability: typed plain `icmp slt` with i32/i64 immediate right
@@ -3562,9 +3562,9 @@ One line per completed cycle, append-only, newest last. This is the
   / 233 failing. Tier 2 and the row-closure Tier 3 are green. The one-cycle
   pipeline is exhausted; stop for review with three half wrappers at `fcmp`,
   double `log10` at cross-input shuffle, and double `log` at global-table GEP.
-  Evidence `docs/evidence/std_debug_hello_slt_immediate_acceptance.md`
+  Evidence `docs/evidence/std_debug_hello_slt_immediate_acceptance.summary.md`
   and
-  `docs/evidence/distribution_all_after_inbox29_slt_immediate.md`.
+  `docs/evidence/distribution_all_after_inbox29_slt_immediate.summary.md`.
 
 - 2026-07-13 (`f510d241`, INBOX-30) Item 12 exact half comparison capability:
   typed `fcmp oeq half` against either zero bit pattern lowers as
@@ -3575,8 +3575,8 @@ One line per completed cycle, append-only, newest last. This is the
   first run exposed the stale framed-FP-phi destination repaired separately in
   `70c63cc4`. Report-all advances to 443 selected / 213 emitting / 230 failing.
   Tier 2 and the single row-closure Tier 3 are green. Evidence
-  `docs/evidence/std_debug_hello_half_zero_fcmp_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox30_half_zero_fcmp.md`.
+  `docs/evidence/std_debug_hello_half_zero_fcmp_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox30_half_zero_fcmp.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-30 pre-authorized successor) Item 12 exact
   two-source vector shuffle capability: typed f64x2 `<0, 3>` lowers through a
@@ -3587,8 +3587,8 @@ One line per completed cycle, append-only, newest last. This is the
   emissions. Tier 2 and the single row-closure Tier 3 are green. The pipeline
   is exhausted; stop for review, and do not begin global-table GEP work before
   its bounded architectural decision. Evidence
-  `docs/evidence/std_debug_hello_f64x2_shuffle_0_3_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox30_f64x2_shuffle_0_3.md`.
+  `docs/evidence/std_debug_hello_f64x2_shuffle_0_3_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox30_f64x2_shuffle_0_3.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-31) Item 12 module-aware constant-table
   capability: one shared typed decoder now gives the selector and ELF writer a
@@ -3603,8 +3603,8 @@ One line per completed cycle, append-only, newest last. This is the
   separately. The capability excludes `.rodata`, STB_LOCAL ordering, PIC,
   writable-table admission, and stores. Stop for the required architectural
   review; no successor is authorized. Evidence
-  `docs/evidence/std_debug_hello_constant_table_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox31_constant_tables.md`.
+  `docs/evidence/std_debug_hello_constant_table_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox31_constant_tables.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-32) Item 12 named predicate capability:
   exact typed `or i1 %a, %b` over named values now lowers through the existing
@@ -3617,8 +3617,8 @@ One line per completed cycle, append-only, newest last. This is the
   selected / 221 emitting / 222 failing. Tier 2 and the row-closure Tier 3 are
   green. Continue with the pre-authorized exact `icmp sgt i64` immediate
   successor; no third cycle is authorized. Evidence
-  `docs/evidence/std_debug_hello_named_i1_or_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox32_named_i1_or.md`.
+  `docs/evidence/std_debug_hello_named_i1_or_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox32_named_i1_or.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-32 pre-authorized successor) Item 12 signed
   comparison capability: exact plain `icmp sgt i64` with an immediate RHS now
@@ -3631,9 +3631,9 @@ One line per completed cycle, append-only, newest last. This is the
   semantic claims. Report-all advances to 443 selected / 226 emitting / 217
   failing. Tier 2 and the row-closure Tier 3 are green. The pipeline is
   exhausted; stop for review before the noted multiply-location repair.
-  Evidence `docs/evidence/std_debug_hello_sgt_i64_immediate_acceptance.md`
+  Evidence `docs/evidence/std_debug_hello_sgt_i64_immediate_acceptance.summary.md`
   and
-  `docs/evidence/distribution_all_after_inbox32_sgt_i64_immediate.md`.
+  `docs/evidence/distribution_all_after_inbox32_sgt_i64_immediate.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-33) Item 12 false-rejection repair:
   `lowerMul64` now consumes an i64 RHS already resident in RAX through the
@@ -3644,8 +3644,8 @@ One line per completed cycle, append-only, newest last. This is the
   to 443 selected / 227 emitting / 216 failing with no collateral emissions.
   Tier 2 and the row-closure Tier 3 are green. Continue with one
   evidence-ranked bounded typed successor; no third cycle is authorized.
-  Evidence `docs/evidence/std_debug_hello_mul64_rax_rhs_repair.md` and
-  `docs/evidence/distribution_all_after_inbox33_mul64_rax_rhs.md`.
+  Evidence `docs/evidence/std_debug_hello_mul64_rax_rhs_repair.summary.md` and
+  `docs/evidence/distribution_all_after_inbox33_mul64_rax_rhs.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-33 evidence-ranked successor) Item 12 signed
   comparison capability: plain named `icmp slt/sgt` for i32/i64 now uses the
@@ -3658,9 +3658,9 @@ One line per completed cycle, append-only, newest last. This is the
   selected / 229 emitting / 214 failing. Tier 2 and the row-closure Tier 3 are
   green. The authorized pipeline is exhausted; stop for review before any
   further capability. Evidence
-  `docs/evidence/std_debug_hello_signed_named_comparisons_acceptance.md`
+  `docs/evidence/std_debug_hello_signed_named_comparisons_acceptance.summary.md`
   and
-  `docs/evidence/distribution_all_after_inbox33_signed_named_comparisons.md`.
+  `docs/evidence/distribution_all_after_inbox33_signed_named_comparisons.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-34 prerequisite correctness repair) Item 12
   call-boundary correction: unimplemented `llvm.*` intrinsics now fail closed
@@ -3672,8 +3672,8 @@ One line per completed cycle, append-only, newest last. This is the
   `__bitreversedi2` had retained unresolved LLVM intrinsic calls and were not
   valid emissions. Tier 2 and the shared-call-boundary Tier 3 are green.
   Resume INBOX-34's exact named i32/i64 inequality capability. Evidence
-  `docs/evidence/std_debug_hello_llvm_intrinsic_boundary_repair.md` and
-  `docs/evidence/distribution_all_after_inbox34_llvm_intrinsic_boundary_repair.md`.
+  `docs/evidence/std_debug_hello_llvm_intrinsic_boundary_repair.summary.md` and
+  `docs/evidence/distribution_all_after_inbox34_llvm_intrinsic_boundary_repair.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-34) Item 12 named integer inequality:
   exact plain named `icmp ne` for i32/i64 now lowers through the existing typed
@@ -3685,9 +3685,9 @@ One line per completed cycle, append-only, newest last. This is the
   to 443 selected / 230 emitting / 213 failing with no collateral emissions.
   Tier 2 and the row-closure Tier 3 are green. Continue with the pre-authorized
   exact immediate-left i32 shift successor. Evidence
-  `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.md`
+  `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary.md`
   and
-  `docs/evidence/distribution_all_after_inbox34_named_integer_inequality.md`.
+  `docs/evidence/distribution_all_after_inbox34_named_integer_inequality.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-34 evidence fix-forward) Item 12 acceptance
   correction: the first named-inequality native harness incorrectly used a
@@ -3697,7 +3697,7 @@ One line per completed cycle, append-only, newest last. This is the
   mismatch, and exits successfully. Production, permanent tests, the exact row
   object, and gate inputs are unchanged; the acceptance artifact hash is
   corrected in
-  `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.md`.
+  `docs/evidence/std_debug_hello_named_integer_inequality_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-34 pre-authorized successor) Item 12 typed
   immediate-left shift: exact i32 `shl imm, %named` now uses the existing CL
@@ -3709,8 +3709,8 @@ One line per completed cycle, append-only, newest last. This is the
   Tier 2 and the row-closure Tier 3 are green. The INBOX-34 pipeline is
   exhausted; stop for review before the noted i6 comparison, half store, or
   `lowerIcmp` structural split. Evidence
-  `docs/evidence/std_debug_hello_immediate_left_shl_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox34_immediate_left_shl.md`.
+  `docs/evidence/std_debug_hello_immediate_left_shl_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox34_immediate_left_shl.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-35 authorized interlude) Item 12 selector
   ownership: the complete `lowerIcmp` predicate matrix moves byte-for-byte from
@@ -3718,7 +3718,7 @@ One line per completed cycle, append-only, newest last. This is the
   preserves all call sites. Focused unit tests and structural smoke are green;
   no Tier 3 was run under the move-only interlude contract. Continue with the
   directed narrow i6 unsigned-immediate comparison. Evidence
-  `docs/evidence/inbox35_lower_icmp_ownership_split.md`.
+  `docs/evidence/inbox35_lower_icmp_ownership_split.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-35) Item 12 narrow comparison capability:
   exact `icmp samesign ult i6 %x, imm` now zero-extends the i6 source in EAX
@@ -3730,7 +3730,7 @@ One line per completed cycle, append-only, newest last. This is the
   so report-all remains 443 selected / 232 emitting / 211 failing and no row
   closure is claimed. Tier 2 is green and Tier 3 is not triggered. Continue
   with the pre-authorized half pointer-store successor. Evidence
-  `docs/evidence/std_debug_hello_i6_samesign_ult_acceptance.md`.
+  `docs/evidence/std_debug_hello_i6_samesign_ult_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-35 pre-authorized successor) Item 12 scalar
   FP memory capability: exact half stores through ABI-proven pointer
@@ -3743,8 +3743,8 @@ One line per completed cycle, append-only, newest last. This is the
   Tier 2 and the row-closure Tier 3 are green. The INBOX-35 pipeline is
   exhausted; stop for the fresh inventory and vector-mask architectural
   checkpoint. Evidence
-  `docs/evidence/std_debug_hello_half_pointer_store_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox35_half_pointer_store.md`.
+  `docs/evidence/std_debug_hello_half_pointer_store_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox35_half_pointer_store.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-36) Item 12 architectural inventory: a
   read-only scan of the accepted 443 / 233 / 210 report and pinned captured IR
@@ -3770,8 +3770,8 @@ One line per completed cycle, append-only, newest last. This is the
   233 emitting / 210 failing to 443 / 235 / 208 with no collateral emissions.
   Tier 2 and the row-closure Tier 3 are green. Continue with INBOX-37's
   pre-authorized exact typed `llvm.ctlz.i64` successor. Evidence
-  `docs/evidence/std_debug_hello_cttz_i32_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox37_cttz_i32.md`.
+  `docs/evidence/std_debug_hello_cttz_i32_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox37_cttz_i32.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-37 pre-authorized successor) Item 12 typed
   leading-zero capability: exact `llvm.ctlz.i64` now reuses the existing
@@ -3783,7 +3783,7 @@ One line per completed cycle, append-only, newest last. This is the
   report-all remains 443 selected / 235 emitting / 208 failing. Tier 2 is
   green and Tier 3 is not triggered. The INBOX-37 pipeline is exhausted;
   `llvm.cttz.i64` requires its own directive. Evidence
-  `docs/evidence/std_debug_hello_ctlz_i64_acceptance.md`.
+  `docs/evidence/std_debug_hello_ctlz_i64_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-38 Part 1) Item 12 narrow binary and CFG
   correctness capability: exact scalar i7 binary operations now cover the
@@ -3798,8 +3798,8 @@ One line per completed cycle, append-only, newest last. This is the
   pre-authorized scalar `fptosi`-to-i32 successor, selected over signed i32
   divide-by-two because `exp` and `expf` share the exact existing SSE-shaped
   conversion frontier. Evidence
-  `docs/evidence/std_debug_hello_i7_binary_phi_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox38_i7_phi.md`.
+  `docs/evidence/std_debug_hello_i7_binary_phi_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox38_i7_phi.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-38 pre-authorized successor) Item 12 scalar
   conversion capability: exact `fptosi float|double -> i32` now preserves live
@@ -3811,7 +3811,7 @@ One line per completed cycle, append-only, newest last. This is the
   collateral report changes, so report-all remains 443 / 236 / 207. Tier 2 is
   green and Tier 3 is not triggered. The INBOX-38 pipeline is exhausted; stop
   for the next scalar-tranche directive. Evidence
-  `docs/evidence/std_debug_hello_fptosi_i32_acceptance.md`.
+  `docs/evidence/std_debug_hello_fptosi_i32_acceptance.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-39 Part 1) Item 12 exact signed division and
   CFG correctness: `sdiv i32 %named, 2` now implements truncation toward zero
@@ -3825,8 +3825,8 @@ One line per completed cycle, append-only, newest last. This is the
   from 443 / 236 / 207 to 443 / 238 / 205. Tier 2 and the single row-closure
   and shared-CFG Tier 3 are green. Continue with INBOX-39's pre-authorized
   half-to-double `fpext` composition successor targeting `__fmah`. Evidence
-  `docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox39_sdiv2.md`.
+  `docs/evidence/std_debug_hello_sdiv_i32_by_two_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox39_sdiv2.summary.md`.
 
 - 2026-07-13 (this commit, INBOX-39 pre-authorized successor) Item 12 scalar
   FP composition: exact `fpext half -> double` now calls the proven
@@ -3840,8 +3840,8 @@ One line per completed cycle, append-only, newest last. This is the
   443 / 238 / 205 to 443 / 239 / 204. Tier 2 and the row-closure/shared-frame
   Tier 3 are green. The INBOX-39 pipeline is exhausted; stop at the refreshed
   frontier before the agreed half-fcmp tranche. Evidence
-  `docs/evidence/std_debug_hello_half_to_double_fpext_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox39_half_double.md`.
+  `docs/evidence/std_debug_hello_half_to_double_fpext_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox39_half_double.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-40 Part 1) Item 12 scalar FP comparison:
   exact half `fcmp uno/olt` now widens named operands through the proven
@@ -3854,8 +3854,8 @@ One line per completed cycle, append-only, newest last. This is the
   without semantic claims; no new failure appears. Report-all advances from
   443 / 239 / 204 to 443 / 243 / 200. Tier 2 and the single row-closure/shared
   selector Tier 3 are green. Continue with INBOX-40's pre-authorized half-add
-  successor. Evidence `docs/evidence/std_debug_hello_half_fcmp_acceptance.md`
-  and `docs/evidence/distribution_all_after_inbox40_half_fcmp.md`.
+  successor. Evidence `docs/evidence/std_debug_hello_half_fcmp_acceptance.summary.md`
+  and `docs/evidence/distribution_all_after_inbox40_half_fcmp.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-40 pre-authorized successor) Item 12 scalar
   FP addition: exact half `fadd` now widens through `__extendhfsf2`, adds with
@@ -3871,8 +3871,8 @@ One line per completed cycle, append-only, newest last. This is the
   row-closure/shared-frame Tier 3 are green. The INBOX-40 pipeline is exhausted;
   stop before the lanes-canonical vector-mask bridge, which requires its own
   directive. Evidence
-  `docs/evidence/std_debug_hello_half_fadd_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox40_half_fadd.md`.
+  `docs/evidence/std_debug_hello_half_fadd_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox40_half_fadd.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-41) Item 12 canonical vector-mask bridge:
   the existing XMM vector location now records canonical two-lane masks with
@@ -3888,8 +3888,8 @@ One line per completed cycle, append-only, newest last. This is the
   197 to 443 / 247 / 196 with no collateral changes. Tier 2 and the single
   shared-shape Tier 3 are green. Stop for the aggregate-ABI architectural
   review; vector selects remain unauthorized. Evidence
-  `docs/evidence/std_debug_hello_vector_mask_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox41_mask.md`.
+  `docs/evidence/std_debug_hello_vector_mask_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox41_mask.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-42 slice 1) Item 12 exact SSE aggregate
   returns: the authoritative SysV classifier now admits only
@@ -3904,8 +3904,8 @@ One line per completed cycle, append-only, newest last. This is the
   complex rows to aggregate allocas. Tier 2 and the single shared-ABI/verifier
   Tier 3 are green. Continue with the pre-authorized aggregate stack-object
   successor, then stop; no third cycle is authorized. Evidence
-  `docs/evidence/std_debug_hello_aggregate_sse_returns_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox42_aggregate_sse_returns.md`.
+  `docs/evidence/std_debug_hello_aggregate_sse_returns_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox42_aggregate_sse_returns.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-42 pre-authorized successor) Item 12 exact f32
   aggregate stack objects: a shared typed decoder admits only one 8-byte,
@@ -3921,8 +3921,8 @@ One line per completed cycle, append-only, newest last. This is the
   `__mulsc3` to `<4 x float>` construction. Tier 2 and the shared-frame Tier 3
   are green. The INBOX-42 pipeline is exhausted; stop for review with no third
   cycle authorized. Evidence
-  `docs/evidence/std_debug_hello_aggregate_object_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox42_aggregate_object.md`.
+  `docs/evidence/std_debug_hello_aggregate_object_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox42_aggregate_object.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-43 Part 1) Item 12 scalar FP intrinsic
   capability: exact `llvm.maxnum.f32/f64` now distinguishes either NaN before
@@ -3934,7 +3934,7 @@ One line per completed cycle, append-only, newest last. This is the
   `__divdc3` advances to its vector-PHI destination and `__divsc3` to scalar
   `llvm.copysign.f32`. Tier 2 is green. Continue with INBOX-43's pre-authorized
   complete `<4 x float>` successor, which carries the single Tier 3 trigger.
-  Evidence `docs/evidence/std_debug_hello_scalar_maxnum_acceptance.md`.
+  Evidence `docs/evidence/std_debug_hello_scalar_maxnum_acceptance.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-43 pre-authorized successor) Item 12 complete
   bounded f32x4 slice: four-bit static lane definedness, the exact captured
@@ -3950,8 +3950,8 @@ One line per completed cycle, append-only, newest last. This is the
   443 / 247 / 196 to 443 / 248 / 195. Tier 2 and the single shared-shape Tier 3
   are green. The INBOX-43 pipeline is exhausted; stop for periodic review with
   no successor authorized. Evidence
-  `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox43_f32x4.md`.
+  `docs/evidence/std_debug_hello_f32x4_mulsc3_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox43_f32x4.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-44) Item 12 read-only frontier ranking: the
   ten `icmp-form` rows separate into narrow i6/i7 unsigned-immediate,
@@ -3978,8 +3978,8 @@ One line per completed cycle, append-only, newest last. This is the
   tests; the mandatory P0 Tier 3 is green across all 17 subgates. No row closure
   is claimed. Resume and revalidate the preserved INBOX-45 comparison cycle
   against this repaired baseline. Evidence
-  `docs/evidence/std_debug_hello_accumulator_alias_p0_repair.md` and
-  `docs/evidence/distribution_all_after_inbox45_accumulator_alias_p0.md`.
+  `docs/evidence/std_debug_hello_accumulator_alias_p0_repair.summary.md` and
+  `docs/evidence/distribution_all_after_inbox45_accumulator_alias_p0.summary.md`.
 
 - 2026-07-14 (this commit, fix-forward after `0717acf7`) Item 12 accepted-row
   audit: a structured IR/liveness scan conservatively found 15 functions that
@@ -4003,7 +4003,7 @@ One line per completed cycle, append-only, newest last. This is the
   rows all advance to exact `llvm.cttz.i64`, authorizing INBOX-45 Part 2. No
   Tier 3 ran; the two closures remain provisional until the cumulative
   pipeline gate. Evidence
-  `docs/evidence/std_debug_hello_inbox45_narrow_icmp.md`.
+  `docs/evidence/std_debug_hello_inbox45_narrow_icmp.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-45 Part 2) Item 12 exact i64
   count-trailing-zeros: the composed selector now admits only
@@ -4015,7 +4015,7 @@ One line per completed cycle, append-only, newest last. This is the
   collateral emissions. Tier 2 is green at 24/24 steps and 977/977 tests. No
   Tier 3 ran; all eight INBOX-45 closures remain provisional pending the one
   cumulative pipeline gate. Evidence
-  `docs/evidence/std_debug_hello_inbox45_cttz_i64.md`.
+  `docs/evidence/std_debug_hello_inbox45_cttz_i64.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-45 cumulative acceptance) Item 12 pipeline A
   close: the single required Tier 3 passes all 17 subgates against committed
@@ -4027,7 +4027,7 @@ One line per completed cycle, append-only, newest last. This is the
   boundaries remain 100/100 each. Total reported duration is 2,268,761 ms,
   3.4% below the prior INBOX-43 run with no material runtime regression.
   Evidence
-  `docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.md`.
+  `docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-46 Part 1) Item 12 exact named i16
   comparisons: non-`samesign` `slt`, `sgt`, and `ne` now sign-normalize both
@@ -4038,7 +4038,7 @@ One line per completed cycle, append-only, newest last. This is the
   emissions. Tier 2 is green at 24/24 steps and 980/980 tests. No Tier 3 ran;
   both closures remain provisional pending the single cumulative INBOX-46
   gate after the pre-authorized i128 pair-comparison successor. Evidence
-  `docs/evidence/std_debug_hello_inbox46_named_i16.md`.
+  `docs/evidence/std_debug_hello_inbox46_named_i16.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-46 Part 2) Item 12 exact i128 pair
   comparisons: `llvm.ucmp.i32.i128` and `llvm.scmp.i32.i128` now compare the
@@ -4050,7 +4050,7 @@ One line per completed cycle, append-only, newest last. This is the
   2 is green at 24/24 steps and 983/983 tests. No Tier 3 ran; all four
   INBOX-46 closures remain provisional pending the single cumulative pipeline
   gate. Evidence
-  `docs/evidence/std_debug_hello_inbox46_i128_compare.md`.
+  `docs/evidence/std_debug_hello_inbox46_i128_compare.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-46 cumulative acceptance) Item 12 pipeline B
   close: the single required Tier 3 passes all 17 subgates against committed
@@ -4061,7 +4061,7 @@ One line per completed cycle, append-only, newest last. This is the
   integrated executables remain 6/6, and release-source object/link/probe
   boundaries remain 100/100 each. Total reported duration is 2,268,358 ms,
   effectively unchanged from INBOX-45. Evidence
-  `docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.md`.
+  `docs/evidence/distribution_all_after_inbox46_named_i16_i128_compare.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-47 Part 1) Item 12 bounded f32x2 vector
   capability: exact canonical-mask select and `llvm.copysign.v2f32` now reuse
@@ -4076,7 +4076,7 @@ One line per completed cycle, append-only, newest last. This is the
   green at 24/24 steps and 986/986 tests. No Tier 3 ran; continue with the
   pre-authorized f64x2 parity successor, then accept the pipeline with its one
   cumulative gate. Evidence
-  `docs/evidence/std_debug_hello_inbox47_f32x2_select_copysign.md`.
+  `docs/evidence/std_debug_hello_inbox47_f32x2_select_copysign.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-47 Part 2) Item 12 f64x2 parity capability:
   packed canonical-mask select, fabs, and copysign now share shape-driven
@@ -4091,7 +4091,7 @@ One line per completed cycle, append-only, newest last. This is the
   `stage2-phi-dst` boundary. Tier 2 is green at 24/24 steps and 988/988 tests.
   No Tier 3 ran; commit this slice, then run the single cumulative INBOX-47
   gate and stop for the f64x2 PHI review. Evidence
-  `docs/evidence/std_debug_hello_inbox47_f64x2_parity.md`.
+  `docs/evidence/std_debug_hello_inbox47_f64x2_parity.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-47 cumulative acceptance) Item 12 vector
   pipeline close: the single required Tier 3 passes all 17 subgates against
@@ -4104,7 +4104,7 @@ One line per completed cycle, append-only, newest last. This is the
   each. Total reported duration is 2,274,150 ms, effectively unchanged from
   INBOX-46. Stop for the separately reviewed f64x2 PHI architecture; no
   implementation successor is authorized. Evidence
-  `docs/evidence/distribution_all_after_inbox47_vector_pipeline.md`.
+  `docs/evidence/distribution_all_after_inbox47_vector_pipeline.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-48) Item 12 bounded f64x2 PHI capability:
   stage2 now assigns fully defined `<2 x double>` PHI destinations to the
@@ -4120,7 +4120,7 @@ One line per completed cycle, append-only, newest last. This is the
   and pinned-row proof therefore do not occur, and no closure is claimed.
   Run the required shared-CFG Tier 3 against this committed tree, then stop on
   the unexpected later frontier before the pre-authorized successor. Evidence
-  `docs/evidence/std_debug_hello_inbox48_f64x2_phi.md`.
+  `docs/evidence/std_debug_hello_inbox48_f64x2_phi.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-48 acceptance) Item 12 f64x2 PHI close:
   the single required Tier 3 passes all 17 subgates against committed tree
@@ -4132,7 +4132,7 @@ One line per completed cycle, append-only, newest last. This is the
   `__divdc3` remains unaccepted at its later `<2 x i64>` extraction frontier.
   Total reported duration is 2,283,788 ms, effectively unchanged from
   INBOX-47. Continue with the pre-authorized bit-permutation leaves pipeline.
-  Evidence `docs/evidence/distribution_all_after_inbox48_f64x2_phi.md`.
+  Evidence `docs/evidence/distribution_all_after_inbox48_f64x2_phi.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-48 successor) Item 12 exact bit-permutation
   leaves: exact typed `llvm.bswap.i128`, `llvm.bitreverse.i64`, and
@@ -4146,7 +4146,7 @@ One line per completed cycle, append-only, newest last. This is the
   collateral emission or new failure. Tier 2 passes 24/24 steps and 995/995
   tests. Commit the slice, then run one cumulative Tier 3 to accept the three
   closures. Evidence
-  `docs/evidence/std_debug_hello_inbox48_bit_permutation.md`.
+  `docs/evidence/std_debug_hello_inbox48_bit_permutation.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-48 successor acceptance) Item 12
   bit-permutation pipeline close: the single cumulative Tier 3 passes all 17
@@ -4158,7 +4158,7 @@ One line per completed cycle, append-only, newest last. This is the
   integrated executables remain 6/6, and release-source object/link/probe
   boundaries remain 100/100 each. Total reported duration is 2,281,518 ms,
   effectively unchanged from the INBOX-48 PHI gate. Evidence
-  `docs/evidence/distribution_all_after_inbox48_bit_permutation.md`.
+  `docs/evidence/distribution_all_after_inbox48_bit_permutation.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-49 Part 1) Item 12 exact i64x2 extraction:
   constant lanes 0 and 1 from fully defined `<2 x i64>` values now reuse the
@@ -4172,7 +4172,7 @@ One line per completed cycle, append-only, newest last. This is the
   finite-over-infinite cases through the five-edge return join. Tier 2 passes
   24/24 steps and 997/997 tests. No Tier 3 ran; continue with INBOX-49 Part 2
   and accept the complete pipeline with one cumulative gate. Evidence
-  `docs/evidence/std_debug_hello_inbox49_i64x2_extract.md`.
+  `docs/evidence/std_debug_hello_inbox49_i64x2_extract.summary.md`.
 
 - 2026-07-14 (this commit, self-declared P0 during INBOX-49 Part 2) Item 12
   baseline-safe population count: the required audit confirmed that accepted
@@ -4187,8 +4187,8 @@ One line per completed cycle, append-only, newest last. This is the
   subgates against staged tree `a938272b6c22a4cb07393de498cfc0d53223f498`.
   No closure or report movement is claimed. Commit the repair standalone,
   then resume the preserved INBOX-49 Part 2 capability. Evidence
-  `docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.md` and
-  `docs/evidence/distribution_all_after_inbox49_popcount_p0.md`.
+  `docs/evidence/std_debug_hello_inbox49_popcount_baseline_p0.summary.md` and
+  `docs/evidence/distribution_all_after_inbox49_popcount_p0.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-49 Part 2) Item 12 exact range-attributed
   population count: a shared typed decoder admits only `range(i64 0, 65)` for
@@ -4202,7 +4202,7 @@ One line per completed cycle, append-only, newest last. This is the
   and `__popcountti2` with no collateral change. Tier 2 passes 24/24 steps and
   1004/1004 tests. Commit this slice, then run the cumulative INBOX-49 Tier 3
   to accept these rows together with Part 1's `__divdc3`. Evidence
-  `docs/evidence/std_debug_hello_inbox49_popcount.md`.
+  `docs/evidence/std_debug_hello_inbox49_popcount.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-49 cumulative acceptance) Item 12 pipeline
   close: the one cumulative Tier 3 passes all 17 subgates against committed
@@ -4214,7 +4214,7 @@ One line per completed cycle, append-only, newest last. This is the
   collateral emission or new failure. The standalone baseline-safe popcount
   P0 is also accepted independently at `76831275`. Stop for periodic review;
   no successor capability is authorized. Evidence
-  `docs/evidence/distribution_all_after_inbox49_pipeline.md`.
+  `docs/evidence/distribution_all_after_inbox49_pipeline.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-50 Part 1) Item 12 preservation-frame
   false-rejection repair: stage-two planning now records selection-time
@@ -4233,8 +4233,8 @@ One line per completed cycle, append-only, newest last. This is the
   against staged implementation tree
   `0ec31119087ee5b2ca33e104582ae6e95742432e`, accepting the repair and three
   closures. Continue with the separately gated comparison-RHS pipeline.
-  Evidence `docs/evidence/std_debug_hello_inbox50_frame_repair.md` and
-  `docs/evidence/distribution_all_after_inbox50_frame_repair.md`.
+  Evidence `docs/evidence/std_debug_hello_inbox50_frame_repair.summary.md` and
+  `docs/evidence/distribution_all_after_inbox50_frame_repair.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-50 comparison cycle 1) Item 12 exact i16
   unsigned negative-literal comparison: LLVM constants in the signed-i16 to
@@ -4246,7 +4246,7 @@ One line per completed cycle, append-only, newest last. This is the
   to `composed-block-icmp-form`, so neither expected closure is claimed.
   Continue with the pre-authorized named i64 `ult` cycle and hold any closures
   for the comparison pipeline's cumulative Tier 3. Evidence
-  `docs/evidence/std_debug_hello_inbox50_i16_negative_literal.md`.
+  `docs/evidence/std_debug_hello_inbox50_i16_negative_literal.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-50 comparison cycle 2) Item 12 exact named
   i64 unsigned less-than: plain named operands now reuse the existing two-
@@ -4260,7 +4260,7 @@ One line per completed cycle, append-only, newest last. This is the
   passes 24/24 steps and 1010/1010 tests. Commit, then run the comparison
   pipeline's one cumulative Tier 3; only these two closures are pending
   acceptance. Evidence
-  `docs/evidence/std_debug_hello_inbox50_named_i64_ult.md`.
+  `docs/evidence/std_debug_hello_inbox50_named_i64_ult.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-50 comparison acceptance) Item 12 pipeline
   close: the one cumulative Tier 3 passes all 17 subgates against committed
@@ -4272,7 +4272,7 @@ One line per completed cycle, append-only, newest last. This is the
   strict real rows remain 100/100/100, and release-source object/link/probe
   boundaries remain 100/100 each. Stop for review; no third pipeline is
   authorized. Evidence
-  `docs/evidence/distribution_all_after_inbox50_comparison.md`.
+  `docs/evidence/distribution_all_after_inbox50_comparison.summary.md`.
 
 - 2026-07-14 (this commit, self-declared P0 during INBOX-51) Item 12 scalar
   fneg correctness: executable `__subdf3` evidence proved the composed
@@ -4289,8 +4289,8 @@ One line per completed cycle, append-only, newest last. This is the
   `30c201aed2c45bf782e548205a948193408b9310`. Actual wall time is approximately
   1,682 seconds; summed concurrent child duration is 2,380.478 seconds. Commit
   the isolated repair, then resume the preserved INBOX-51 select cycle.
-  Evidence `docs/evidence/std_debug_hello_inbox51_scalar_fneg_p0.md` and
-  `docs/evidence/distribution_all_after_inbox51_fneg_p0.md`.
+  Evidence `docs/evidence/std_debug_hello_inbox51_scalar_fneg_p0.summary.md` and
+  `docs/evidence/distribution_all_after_inbox51_fneg_p0.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-51 select-value pipeline) Item 12 exact i64
   select literals: scalar selects now materialize exact i64 immediate arms
@@ -4305,7 +4305,7 @@ One line per completed cycle, append-only, newest last. This is the
   add/sub rows already clear that later form. Full unit passes 1005/1005 and
   Tier 2 passes 24/24 steps with 1013/1013 tests. Commit, then run the one
   cumulative Tier 3 for all six closures. Evidence
-  `docs/evidence/std_debug_hello_inbox51_select_immediate.md`.
+  `docs/evidence/std_debug_hello_inbox51_select_immediate.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-51 cumulative acceptance) Item 12 pipeline
   close: the single cumulative Tier 3 passes all 17 subgates against committed
@@ -4319,7 +4319,7 @@ One line per completed cycle, append-only, newest last. This is the
   duration includes concurrent work and is not wall time. Stop for periodic
   review #13 and the switch-PHI/EI-conversion architectural discussion.
   INBOX-52 remains queued. Evidence
-  `docs/evidence/distribution_all_after_inbox51_select_pipeline.md`.
+  `docs/evidence/distribution_all_after_inbox51_select_pipeline.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-52 artifact-reuse interlude) Distribution-all
   infrastructure now produces the 100 release-source objects once in the
@@ -4332,7 +4332,7 @@ One line per completed cycle, append-only, newest last. This is the
   saving 340.781 seconds (20.30%). The separately reported summed
   child duration is 2,021.645 seconds. Stop after this bounded slice; preopt
   sharding remains a separate reviewed candidate. Evidence
-  `docs/evidence/distribution_all_inbox52_artifact_reuse.md`.
+  `docs/evidence/distribution_all_inbox52_artifact_reuse.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 phase 1) Item 12 switch-PHI/EI program
   census: the accepted 443 / 278 / 165 report and frozen captured IR account
@@ -4357,7 +4357,7 @@ One line per completed cycle, append-only, newest last. This is the
   tests. The report remains 443 / 278 / 165 with zero closures and six honest
   FP-to-i128 advances. One committed-tree Tier 3 remains required before the
   phase boundary is accepted. Evidence
-  `docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.md`.
+  `docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation phase-2 acceptance) The
   single committed-tree Tier 3 passes all 17 subgates for implementation
@@ -4367,7 +4367,7 @@ One line per completed cycle, append-only, newest last. This is the
   Actual wall time was approximately 1,328.308 seconds; summed child duration
   was 2,003.646 seconds. Phase 2 is complete. Stop for review of the frozen
   Phase 3 exact EI entry-switch-edge contract. Evidence
-  `docs/evidence/distribution_all_after_inbox53_phase2.md`.
+  `docs/evidence/distribution_all_after_inbox53_phase2.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation phase 3) Exact EI entry
   switch edges now admit only the frozen i16 `0..4` plus live-default shape
@@ -4380,7 +4380,7 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-load-ptr-width`, while two half rows reach
   `composed-int-fp-to-type`. One committed-tree Tier 3 remains required before
   the phase boundary is accepted. Evidence
-  `docs/evidence/std_debug_hello_inbox53_phase3_ei_switch_phi.md`.
+  `docs/evidence/std_debug_hello_inbox53_phase3_ei_switch_phi.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation phase-3 acceptance) The
   single committed-tree Tier 3 passes all 17 subgates for implementation
@@ -4390,7 +4390,7 @@ One line per completed cycle, append-only, newest last. This is the
   time was approximately 1,340 seconds; summed child duration was 2,002.124
   seconds. Phase 3 is complete. Stop for review of the frozen Phase 4 EI loop
   and narrow-integer-PHI contract. Evidence
-  `docs/evidence/distribution_all_after_inbox53_phase3.md`.
+  `docs/evidence/distribution_all_after_inbox53_phase3.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation phase 4 cycle 1) Direct
   readonly-parameter i64/i96/i128 loads and exact signed/unsigned
@@ -4403,7 +4403,7 @@ One line per completed cycle, append-only, newest last. This is the
   `composed-block-unknown-rhs` diagnostic. Continue with the approved Phase 4
   cycle 2; cumulative Tier 3 remains deferred to the Phase 5 family boundary.
   Evidence
-  `docs/evidence/std_debug_hello_inbox53_phase4_ei_fixed_cases.md`.
+  `docs/evidence/std_debug_hello_inbox53_phase4_ei_fixed_cases.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation narrow-return P0) The
   specialized `zig.target.intByteSize` path now normalizes its i16 ABI return
@@ -4418,8 +4418,8 @@ One line per completed cycle, append-only, newest last. This is the
   capability is excluded from this P0 commit. The immediate Tier 3 passes all
   17 subgates against staged tree
   `6a2fb4a2b42f53f198aa67835b0239c26d3ea2a0`. Evidence
-  `docs/evidence/std_debug_hello_inbox53_intbytesize_p0.md` and
-  `docs/evidence/distribution_all_after_inbox53_intbytesize_p0.md`.
+  `docs/evidence/std_debug_hello_inbox53_intbytesize_p0.summary.md` and
+  `docs/evidence/distribution_all_after_inbox53_intbytesize_p0.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation phase 4 cycle 2) The exact
   EI `(readonly ptr, i64) -> half|float|double` family now plans simple scalar
@@ -4431,7 +4431,7 @@ One line per completed cycle, append-only, newest last. This is the
   exactly to 443 / 284 / 159, provisionally closing the six EI-to-FP rows
   with no collateral movement. Run the family's one cumulative Tier 3 in
   Phase 5 before accepting the closures, then re-rank `fma`. Evidence
-  `docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.md`.
+  `docs/evidence/std_debug_hello_inbox53_phase4_ei_default_bodies.summary.md`.
 
 - 2026-07-15 (this commit, INBOX-54) The generated-index correctness recovery
   restores the semantic acceptance invalidated by the narrow-return P0 audit.
@@ -4441,8 +4441,8 @@ One line per completed cycle, append-only, newest last. This is the
   `__umodei4`, `__divei4`, `__divei5`, `__modei4`, and `__modei5`; the accepted-
   row object audit finds no additional emitted hit. Report-all remains
   443 / 284 / 159. Evidence
-  `docs/evidence/std_debug_hello_inbox54_generated_index_recovery.md` and
-  `docs/evidence/distribution_all_after_inbox54_generated_index_recovery.md`.
+  `docs/evidence/std_debug_hello_inbox54_generated_index_recovery.summary.md` and
+  `docs/evidence/distribution_all_after_inbox54_generated_index_recovery.summary.md`.
 
 - 2026-07-14 (this commit, INBOX-53 continuation phase 5 acceptance) The one
   cumulative family Tier 3 passes all 17 subgates against commit `9e3f78fe` /
@@ -4452,7 +4452,7 @@ One line per completed cycle, append-only, newest last. This is the
   separate i11/i32 switches precede `ctlz.i52`, copysign, and vector forms,
   so implementation requires a bounded switch-contract review. Stop without
   fma widening or preopt sharding. Evidence
-  `docs/evidence/distribution_all_after_inbox53_phase5_ei_family.md`.
+  `docs/evidence/distribution_all_after_inbox53_phase5_ei_family.summary.md`.
 
 - 2026-07-15 (this commit, INBOX-55) The frozen `compiler_rt.fma.fma` body is
   reviewed without selector changes or gate runs. Three identical named-i11
@@ -4479,8 +4479,8 @@ One line per completed cycle, append-only, newest last. This is the
   is the sole closure, moving report-all from 443 / 284 / 159 to
   443 / 285 / 158; `fmal`, `fmaq`, and `__fixdfei` remain unchanged. All 17
   Tier-3 subgates pass. Stop for review; preopt sharding was not started.
-  Evidence `docs/evidence/std_debug_hello_inbox56_fma_acceptance.md` and
-  `docs/evidence/distribution_all_after_inbox56_fma_acceptance.md`.
+  Evidence `docs/evidence/std_debug_hello_inbox56_fma_acceptance.summary.md` and
+  `docs/evidence/distribution_all_after_inbox56_fma_acceptance.summary.md`.
 
 - 2026-07-15 (this commit, INBOX-59) The non-destructive retention checkpoint
   inventories the per-INBOX/per-run tmp population, the healthy three-mode
@@ -4493,7 +4493,7 @@ One line per completed cycle, append-only, newest last. This is the
   No cleanup or gate ran. Evidence
   `docs/evidence/inbox59_cache_inventory.md`,
   `docs/evidence/inbox59_would_remove.tsv`, and
-  `docs/evidence/inbox59_report_only_fixture.md`.
+  `docs/evidence/inbox59_report_only_fixture.summary.md`.
 
 - 2026-11-05 (arithmetic/hash slice, `9a8cc1c9`) Accepted accumulator-address
   stores, narrow integer normalization, constant pairs, bounded i128 arithmetic,

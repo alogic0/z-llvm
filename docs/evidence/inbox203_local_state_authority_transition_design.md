@@ -187,9 +187,9 @@ The following tracked files contain old-authority, old-v3-root, or transition
 references but are immutable evidence/design, not active runtime consumers:
 
 ```text
-docs/evidence/inbox193c_o2_artifact_store_dormant.md
-docs/evidence/inbox194d_o2_artifact_store_cli_dormant.md
-docs/evidence/inbox195c_o2_calls_real_store_verification.md
+docs/evidence/inbox193c_o2_artifact_store_dormant.summary.md
+docs/evidence/inbox194d_o2_artifact_store_cli_dormant.summary.md
+docs/evidence/inbox195c_o2_calls_real_store_verification.summary.md
 docs/evidence/inbox197_v3_artifact_cli_surface_design.md
 docs/evidence/inbox198_v3_operational_root_and_test_seam_design.md
 docs/evidence/inbox199_local_state_boundary.md

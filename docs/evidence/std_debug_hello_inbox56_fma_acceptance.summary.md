@@ -1,0 +1,115 @@
+# INBOX-56 Compiler-RT Fma Acceptance
+
+schema_version: 1
+directive: `INBOX-56`
+target: `x86_64-linux-gnu`
+status: tier-2-pass, native-pass, tier-3-accepted
+baseline: `21aaf111`, 443 selected / 284 emitting / 159 failing
+accepted: 443 selected / 285 emitting / 158 failing
+
+## One Provisional Pipeline
+
+The two contract phases were implemented and accepted as one provisional
+pipeline. Phase 1 did not run a separate Tier 3. Its gate was the strengthened
+Tier 2 over the complete accepted captured-row cohort, the real-program
+boundary, executable switch/PHI paths, and structural negatives. The observed
+inter-phase frontier was exactly the first i52 zero comparison; report counts
+remained 443 / 284 / 159 and `compiler_rt.fixdfei.__fixdfei` remained at
+`composed-block-cast-from-not-int`.
+
+Phase 1 admits only the exact named-i11 `{0,-1,default}` frexp switch whose
+`-1` edge directly reaches exactly two full-defined i32/i64 PHIs with the same
+four predecessors. The switch predecessor contributes i32 zero and a named
+i64 value. That edge is routed through an owned stub after stabilizing sources,
+then uses the existing `emitPhiEdgeMoves` authority. Focused execution covers
+default, zero, subnormal, and all-ones paths and observes a scalar spill while
+the named i64 source remains live. Negatives include wrong width/cases, wrong
+PHI type/count, poison, and a second PHI-bearing target.
+
+Phase 2 represents i52 as a normalized low-52-bit value in the existing 64-bit
+GPR/spill class. It admits only the contracted casts, equality with zero,
+`ctlz.i52(true)` with exact `range(i52 0, 53)`, the proven shift-count chain,
+and plain i6 unsigned comparison against modulo pattern 51. No odd-width
+register or memory class was added. The executable sequence covers zero only
+through the guard, all 52 single-bit positions, dense and upper-garbage rows,
+ctlz counts 50 and 51, and physical shift counts 51 and 52. Count 52 remains
+LLVM poison in `shl i52`; it is tested only on the unselected false-select
+side and is not claimed to be in range. False/nonliteral ctlz flags, altered
+range/ABI attributes, unrelated odd widths, arbitrary i52 arithmetic, signed
+comparison, unproven shifts, i52 memory, and i52 parameters/returns fail
+closed.
+
+## Exact Native Fma Proof
+
+`test/zig/integrated/compiler_rt_fma.ll` is the debug-stripped frozen
+`compiler_rt.fma.fma` body. z_llvm emits that symbol with the generic CFG
+selector. `test/zig/integrated/compiler_rt_fma_helpers.ll` contains the exact
+frozen `math.ldexp.ldexp__anon_5959` and
+`compiler_rt.fma.add_and_denorm` bodies plus ABI-safe proof wrappers; pinned
+stage4 Zig emits the helper object. This split allows the executable to run the
+frozen internal bodies without substituting libc or another fma routine.
+
+Before link, object inspection requires the emitted fma definition, both exact
+helper definitions, and both proof wrappers. The fma object may have exactly
+the two frozen internal-helper references and no others; the helper object may
+have no undefined symbols. Relocations to `compiler_rt.fma.fma` are rejected.
+The start and final executable are built with `-fno-compiler-rt`, and no host
+libc fma symbol or recursive fma libcall is present.
+
+The native executable checks 25 precomputed exact-bit fma results plus four
+direct helper results. Rows cover ordinary finite arithmetic, fused
+cancellation, ties rounding down and up, inexact fused products, normal and
+subnormal x/y/z populations, both post-frexp scaling branches, normal/
+subnormal boundaries, underflow to zero and minimum subnormal, overflow to
+maximum finite and infinity, both signed zeros, infinities, and signed quiet/
+signaling NaN payload behavior. The direct helper rows execute normal and
+subnormal `ldexp` results plus positive and negative `add_and_denorm` results.
+
+The executable proof exposed one pre-existing shared literal-decoding defect:
+LLVM short raw-hex `double 0x10000000000000` is the minimum-normal bit pattern,
+but the parser had treated it as the numeric integer 2^52. The repair accepts
+1-16 raw hex digits as LLVM bit patterns; focused tests cover the minimum-
+normal spelling, one-bit spelling, and the existing full-width splitter
+constant. With the repair, every z_llvm fma result matches the frozen LLVM
+reference exactly.
+
+## Report And Validation
+
+The refreshed frozen report is exactly:
+
+```text
+summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=443 emitted_functions=285 failed_functions=158 local_fail=1
+```
+
+`compiler_rt.fma.fma` is the sole closure. `compiler_rt.fma.fmal` remains at
+the long-double ABI boundary, `compiler_rt.fma.fmaq` remains at its unsupported
+return type, and `compiler_rt.fixdfei.__fixdfei` remains at
+`composed-block-cast-from-not-int`.
+
+Focused and strengthened Tier 2:
+
+```text
+frexp switch tests: pass
+i52 tests: pass
+LLVM short raw-hex tests: pass
+distribution-zig-integrated-exe ReleaseFast: pass, including compiler_rt_fma
+complete strengthened Tier 2: 28/28 steps, 1032/1032 tests
+```
+
+The directive's one cumulative Tier 3 passed all 17 subgates and is recorded
+separately in
+`docs/evidence/distribution_all_after_inbox56_fma_acceptance.summary.md`.
+
+Artifacts:
+
+- report `tmp/inbox56_fma_report.log`, sha256
+  `e407320e4e95328b3b058504471d814528df1b15f75c222719b8207c8d7f6689`;
+- frozen fma fixture, sha256
+  `5c2b4d16ed8129bfc82ce06cb5d023c16c614f04adb4d1a352b28172fe249122`;
+- frozen helper fixture, sha256
+  `d7da6921d9831512e8967496fadbea7d2942de676d451887a9d677e8f358d1c4`;
+- exact-bit start harness, sha256
+  `74377fe7571bf41f5447845e5f60974e1b2228a8c0778faea189d509cb09758c`.
+
+INBOX-56 is acknowledged. Stop after fma acceptance and request review;
+preopt sharding was not started.

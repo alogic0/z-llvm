@@ -111,7 +111,7 @@ before scaling the loop.
     the first failing real row), not only family/checklist state.
 - **Evidence durability.** Checklist proof currently lives in untracked
   `tmp/*.log` files. Add a small tool (`tools/summarize_gate_log.zig`) that
-  writes a tracked `docs/evidence/<topic>.md` file, and change the doc
+  writes a tracked `docs/evidence/<topic>.summary.md` file, and change the doc
   rule: a checklist item is closed by a tracked summary, with the full log
   path recorded as a pointer only. Backfill summaries for the currently
   cited logs that still exist in `tmp/`.

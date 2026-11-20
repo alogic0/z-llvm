@@ -1,0 +1,59 @@
+# Signed-Greater I64 Immediate Acceptance
+
+schema_version: 1
+directive: `INBOX-32` pre-authorized successor
+target: `x86_64-linux-gnu`
+validation_tier: 3
+result: pass
+
+The composed selector now admits plain scalar `icmp sgt i64 %value,
+<immediate>` through the existing 64-bit scratch materialization,
+`cmp_arg64_imm64`, and `setg` forms. `samesign`, named right-hand operands,
+other widths, and other predicates do not enter the new path.
+
+Focused structural coverage proves the exact `rcx` compare stream for the
+captured `-1` threshold and keeps a `samesign` near miss fail-closed. Permanent
+executable coverage checks signed minimum, -2, -1, zero, and signed maximum,
+including both sides of the threshold.
+
+The directed captured row `compiler_rt.exp2.exp2` now emits. Its exact native
+module contains the z_llvm-emitted row body and 4096-byte table, with the
+existing `R_X86_64_PC32` table relocation and an `R_X86_64_PLT32` call to
+`math.ldexp.ldexp__anon_5959`. The captured helper body remains unsupported and
+is not claimed by this cycle. Native acceptance resolves that dependency with
+a separate ReleaseFast object compiled from the pinned Zig `std.math.ldexp`
+implementation.
+
+Twenty precomputed-bit calls pass over both zero signs, subnormals,
+underflow/overflow boundaries, ordinary finite values, infinities, and quiet
+and signaling NaNs. Expected bits come from the pinned compiler-rt `exp2`
+source, not host libm.
+
+Fresh report-all advances from 443 selected / 221 emitting / 222 failing to
+443 selected / 226 emitting / 217 failing. In addition to the directed
+`exp2` closure, these four emissions are collateral and carry no separate
+semantic claim:
+
+- `compiler_rt.fixdfsi.__fixdfsi`;
+- `compiler_rt.floor_ceil.ceil`;
+- `compiler_rt.floor_ceil.floor`;
+- `compiler_rt.round.round`.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=226 failed_functions=217 local_fail=1
+focused tests: unit=921/921 sgt_i64_boundary_calls=5/5 fail_closed_near_misses=1/1 native_exp2_calls=20/20
+tier2: pass; steps=24/24 tests=929/929 structural=8/8 assembly/encoding/object inspection=pass integrated_executable=5/5
+```
+
+Logs and artifacts:
+
+- `tmp/inbox32_sgt_i64_report.log`, sha256 `145c46ab743fab92ace8d78dfa3e7d1e626432b66fa29b4166f8cd6e31e9e30b`;
+- `tmp/inbox32_sgt_i64_tier2.log`, sha256 `3957fbc6a3ce7a59a9c1d41fd7288d4e11032f66e86d1d63539a834e7b70f0df`;
+- `tmp/inbox32_exp2_reference.log`, sha256 `312c3ce133e99da7aec25fe595b7ae16c1da24b28aadb40258d8b0448a6373fe`;
+- `tmp/inbox32_exp2_row.ll`, sha256 `2fe96849716f9496ba3a05e227560f53c142b40cd781e42b221801ad9eb0cc58`;
+- `tmp/inbox32_exp2_row.o`, sha256 `6c746c9becfff75da1878f147be2229dd01e3b802b28295b3a7cd1d271a37c5e`;
+- `tmp/inbox32_exp2_ldexp_helper.o`, sha256 `77ac491f8617df1b4aa75440586a659f190796d1480783d6e61bffa109baa39e`;
+- `tmp/inbox32_exp2_row_acceptance`, sha256 `f1f9bec95974b1378ba6b0807a6bdefe64bc3c22c132b12ccb9a7301aa41c953`.
+
+Tier 3 acceptance is recorded separately in
+`docs/evidence/distribution_all_after_inbox32_sgt_i64_immediate.summary.md`.

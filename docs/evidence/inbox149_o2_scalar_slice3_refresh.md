@@ -74,7 +74,7 @@ and cohort input used below.
 | `docs/evidence/inbox130_o2_scalar_enumeration.md` | 349 | `0929a1451cf349aa16625c617e6fd72ec53a8921add4704efe2e758a7ed6ee89` | old 153-based proposal being corrected |
 | `docs/evidence/inbox140_o2_immediate_family_partition.md` | 334 | `36b10d32ef9e32165c454a3da4a7819c724f91d3e8ad9ea1f0f6aa7a24a89cf7` | R03/R04 occurrence and canary counts |
 | `docs/evidence/inbox142_o2_family_isolation_matrix.md` | 332 | `56423ad43e8b0232a45d293a44d1a7fe705bd62606f0d7cd8d69a587f6ccccba` | R03/R04 first-divergence evidence and matrix discipline |
-| `docs/evidence/inbox143_o2_final_narrowed_wiring.md` | 221 | `a2114ff94f352795b2fb41202810cf1f3208536b3d37968942988232bbc3ca8c` | accepted ratchet 154 and residual dispatch |
+| `docs/evidence/inbox143_o2_final_narrowed_wiring.summary.md` | 221 | `a2114ff94f352795b2fb41202810cf1f3208536b3d37968942988232bbc3ca8c` | accepted ratchet 154 and residual dispatch |
 | `tmp/inbox63_accepted_cohort.ll` | 103,185 | `d8da86cae494d7d4a58053ab24b1e8be944859263072b85ffa164880b0110cd4` | complete cohort IR |
 
 The accepted-row appendix's last column is the exact comma-separated

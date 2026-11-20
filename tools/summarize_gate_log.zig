@@ -2,13 +2,13 @@ const std = @import("std");
 const common = @import("tool_common.zig");
 
 const usage =
-    \\usage: zig run tools/summarize_gate_log.zig -- --log=PATH --out=docs/evidence/TOPIC.md --command='COMMAND' [options]
+    \\usage: zig run tools/summarize_gate_log.zig -- --log=PATH --out=docs/evidence/TOPIC.summary.md --command='COMMAND' [options]
     \\
     \\Reads a saved gate log and writes a Markdown evidence report.
     \\
     \\Required:
     \\  --log=PATH                 Saved gate log to summarize.
-    \\  --out=PATH                 Markdown report under docs/evidence/ with a .md suffix.
+    \\  --out=PATH                 Markdown report under docs/evidence/ with a .summary.md suffix.
     \\  --command=COMMAND          Exact command that produced the log.
     \\
     \\Options:
@@ -50,9 +50,9 @@ pub fn main(init: std.process.Init) !void {
     const options = try parseArgs(allocator, io, init);
 
     if (!std.mem.startsWith(u8, options.out_path, "docs/evidence/") or
-        !std.mem.endsWith(u8, options.out_path, ".md"))
+        !std.mem.endsWith(u8, options.out_path, ".summary.md"))
     {
-        try common.validationError(io, "--out must be a docs/evidence/*.md path: {s}\n", .{options.out_path});
+        try common.validationError(io, "--out must be a docs/evidence/*.summary.md path: {s}\n", .{options.out_path});
     }
 
     const log = try std.Io.Dir.cwd().readFileAlloc(io, options.log_path, allocator, .limited(128 * 1024 * 1024));

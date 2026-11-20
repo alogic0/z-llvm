@@ -1,0 +1,48 @@
+# Mul64 RAX RHS Repair
+
+schema_version: 1
+directive: `INBOX-33`
+target: `x86_64-linux-gnu`
+validation_tier: 3
+result: pass
+
+This false-rejection repair completes `lowerMul64`'s existing operand-location
+matrix by admitting an i64 RHS already resident in RAX. The destination remains
+an independently selected 64-bit GPR and uses the established
+`imul_arg64_rax` machine form; no instruction, register class, allocator rule,
+or type surface changes.
+
+The regression constructs the formerly rejected location state, checks that
+the RHS remains bound to RAX after the non-destructive two-operand multiply,
+and executes two exact products. An EAX-resident RHS for an i64 multiply still
+fails closed at `composed-block-mul64-rhs`.
+
+The directed captured row `compiler_rt.sqrt.sqrtf` now emits and passes 18
+precomputed-bit native calls over both zero signs, subnormals, normal values,
+finite extrema, infinities, negative inputs, and quiet/signaling NaNs. The
+emitted object defines the exact row and its 256-byte lookup table, with one
+`R_X86_64_PC32` relocation and addend `-4`.
+
+Double `compiler_rt.sqrt.sqrt` advances honestly to
+`composed-block-pair-binary-op` at its first i128 multiply. Pair multiplication
+is outside this repair and remains fail-closed. Fresh report-all advances from
+443 selected / 226 emitting / 217 failing to 443 selected / 227 emitting / 216
+failing. `sqrtf` is the sole new emission; there are no collateral emissions.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=227 failed_functions=216 local_fail=1
+focused tests: unit=922/922 mul64_rax_calls=2/2 fail_closed_near_misses=1/1 native_sqrtf_calls=18/18
+tier2: pass; steps=24/24 tests=930/930 structural=8/8 assembly/encoding/object inspection=pass integrated_executable=5/5
+```
+
+Logs and artifacts:
+
+- `tmp/inbox33_mul64_rax_report.log`, sha256 `6ff822939471a33bfed8be607b62fc7c129b74cd495a60d8ad9d125be6b36a6d`;
+- `tmp/inbox33_mul64_rax_tier2.log`, sha256 `3e204d7cd636614d31c9dd05988bc945252b9ab40c6313f8a321fa868a3c2d4b`;
+- `tmp/inbox33_sqrtf_reference.log`, sha256 `0c39c6c8ada6d93a56e3bb3b0b906edcefb80b7fbe3e9088d2ab9e631a11ce10`;
+- `tmp/inbox33_sqrtf_row.ll`, sha256 `eec29bb35d7e6f4fedb89948ace4038d3d611288873e279442305f2fc50c49aa`;
+- `tmp/inbox33_sqrtf_row.o`, sha256 `5c1b7d9e073d5dd02af07be7a530476755c01e5a83d85526163af9e56448b39d`;
+- `tmp/inbox33_sqrtf_row_acceptance`, sha256 `2e7dad23dd71ac7052e37255c92b64ee15079e23fb1a1e47282635c2d3ed56e3`.
+
+Tier 3 acceptance is recorded separately in
+`docs/evidence/distribution_all_after_inbox33_mul64_rax_rhs.summary.md`.

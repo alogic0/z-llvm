@@ -4,7 +4,7 @@ Directive: `INBOX-66`
 
 Status: implementation, mandatory Tier 2, and the INBOX-66C acceptance
 continuation are complete. Acceptance criteria are satisfied and Supervisor
-acceptance is requested. See `inbox66c_acceptance_continuation.md`.
+acceptance is requested. See `inbox66c_acceptance_continuation.summary.md`.
 
 ## Population and counter decision
 

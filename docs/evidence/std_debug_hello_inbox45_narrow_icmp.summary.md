@@ -1,0 +1,80 @@
+# Narrow Samesign Unsigned Comparison Evidence
+
+schema_version: 1
+directive: `INBOX-45 Part 1`
+target: `x86_64-linux`
+validation_tier: 2
+closure_status: `accepted by cumulative pipeline Tier 3`
+result: pass
+
+The cycle baseline is `6fe92387`, including the accepted `0717acf7`
+accumulator repair and its no-invalidation audit. The accepted report baseline
+is 443 selected / 248 emitting / 195 failing. Captured compiler_rt IR md5 is
+`b0eda7a6427c3084fdf096a68696f19c`; the stage4 Zig pin is
+`bdee02bc0c7f227c0f11bc9a449df673fe803540`. The production and permanent-test
+diff has sha256
+`22eb46cc59e45b48f96cf3b5359fb94ca65b60a000c38fa32668e59668b97a02`.
+
+The composed selector now admits only `samesign ult` and `samesign ugt` with
+an i6 or i7 named left operand and an in-range integer immediate right
+operand. It masks the source to the declared width before the unsigned
+comparison, using 63 for i6 and 127 for i7. Non-samesign operations, other
+predicates, other widths, out-of-range immediates, and named right operands
+remain fail-closed.
+
+Permanent selector coverage checks all four admitted width/predicate pairs,
+seven excluded forms, and 20 executable boundary/upper-bit-normalization
+cases. Repository Tier 2 passes all 967 unit tests plus eight structural-smoke
+tests and all required selector captured-row, object, executable, and
+real-program boundary steps.
+
+Fresh report-all advances from 443 / 248 / 195 to 443 / 250 / 193. Exactly the
+two expected rows emit provisionally:
+
+- `compiler_rt.floatunsihf.__floatunsihf`;
+- `compiler_rt.floatsihf.__floatsihf`.
+
+A structured extraction containing exactly those two functions emits a
+relocation-free ELF object. A pinned-Zig `callconv(.c)` executable invokes the
+z_llvm object for 25 precomputed raw-half cases: zero, signs, mantissa rounding
+boundaries, maximum finite half boundaries, infinities, and signed/unsigned
+i32 extrema. All 25 results match exactly.
+
+The refresh also confirms the conditional INBOX-45 successor. All six
+predicted i64 conversion rows now fail at
+`no_emitter/composed-block-llvm-intrinsic`, and their captured bodies contain
+exact `llvm.cttz.i64(i64, i1 immarg)` calls:
+
+- `__floatundidf`, `__floatundisf`, and `__floatundihf`;
+- `__floatdidf`, `__floatdisf`, and `__floatdihf`.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-linux selected_functions=443 emitted_functions=250 failed_functions=193 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
+native rows: symbols=2 relocations=0 raw_half_cases=25/25
+tier2: pass; steps=24/24 tests=975/975
+```
+
+No Tier 3 ran in this capability commit. The later cumulative INBOX-45 gate
+accepted both parts; see
+`docs/evidence/distribution_all_after_inbox45_narrow_cmp_cttz_i64.summary.md`.
+
+Artifacts:
+
+- current-source z_llvm, sha256
+  `bc805f2e808387d703fa48df914fa13c9fba30248b752dc066b6b3a4103ea53b`;
+- `tmp/inbox45_narrow_cmp_report_final.log`, sha256
+  `c29550dff18b4041717bb128c507c52006a16e42e45cc8673a70744d551305b5`;
+- `tmp/inbox45_narrow_cmp_rows.ll`, sha256
+  `e3d07a40426ff2a47ad2a9c62c45e6f5b91e420b906e027aad243337614033ed`;
+- `tmp/inbox45_narrow_cmp_rows_final.o`, sha256
+  `5b91ee8ef443f61568261cbb27430c27282506422f6262e7a7aff978d2d151cf`;
+- `tmp/inbox45_narrow_cmp_start.zig`, sha256
+  `5c1c93cde53424370f7b5bdc3f75d2dd0dd22134b1efe6cdce8decf3abcf7855`;
+- `tmp/inbox45_narrow_cmp_acceptance_final`, sha256
+  `1eda53f76a881f41236e34f2f7ade4c7725f9e49d40f5177d33f5ade51ee736b`;
+- `tmp/inbox45_narrow_cmp_readelf_final.log`, sha256
+  `6fa8ffa312b644d0f52b93bfbaecda83fd52534f1044ebd2d1edabe7ce45918b`;
+- `tmp/inbox45_narrow_cmp_objdump_final.log`, sha256
+  `653946214b30fcb932e490bc3a96dc5646ef396db2107fbd77ea105bf872fc73`;
+- `tmp/inbox45_narrow_cmp_tier2_repaired.log`, sha256
+  `051a0731faf21ce2da126e238ebf980bb71a78c78128d2f45f5490d22a393802`.

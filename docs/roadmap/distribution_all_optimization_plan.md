@@ -367,8 +367,8 @@ Maintain a compact table here or in a linked evidence summary:
 
 | State | Commit | Fresh wall | Cached wall | Incremental | Cumulative | Slowest gate | Notes |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| Phase 0 baseline | this commit | 3,764.620 s | 2,289.680 s | n/a | n/a | integrated object preopt (cached: 565.374 s) | Phase 1 no-go; startup cost not proven >=10%; [evidence](../evidence/distribution_all_phase0_timing_baseline.md) |
-| Bounded real-row parallelism | `5901a3b0` + this change | not rerun | 1,751.710 s | -552.351 s / -23.97% | -537.970 s / -23.50% | integrated object preopt (588.980 s) | Three mode-specific strict real-row gates overlap; canonical 53-record comparison matches; [evidence](../evidence/distribution_all_parallel_real_rows.md) |
+| Phase 0 baseline | this commit | 3,764.620 s | 2,289.680 s | n/a | n/a | integrated object preopt (cached: 565.374 s) | Phase 1 no-go; startup cost not proven >=10%; [evidence](../evidence/distribution_all_phase0_timing_baseline.summary.md) |
+| Bounded real-row parallelism | `5901a3b0` + this change | not rerun | 1,751.710 s | -552.351 s / -23.97% | -537.970 s / -23.50% | integrated object preopt (588.980 s) | Three mode-specific strict real-row gates overlap; canonical 53-record comparison matches; [evidence](../evidence/distribution_all_parallel_real_rows.summary.md) |
 
 Record only materially changed states. Do not turn routine worker cycles into
 repeated full-suite benchmarks.
