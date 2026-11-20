@@ -64,3 +64,70 @@ jobs:
       - name: Check documentation
         if: matrix.optimize == 'Debug'
         run: zig build check-docs
+
+      - name: Package the standalone optimizer
+        if: matrix.optimize == 'ReleaseSafe' && github.event_name != 'pull_request'
+        run: tar -C zig-out -czf "$RUNNER_TEMP/z_llvm-ReleaseSafe-x86_64-linux.tar.gz" bin/z_llvm
+
+      - name: Upload the standalone optimizer
+        if: matrix.optimize == 'ReleaseSafe' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ runner.temp }}/z_llvm-ReleaseSafe-x86_64-linux.tar.gz
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+  released-sdk:
+    name: Install and smoke-test the public G2 SDK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RELEASE_URL: https://github.com/alogic0/z-llvm/releases/download/sdk-0.17.0-g2
+      MANIFEST: zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json
+      SOURCE: zig-bd0e36fa-src.tar.zst
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify the release and install the SDK
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -O "$RELEASE_URL/$MANIFEST"
+          cmp "$MANIFEST" "$GITHUB_WORKSPACE/docs/evidence/artifacts/$MANIFEST"
+          archive=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["artifacts"][0]["name"])' "$MANIFEST")
+          curl -fsSL --retry 3 -O "$RELEASE_URL/$archive"
+          curl -fsSL --retry 3 -O "$RELEASE_URL/$SOURCE"
+          python3 - "$MANIFEST" <<'PY'
+          import json, sys
+          from pathlib import Path
+          manifest = json.loads(Path(sys.argv[1]).read_text())
+          asset, = manifest["artifacts"]
+          Path("sdk.sha256").write_text(f"{asset['sha256']}  {asset['name']}\n")
+          inputs = {row["name"]: row["identity"] for row in manifest["inputs"]}
+          Path("binaries.sha256").write_text("".join(
+              f"{inputs[name + '-executable']}  bin/{name}\n" for name in ("zig", "z_llvm")
+          ))
+          Path("source-pin").write_text(inputs["zig-source"] + "\n")
+          PY
+          sha256sum -c sdk.sha256
+          printf '%s  %s\n' 922c3208d627a2216f3d0b4731f2d25405a20d6d6ac022feee1d7d862cdc2039 "$SOURCE" | sha256sum -c -
+          zstd -d "$SOURCE" -o zig-src.tar
+          git get-tar-commit-id < zig-src.tar | diff - source-pin
+          mkdir sdk
+          tar --zstd --no-same-owner --same-permissions --delay-directory-restore -xf "$archive" -C sdk
+          (cd sdk && sha256sum -c ../binaries.sha256)
+
+      - name: Compile hello with the downloaded driver and provider
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          test "$(sdk/bin/zig version)" = 0.17.0
+          sdk/bin/zig build-exe "$GITHUB_WORKSPACE/test/zig/integrated/std_debug_hello.zig" \
+            -O ReleaseFast -target x86_64-linux-gnu -mcpu=baseline -fllvm -fno-libllvm -fno-lld \
+            --zllvm-object-provider "$RUNNER_TEMP/sdk/bin/z_llvm" -femit-bin=hello
+          ./hello > stdout 2> stderr
+          test ! -s stdout
+          printf 'hello\n' | diff - stderr

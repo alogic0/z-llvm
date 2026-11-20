@@ -22,6 +22,12 @@ Repeat the build and test commands with `-Doptimize=ReleaseSafe`. CI checks
 documentation once, in the Debug job. The isolated checks use the source
 checkout and the pinned compiler. [GitHub Actions](.github/workflows/ci.yml)
 
+Successful ReleaseSafe push and manual jobs provide the standalone optimizer
+as `z_llvm-ReleaseSafe-x86_64-linux.tar.gz` for 14 days. Open the
+[CI run](https://github.com/alogic0/z-llvm/actions/workflows/ci.yml) and select its artifact.
+The full SDK has a permanent [release download](docs/install_toolchain.md#install-the-reviewed-archive).
+A separate CI job verifies the public assets and compiles and runs hello using the downloaded SDK.
+
 When upgrading Zig, update `.zigversion` and the matching archive version
 and SHA-256 in the CI workflow together.
 

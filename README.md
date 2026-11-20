@@ -7,8 +7,9 @@ compile pure Zig and its compiler runtime in **ReleaseFast for baseline
 Programs that need the system C library or startup objects still use those
 system inputs. [Architecture](docs/architecture.md)
 
-To get the full Zig driver and provider on another machine, follow the
-[installation and source-build guide](docs/install_toolchain.md).
+Download the full Zig driver, provider and SDK from the
+[G2 release](https://github.com/alogic0/z-llvm/releases/tag/sdk-0.17.0-g2).
+The [installation and source-build guide](docs/install_toolchain.md) includes checksums and a hello program.
 If you have the SDK installed, [compile a Zig program](#use-the-packaged-compiler).
 From a fresh clone, [build the standalone optimizer](#build-the-standalone-optimizer).
 
