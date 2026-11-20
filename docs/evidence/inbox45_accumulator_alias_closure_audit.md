@@ -52,9 +52,9 @@ byte-identical:
 The accepted and repair-only full reports are also byte-identical and retain
 443 selected / 248 emitting / 195 failing. Existing row-exact semantic
 evidence for the two conversion rows is
-`docs/evidence/std_debug_hello_cttz_i32_acceptance.summary`; shift evidence is
-`docs/evidence/std_debug_hello_ashlsi3_phi_acceptance.summary` and
-`docs/evidence/std_debug_hello_ashrdi3_acceptance.summary`.
+`docs/evidence/std_debug_hello_cttz_i32_acceptance.md`; shift evidence is
+`docs/evidence/std_debug_hello_ashlsi3_phi_acceptance.md` and
+`docs/evidence/std_debug_hello_ashrdi3_acceptance.md`.
 
 ## Conclusion
 

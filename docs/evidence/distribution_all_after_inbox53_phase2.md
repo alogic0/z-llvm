@@ -1,0 +1,70 @@
+# Distribution-All After INBOX-53 Phase 2
+
+schema_version: 1
+directive: `INBOX-53 continuation, phase 2 shared-CFG acceptance`
+target: `x86_64-linux-gnu`
+status: pass
+
+Committed implementation: `4fc11d68a5527ed02abcfb2fa89b125b2481bfc4`.
+Committed tree identity before and after the run:
+`2a5a2889f848521a7cb125ad1bc2390e696d68de`.
+
+Changed subsystem: x86_64 generic-CFG stage-two scalar PHI source
+materialization and shared parallel edge-copy planning.
+
+Tier-3 trigger: the phase crosses shared CFG planning and introduces
+overlap-safe scalar edge copies. The frozen Phase 2 contract requires exactly
+one Tier 3 at the phase boundary.
+
+Exact accepted command and log:
+
+```text
+zig build distribution-all --summary all > tmp/distribution_all_after_inbox53_phase2.log 2>&1
+```
+
+Prior evidence cannot be reused because it predates exact i128 PHI literal
+materialization, scalar overlap snapshots, and the permanent multiway and
+crossed-copy executable canaries. The single run passes all 17 subgates.
+
+```text
+Build Summary: 2/2 steps succeeded
+distribution-all success
+summary zig-integrated-object pipeline=postopt ir_writer=false total=146 executable_ok=146 link_only_ok=0 local_fail=0
+summary zig-integrated-object pipeline=preopt ir_writer=false total=146 executable_ok=146 link_only_ok=0 local_fail=0
+summary zig-integrated-object pipeline=preopt ir_writer=true total=146 executable_ok=146 link_only_ok=0 local_fail=0
+summary distribution-real-rows mode=ReleaseFast limit=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 local_fail=0
+summary distribution-real-rows mode=ReleaseSafe limit=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 local_fail=0
+summary distribution-real-rows mode=ReleaseSmall limit=100 real_functions_lowered=100 real_objects_emitted=100 real_native_linked=100 local_fail=0
+summary zig-integrated-exe total=6 build_ok=6 run_ok=6 stdout_ok=6 exit_ok=6 local_fail=0
+summary native-link-object-inspection inventory=release-source-owned inspected=100 elf64_rel=100 local_fail=0
+summary distribution-native-link inventory=release-source-owned total=100 executable_abi_proof_rows=100 local_fail=0
+summary native-link-probe inventory=release-source-owned accepted=100 failed=0
+summary distribution-all-gate-inventory schema_version=1 subgates=17 local_fail=0
+summary distribution-all-timing subgates=17 total_duration_ms=2003646 cache_hit_subgates=3 cache_none_subgates=14 fresh_real_rows=false local_fail=0
+ok distribution all gates
+```
+
+The report remains 443 selected / 278 emitting / 165 failing. This accepts
+the bounded scalar multiway-PHI foundation with zero closures, six honest
+FP-to-i128 advances, zero collateral emissions, and zero new failures. The
+crossed-copy defect found by the synthetic canary had no accepted-row hit in
+the frozen compiler_rt module, so no accepted closure is invalidated.
+
+The log file was created at approximately 2026-07-14 19:50:47 -0500 and
+completed at 20:12:55.308354880 -0500. Actual wall time was approximately
+1,328.308 seconds (22m08.308s). The separately reported summed child duration
+was 2,003.646 seconds and includes concurrent work; it is not wall time.
+
+Artifacts:
+
+- preface `tmp/inbox53_phase2_tier3_preface.txt`, sha256
+  `f1ec267e646ef8c88c85f5b0000d89158e6d5832a4a73d9112340d8a54191a13`;
+- accepted full log `tmp/distribution_all_after_inbox53_phase2.log`, sha256
+  `f7f4511f02d297e6302dc8369706d1398e2c708acf7259c156baefd23e997bc9`;
+- focused evidence
+  `docs/evidence/std_debug_hello_inbox53_phase2_multiway_phi.md`.
+
+INBOX-53 continuation Phase 2 is complete and accepted. Stop for review of
+the frozen Phase 3 exact EI entry-switch-edge contract. Phase 3 switch-edge
+implementation, EI loops, fma widening, and preopt sharding remain
+unauthorized.

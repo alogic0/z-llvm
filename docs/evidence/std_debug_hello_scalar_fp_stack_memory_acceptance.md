@@ -1,0 +1,73 @@
+# Scalar FP Stack Memory And Out-Parameter Call Acceptance
+
+schema_version: 1
+directive: `INBOX-25`
+target: `x86_64-linux-gnu`
+validation_tier: 2
+result: pass
+
+The accepted baseline is commits `445c03f8` and `830dc0af`, report state
+443 selected / 192 emitting / 251 failing, captured compiler_rt IR md5
+`b0eda7a6427c3084fdf096a68696f19c`, and stage4 pin
+`bdee02bc0c7f227c0f11bc9a449df673fe803540`.
+
+The composed selector's existing scalar stack-object location now records
+whether an object contains integer or floating-point data. The single frame
+authority allocates float and double objects at their natural size/alignment,
+and local non-barrier loads/stores move exact bits between those objects and
+width-tagged XMM locations. Volatile/atomic FP memory, address-space variants,
+width or kind mismatches, non-frame FP loads, and non-frame FP stores remain
+fail-closed.
+
+The authoritative SysV planner admits the non-classifying `nonnull` and
+power-of-two `align N` pointer argument attributes used by the captured call,
+while continuing to reject unknown and aggregate ABI attributes. Its existing
+independent GPR/XMM argument assignments now stage the exact
+`fastcc i32(float, ptr-local-double)` form. Existing caller-clobber spilling
+preserves live XMM and GPR values across the call, the i32 result remains
+consumable, and the callee relocation is emitted normally.
+
+The newly reachable trig bodies exposed a pre-existing fixed-XMM `fadd` false
+rejection when the left operand occupied XMM1. Scalar float/double addition
+now uses register-parametric `addss`/`addsd`, sharing the operand-safe path
+already used by multiply, subtract, and divide. Legacy fixed-XMM instruction
+forms and their other users are unchanged. An executable regression case
+proves the XMM1-left shape exactly.
+
+Focused executable selector tests pass 12/12 exact stack round trips: float
+and double positive/negative zero, positive/negative subnormal, infinity, and
+quiet NaNs with payloads. A controlled native object then calls an external
+writer through the admitted fastcc shape, preserves a live double across the
+call, stores the reduced i32 result, reloads the local double, and passes three
+precomputed exact-result cases. The object has one `R_X86_64_PLT32 write_out`
+relocation and links with `zig build-exe -fno-lld`; native status is zero.
+
+Fresh report-all advances to 443 selected / 193 emitting / 250 failing.
+`tanf` and `sinf` clear alloca, local load, out-parameter staging, result
+reduction, and the register-alias repair before stopping at
+`composed-block-select-type`. `cosf` advances to `stage2-phi-src`.
+`sincosf` advances to the intentionally excluded external FP store at
+`composed-block-store-fp-ptr`. None of these directed rows closes, so no trig
+semantic claim or Tier 3 run is authorized. `compiler_rt.int.__udivdi3` is one
+collateral emission after the planner's narrow pointer-attribute admission;
+it has no separate semantic claim.
+
+```text
+summary zllvm-codegen-report-all target=x86_64-unknown-linux-gnu selected_functions=443 emitted_functions=193 failed_functions=250 first_failing_function=compiler_rt.trunc.truncl first_failing_diagnostic=UnsupportedLongDoubleAbi first_failing_selector_tag=unsupported_type first_failing_selector_detail=unsupported-return-type local_fail=1
+focused tests: unit=895/895 executable_fp_stack_roundtrips=12/12 executable_fadd_alias=1/1
+native out-parameter canary: status=0 cases=3/3 reduced_result=3/3 relocation=R_X86_64_PLT32:write_out native_linker=zig-build-exe-fno-lld
+tier2: pass; structural/object/selected-modes/native-link/executable-canaries=pass
+tier3: not run; INBOX-25 limits Tier 3 to tanf/sinf row closure and neither row emitted
+```
+
+Logs: `tmp/inbox25_tier2.log` (sha256
+`6957e2f23a8e1b7560c3a8594fd88e768ceba8e2f3c877db19d1ecfe838a0bbf`)
+and `tmp/inbox25_scalar_fp_memory_final_report.log` (sha256
+`7030644b3d14a509bc13d8c6a6e8b55e8806110cf47b8fe50bea02b025ddc25e`).
+Focused object: `tmp/inbox25_fp_stack_call_acceptance.o` (sha256
+`ec84a7fcd37969479ae6a3e4fb029dafa0689fcebb792938927bae92a039e548`).
+
+`INBOX-25` is acknowledged by id. The standing Tier 3 evidence naming rule is
+accepted for future triggered runs: immediately create
+`docs/evidence/distribution_all_after_<cycle>.md` with implementation or
+staged-tree identity, command, log checksum, trigger, and final summary lines.

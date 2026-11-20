@@ -13,7 +13,7 @@ The requested accepted O1 base is commit
 `05857c3cc2f3b193725b1431f312009410a586b0`. Enumeration ran at the current
 accepted documentation head `d834147b2241d46cadd440181b5dcc486a8a02c4`,
 tree `142eea9f1ea18fea87ec513765c2173357a4262b`. The only paths changed between
-those commits are `docs/evidence/inbox80_o1_closeout_7b.summary` and
+those commits are `docs/evidence/inbox80_o1_closeout_7b.md` and
 `docs/next_steps.md`; `git diff 6437c89f..d834147b -- src tools build.zig`
 is empty. Thus the production tree inspected here is exactly the accepted O1
 production state requested by INBOX-81.

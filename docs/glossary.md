@@ -293,16 +293,20 @@ value so honest selector improvements can be told apart from regressions.
 **Ratchet-migration note** — the only legal way for a counter to change
 because its denominator changed: an explicit note in the evidence summary
 recording old and new hashes and why. Example: the selector v1→v2
-migration note in `docs/evidence/real_rows_strict_limit25_v2.summary`.
+migration note in `docs/evidence/real_rows_strict_limit25_v2.md`.
 
 **`unsupported_functions`** — the inventory's count of real compiler-core
 functions not yet claimable (55,479 in ReleaseFast at the current
 baseline). The long-term number Phase 4 drives below 1,000.
 
-**Evidence summary** — a tracked file under `docs/evidence/` produced by
-`tools/summarize_gate_log.zig` from a gate log: the exact command, z_llvm
-commit, pin, exit status, all `summary` lines, first failure line, and
-ratchet metadata. Checklist items may only be closed by pointing at one.
+**Evidence summary** — a tracked report under `docs/evidence/`. Closing a
+checklist item requires a reference to its report. The gate log summarizer
+(`tools/summarize_gate_log.zig`) writes Markdown (`.md`) with the command,
+z_llvm commit, Zig pin, exit status, summary
+lines, first failure and ratchet metadata. Raw gate extracts use `.summary`.
+Some frozen records cite a Markdown report by its original `.summary` name.
+Use the same basename with `.md` to read it, or use the recorded revision
+and original path to reproduce a historical checksum.
 
 **Discovered State vs Ratchet State** — two tracker tables: Discovered
 State holds report-mode green counts per mode (real progress, not yet
