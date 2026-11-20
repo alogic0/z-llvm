@@ -21,8 +21,9 @@ and CRT inputs when a build requires them.
 | G2 install and relocation | Two static executables and 19,501 SDK files. All 19,503 entries and all directory modes survived extraction |
 | Preservation | All 17 serial gates passed. The helper tested in three modes matches the ordinary install, assembled SDK and extracted archive |
 
-All 187,640,571 SDK file-content bytes match between G1 and G2. The
-compiler and provider ELFs differ between generations. Their identities
+All 19,501 SDK files have identical contents across generations,
+totaling 187,640,571 bytes. The compiler and provider ELFs differ
+between generations. Their identities
 and first differences are recorded alongside the linked function checks.
 [Generation comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/report.json)
 · [Binding to the distributed archive](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-package-binding/report.json)
@@ -594,3 +595,21 @@ The suite used historical Zig checkout `1c08b09d` in its private test
 environment. The host checkout stayed at `bd0e36fa`.
 [Command clocks](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/compiler-deadlines.json)
 · [Private and host revisions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/host-checkout.json)
+
+## Storage closure
+
+The reviewer checked 415 distinct workspace removals against the reports
+and journals from 65 collector transactions. A final transaction removed
+the inventory's own workspace as action 7. Together they account for all
+416 registered workspaces and 88,344,403,968 reclaimed allocated bytes.
+The terminal inventory found zero temporary roots. Its receipt has SHA-256
+`4cf00c7e1587a10ec7bdae19631edbc261f4d8fff7d8c900af5e6b10d12f4ccc`.
+[Workspace ledger and native transactions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/storage-closure/native-removal-receipts.json)
+· [Final collector action](../../local-state/retirements/automatic-storage-cleanup/1795153189494485392-576464/report.json)
+· [Terminal inventory](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/storage/cycle-closed.json)
+
+After the last collection, the published archive still shared its
+read-only inode with the immutable store object. The reviewer rehashed
+the archive and the canonical manifest and verified the 17 independent
+holds and ten pre-existing integrity manifests.
+[Verified package and protected files](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/storage-closure/report.json)

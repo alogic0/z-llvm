@@ -22,6 +22,7 @@ and extracted archive. The published archive contains 19,503 files in
 [Published manifest](../evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
 · [Final acceptance](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-acceptance/acceptance.json)
 · [Publication receipt](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-publication/result.json)
+· [Storage closure](#storage-closure)
 
 **First handoff.** An ordinary cold build of unchanged upstream `cat`
 exited zero on driver `5c6c457c` and helper `e1cfa98f`. The local
@@ -758,3 +759,15 @@ producer version. The explicit workspace release and collection receipts
 go in the batch's storage directory.
 [Original collector finding](../../local-state/retirements/automatic-storage-cleanup/1795084041675785218-849350/pin-references.json)
 · [Reviewed identity transition](../../local-state/validations/llvm-dependency-removal-20261119/handoff-01/review-storage-identities/transition.json)
+
+## Storage closure
+
+The primary reviewer accepted the implementer's final inventory. The
+collector removed all 416 temporary workspaces and reclaimed 88,344,403,968
+allocated bytes. The removals cover 149 handoff, 76 distribution, 186
+rebuild and five review-preflight workspaces. The physical inventory
+found zero remaining roots across those four batches. The reviewer
+verified the 17 pre-existing holds, the ten integrity manifests and
+the published G2 archive after collection.
+[Terminal receipt](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/storage/cycle-closed.json)
+· [Independent review and removal evidence](../evidence/llvm_free_self_rebuild_20261119.md#storage-closure)
