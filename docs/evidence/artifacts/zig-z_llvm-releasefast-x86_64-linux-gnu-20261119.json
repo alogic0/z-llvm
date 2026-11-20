@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "run_id": "zig-z_llvm-releasefast-x86_64-linux-gnu-20261119",
+  "command": [
+    "zig",
+    "build",
+    "install"
+  ],
+  "source_revision": "8c91f09ea8f3082e3dd104c10866661d5ba0f8d1",
+  "compiler": "Zig 0.17.0, installed generation two, baseline x86_64-linux-gnu",
+  "inputs": [
+    {
+      "name": "zig-source",
+      "identity": "bd0e36fadb55abd10f502dac3d194488ff861ab8"
+    },
+    {
+      "name": "installed-file-ledger",
+      "identity": "285d2d3821c62af4c5e08986414647cec5d4a8285b96545a31453456a6ff5ab0"
+    },
+    {
+      "name": "zig-executable",
+      "identity": "f8b24bfd4613325a9b25abd6d912c6174ae3d341a3d1722bdf835cd7f66f39f4"
+    },
+    {
+      "name": "z_llvm-executable",
+      "identity": "771baaa8526d927d5f4b2389ec7086f18f1b017110e72865c1012dec02a670a4"
+    },
+    {
+      "name": "final-review",
+      "identity": "bc75a0ff0c369e0da665be5ddcff9e825420391688fe45f2754e1633c10d6688"
+    }
+  ],
+  "result": "Qualified relocated compiler, object provider and SDK from the clean two-generation build.",
+  "artifacts": [
+    {
+      "name": "zig-z_llvm-0.17.0-x86_64-linux-gnu.tar.zst",
+      "sha256": "f7f2c83a43475c775e0da17bec9d8fa88a0d2df696ba395240959488a08270c9",
+      "bytes": 46799505
+    }
+  ]
+}

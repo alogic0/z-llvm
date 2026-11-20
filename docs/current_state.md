@@ -1,5 +1,22 @@
 # Current state
 
+## LLVM-free installed ReleaseFast toolchain
+
+The first installed generation rebuilt both Zig and `z_llvm` in an
+isolated baseline `x86_64-linux-gnu` environment with host LLVM, Clang and
+LLD excluded. Both generations matched the upstream 2,097-case ReleaseFast
+reference, including all 34 skips. Their external-provider `cat` executables
+match byte for byte. Both compiler tools differ between generations. The
+initial G0 compiler used LLVM and Clang. [Rebuild and package review](evidence/llvm_free_self_rebuild_20261119.md)
+
+The published G2 archive contains two static executables and 19,501 SDK
+files. Its helper passed all 17 serial gates, including 237 native
+registry cases in each of ReleaseFast, ReleaseSafe and ReleaseSmall.
+[Package manifest](evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
+· [Extract and use the toolchain](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
+
+## Earlier compiler-object and upstream behavior qualification
+
 The compiler-object, upstream behavior and normal-resource self-rebuild
 objective is complete at backend source `dbf7ade0`. The
 [final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)

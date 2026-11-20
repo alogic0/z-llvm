@@ -1,5 +1,62 @@
 # Rebuilding Zig and z_llvm with the installed provider
 
+## Accepted G2 package
+
+G1 used its own installed compiler and provider to rebuild both tools at
+Zig `bd0e36fadb55abd10f502dac3d194488ff861ab8` and z_llvm
+`8c91f09ea8f3082e3dd104c10866661d5ba0f8d1`. Each ordinary
+`zig build install` started with empty caches in an isolated environment
+that excluded host LLVM, Clang and LLD. The initial G0 compiler used LLVM
+and Clang. Qualification covers pure Zig and its compiler runtime in
+ReleaseFast for baseline `x86_64-linux-gnu`, with declared system libc
+and CRT inputs when a build requires them.
+[Seed and installed environment](llvm_free_zig_toolchain_20261119.md)
+· [Independent generation acceptance](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-acceptance/acceptance.json)
+
+| Check | Result |
+| --- | --- |
+| Installed G1 and relocated G2 | Both matched 2,097 ordered upstream outcomes, with 2,063 passes and 34 skips |
+| Unchanged upstream `cat` | Both generations passed six I/O cases on each compiler route. The external-provider executables match byte for byte |
+| Runtime and error handling | Each generation passed 17 native runtime comparisons. Forced failures preserved both an absent output and a pre-existing executable |
+| G2 install and relocation | Two static executables and 19,501 SDK files. All 19,503 entries and all directory modes survived extraction |
+| Preservation | All 17 serial gates passed. The helper tested in three modes matches the ordinary install, assembled SDK and extracted archive |
+
+All 187,640,571 SDK file-content bytes match between G1 and G2. The
+compiler and provider ELFs differ between generations. Their identities
+and first differences are recorded alongside the linked function checks.
+[Generation comparison](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-generation-differences/report.json)
+· [Binding to the distributed archive](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-package-binding/report.json)
+
+### Using the package
+
+The published archive is 46,799,505 bytes. Its SHA-256 is
+`f7f2c83a43475c775e0da17bec9d8fa88a0d2df696ba395240959488a08270c9`.
+[Download the local archive](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-publication/zig-z_llvm-0.17.0-x86_64-linux-gnu.tar.zst)
+· [Artifact manifest](artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
+
+From a working directory containing the archive, extract it to a new SDK
+directory. The example uses the unchanged `cat` in the pinned Zig checkout
+under `~/prog/ziglang`. The `-fllvm` flag selects Zig's IR builder.
+The installed `z_llvm` optimizes the IR and emits the object.
+`-fno-lld` selects Zig's native ELF linker.
+[Actual extraction](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-archive/extract.argv.json)
+· [Actual compiler invocation](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-g2-cat-positive/compile.argv.json)
+
+```sh
+archive=zig-z_llvm-0.17.0-x86_64-linux-gnu.tar.zst
+prefix="$PWD/zig-zllvm"
+mkdir -p "$prefix"
+tar --zstd --no-same-owner --same-permissions --delay-directory-restore \
+  -xf "$archive" -C "$prefix"
+"$prefix/bin/zig" build-exe "$HOME/prog/ziglang/test/standalone/simple/cat/main.zig" \
+  --name cat -O ReleaseFast -target x86_64-linux-gnu -mcpu=baseline \
+  -fllvm -fno-libllvm -fno-lld --zllvm-object-provider "$prefix/bin/z_llvm" \
+  -femit-bin=./cat
+printf '%s\n' 'compiled with z_llvm' | ./cat
+```
+
+## First isolated builds
+
 The first isolated builds used the installed G1 Zig and helper, empty
 caches and each project's ordinary `zig build install`. The first
 compiler build stopped before installing Zig. The helper build reached
@@ -514,3 +571,26 @@ this harness and the installed G2 helper.
 [Published patch, product identity and test receipts](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-deadline-publication/report.json)
 · [CLI command clocks](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/preservation-deadline-cli/result.json)
 · [Full-run installed helper](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/installed-input.json)
+
+## Full preservation on the installed G2 helper
+
+All 17 serial gates passed in 5 hours 26 minutes. The real-input gates
+exported, lowered and linked 100 fresh functions in each of ReleaseFast,
+ReleaseSafe and ReleaseSmall. All seven unchanged Zig programs passed.
+The reviewer matched the native registry at product commit `8c91f09e`
+to actual stdout and exit status for 237 cases in each mode. The three
+routes produced 2,133 successful executions, covering 60,432,954
+reference observations and 120,865,908 observations from direct and
+optimized G2 emission. [Serial gates and real-input results](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/distribution-all.log)
+· [Fresh exports](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/air-exports.txt)
+· [Recorded program observations](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/integrated/unchanged-upstream-c/report.json)
+
+All 3,558 G2 compiler calls covered by the extended deadline completed.
+The longest took 200.265 seconds. The other clocks covered 2,866
+reference-compiler and link commands, 2,148 native executions and guard
+probes, and six explicit-provider calls. In each mode the original
+pointer-constants program passed 10,240 checks on each native route.
+The suite used historical Zig checkout `1c08b09d` in its private test
+environment. The host checkout stayed at `bd0e36fa`.
+[Command clocks](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/compiler-deadlines.json)
+· [Private and host revisions](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/final-preservation-04/host-checkout.json)

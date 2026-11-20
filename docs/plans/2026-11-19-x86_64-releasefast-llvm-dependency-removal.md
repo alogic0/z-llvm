@@ -1,18 +1,29 @@
 # Remove the LLVM toolchain dependency from Zig ReleaseFast on x86_64 Linux
 
-**Authorized on November 19, 2026.** The primary accepted the first
-assignment, one ordinary `zig build-exe` of upstream Zig’s `cat` through the
-finalized Zig IR builder, `z_llvm` and Zig’s native ELF linker. The
-implementer landed Zig `ac359bdcd1` and z_llvm `8573a3df` locally.
-The primary compared both committed diffs with the actual build inputs.
-The primary also accepted the installed toolchain on Zig `bd0e36fadb`
-and backend `8f2b12fb` after the isolated application and failure tests
-and both link audits. The third assignment uses that package to rebuild
-both tools and compare their upstream behavior. This
-plan covers baseline `x86_64-linux-gnu`, ReleaseFast, pure Zig source and
-the compiler runtime, system libc and CRT inputs identified for that target.
+**All three milestones accepted on November 19, 2026.** The first
+milestone qualified the finalized Zig IR handoff and native ELF link at
+Zig `ac359bdcd1` and z_llvm `8573a3df`. The second qualified the installed
+LLVM-disabled compiler and provider at Zig `bd0e36fa` and z_llvm `8f2b12fb`.
+For the third, G1 rebuilt both tools from Zig `bd0e36fa` and z_llvm
+`8c91f09e` with separate cold caches and host LLVM, Clang and LLD
+excluded. Each installed generation matched all 2,097 ordered upstream
+behavior outcomes. The initial G0 compiler used LLVM and Clang.
+Qualification covers baseline `x86_64-linux-gnu`, ReleaseFast, pure
+Zig source, the compiler runtime and declared system libc and CRT inputs.
+[Handoff review](../evidence/finalized_zig_builder_handoff_20261119.md)
+· [Installed toolchain review](../evidence/llvm_free_zig_toolchain_20261119.md)
+· [Self-rebuild and package usage](../evidence/llvm_free_self_rebuild_20261119.md)
 
-**Current handoff.** An ordinary cold build of unchanged upstream `cat`
+The primary reviewer accepted the G2 archive after all 17 serial gates
+passed and the tested helper matched the ordinary install, assembled SDK
+and extracted archive. The published archive contains 19,503 files in
+46,799,505 bytes. Its SHA-256 is
+`f7f2c83a43475c775e0da17bec9d8fa88a0d2df696ba395240959488a08270c9`.
+[Published manifest](../evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
+· [Final acceptance](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-acceptance/acceptance.json)
+· [Publication receipt](../../local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-publication/result.json)
+
+**First handoff.** An ordinary cold build of unchanged upstream `cat`
 exited zero on driver `5c6c457c` and helper `e1cfa98f`. The local
 backend emitted all 1,833 application functions and all 921 compiler
 runtime functions. Zig's native linker listed the local application

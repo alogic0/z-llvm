@@ -1,44 +1,25 @@
 # Next steps
 
-Two cold builds of upstream Zig’s unchanged `cat` through its finalized
-IR builder, `z_llvm` and the native ELF linker produced the same executable.
-It passed all six I/O tests. The runtime object from the cold archive
-passed a separate 17-case numerical check. The reviewer verified all six
-cache transitions and both failure destinations. All 17 serial gates and
-237 native populations passed. The primary accepted the first milestone
-on Zig `ac359bdcd1` and z_llvm `8573a3df`. The implementer now owns
-the installed compiler and helper with LLVM disabled. With the optional
-AIR exporter corrected, the new Zig `06c09683` built helper `a95be5c7`.
-Both installed tools passed review in an empty root. The current assignment
-is the isolated generation-two build of both tools and the comparison of
-all 2,097 ordered upstream behavior outcomes for each generation.
-The revised installed helper `b0ac4145` passed the empty-struct test
-that exposed the original parser failure. The reviewed tail-call repair
-landed at `864af769`. The trial emitted all 65,078 Zig compiler functions
-and, with the tail repair, all 7,459 behavior functions. The wide
-decimal correction landed at `e524d2e3`. The four arithmetic repairs
-landed at `bb4f4c22` after the full helper emitted all 14,820 functions
-and passed 1,196 checks on the original functions. The ordinary
-tail-only installation ran the full suite and exposed the wide shift
-and optimized floating-point failures. The floating correction landed
-at `a55b1313`. The full trial object then matched all 2,097 ordered
-upstream outcomes. The combined G1 installation produced helper
-`600cb8c4` and ran all 2,097 upstream cases successfully. A broader
-repository run found two defects. The repair at `8c91f09e` passed
-all 2,472 repository tests. The G1-07 package with helper `f041c1d5`
-passed all 2,097 ordered upstream cases, both `cat` routes and the
-runtime checks. This package built and installed the G2 helper
-`771baaa8`, which reproduced the full upstream optimizer output
-and passed 1,196 numerical cases on the four original functions.
-The ordinary isolated Zig build also completed, installing compiler
-`f8b24bfd`. The extracted G2 pair matched all 2,097 ordered upstream
-outcomes and passed both application routes, both failure controls and
-all 17 runtime checks. Its external-provider `cat` matched G1 byte for
-byte. The reviewer is awaiting the full serial preservation run on the
-same G2 helper before publishing the archive.
-[Installed package review](evidence/llvm_free_zig_toolchain_20261119.md)
-· [Isolated rebuild and source findings](evidence/llvm_free_self_rebuild_20261119.md)
-· [Dependency-removal plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+The next compiler-performance experiment targets x86-64 object emission
+for `test/real_programs/pointer_constants.ll`. On the same uninstrumented
+direct emission, the G2 helper took 209.2 seconds, G1 took 19.1 seconds
+and the same-source LLVM-built helper took 1.42 seconds. The three objects
+were byte-identical. Samples traced the G2 cost to repeated instruction-name
+searches while determining which stack allocation a pointer refers to.
+[Profile and object comparison](evidence/llvm_free_self_rebuild_20261119.md#pointer-constants-emission-time)
+
+Record during frame planning whether a function contains an eligible
+two-float stack allocation. For functions without one, test skipping
+the definition scan for byte GEPs. Check genuine GEP and PHI views,
+named aggregate types, offsets and rejected inputs. Compare the full
+objects, selection-owner manifests, 10,240 native observations and timings
+for the 16 original body/probe pairs before proposing a new compiler build.
+[Experiment and review criteria](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md#3-rebuild-and-qualify-the-compiler-in-the-isolated-environment)
+
+The dependency-removal plan is complete. G1 rebuilt both shipped tools
+with the native ELF linker, and both generations matched all 2,097 upstream
+outcomes. The G0 bootstrap used LLVM and Clang. [Published SDK and usage](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
+· [Completed plan](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
 
 The x86_64 loop accumulator change landed on `main` at `3a9b6d8f` after
 independent review and selector Tier 2. Keeping the accumulator in R9D saved
