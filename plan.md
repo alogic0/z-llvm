@@ -1,15 +1,21 @@
 # Implementation Plan: z_llvm Development & Convergence
 
-This document defines the actionable implementation plan for taking `z_llvm` from the current expanded-frontier development state through the Zig 0.17.0 real-rows migration, ABI differential alignment, Tier-3 distribution acceptance, and performance baselines.
+This historical plan records the Zig 0.17.0 real-rows migration, ABI
+comparisons, distribution checks and performance baselines. The later
+dependency-removal plan delivered the packaged compiler. The next proposed
+experiment addresses compile time in the self-built x86-64 helper.
+[Completed toolchain plan](docs/plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md)
+· [Compile-time experiment](docs/plans/2026-11-20-x86_64-pointer-constants-compile-time.md) · [Next steps](docs/next_steps.md)
 
 ---
 
 ## 1. Context & Architectural Guardrails
 
-### Active Workspace State
-- **Active Branch**: `x86_64-codegen-expanded-frontier`
+### Workspace at the start of this plan
+
+- **Branch**: `x86_64-codegen-expanded-frontier`
 - **Compiler Pin**: **Zig 0.17.0** ([`.zigversion`](.zigversion)), reference emitter at `0.17.0-dev.11+1c08b09d1` ([`docs/evidence/ziglang_pin.txt`](docs/evidence/ziglang_pin.txt)).
-- **Current Baseline**:
+- **Starting baseline**:
   - Unit tests: 1,528 / 1,528 pass cleanly (`zig build test-unit`, `zig test src/tests.zig`).
   - Documentation validation: passes cleanly (`zig build check-docs`).
   - Behavioral differential gate against Clang-22: 6,528 observations across 8 programs and 3 release modes pass with 0 fallbacks (`zig build behavioral-diff`).
@@ -663,7 +669,7 @@ flowchart TD
    - Extend SROA and `mem2reg` in [`src/passes/`](src/passes/) to decompose multi-field aggregate allocas into SSA scalars.
    - Expand EarlyCSE and LICM to hoist loop-invariant memory loads where memory mutation can be proven disjoint.
 3. **Performance Matrix Refresh**:
-   - Run [`tools/fixed_program_baseline.py`](tools/fixed_program_baseline.py) across all 15 workload/route pairs to record compilation speed, execution runtime, and code size metrics without inventing unsupported claims.
+   - Measure compile time, runtime and code size for all 15 workload/route pairs. The original Python runner was replaced by the [maintained Zig runner](tools/fixed_program_baseline.zig).
 
 ---
 

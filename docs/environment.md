@@ -1,6 +1,11 @@
 # Development Environment
 
-Current environment used for `z_llvm` development and LLVM comparison testing:
+To compile pure Zig in ReleaseFast for baseline `x86_64-linux-gnu`, use
+the packaged Zig 0.17.0 driver and its `z_llvm` provider. Both executables
+are static. The SDK includes `lib/zig`. The qualified route works without
+LLVM, Clang or LLD. [Archive and compiler invocation](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
+
+The development and LLVM comparison environment uses the following tools.
 
 ```text
 OS: Ubuntu 24.04.4 LTS (noble)
@@ -30,9 +35,10 @@ Use different Zig executables for different jobs:
 
 | Task | Compiler | Reason |
 | --- | --- | --- |
+| Compile a pure Zig program with the packaged provider | Extracted `bin/zig` with `--zllvm-object-provider` pointing to the same SDK's `bin/z_llvm` | Selects the installed compiler and backend qualified together. Use the full flags in the package guide above. |
 | Build and test `z_llvm` itself | Zig 0.17.0, explicitly selected | Build tools inherit the selected executable directory; PATH may contain another version. |
 | Emit authoritative Zig LLVM IR fixtures | `../ziglang/build/stage4/bin/zig` | Fixtures must come from the same `../ziglang` source checkout used by inventory and roadmap source anchors. |
-| Inspect current upstream Zig behavior | `../ziglang/build/stage4/bin/zig` plus `../ziglang` sources | Stage4 currently matches the checked-out Zig source revision. |
+| Inspect upstream Zig behavior at the fixture revision | `../ziglang/build/stage4/bin/zig` plus `../ziglang` sources | Verify the stage4 executable matches the source revision being inspected. |
 | Bootstrap/debug the Zig compiler build | `../ziglang/build/stage3/bin/zig` only when explicitly needed | Stage3 can lag behind the source checkout and must not be used for authoritative fixture generation. |
 
 Before regenerating Zig-emitted IR fixtures, verify the source/compiler pair:
@@ -77,7 +83,7 @@ opt-22 -passes=simplifycfg test/opt/inputs/simplifycfg.ll -S -o /tmp/llvm_simpli
 opt-22 -passes=mem2reg test/opt/inputs/mem2reg.ll -S -o /tmp/llvm_mem2reg.ll
 ```
 
-If a fresh Ubuntu machine does not have LLVM 22 installed:
+To install the LLVM 22 comparison tools on a fresh Ubuntu development machine:
 
 ```bash
 sudo apt update

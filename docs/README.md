@@ -1,19 +1,27 @@
 # Zig LLVM Removal Roadmap
 
-Start with [current architecture](architecture.md) for the implemented components,
-input routes, selector ownership, and validation limits. The
-[architecture refactor plan](roadmap/architecture_refactor_plan.md) records
-the completed bounded consolidation and performance baseline. [Current state](current_state.md) owns status and
-[next steps](next_steps.md) owns active direction. The long roadmap and completion
-lists below are historical context, not proof of current general capability.
+The November 19 package pairs a patched Zig 0.17.0 compiler with `z_llvm`
+for pure Zig and its compiler runtime in ReleaseFast on baseline
+`x86_64-linux-gnu`. The first installed generation rebuilt both tools
+without host LLVM, Clang or LLD. [Extract and use the compiler](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
+· [Package manifest](evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
 
-The [compiler-object, behavior and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
-is complete through milestone 8 at backend source `dbf7ade0`. The
+For the compiler and backend responsibilities, see the [architecture](architecture.md).
+For qualification results, see [current state](current_state.md). The next
+proposed experiment targets slow object emission in the self-built helper.
+[Compile-time plan](plans/2026-11-20-x86_64-pointer-constants-compile-time.md) · [Next steps](next_steps.md)
+
+## Earlier milestones
+
+The [architecture refactor plan](roadmap/architecture_refactor_plan.md) records
+the earlier consolidation and performance baseline. The November 13
+[compiler-object, behavior and self-rebuild plan](plans/2026-11-11-complete-compiler-object-and-self-rebuild.md)
+finished at backend source `dbf7ade0`. Its
 [final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
 records both compiler generations matching the reference in four modes through
 normal LLVM and local-hook routes, all 20 delivered local objects independently
-audited, and a normal-resource self-rebuild with fresh backend execution. LLVM
-frontend optimization and declared providers remain in use.
+audited, and a normal-resource self-rebuild with fresh backend execution. That
+configuration used LLVM for frontend optimization and its declared providers.
 
 For compiler performance investigations, follow [compiler profiling](compiler_profiling.md)
 for the verified hardware-sampling setup, recording commands and evidence checks.

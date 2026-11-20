@@ -1,7 +1,12 @@
 # Upstream Integration Readiness
 
-This document summarizes what the project can currently prove for Zig upstream
-discussion and what must remain an external experiment.
+The November 19 package demonstrates the explicit `z_llvm` provider in
+a patched Zig compiler for pure Zig and its compiler runtime in ReleaseFast
+on baseline `x86_64-linux-gnu`. G1 rebuilt both tools with host LLVM, Clang
+and LLD excluded. [Package and self-rebuild evidence](evidence/llvm_free_self_rebuild_20261119.md)
+
+The capability map and gate inventories below record earlier fixture evidence
+for discussing individual optimizer and backend changes with Zig upstream.
 
 ## Reproducibility
 
@@ -71,11 +76,10 @@ Mode and metadata preservation input.
 
 ### Backend handoff
 
-Current capability:
-Tiny x86_64 Machine IR plus asm/object smoke checks.
-
-Zig boundary:
-Validation-only, not a backend replacement.
+The original fixture checks cover small x86_64 Machine IR, assembly and object
+emission. The later packaged driver hands complete modules to the external
+provider and links the resulting objects with Zig's native ELF linker.
+[Finalized IR handoff](evidence/finalized_zig_builder_handoff_20261119.md)
 
 ### Selected distribution replacement gate
 
@@ -1007,7 +1011,9 @@ readiness check script that reproduces current claims
 
 ## Next Roadmap Wave
 
-The next wave should be selected from Zig's actual LLVM-removal blockers:
+The fixture readiness audit identified these candidates for broader coverage.
+The current project proposal targets compile time in the self-built x86-64
+helper. [Compile-time experiment](plans/2026-11-20-x86_64-pointer-constants-compile-time.md)
 
 ```text
 inline asm and atomicrmw IR representation with verifier fail-closed rules
@@ -1022,7 +1028,7 @@ The evidence behind that ordering is recorded in
 
 ## Current Verdict
 
-The project is useful as a structured LLVM-removal experiment and regression
-corpus, but it is not an LLVM replacement. Its strongest upstream-facing value
-is the inventory, fixture discipline, conservative legality boundaries, and
-clear split between LLVM-compatible IR work and Zig-native backend ownership.
+The packaged compiler demonstrates a self-rebuild on one target and mode.
+The upstream-facing material also includes the dependency inventory, regression
+corpus and optimizer legality checks. Claims about additional targets, modes
+or upstream adoption need separate evidence. [Current qualification](current_state.md)

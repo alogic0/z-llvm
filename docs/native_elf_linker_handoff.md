@@ -1,7 +1,11 @@
 # Native ELF Linker Handoff
 
-This note scopes the handoff from `z_llvm` object emission to Zig's native ELF
-linker. It does not move linker ownership into `z_llvm`.
+In the accepted ReleaseFast package for baseline `x86_64-linux-gnu`,
+`z_llvm` emits the application and compiler-runtime objects. The packaged
+Zig driver selects its native ELF linker with `-fno-lld`. The upstream
+`cat` build traced the application object and the compiler-runtime archive
+through the final link. [Link evidence](evidence/finalized_zig_builder_handoff_20261119.md#what-produced-the-executable)
+· [Packaged driver invocation](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
 
 ## Zig Linker Selection
 
@@ -22,7 +26,7 @@ The local Zig checkout selects the linker in three layers:
    `Tag.fromObjectFormat(ofmt, use_new_linker)` maps ELF to `link.Elf` for the
    old/self-hosted linker and to `link.Elf2` for the new linker.
 
-For this repository's current proof, the accepted handoff command is:
+The fixture gates below select the native linker with this option.
 
 ```text
 zig build-exe -fno-lld ...

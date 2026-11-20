@@ -1,95 +1,70 @@
 # z_llvm
 
-An experimental LLVM IR parser, optimizer, and x86-64 code generator written in
-Zig. The project implements the compiler behavior needed by Zig's LLVM backend,
-with explicit validation against LLVM and native execution.
+`z_llvm` parses and optimizes LLVM IR and emits x86-64 ELF objects. It is written in Zig.
+The project packages it with a patched **Zig 0.17.0** compiler. Together they
+compile pure Zig and its compiler runtime in **ReleaseFast for baseline
+`x86_64-linux-gnu`** without `libLLVM`, `libclang-cpp` or LLD.
+Programs that need the system C library or startup objects still use those
+system inputs. [Architecture](docs/architecture.md)
 
-See the [current architecture](docs/architecture.md) for input routes, optimizer
-invocation, selector ownership, and the scope of validation evidence.
+## Use the packaged compiler
+
+The accepted second-generation (G2) archive is stored in the release
+workstation's `local-state/` directory. A fresh Git checkout contains the
+source and the [package manifest](docs/evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json).
+From the repository root on that workstation, extract the archive to a new
+directory, keeping `bin/zig`, `bin/z_llvm` and `lib/zig` together.
+
+```sh
+archive=local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-publication/zig-z_llvm-0.17.0-x86_64-linux-gnu.tar.zst
+sdk="$HOME/zig-zllvm-0.17.0-g2"
+mkdir "$sdk" && tar --zstd --no-same-owner --same-permissions --delay-directory-restore \
+  -xf "$archive" -C "$sdk"
+```
+
+To compile your own `main.zig` with that SDK, use the packaged driver and
+select its object provider explicitly.
+
+```sh
+"$sdk/bin/zig" build-exe main.zig -O ReleaseFast -target x86_64-linux-gnu -mcpu=baseline \
+  -fllvm -fno-libllvm -fno-lld --zllvm-object-provider "$sdk/bin/z_llvm"
+```
+
+Here `-fllvm` selects Zig's LLVM IR builder. Zig writes the finalized module
+as text, `z_llvm` optimizes it and emits a native object, and `-fno-lld`
+selects Zig's native ELF linker. The package guide includes the archive
+checksum and the exact invocation used to build upstream Zig's `cat`.
+[Package guide and tested example](docs/evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
 
 ## Status
 
-The accepted 2026-11-13 result at backend source `dbf7ade0` emits complete local
-objects for all **8,928 original compiler definitions**, **455 original runtime
-definitions**, and **7,874 original Debug behavior definitions**. The separate
-Small-runtime population also completes all 503 definitions.
+On November 19, 2026, the first installed generation (G1) rebuilt both G2
+executables from empty caches with host LLVM, Clang and LLD excluded. The
+initial bootstrap used LLVM and Clang. Both installed generations matched all
+2,097 ordered upstream ReleaseFast behavior outcomes (2,063 passes and 34
+skips) and produced byte-identical `cat` executables. The packaged helper
+also passed all 17 integration gates, including 237 native regression cases
+in each of ReleaseFast, ReleaseSafe and ReleaseSmall.
+[Self-rebuild evidence](docs/evidence/llvm_free_self_rebuild_20261119.md) · [Current state and earlier qualifications](docs/current_state.md)
 
-The unchanged pinned Zig compiler builds through the local postopt hook and
-rebuilds itself with fresh backend execution, inheriting stack and CPU settings
-without validation overrides. Both compiler generations match all 2,097 named
-reference outcomes, including reference skips, in every mode through both the
-normal LLVM and local-hook routes: **16 complete results and 33,552 exact outcome
-comparisons**. All 20 delivered local objects pass independent audits.
+The next proposed experiment targets **compiler time** on
+`pointer_constants.ll`. Direct emission of the same object took 209.2 seconds
+with G2, 19.1 seconds with G1 and 1.42 seconds with an LLVM-built copy of the
+same helper source. The first goal is to bring G2 below 120 seconds while
+preserving the object bytes and all 10,240 observed results.
+[Compile-time plan](docs/plans/2026-11-20-x86_64-pointer-constants-compile-time.md)
 
-That acceptance records 2,364 unit tests, 65 structural checks and two profiling
-checks per Debug/ReleaseSafe build. All eight readiness procedures, 17 integration
-gates and both 225-population native suites pass; all 6,724 required fault controls
-are detected.
-LLVM frontend optimization and declared LLVM/system providers remain in use.
-
-The [2026-11-14 throughput follow-up](docs/evidence/compiler_throughput_20261114.md)
-removes redundant address-dependency copies. Median backend emission for the
-fixed Debug behavior input falls from 114.39 to 109.66 seconds (4.1%), with
-byte-identical objects and ownership. This measures one postopt module;
-whole-compiler throughput and generated-program performance are separate scopes.
-
-The completed [ReleaseSafe preopt plan](docs/plans/2026-11-14-release-safe-preopt-behavior.md)
-adds local optimization before local object emission. Its
-[acceptance](docs/evidence/release_safe_preopt_acceptance_20261116.md)
-matches all 2,097 reference outcomes in one unchanged local run, with audited
-921-function runtime and 7,716-function test objects, reconciled stage chains
-and a passing optimizer-failure control. All 17 integration gates, native
-preservation, four-mode postopt preservation and storage disposition pass.
-LLVM construction, setup and declared providers remain dependencies.
-The completed
-[compiler generalization plan](docs/plans/2026-11-16-generalize-compiler-mechanisms.md)
-adds shared use queries, typed constant-table descriptions, optional-pointer
-cleanup with scalar preservation across branches, and compact scoped value-use
-identities. That four-stage implementation passes all 17 integration gates and the
-complete 233-population native suite. Table lengths and remaining name limits
-retain explicit boundaries in the stage evidence.
-
-Subsequent reviews fix table layout, consumer fallback and private ELF placement.
-The authorized follow-up shares exact module layout facts, table admission rules,
-private rewrite construction and checked byte bounds. Current validation passes
-2,438 Fast units, 74 structural checks, all 17 integration gates and all 237 native
-populations. The [follow-up evidence](docs/evidence/checked_byte_facts_20261117.md)
-distinguishes semantic corrections, admission policies and storage disposition.
-
-The [ReleaseFast preopt qualification](docs/evidence/release_fast_preopt_acceptance_20261117.md)
-matches all 2,097 ordered reference outcomes in one unchanged local run at
-`c32ba3cf`: 2,063 OK and 34 SKIP. Both runtime/test optimizer-emitter chains,
-all 921/7,459 definitions and complete object/ownership/ELF/event audits pass.
-The real optimizer-failure control stops before emission. Fresh preservation
-passes all 17 integration gates and 237 native populations; storage is closed.
-LLVM construction, setup and declared providers remain dependencies.
-
-The ReleaseSmall run at the same compiler source also matches all 2,097 ordered
-normal LLVM outcomes, including 34 skips. Compiler-rt switches to Small for
-this run. The independently inventoried runtime and test objects contain 903
-and 6,684 definitions. The local optimizer failure control stops the compile
-before emission. [ReleaseSmall qualification](docs/evidence/release_small_preopt_acceptance_20261117.md)
-
-Five generated-program benchmarks compare the local Fast and Small pipelines
-with LLVM O3 and Oz on baseline x86_64. The largest elapsed-time difference
-was the loop workload, about 150 ms per Fast process. The largest relative
-difference was the memset family, 5.55× LLVM O3 and 5.57× LLVM Oz. The report
-includes paired timings, object and executable sizes, and the disassembly
-behind the proposed improvements. [Runtime and size measurements](docs/evidence/generated_program_performance_20261117.md)
-
-Selective legalization was prototyped and measured, then deferred under the
-plan's benefit requirement. Five unprofiled pairs did not demonstrate the
-required time or memory gain; production scheduling is unchanged. The
-[experiment](docs/evidence/compiler_generalization_stage5_20261116.md) retains
-all measurements and the qualified patch.
-
-See the [final acceptance](docs/evidence/compiler_behavior_follow_up_acceptance_20261113.json),
-[completed plan](docs/plans/2026-11-11-complete-compiler-object-and-self-rebuild.md),
-[current state](docs/current_state.md), and [next steps](docs/next_steps.md).
+For **generated-program performance**, the project measured five workloads
+against LLVM. Two later changes reduced median paired ReleaseFast runtime by
+36.42 ms on the loop benchmark and 21.37 ms on the memory-fill benchmark,
+each against its preceding local version.
+[Five-workload comparison](docs/evidence/generated_program_performance_20261117.md) · [Loop results](docs/evidence/loop_register_residency_20261118.md) · [Memory-fill results](docs/evidence/loop_and_bounded_memset_20261118.md)
 
 ## Build and isolated tests
 
-The tested development platform is **Linux x86-64**, with Ubuntu 24.04 used in CI.
+To build the standalone `z_llvm` helper from source, use `zig build`. It installs
+`zig-out/bin/z_llvm`. The tested development platform is **Linux x86-64**,
+with Ubuntu 24.04 used in CI.
 Use [**Zig 0.17.0**](https://ziglang.org/download/0.17.0/), pinned in
 [`.zigversion`](.zigversion). If PATH selects another compiler,
 invoke the 0.17.0 executable explicitly. Build-tool subprocesses inherit that
@@ -169,9 +144,10 @@ the guide includes recording, stack verification, and separate throughput measur
 
 ## Integration
 
-Integration uses the pinned patched compiler in `../ziglang/build/stage4/bin/zig`
-and LLVM 22 comparison tools. `ZIG_EMITTER` and `ZIG_SOURCE_DIR` select the emitter
-and source checkout. See [environment](docs/environment.md),
+Development integration checks use the pinned fixture emitter in
+`../ziglang/build/stage4/bin/zig` and LLVM 22 comparison tools.
+`ZIG_EMITTER` and `ZIG_SOURCE_DIR` select the emitter and source checkout.
+See [environment](docs/environment.md),
 [build steps](docs/build_steps.md), and [validation tiers](docs/validation_tiers.md).
 
 ```sh
@@ -231,9 +207,9 @@ to those original artifact paths; the isolated checks above run from a fresh
 checkout without them.
 
 [Current state](docs/current_state.md) distinguishes accepted evidence from
-pending development. The [improvement plan](docs/roadmap/project_improvement_plan.md)
-records implementation progress; [documentation](docs/README.md) contains the
-compiler architecture and historical roadmap.
+pending development. [Next steps](docs/next_steps.md) tracks proposed work.
+The [documentation index](docs/README.md) links the compiler architecture and
+historical roadmap.
 
 For the initial repository upload, see [publishing on GitHub](docs/github.md).
 

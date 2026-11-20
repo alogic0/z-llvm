@@ -15,6 +15,11 @@ registry cases in each of ReleaseFast, ReleaseSafe and ReleaseSmall.
 [Package manifest](evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
 · [Extract and use the toolchain](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
 
+The proposed follow-up targets a compile-time regression on the
+`pointer_constants.ll` fixture. Direct emission with G2 took 209.2 seconds
+for the same object G1 emitted in 19.1 seconds.
+[Profile and measurements](evidence/llvm_free_self_rebuild_20261119.md#pointer-constants-emission-time) · [Experiment and acceptance criteria](plans/2026-11-20-x86_64-pointer-constants-compile-time.md)
+
 ## Earlier compiler-object and upstream behavior qualification
 
 The compiler-object, upstream behavior and normal-resource self-rebuild

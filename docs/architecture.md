@@ -1,24 +1,23 @@
 # Current architecture
 
-Accepted backend source: `dbf7ade0` (2026-11-13), validated with tooling Zig
-0.17.0 and upstream Zig source `1c08b09d`. This page describes implementation
-and ownership; [current state](current_state.md) owns acceptance counts and the
-[refactor plan](roadmap/architecture_refactor_plan.md) records the completed
-bounded consolidation.
+The November 19 G2 package pairs patched Zig `bd0e36fa` with `z_llvm`
+`8c91f09e`. The qualified target is baseline `x86_64-linux-gnu` in
+ReleaseFast for pure Zig and its compiler runtime. [Package manifest](evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json)
 
-The project implements a bounded LLVM-compatible IR, optimizer, and x86_64 Linux
-backend. Through the patched postopt hook, z_llvm emits the complete compiler
-and runtime objects used to build the unchanged pinned Zig compiler and rebuild
-itself under inherited stack and CPU settings. Both resulting compiler
-generations pass the complete four-mode upstream behavior matrix through both
-normal LLVM and local-hook routes. See the
-[final acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json).
+With `-fllvm -fno-libllvm`, the patched driver serializes its finalized
+LLVM IR builder to text. The executable selected by `--zllvm-object-provider`
+optimizes that IR and emits x86-64 ELF objects for the application and
+compiler runtime. With `-fno-lld`, Zig uses its native ELF linker to produce
+the executable. The first installed generation used this route to rebuild both
+tools without host LLVM, Clang or LLD. [Driver handoff](evidence/finalized_zig_builder_handoff_20261119.md)
+· [Self-rebuild and qualification](evidence/llvm_free_self_rebuild_20261119.md)
 
-LLVM still performs frontend optimization and supplies declared external
-providers; Zig owns final executable linking. The accepted build and self-rebuild
-prove this configuration. General LLVM replacement, arbitrary LLVM inputs and
-other targets remain outside that acceptance. The text and AIR adapters retain
-the distinct routes described below.
+The earlier November 13 postopt hook at `dbf7ade0` used LLVM for
+optimization and `z_llvm` for object emission. Both compiler generations
+in that experiment matched upstream behavior in four modes. The comparisons
+below include that hook and the separate AIR and fixture adapters.
+[Four-mode acceptance](evidence/compiler_behavior_follow_up_acceptance_20261113.json)
+· [Current state](current_state.md) · [Architecture refactor](roadmap/architecture_refactor_plan.md)
 
 ## Components and ownership
 
@@ -31,7 +30,7 @@ the distinct routes described below.
 | Optimization | [analyses](../src/analysis), [passes](../src/passes), [pass manager](../src/pass_manager.zig) | Apply explicitly selected transformations with local analyses. |
 | x86_64 lowering | [lowering dispatch](../src/codegen/x86_64/air_patterns_impl.zig), [composed selector](../src/codegen/x86_64/generic_cfg_selector.zig) | Lower supported IR through structural or composed paths, including bounded allocation/spill planning and ABI handling. |
 | Machine representation and objects | [MachineFunction](../src/codegen/x86_64/machine.zig), [MC](../src/mc) | Verify machine instructions and emit assembly, encoded instructions, and ELF relocatable objects. |
-| Final linking | Zig toolchain, invoked by integration runners | Own executable layout, final relocation/linking, and runtime integration. `z_llvm` does not emit final executables. |
+| Final linking | Zig's native ELF linker in the packaged compiler | Link application and runtime objects, resolve relocations and lay out the executable. |
 
 Both text and AIR adapters can construct project IR. They do **not** currently
 follow one identical optimize-and-emit route. Case/semantic-descriptor writers
@@ -59,10 +58,12 @@ consume the current authenticated AIR cache.
 
 ## Actual execution routes
 
-The dispatch is in [main_flow.zig](../src/main_flow.zig).
+The packaged Zig driver selects the provider. Inside `z_llvm`, the CLI
+dispatches by input and requested operation. [CLI dispatch](../src/main_flow.zig)
 
 | Input and operation | Optimization behavior | Output |
 | --- | --- | --- |
+| Packaged Zig driver with explicit `z_llvm` provider | Zig writes the finalized builder's IR as text. The provider runs local ReleaseFast optimization and object emission. | Application and compiler-runtime objects for Zig's native ELF linker. |
 | LLVM IR, default/`--emit=ir` | Run the selected pass list; default `instcombine,dce`. | Transformed LLVM-compatible text. |
 | LLVM IR, `--emit=obj`, `--emit=asm`, or selection-owner manifest | Shared preparation verifies the module and runs explicit `--passes`/`--pipeline` requests before selection. No optimization by default. | Object, assembly, or ownership report. |
 | Exported AIR, `--emit=ir` | Lower, verify, run any explicit optimization request, then print. No optimization by default. | Project IR text. |
@@ -77,14 +78,12 @@ development pipelines. The structured helper explicitly disables per-pass
 verification; callers and tests must not assume the pass manager's default
 verification setting applies to every route.
 
-The [ReleaseSafe preopt acceptance](evidence/release_safe_preopt_acceptance_20261116.md)
-proves one complete unchanged behavior suite through the local optimizer and
+The November 16 [ReleaseSafe preopt acceptance](evidence/release_safe_preopt_acceptance_20261116.md)
+covered one complete unchanged behavior suite through the local optimizer and
 object emitter, with all 2,097 ordered reference outcomes and independent audits.
-The global hook mode is Safe; compiler-runtime frontend mode remains Fast.
-LLVM construction, bitcode parsing and target/analysis/pass-manager setup still
-occur, and declared providers remain. The selected route executes no LLVM
-optimizer or object-emission pass; a real optimizer-failure control proves that
-failed local optimization cannot fall back to object delivery.
+The hook ran in Safe and the compiler-runtime frontend ran in Fast. That
+driver still used LLVM for construction, bitcode parsing and setup. A forced
+local optimizer failure stopped object delivery.
 
 The shared contract is implemented by [compilation.zig](../src/compilation.zig)
 and [compilation_artifact.zig](../src/compilation_artifact.zig). Codegen pass
@@ -316,6 +315,7 @@ these folds so newly constant safety branches disappear before codegen.
 
 | Check | Population and path | Limit of the claim |
 | --- | --- | --- |
+| Installed compiler and provider | G1 rebuilt both G2 tools. Both generations matched 2,097 upstream behavior outcomes and produced byte-identical `cat` executables. | Pure Zig and compiler runtime, ReleaseFast, baseline `x86_64-linux-gnu`. The tool binaries themselves differ between generations. |
 | Compiler-core real-row gate | Selected AIR functions, direct lowering/object emission and native linking; a fixed execution cohort. | The gate does not run the local module pass manager. Linking 100 functions does not mean executing 100 functions. |
 | Standalone behavioral suite | Composed local codegen from unoptimized LLVM IR, paired with independently optimized LLVM references. | Harness/reference release modes do not select local `release-o3`; this is primarily codegen evidence. |
 | Optimizer correctness runner | The original 17-function suite, five alias/reference entry points, vector operands, and seven integer/allocation boundary functions; fixture-specific pipelines plus `release-o3`, with transformed IR verified and compiled by LLVM at `-O0`. | This tests optimizer semantics independently of local codegen; these populations do not establish local object-emission coverage. |
