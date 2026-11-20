@@ -14,7 +14,7 @@ the definition scan for byte GEPs. Check genuine GEP and PHI views,
 named aggregate types, offsets and rejected inputs. Compare the full
 objects, selection-owner manifests, 10,240 native observations and timings
 for the 16 original body/probe pairs before proposing a new compiler build.
-[Experiment and review criteria](plans/2026-11-19-x86_64-releasefast-llvm-dependency-removal.md#3-rebuild-and-qualify-the-compiler-in-the-isolated-environment)
+[Proposed compile-time experiment and review criteria](plans/2026-11-20-x86_64-pointer-constants-compile-time.md)
 
 The dependency-removal plan is complete. G1 rebuilt both shipped tools
 with the native ELF linker, and both generations matched all 2,097 upstream
