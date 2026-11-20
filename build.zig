@@ -104,7 +104,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const test_step = b.step("test", "Run unit tests");
+    const test_step = b.step("test", "Run unit tests and the compiler-rt ABI differential gate");
     const unit_run = b.addRunArtifact(unit_tests);
     test_step.dependOn(&unit_run.step);
     const test_unit_step = b.step("test-unit", "Run isolated compiler unit tests without external integration tools");
@@ -177,7 +177,12 @@ pub fn build(b: *std.Build) void {
     zig_input_program.step.dependOn(b.getInstallStep());
     zig_input_program.addPassthruArgs();
     b.step("zig-input-program", "Execute the file corpus against Zig's unchanged language-reference migration tool").dependOn(&zig_input_program.step);
-    addToolStepWithArgs(b, "check-docs", "Validate current documentation links and accepted status", "tools/check_project_docs.zig");
+    const docs_tool = "tools/check_project_docs.zig";
+    const docs_check = b.addSystemCommand(&.{ b.graph.zig_exe, "run", docs_tool, "--" });
+    docs_check.addPassthruArgs();
+    const docs_tests = b.addSystemCommand(&.{ b.graph.zig_exe, "test", docs_tool });
+    docs_check.step.dependOn(&docs_tests.step);
+    b.step("check-docs", "Validate documentation files, headings and accepted status").dependOn(&docs_check.step);
     addToolStep(b, "check-zig-stage4-emitter", "Check the authoritative Zig stage4 emitter", "tools/check_zig_stage4_emitter.zig");
     addToolStep(b, "focused-codegen-canaries", "Run procedural fma and __multi3 codegen canaries (non-gating)", "tools/run_focused_codegen_canaries.zig");
     addToolStepWithArgs(b, "real-candidates-v2", "Build the mode-stable real-row candidate denominator", "tools/build_real_candidates_v2.zig");

@@ -59,14 +59,10 @@ those slices):
 
 ## Tier 3 — full integration (`distribution-all`)
 
-The authoritative serial Tier-3 command is
-`zig build distribution-all -- --serial` with explicit `--zig-emitter`,
-`--real-rows-validation-root`, and `--real-rows-cache-root` selections (see the
-[root setup example](../README.md)). It uses the tracked 17-subgate
-inventory, exclusive runner-owned paths, immutable bundle identity checks, and
-durable headroom reporting. The earlier ignored
-`tmp/inbox66c_serial_tier3_fresh.sh` wrapper is obsolete historical evidence;
-it is not deleted, but must not be used for a new acceptance run.
+The serial Tier 3 suite covers 17 integration gates and records disk
+headroom, cache state and the identity of the object bundle shared by the
+gates. Older evidence refers to `tmp/inbox66c_serial_tier3_fresh.sh`. The
+[managed command below](#run-the-full-integration-suite) supersedes that wrapper.
 
 Run:
 
@@ -81,6 +77,61 @@ Run:
 Tier 3 is not the default end of every worker cycle. After a tier-3 run,
 inspect and record its result before starting another cycle or another full
 run. A failed run is investigated with the narrowest reproducing subgate.
+
+### Run the full integration suite
+
+From the repository root on the integration host, select the pinned Zig
+0.17.0 compiler and the patched stage4 fixture emitter. The latter must
+match the checkout used for fixture capture. Install the LLVM 22 reference
+tools first. [Integration environment](environment.md)
+
+This example runs one **fresh** comparison. The launcher records the command,
+output and storage layout under a new run directory. In its temporary workspace
+the real-row validation and cache paths must already exist, be relative to
+the checkout, and end in the same component. The serial scratch directory
+must be absent so the runner can create it. [Development storage](development_storage.md)
+
+```bash
+set -e
+export ZIG="$(realpath "$(command -v zig)")"
+export ZIG_EMITTER="$(realpath "${ZIG_EMITTER:-../ziglang/build/stage4/bin/zig}")"
+test "$("$ZIG" version)" = 0.17.0
+test -x "$ZIG_EMITTER"
+batch=local-state/validations/distribution/batch-01
+mkdir -p "$batch"
+run=$(mktemp -d "$batch/run-XXXXXXXX")
+cat > "$run/retention.md" <<'NOTE'
+The serial comparison consumes its own real-row scratch, fresh export cache
+and serial bundle. Retain the command log, result and layout in this directory.
+Release temporary products on success. Keep failed work for diagnosis.
+NOTE
+tools/run-validation --output-root "$run" serial --command bash -eu -c '
+  temp=$(realpath --relative-to=. "$ZLLVM_TEMP_ROOT")
+  rows="$temp/real-rows"
+  mkdir -p "$rows/validation/cohort" "$rows/cache/cohort"
+  exec "$ZIG" build distribution-all -- --serial --fresh-real-rows \
+    --zig-emitter="$ZIG_EMITTER" --serial-root="$temp/serial" \
+    --real-rows-validation-root="$rows/validation/cohort" \
+    --real-rows-cache-root="$rows/cache/cohort"
+'
+```
+
+Read `$run/serial.log` for per-gate results and `$run/serial.json` for the
+exit status. A successful run releases its temporary workspace after its
+last consumer. A failed run keeps its own workspace for diagnosis.
+
+For a **fresh versus cached** comparison, declare both consumers in
+`retention.md` and use `--retain-products` on the fresh run. In a second
+managed run with its own log and serial scratch, reuse the first run's
+real-row roots and omit `--fresh-real-rows`. Compare the two logs with
+`zig run tools/compare_distribution_all_logs.zig -- fresh.log cached.log`,
+then release the first workspace using its recorded layout. For just the
+three real-row modes, the focused runner is
+`tools/run_distribution_real_rows_parallel.zig`. It takes the same selected
+roots as `--scratch-root` and `--export-cache-root`, an explicit `--zig-emitter`,
+and `--fresh-export` on the first pass. To compare those focused logs, pass
+`--real-rows` before the two log paths in the comparison command above.
+[Pipeline release and collection](development_storage.md#close-the-cycle)
 
 ### Row-closure batching (amendment 2026-07-14, user-directed)
 

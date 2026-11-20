@@ -2,7 +2,7 @@
 
 | I want to… | Start here |
 | --- | --- |
-| Use the compiler | [Compile the hello program with the SDK](../README.md#use-the-packaged-compiler), or [build the optimizer from a fresh clone](../README.md#build-the-standalone-optimizer). Check [which tasks need LLVM](../README.md#do-i-need-llvm). |
+| Use the compiler | [Install or rebuild the full toolchain](install_toolchain.md), [compile the hello program with the SDK](../README.md#use-the-packaged-compiler), or [build the optimizer from a fresh clone](../README.md#build-the-standalone-optimizer). Check [which tasks need LLVM](../README.md#do-i-need-llvm). |
 | Understand the architecture | [Follow the IR from the Zig driver to the native ELF linker](architecture.md). See [current state](current_state.md) for the target, modes and test coverage. |
 | Compare results with LLVM | [Compare compiler time, generated-program runtime and binary size](performance.md). Each result links to the workload and its baseline. |
 | Contribute | [Set up a development checkout](../CONTRIBUTING.md), [choose the checks for a change](validation_tiers.md) and [read the current proposal](next_steps.md). |

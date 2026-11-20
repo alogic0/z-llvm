@@ -5,11 +5,11 @@ Use Zig 0.17.0, as pinned in `.zigversion`. `test-unit` (with optional
 compiler or historical local state. `test` also runs the mandatory ABI gate.
 `behavioral-diff`, `memset-diff`, `memcpy-diff` and `byte-loops-diff` require clang-22;
 the memory-family gates also use opt-22. `byte-loops-diff` uses `timeout` to bound native loop execution.
-`check-docs` verifies current status and links.
-Full distribution runs require the explicit emitter/root selections shown in
-[the root setup guide](../README.md). Older tables below describe their named
-fixture populations and must not be read as compiler-core acceptance counters.
-
+`check-docs` verifies status blocks, local files and section links in the
+maintained guides. It recognizes their English `#`-style headings, skips
+fenced examples and resolves numbered links to repeated headings. For full
+distribution runs, use the [managed Tier 3 command](validation_tiers.md#run-the-full-integration-suite).
+The older tables below describe their named fixture populations.
 
 This file summarizes the project-specific `zig build` steps and what each one
 is for. Use `zig build --help` to see the authoritative current list.
@@ -20,7 +20,8 @@ is for. Use `zig build --help` to see the authoritative current list.
 | --- | --- |
 | `zig build` | Build and install the `z_llvm` executable into `zig-out/bin/z_llvm`. |
 | `zig build run -- <args>` | Run `z_llvm` with arguments passed after `--`. |
-| `zig build test` | Run the unit test suite. Use this for ordinary implementation slices that touch parser, verifier, optimizer, codegen, or shared tool behavior. |
+| `zig build test-unit` | Run isolated unit tests. Use `-Dtest-filter=NAME` for focused work. |
+| `zig build test` | Run the unit suite and the audited compiler-rt ABI differential gate. Requires the integration environment. |
 
 The historical selector-v3 membership audit replays from the checked
 [semantic fact manifest](evidence/real_candidates_release_v3_facts_manifest.json).
@@ -187,7 +188,7 @@ Recommended validation ladder for source-owned work:
 6. zig build distribution-native-link-object-inspection -- --release-source-owned
 7. zig build distribution-native-link -- --release-source-owned
 8. zig build probe-native-linker -- --release-source-owned
-9. zig build distribution-all
+9. Full serial distribution suite (managed Tier 3 command above)
 ```
 
 `distribution-native-link-object-inspection -- --release-source-owned` and

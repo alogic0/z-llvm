@@ -3,7 +3,7 @@
 To compile pure Zig in ReleaseFast for baseline `x86_64-linux-gnu`, use
 the packaged Zig 0.17.0 driver and its `z_llvm` provider. Both executables
 are static. The SDK includes `lib/zig`. The qualified route works without
-LLVM, Clang or LLD. [Archive and compiler invocation](evidence/llvm_free_self_rebuild_20261119.md#using-the-package)
+LLVM, Clang or LLD. [Install or rebuild on another machine](install_toolchain.md)
 · [LLVM requirements by task](../README.md#do-i-need-llvm)
 
 The development and LLVM comparison environment uses the following tools.

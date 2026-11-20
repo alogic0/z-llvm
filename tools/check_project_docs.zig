@@ -42,6 +42,7 @@ const docs = [_][]const u8{
     "docs/zllvm_artifact_retention_contract.md",
     "docs/evidence/project_improvement/implementation.md",
     "docs/environment.md",
+    "docs/install_toolchain.md",
     "docs/compiler_profiling.md",
     "docs/build_steps.md",
     "docs/working-cycle.md",
@@ -95,27 +96,127 @@ pub fn main(init: std.process.Init) !void {
         }
     }
     var links: usize = 0;
+    var headings: usize = 0;
     for (docs) |path| {
         const content = try read(a, io, path);
         defer a.free(content);
-        var offset: usize = 0;
-        while (std.mem.indexOfPos(u8, content, offset, "](")) |start| {
-            const close = std.mem.indexOfScalarPos(u8, content, start + 2, ')') orelse return error.MalformedLink;
-            offset = close + 1;
-            const target = std.mem.trim(u8, content[start + 2 .. close], "<>");
-            if (std.mem.indexOf(u8, target, "://") != null or std.mem.startsWith(u8, target, "mailto:") or target.len == 0 or target[0] == '#') continue;
-            const file = target[0 .. std.mem.indexOfScalar(u8, target, '#') orelse target.len];
-            const joined = try std.fs.path.resolve(a, &.{ std.fs.path.dirname(path) orelse ".", file });
-            defer a.free(joined);
-            std.Io.Dir.cwd().access(io, joined, .{}) catch |err| {
-                std.debug.print("broken internal link: {s} -> {s}\n", .{ path, target });
-                return err;
-            };
-            links += 1;
+        var lines = MarkdownLines{ .remaining = content };
+        while (lines.next()) |line| {
+            var offset: usize = 0;
+            while (std.mem.indexOfPos(u8, line, offset, "](")) |start| {
+                const close = std.mem.indexOfScalarPos(u8, line, start + 2, ')') orelse return error.MalformedLink;
+                offset = close + 1;
+                const target = std.mem.trim(u8, line[start + 2 .. close], "<>");
+                if (target.len == 0 or std.mem.indexOf(u8, target, "://") != null or std.mem.startsWith(u8, target, "mailto:")) continue;
+                var parts = std.mem.splitScalar(u8, target, '#');
+                const file = parts.first();
+                const joined = if (file.len == 0) try a.dupe(u8, path) else try std.fs.path.resolve(a, &.{ std.fs.path.dirname(path) orelse ".", file });
+                defer a.free(joined);
+                std.Io.Dir.cwd().access(io, joined, .{}) catch |err| {
+                    std.debug.print("broken internal link: {s} -> {s}\n", .{ path, target });
+                    return err;
+                };
+                links += 1;
+                const fragment = parts.rest();
+                if (fragment.len == 0 or !std.mem.endsWith(u8, joined, ".md")) continue;
+                const destination = if (file.len == 0) content else try read(a, io, joined);
+                defer if (file.len != 0) a.free(destination);
+                if (!try hasHeading(a, destination, fragment)) {
+                    std.debug.print("broken heading link: {s} -> {s}\n", .{ path, target });
+                    return error.MissingHeading;
+                }
+                headings += 1;
+            }
         }
     }
-    std.debug.print("documentation check ok: {} current documents, {} internal file links, 2 status blocks\n", .{ docs.len, links });
+    std.debug.print("documentation check ok: {} current documents, {} internal links, {} heading links, 2 status blocks\n", .{ docs.len, links, headings });
 }
+
+const MarkdownLines = struct {
+    remaining: []const u8,
+    fence: []const u8 = "",
+
+    fn next(self: *MarkdownLines) ?[]const u8 {
+        while (self.remaining.len != 0) {
+            const end_of_line = std.mem.indexOfScalar(u8, self.remaining, '\n') orelse self.remaining.len;
+            const line = std.mem.trimEnd(u8, self.remaining[0..end_of_line], "\r");
+            self.remaining = self.remaining[@min(end_of_line + 1, self.remaining.len)..];
+            const trimmed = std.mem.trimStart(u8, line, " ");
+            if (line.len - trimmed.len <= 3 and trimmed.len != 0 and (trimmed[0] == '`' or trimmed[0] == '~')) {
+                const marker = trimmed[0..1];
+                const length = std.mem.findNone(u8, trimmed, marker) orelse trimmed.len;
+                const tail = trimmed[length..];
+                if (self.fence.len != 0) {
+                    if (std.mem.startsWith(u8, trimmed, self.fence) and std.mem.trim(u8, tail, " \t").len == 0) self.fence = "";
+                    continue;
+                }
+                if (length >= 3 and (marker[0] == '~' or std.mem.indexOfScalar(u8, tail, '`') == null)) {
+                    self.fence = trimmed[0..length];
+                    continue;
+                }
+            }
+            if (self.fence.len == 0) return line;
+        }
+        return null;
+    }
+};
+
+// These guides use ATX headings with English titles, inline code and punctuation.
+fn hasHeading(allocator: std.mem.Allocator, content: []const u8, fragment: []const u8) !bool {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const wanted = std.Uri.percentDecodeInPlace(try a.dupe(u8, fragment));
+    var seen = std.StringHashMap(void).init(a);
+    var lines = MarkdownLines{ .remaining = content };
+    while (lines.next()) |line| {
+        const trimmed = std.mem.trimStart(u8, line, " ");
+        if (line.len - trimmed.len > 3) continue;
+        const level = std.mem.findNone(u8, trimmed, "#") orelse continue;
+        if (level == 0 or level > 6 or !std.ascii.isWhitespace(trimmed[level])) continue;
+        const title = std.mem.trim(u8, trimmed[level..], " \t");
+        const without_hashes = std.mem.trimEnd(u8, title, "#");
+        const text = if (without_hashes.len != 0 and std.ascii.isWhitespace(without_hashes[without_hashes.len - 1]))
+            std.mem.trimEnd(u8, without_hashes, " \t")
+        else
+            title;
+        var slug: std.ArrayList(u8) = .empty;
+        for (text) |byte| {
+            if (std.ascii.isAlphanumeric(byte) or byte == '-' or byte == '_') {
+                try slug.append(a, std.ascii.toLower(byte));
+            } else if (byte == ' ') {
+                try slug.append(a, '-');
+            }
+        }
+        var id: []const u8 = slug.items;
+        var suffix: usize = 0;
+        while (seen.contains(id)) {
+            suffix += 1;
+            id = try std.fmt.allocPrint(a, "{s}-{}", .{ slug.items, suffix });
+        }
+        if (std.mem.eql(u8, id, wanted)) return true;
+        try seen.put(id, {});
+    }
+    return false;
+}
+
+test "Markdown anchors handle formatted titles, collisions, and fenced examples" {
+    const text =
+        \\## Using `z_llvm`?
+        \\## Using `z_llvm`?-1
+        \\## Using `z_llvm`? ##
+        \\   ~~~~md
+        \\## Removed heading
+        \\~~~
+        \\## Still inside
+        \\~~~~
+    ;
+    try std.testing.expect(try hasHeading(std.testing.allocator, text, "using-z%5Fllvm"));
+    try std.testing.expect(try hasHeading(std.testing.allocator, text, "using-z_llvm-2"));
+    try std.testing.expect(!try hasHeading(std.testing.allocator, text, "removed-heading"));
+    try std.testing.expect(!try hasHeading(std.testing.allocator, text, "still-inside"));
+}
+
 fn read(a: std.mem.Allocator, io: std.Io, path: []const u8) ![]u8 {
     return std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(8 * 1024 * 1024));
 }

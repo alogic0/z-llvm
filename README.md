@@ -7,30 +7,21 @@ compile pure Zig and its compiler runtime in **ReleaseFast for baseline
 Programs that need the system C library or startup objects still use those
 system inputs. [Architecture](docs/architecture.md)
 
-If you have the SDK archive, [compile a Zig program](#use-the-packaged-compiler).
+To get the full Zig driver and provider on another machine, follow the
+[installation and source-build guide](docs/install_toolchain.md).
+If you have the SDK installed, [compile a Zig program](#use-the-packaged-compiler).
 From a fresh clone, [build the standalone optimizer](#build-the-standalone-optimizer).
 
 ## Use the packaged compiler
 
-The accepted second-generation (G2) archive is stored in the release
-workstation's `local-state/` directory. A fresh Git checkout contains the
-source and the [package manifest](docs/evidence/artifacts/zig-z_llvm-releasefast-x86_64-linux-gnu-20261119.json).
-From the repository root, extract the archive to a new directory, keeping
-`bin/zig`, `bin/z_llvm` and `lib/zig` together. If you copied the archive
-from the release workstation, set `archive` to your copy.
+Install the accepted second-generation (G2) archive and keep its two
+executables and SDK together. [Archive location, checksum and extraction](docs/install_toolchain.md#install-the-reviewed-archive)
+
+From the repository root, compile and run the checked-in hello program.
+Set `sdk` to your installation directory if you used another location.
 
 ```sh
-archive=local-state/validations/llvm-dependency-removal-20261119/rebuild-01/review-final-publication/zig-z_llvm-0.17.0-x86_64-linux-gnu.tar.zst
-sdk="$HOME/zig-zllvm-0.17.0-g2"
-mkdir "$sdk" && tar --zstd --no-same-owner --same-permissions --delay-directory-restore \
-  -xf "$archive" -C "$sdk"
-```
-
-With the SDK extracted, set `sdk` to its directory and run the following
-from the repository root. The example compiles the checked-in hello program
-and runs the resulting executable.
-
-```sh
+sdk="${sdk:-$HOME/zig-zllvm-0.17.0-g2}"
 "$sdk/bin/zig" build-exe test/zig/integrated/std_debug_hello.zig \
   -O ReleaseFast -target x86_64-linux-gnu -mcpu=baseline \
   -fllvm -fno-libllvm -fno-lld --zllvm-object-provider "$sdk/bin/z_llvm" \
@@ -91,20 +82,10 @@ targets slow object emission in the self-built helper.
 
 ## Build and isolated tests
 
-CI uses Ubuntu 24.04 x86-64. If PATH selects another compiler, invoke the
-Zig 0.17.0 executable explicitly. Build-tool subprocesses inherit that
-compiler. The development integration checks select their fixture emitter
-separately.
-
-```sh
-zig build test-unit
-zig build test-unit -Dtest-filter=verifier
-zig build structural-smoke artifact-store-test
-zig build test-tool-regex
-zig build test-tool-regex -Doptimize=ReleaseSafe
-zig build check-docs
-zig build run -- --help
-```
+CI uses Ubuntu 24.04 x86-64. Use `zig build test-unit` for isolated unit
+tests and `zig build test` for unit tests plus the ABI integration gate.
+The [contributor instructions](CONTRIBUTING.md#build-and-check-a-change)
+give the pinned compiler, focused test filter and full CI commands.
 
 Native tool regex assertions use the public `zig-regex` package source, pinned
 with per-file digests. See [tool dependency provenance](tools/vendor/README.md).
@@ -131,14 +112,6 @@ to the shared CLI. Metrics and cycles advise review. This adds no new compiler
 architecture gate or ABI acceptance claim. [Snapshot identities](tools/vendor/README.md)
 record the independent source owner and digests.
 
-Unit tests and storage tests do not require the patched sibling compiler,
-historical worktrees, or LLVM utilities. `zig build test` additionally runs the
-ABI integration gate and retains its external requirements.
-
-[GitHub Actions](.github/workflows/ci.yml) builds and runs the isolated checks
-in Debug and ReleaseSafe. See [CONTRIBUTING.md](CONTRIBUTING.md) for the same
-commands and guidance on additional integration validation.
-
 ## Local experiments
 
 Use `scratch/` for local compiler experiments and their generated IR or assembly.
@@ -159,48 +132,12 @@ the guide includes recording, stack verification, and separate throughput measur
 
 ## Integration
 
-Development integration checks use the pinned fixture emitter in
-`../ziglang/build/stage4/bin/zig` and LLVM 22 comparison tools.
-`ZIG_EMITTER` and `ZIG_SOURCE_DIR` select the emitter and source checkout.
-See [environment](docs/environment.md),
-[build steps](docs/build_steps.md), and [validation tiers](docs/validation_tiers.md).
-
-```sh
-zig build behavioral-diff  # requires clang-22
-zig build check-zig-stage4-emitter
-mkdir -p local-state/validations/current local-state/caches/current
-zig build distribution-all -- --serial --fresh-real-rows \
-  --zig-emitter=/absolute/path/to/ziglang/build/stage4/bin/zig \
-  --real-rows-validation-root=local-state/validations/current \
-  --real-rows-cache-root=local-state/caches/current
-```
-
-A fresh run requires a cache root without any `ReleaseFast`, `ReleaseSafe`, or
-`ReleaseSmall` entries. The runner checks this before launching subgates. After
-a failed fresh run, inspect the retained cache before choosing a new generation;
-remove only verified disposable state. Existing generations are never overwritten.
-
-For a cached comparison, reuse the same roots and omit `--fresh-real-rows`.
-The runner allocates unique run directories. All three root/emitter selections
-are required. Validation/cache roots must exist, be relative, and have the same
-final component (`current` above); see [the recorded command](docs/evidence/project_improvement/implementation.md).
-
-To reproduce only the real-row group, use the project compiler on PATH and run:
-
-```sh
-zig run tools/run_distribution_real_rows_parallel.zig -- --fresh-export \
-  --scratch-root=local-state/validations/current \
-  --export-cache-root=local-state/caches/current \
-  --zig-emitter=/absolute/path/to/ziglang/build/stage4/bin/zig
-```
-
-Omit `--fresh-export` for the required-hit run; cached execution still reruns all
-real-row and cohort checks. The same root restrictions apply.
-
-Compare focused logs with `zig run tools/compare_distribution_all_logs.zig -- --real-rows fresh.log cached.log`.
-For full Tier-3 logs, omit `--real-rows`. Both modes validate the raw cohort records
-before normalizing the independently built wrapper hashes; selected object hashes,
-byte counts, results and counters must still match.
+The full integration suite uses the pinned patched stage4 fixture emitter and
+LLVM 22 reference tools. Run it through the managed launcher with fresh
+scratch and cache directories. The Tier 3 guide gives the command, explains
+the fresh and cached modes, and identifies the result log.
+[Run the full integration suite](docs/validation_tiers.md#run-the-full-integration-suite)
+· [Development environment](docs/environment.md) · [Build targets](docs/build_steps.md)
 
 ## Artifacts and project status
 
