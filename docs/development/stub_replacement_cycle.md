@@ -1,8 +1,8 @@
 # Stub Replacement Cycle
 
 Use this cycle when implementing
-[`roadmap/llvm_shaped_stub_replacement_plan.md`](roadmap/llvm_shaped_stub_replacement_plan.md).
-It is based on [`development_cycle.md`](development_cycle.md), but it is
+[`roadmap/llvm_shaped_stub_replacement_plan.md`](../roadmap/llvm_shaped_stub_replacement_plan.md).
+It is based on [`development_cycle.md`](../development_cycle.md), but it is
 stricter: the goal is to replace placeholders and local-conservative stubs with
 LLVM-shaped implementations one planned slice at a time until the replacement
 plan is finished.
@@ -149,7 +149,7 @@ Update the relevant docs before marking the slice complete:
 
 - `docs/passes/<pass>.md` for pass behavior.
 - `docs/analysis/<analysis>.md` for analysis behavior.
-- `docs/ir_*.md` for new accepted IR syntax or verifier rules.
+- `docs/ir/*.md` for new accepted IR syntax or verifier rules.
 - `docs/analysis/algorithm_parity_audit.md` if a pass status changes.
 - `docs/roadmap/llvm_shaped_stub_replacement_plan.md` to mark the slice
       complete only after tests pass.
@@ -182,7 +182,7 @@ zig build readiness
 ```
 
 For Zig-emitted corpus changes, follow the compiler policy in
-[`environment.md`](environment.md) and [`development_cycle.md`](development_cycle.md):
+[`environment.md`](../environment.md) and [`development_cycle.md`](../development_cycle.md):
 
 - use `zig` on `PATH` for building and testing `z_llvm`;
 - use `../ziglang/build/stage4/bin/zig` for authoritative Zig-emitted LLVM IR
@@ -193,7 +193,7 @@ For Zig-emitted corpus changes, follow the compiler policy in
 ## 8. Review Before Commit
 
 Use the review loop from
-[`three_agent_bug_discovery_fix_review_scheme.md`](three_agent_bug_discovery_fix_review_scheme.md)
+[bug discovery, fix and review guide](bug_review.md)
 when the slice changes optimizer legality, CFG rewriting, MemorySSA, aliasing,
 debug salvage, or backend handoff behavior.
 
@@ -209,17 +209,8 @@ Commit only after positive review for slices that use the review loop.
 
 ## 9. Commit Policy
 
-Commit every completed slice or sub-slice separately. Follow
-[`commit_policy.md`](commit_policy.md):
-
-- Stage all files for that completed slice.
-- Create a temporary commit-message file.
-- Include a header and list of changes.
-- Use `git commit -F path_to_temp_file`.
-- In commit messages and comments, never write full local paths; use paths
-      relative to `prog`.
-
-Do not combine unrelated planned slices in one commit.
+Commit each completed slice or sub-slice separately. Follow the
+[project commit instructions](../../CONTRIBUTING.md#commits).
 
 ## 10. Mark Progress And Continue
 

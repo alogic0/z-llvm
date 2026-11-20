@@ -376,7 +376,7 @@ repeated full-suite benchmarks.
 ## Supervisor And Worker Protocol
 
 One monitoring agent may supervise the worker, following
-[`../worker_agent_howto.md`](../worker_agent_howto.md). It is the single
+[the worker guide](../development/worker_agent_howto.md). It is the single
 supervisor and single writer for `docs/worker_inbox.md`.
 
 The supervisor may nudge the worker to continue only when all are true:
@@ -403,7 +403,7 @@ The supervisor must not:
 - use the retired `scripts/inbox_watch.sh` alongside direct supervision.
 
 Substantive direction is written as a numbered Active inbox entry first, then
-delivered as the short tmux nudge documented in `worker_agent_howto.md`.
+delivered as the short tmux nudge documented in the worker guide.
 Routine continuation after a clean, successful cycle needs no new technical
 directive: instruct the worker to resume the next documented slice.
 

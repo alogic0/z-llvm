@@ -3,7 +3,7 @@
 This document tracks LLVM IR syntax and semantics that `z_llvm` does not support yet.
 
 The finish-oriented unsupported/future status is tracked in
-[`roadmap/finish_gap_burndown_table.md`](roadmap/finish_gap_burndown_table.md).
+[`roadmap/finish_gap_burndown_table.md`](../roadmap/finish_gap_burndown_table.md).
 As of Cycle 01, unsupported constructs must be tied to one of four statuses:
 active next step, later measured blocker, conservative accepted boundary, or
 out of scope.
@@ -106,7 +106,7 @@ remain unsupported. The only current vector-valued select transform is the
 target-independent identical-arm fold for scalar `i1` conditions. Accepted lane
 operations are parser/verifier-only except for DCE of unused pure lane ops and
 the same-constant-lane extract-after-insert fold documented in
-`docs/ir_vectors.md`.
+`docs/ir/vectors.md`.
 
 ## Finish Burn-Down Corpus Status
 

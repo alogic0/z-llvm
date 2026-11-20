@@ -1,9 +1,9 @@
 # Named pipelines and invocation
 
-The canonical definitions and registry are in [pipelines.zig](../src/pipelines.zig).
+The canonical definitions and registry are in [pipelines.zig](../../src/pipelines.zig).
 Names describe local subsets and intended analogues; `release-o3` and LTO names
 do not assert LLVM algorithm parity, full LTO support, or optimizer completeness.
-See [current architecture](architecture.md) for the full route map.
+See [current architecture](../architecture.md) for the full route map.
 
 ## Accepted and development pipelines
 
@@ -30,8 +30,8 @@ For ordinary LLVM-compatible input, the CLI's default IR output runs
 into module-pass execution. There are no distinct nested pass managers.
 
 Object, assembly, and selection-owner-manifest output use shared preparation in
-[compilation.zig](../src/compilation.zig), called by
-[main_flow.zig](../src/main_flow.zig) before selection. Explicit `--passes` and
+[compilation.zig](../../src/compilation.zig), called by
+[main_flow.zig](../../src/main_flow.zig) before selection. Explicit `--passes` and
 `--pipeline` requests run on these routes; without an explicit request, the
 module is verified and emitted without optimization. Exported AIR uses this
 same preparation contract after lowering, including for IR output.
@@ -58,7 +58,7 @@ selection census. The whole-compiler diagnostic runner exposes this option as
 
 The patched Zig preopt textual hook chooses an accepted mode alias. The postopt
 hook leaves module optimization with LLVM. The separate structured writer helper
-in [main_flow_ir_writer.zig](../src/main_flow_ir_writer.zig) conditionally runs
+in [main_flow_ir_writer.zig](../../src/main_flow_ir_writer.zig) conditionally runs
 `sccp,simplifycfg,instcombine,dce` for selected surfaces when the relevant preopt
 and Zig-mode environment fields are present. That helper sets
 `verify_each_pass=false`; it is not the ordinary accepted alias.
@@ -72,7 +72,7 @@ is not optimized as an ordinary textual module. Artifact-generation operations
 
 ## Verification and analysis lifetime
 
-[ModulePassManager](../src/pass_manager.zig) defaults to verification after each
+[ModulePassManager](../../src/pass_manager.zig) defaults to verification after each
 executed pass. Callers can override that option. When debug variable-location
 intrinsics are present, it skips transform categories because salvage is not
 modeled, and reports the skipped count.
@@ -104,4 +104,4 @@ The compiler-core real-row gate lowers exported AIR directly to objects without
 invoking this module pass manager. Integrated routes have their own contracts.
 A passing `distribution-all` run therefore does not establish every development
 pass on every real function. Pass promotion needs explicit pipeline, population,
-and executable evidence under [validation tiers](validation_tiers.md).
+and executable evidence under [validation tiers](../validation_tiers.md).

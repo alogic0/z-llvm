@@ -6,9 +6,9 @@ LLVM behavior Zig still relies on, reproduce the smallest correct subsets in
 Zig, and produce fixtures, docs, and implementation slices that can guide or
 eventually feed Zig's self-hosted compiler work.
 
-This is a strategy document, not an active completion checklist. The numbered
-epics in `docs/README.md` carry completion state; this file explains why those
-epics exist and how future work should stay aligned.
+The [foundation epics](historical/completed_epics/README.md) record what was
+completed. This plan explains why the epics exist and how future work should
+stay aligned.
 
 The x86_64 Linux ReleaseFast milestone begins with one ordinary
 upstream program compiled through Zig’s finalized IR builder and `z_llvm`.
@@ -98,7 +98,7 @@ Deliverables:
 - `test/zig/inputs/*.zig`
 - `test/zig/expected/*.ll`
 - `docs/fixtures/zig_emitted_ir.md`
-- `docs/unsupported_ir.md` updates
+- `docs/ir/unsupported.md` updates
 
 ## Phase 3: LLVM-Compatible IR Semantics Before More Passes
 
@@ -120,9 +120,9 @@ semantic gaps.
 Deliverables:
 
 - `Verifier Foundation Epic`
-- semantic docs under `docs/ir_*.md`
+- semantic docs under `docs/ir/*.md`
 - verifier accepted/rejected fixtures
-- updated `docs/unsupported_ir.md`
+- updated `docs/ir/unsupported.md`
 
 ## Phase 4: Required Optimizer Slices From Zig's LLVM Pipeline
 
@@ -235,7 +235,7 @@ Deliverables:
 
 ## Current Post-Epic Focus
 
-The numbered foundation epics in `docs/README.md` are complete. New work should
+The [numbered foundation epics](historical/completed_epics/README.md) are complete. New work should
 now come from a bounded source-backed slice, usually one of these:
 
 - Extend a closed optimizer parity cycle only when a new Zig-emitted fixture

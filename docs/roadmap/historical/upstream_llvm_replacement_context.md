@@ -1,8 +1,8 @@
 # Zig And LLVM Replacement Context
 
-This note is based on the public Zig upstream direction. It is strategy context for this repository;
-active work still belongs in [next_steps.md](next_steps.md) or the roadmap
-files under [roadmap/](roadmap/).
+This note records the upstream direction that informed the original roadmap.
+For present-day project decisions, see the [current proposal](../../next_steps.md)
+and the [qualified compiler architecture](../../architecture.md).
 
 Zig's goal is not to clone all of LLVM in one project before moving forward.
 The direction is to remove LLVM, LLD, and Clang as hard libraries linked into
@@ -226,7 +226,7 @@ millions of lines of C++ and more about reproducing the semantic and pipeline
 subsets Zig actually relies on.
 
 The pass list must come from
-[inventory/zig_llvm_pass_pipeline_inventory.md](inventory/zig_llvm_pass_pipeline_inventory.md),
+[inventory/zig_llvm_pass_pipeline_inventory.md](../../inventory/zig_llvm_pass_pipeline_inventory.md),
 not from a generic LLVM optimizer checklist.
 
 Priority order:
@@ -238,8 +238,8 @@ Priority order:
 5. Vector, FP, debug, sanitizer, LTO, and backend handoff work only when a
    measured source-backed row or opt comparison requires it.
 
-Each optimizer pass should carry one of the statuses defined in
-[README.md](README.md):
+The [LLVM reproduction levels](../llvm_algorithm_parity_gap_closure_plan.md#reproduction-levels)
+define four statuses for optimizer passes.
 
 ```text
 placeholder
@@ -334,6 +334,6 @@ optimizer_fail=0
 ```
 
 Future work should start only from
-[roadmap/future_optimizer_backlog.md](roadmap/future_optimizer_backlog.md), a
+[roadmap/future_optimizer_backlog.md](../future_optimizer_backlog.md), a
 new measured source-backed blocker, a concrete `opt-22` mismatch, or a failing
 readiness check.

@@ -38,7 +38,7 @@ representations globally or require Zig to adopt LLVM PHIs, GEPs, or MemorySSA.
 The hook contracts include `ZIG_USE_ZLLVM_OBJECT`, `ZLLVM_EXE`,
 `ZLLVM_PIPELINE=postopt|preopt`, and the separate IR-writer contract. Source and
 emitter selection is documented in [environment](../environment.md).
-[Pipeline documentation](../pipelines.md) records local pass-manager invocation.
+[Pipeline documentation](../passes/pipelines.md) records local pass-manager invocation.
 Gate populations and counters belong to their individual runners; older fixed
 wrapper totals are not a current support inventory.
 

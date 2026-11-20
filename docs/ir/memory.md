@@ -82,7 +82,7 @@ no semantic use of alignment for optimization
 no full volatile or atomic memory model
 no syncscope or atomic ordering semantics beyond parser/verifier preservation
 inline asm and broader atomic semantics are tracked in
-`docs/ir_atomics_inline_asm.md`
+`docs/ir/atomics_inline_asm.md`
 atomic load/store print LLVM's canonical ordering form, with the ordering token
 after the pointer operand and before the optional alignment
 no datalayout-aware getelementptr offset computation beyond scalar integer element sizes

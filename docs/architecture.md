@@ -21,6 +21,9 @@ below include that hook and the separate AIR and fixture adapters.
 
 ## Components and ownership
 
+For instruction syntax, module structure and the verifier rules used by
+the optimizer, see the [LLVM IR reference](ir/README.md).
+
 | Layer | Current owner | Responsibility |
 | --- | --- | --- |
 | LLVM-compatible text input | [IR parser](../src/ir/parser.zig) | Parse the supported textual surface into project IR. |
@@ -73,7 +76,7 @@ dispatches by input and requested operation. [CLI dispatch](../src/main_flow.zig
 | Patched Zig postopt hook | LLVM optimizes the module; z_llvm replaces target-machine object emission. | Object handed to Zig. |
 | Patched Zig preopt textual hook | The hook invokes z_llvm's accepted mode pipeline, then emits the transformed IR. | Object handed to Zig. |
 
-See [pipelines](pipelines.md) for the distinction between accepted aliases and
+See [pipelines](passes/pipelines.md) for the distinction between accepted aliases and
 development pipelines. The structured helper explicitly disables per-pass
 verification; callers and tests must not assume the pass manager's default
 verification setting applies to every route.

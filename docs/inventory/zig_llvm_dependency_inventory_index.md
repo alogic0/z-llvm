@@ -28,7 +28,7 @@ All paths are relative to `prog`.
 | `z_llvm/docs/debug/metadata_inventory.md` | debug info | Inventories Zig-emitted debug metadata and optimizer preservation rules. | Raw metadata preservation only; debug semantics deferred. |
 | `z_llvm/docs/lto/behavior_gaps.md` | LTO | Records Zig LLVM LTO phase choices, local placeholder status, and LTO gap table. | Pre-link pipeline surface only; bitcode and summaries deferred. |
 | `z_llvm/docs/analysis/optimizer_analysis_prerequisites.md` | optimizer analyses | Inventories shared analysis hooks required before optimizer algorithm parity claims. | Current hooks and missing parity blockers documented. |
-| `z_llvm/docs/unsupported_ir.md` | gap tracking | Lists IR constructs this project rejects, defers, or supports narrowly. | Must be updated whenever parser/verifier/pass behavior changes. |
+| `z_llvm/docs/ir/unsupported.md` | gap tracking | Lists IR constructs this project rejects, defers, or supports narrowly. | Must be updated whenever parser/verifier/pass behavior changes. |
 | `z_llvm/docs/roadmap/llvm_algorithm_parity_gap_closure_plan.md` | optimizer parity rubric | Tracks gaps between local optimizer passes and original LLVM algorithms. | Rubric for optimizer epics, not a global blocker. |
 
 ## Dependency Categories
@@ -37,7 +37,7 @@ Use these categories consistently in inventories and roadmap slices:
 
 | Category | Meaning | First local owner |
 | --- | --- | --- |
-| `IR semantics` | LLVM-compatible module, function, type, value, instruction, metadata, verifier, and textual IR behavior. | `src/ir/`, `docs/ir_*.md` |
+| `IR semantics` | LLVM-compatible module, function, type, value, instruction, metadata, verifier, and textual IR behavior. | `src/ir/`, `docs/ir/*.md` |
 | `optimizer` | LLVM middle-end passes and analyses Zig invokes through LLVM pipelines. | `src/passes/`, `src/analysis/`, `docs/passes/` |
 | `target/data-layout` | Triple, target feature, address-space, ABI, size, alignment, and DataLayout facts. | `src/target/`, `docs/target/` |
 | `codegen` | TargetMachine behavior, instruction selection, register allocation, stack frame, ABI lowering, and assembly/object handoff. | `src/codegen/`, `docs/codegen/` |
@@ -173,7 +173,7 @@ Refresh checklist:
       mode handling changes.
 - [ ] Update this index when a dependency changes category, owner, hard/optional
       status, or local action.
-- [ ] Update `unsupported_ir.md` and fixture docs when a new Zig-emitted IR
+- [ ] Update the [unsupported IR reference](../ir/unsupported.md) and fixture docs when a new Zig-emitted IR
       construct is discovered.
 - [ ] Keep all file references relative to `prog`; do not write machine-local
       absolute paths in docs or commit messages.

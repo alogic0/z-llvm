@@ -41,7 +41,7 @@ extractvalue over aggregate values with integer index lists
 insertvalue over aggregate values with integer index lists
 aggregate-typed PHI values and aggregate constants in PHI incoming values
 aggregate call result type spelling for direct calls, including LLVM overflow intrinsic result shapes such as `{ i8, i1 }`
-freeze instruction syntax is documented separately in [ir_scalar.md](ir_scalar.md)
+freeze instruction syntax is documented separately in [scalar operations](scalar.md)
 ```
 
 Upstream mapping:
@@ -65,7 +65,7 @@ extractvalue is parse/verify/print only; no aggregate folding or aggregate layou
 insertvalue is parse/verify/print only; no aggregate folding or aggregate layout reasoning beyond checking the indexed inserted value type
 aggregate-valued calls are preserved only; no overflow intrinsic semantics, aggregate return lowering, or intrinsic folding is modeled
 narrow typed vector constants parse and verify only for the fixed-vector
-boundary in `docs/ir_vectors.md`
+boundary in `docs/ir/vectors.md`
 no constant expressions
 no undef-specific instruction folding rules beyond preserving `freeze`
 ```

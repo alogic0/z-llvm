@@ -35,7 +35,7 @@ target-specific TLS lowering and relocation selection
 
 Narrow `fence`, `atomicrmw`, `cmpxchg`, and side-effecting inline asm forms are
 classified through the conservative atomics/inline-asm barrier boundary in
-`docs/ir_atomics_inline_asm.md`.
+`docs/ir/atomics_inline_asm.md`.
 
 ## Fixture Coverage
 

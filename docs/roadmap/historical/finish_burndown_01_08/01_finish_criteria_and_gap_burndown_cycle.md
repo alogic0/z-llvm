@@ -85,7 +85,7 @@ honestly complete.
 ## Completed Slice
 
 Cycle 01 created
-[`finish_gap_burndown_table.md`](finish_gap_burndown_table.md), which defines
+[`finish_gap_burndown_table.md`](../../finish_gap_burndown_table.md), which defines
 the project finish line, records the readiness evidence, lists the remaining
 corpus blockers, and assigns every open gap one of the required statuses:
 active next step, later measured blocker, conservative accepted boundary, or

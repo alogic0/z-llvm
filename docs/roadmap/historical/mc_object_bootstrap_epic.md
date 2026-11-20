@@ -24,7 +24,7 @@ Pipeline-Ready Optimizer Epic
   output for one tiny target subset.
 - Keep this epic separate from target/DataLayout and AIR lowering work; unresolved
   IR or ABI questions should be fixed in the previous epic first.
-- Under the current [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md),
+- Under the current [Zig-Aligned LLVM Removal Plan](../zig_aligned_llvm_removal_plan.md),
   this epic is a bounded verification experiment, not the primary replacement
   path for Zig's native backends. New backend expansion should pause unless it
   validates optimizer output or clarifies a specific LLVM emission boundary.

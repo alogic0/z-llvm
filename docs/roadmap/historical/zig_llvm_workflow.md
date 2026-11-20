@@ -1,8 +1,9 @@
 # Exploring Zig's LLVM Workflow
 
-This note is for investigating what happens after Zig has produced AIR and the LLVM backend is selected.
-
-The important correction is that LLVM does not consume AIR directly. Zig lowers AIR into LLVM IR/bitcode in `src/codegen/llvm.zig`. After that, LLVM runs its own optimization and target code generation pipeline to produce assembly or object code.
+This note traces Zig's original LLVM-backed route. Zig lowers AIR into LLVM
+IR or bitcode in `src/codegen/llvm.zig`. LLVM then optimizes it and produces
+assembly or object code. For the shipped compiler's external provider route,
+see the [current architecture](../../architecture.md).
 
 ## Pipeline
 

@@ -108,7 +108,7 @@ Known gaps:
 ```text
 no scalar optimization over vector instructions except target-independent
 identical-arm vector-valued selects; fixed vectors are otherwise parsed and
-verified only as described in `docs/ir_vectors.md`
+verified only as described in `docs/ir/vectors.md`
 no pointer casts
 no bitcast/ptrtoint/inttoptr
 no floating-point arithmetic optimization parity

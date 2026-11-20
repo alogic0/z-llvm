@@ -326,9 +326,9 @@ documented boundary category.
 - **Milestone 5c:** the z_llvm-built compiler rebuilds itself (fixed point),
   and the second-generation binary is functionally identical (same test
   results; ideally bit-identical modulo known nondeterminism).
-- Performance of generated code is explicitly *out of scope* for done —
-  correctness first; an optimization pass roadmap (`docs/passes/`,
-  `Zig_LLVM_pass_pipeline_plan.md`) continues after convergence.
+- This plan defines completion through correctness. The [pass references](../passes/)
+  and [original pass pipeline plan](historical/zig_llvm_pass_pipeline_plan.md)
+  cover the optimization work that follows convergence.
 
 ## What Changes in the Working Cycle
 

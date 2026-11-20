@@ -52,5 +52,5 @@ limited metadata/profile-weight handling
 ```
 
 LLVM exception-handling IR is tracked separately in
-`docs/ir_exception_handling.md`. These constructs are rejected explicitly rather
+`docs/ir/exception_handling.md`. These constructs are rejected explicitly rather
 than being normalized into ordinary branches.

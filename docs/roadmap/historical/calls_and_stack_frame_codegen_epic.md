@@ -26,7 +26,7 @@ Pipeline-Ready Optimizer Epic
   consume verified project IR and fail clearly for unsupported call/frame cases.
 - Do not start debug info, unwind info, linking, dynamic linking, varargs, or
   aggregate ABI work here.
-- Under the current [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md),
+- Under the current [Zig-Aligned LLVM Removal Plan](../zig_aligned_llvm_removal_plan.md),
   this epic is a backend-boundary validation track. Do not broaden it into a
   general native backend while verifier, Zig-emitted IR corpus, and
   inventory-selected optimizer slices are the primary path.

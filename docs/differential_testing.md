@@ -2,7 +2,7 @@
 
 The project has separate optimizer and backend comparisons. Their populations
 and transformation owners must remain explicit; see [current architecture](architecture.md)
-and [pipelines](pipelines.md).
+and [pipelines](passes/pipelines.md).
 
 The compiler-core execution cohort now includes `ascii.isAscii` within the
 unchanged 100-row selector-v3 population. Its independent bit-mask oracle checks

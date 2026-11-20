@@ -138,5 +138,5 @@ Known deferred areas:
   algorithms;
 - MemorySSA and complete AliasAnalysis/ModRef validation.
 
-Unsupported cases should stay explicit in `docs/unsupported_ir.md` and in the
+Unsupported cases should stay explicit in `docs/ir/unsupported.md` and in the
 Zig-emitted corpus manifest before parser or optimizer work depends on them.

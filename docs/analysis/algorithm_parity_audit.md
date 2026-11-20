@@ -5,7 +5,8 @@ Zig's LLVM pipeline. It records what the local project actually implements,
 which LLVM sources define the upstream algorithm, which local files own the
 subset, and which gaps block stronger parity claims.
 
-Status meanings match `docs/README.md`:
+The [LLVM reproduction levels](../roadmap/llvm_algorithm_parity_gap_closure_plan.md#reproduction-levels)
+define the statuses used in this table.
 
 ```text
 placeholder: pass is registered but not implemented
@@ -24,7 +25,7 @@ from measured fixture or corpus gaps, not as part of the current finish line.
 
 | Pass | Status | LLVM source | Local source/docs | Fixture proof | Missing analyses | Missing IR surface | Follow-up |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `verify` | LLVM-shaped subset | `llvm/lib/IR/Verifier.cpp` | `src/ir/verifier.zig`, `docs/ir_verifier.md` | Zig corpus runner and unit tests, including atomic ordering/type verifier cases | full attribute, metadata, DataLayout, EH, DataLayout-backed pointer atomic sizing | vector, token, EH, operand bundles, COMDAT/module flags | Cycle 23, Cycle 24; Stub Replacement Slice 29 atomic verifier slice |
+| `verify` | LLVM-shaped subset | `llvm/lib/IR/Verifier.cpp` | `src/ir/verifier.zig`, `docs/ir/verifier.md` | Zig corpus runner and unit tests, including atomic ordering/type verifier cases | full attribute, metadata, DataLayout, EH, DataLayout-backed pointer atomic sizing | vector, token, EH, operand bundles, COMDAT/module flags | Cycle 23, Cycle 24; Stub Replacement Slice 29 atomic verifier slice |
 | `instsimplify` | fixture-equivalent through InstCombine fixtures | `llvm/lib/Analysis/InstructionSimplify.cpp` | `src/passes/inst_simplify.zig`, `docs/passes/inst_simplify.md` | `instcombine_*`, `select_fold`, scalar fixtures | AssumptionCache, DataLayout facts, TLI | vectors, floats, poison-rich cases | Cycle 18 |
 | `instcombine` | fixture-equivalent | `llvm/lib/Transforms/InstCombine/` | `src/passes/instcombine.zig`, `docs/passes/instcombine.md` | `instcombine_*`, `select_fold`, including flagged neutral and zero-result folds, strict scalar FP literal comparisons, selected strict FP arithmetic constants, and `debug_instcombine_dbg_salvage` | AssumptionCache, TLI, richer DataLayout, full debug salvage | general APFloat result printing, vectors, complex casts, poison/undef breadth, variable-location intrinsics | Cycle 18 plus Stub Replacement Slices 17-18 and 28 expansions |
 | `simplifycfg` | fixture-equivalent | `llvm/lib/Transforms/Scalar/SimplifyCFGPass.cpp` | `src/passes/simplifycfg.zig`, `docs/passes/simplifycfg.md` | `simplifycfg_*`, `unreachable_simplifycfg`, ADCE CFG fixtures, including `simplifycfg_diamond_select_prof` | DomTree preservation, TTI, AssumptionCache, broad profile metadata updates | switch, invoke, EH pads, indirectbr, callbr | Cycle 18, Cycle 21; Stub Replacement Slice 27 profile slice |

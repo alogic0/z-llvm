@@ -160,10 +160,8 @@ checkout without them.
 
 [Current state](docs/current_state.md) distinguishes accepted evidence from
 pending development. [Next steps](docs/next_steps.md) tracks proposed work.
-The [documentation index](docs/README.md) links the compiler architecture and
-historical roadmap.
-
-For the initial repository upload, see [publishing on GitHub](docs/github.md).
+The [documentation index](docs/README.md) links the toolchain guides, compiler
+reference and milestone records.
 
 ## License
 

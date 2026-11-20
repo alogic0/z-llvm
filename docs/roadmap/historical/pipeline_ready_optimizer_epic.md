@@ -21,7 +21,7 @@ Pipeline-Ready Optimizer Epic
 - Do not use this optimizer epic to absorb target/DataLayout, AIR lowering, or
   MC/object-emission work; those belong in the later epics.
 - Current strategic direction is
-  [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md): optimizer
+  [Zig-Aligned LLVM Removal Plan](../zig_aligned_llvm_removal_plan.md): optimizer
   work should be selected from Zig's real LLVM dependency inventories and
   Zig-emitted IR fixtures before broadening backend work.
 

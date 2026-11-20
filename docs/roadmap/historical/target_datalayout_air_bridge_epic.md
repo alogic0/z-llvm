@@ -23,7 +23,7 @@ Pipeline-Ready Optimizer Epic
 - This epic anchors the optimizer to Zig-like, target-aware IR input.
 - Later codegen verification epic: [MC/Object Bootstrap Epic](mc_object_bootstrap_epic.md).
 - Current strategic direction is
-  [Zig-Aligned LLVM Removal Plan](zig_aligned_llvm_removal_plan.md): this epic's
+  [Zig-Aligned LLVM Removal Plan](../zig_aligned_llvm_removal_plan.md): this epic's
   most important output is Zig-backed IR evidence for optimizer work, not a
   requirement to continue into full backend replacement.
 - Do not start or broaden MC/object emission unless it is needed to validate

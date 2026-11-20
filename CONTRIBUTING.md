@@ -22,6 +22,9 @@ Repeat the build and test commands with `-Doptimize=ReleaseSafe`. CI checks
 documentation once, in the Debug job. The isolated checks use the source
 checkout and the pinned compiler. [GitHub Actions](.github/workflows/ci.yml)
 
+When upgrading Zig, update `.zigversion` and the matching archive version
+and SHA-256 in the CI workflow together.
+
 Use `zig build test-unit -Dtest-filter=NAME` for focused iteration. Format
 changed first-party Zig files with `zig fmt`. Keep vendored sources unchanged;
 their digests and provenance are recorded in [tools/vendor](tools/vendor/README.md).
@@ -43,6 +46,9 @@ When changing coverage or performance claims, identify the source revision,
 input identities, commands, outcomes, and comparison scope. Keep selection,
 object emission, linking, execution, and self-rebuild results distinct.
 
+For changes that split a large Zig file, use the
+[refactoring guide](docs/development/refactoring_large_zig_files.md).
+
 ## Reports and pull requests
 
 For a bug, include the Zig version, operating system, exact command, smallest
@@ -55,3 +61,13 @@ Preserve the original evidence locally when reducing a regression test.
 
 The project uses the [MIT license](LICENSE). Third-party source and fixture
 notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Commits
+
+For changes made by Codex, stage all files for the change with `git add`.
+Write a short header and a list of changes in a temporary message file, then
+commit with `git commit -F path_to_temp_file`. In commit messages and code
+comments, express local paths relative to the `prog` directory.
+
+Before committing a change that reproduces LLVM behavior, document the
+upstream source mapping required by the [development cycle](docs/development_cycle.md).

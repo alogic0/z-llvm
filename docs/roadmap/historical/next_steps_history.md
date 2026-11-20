@@ -2,7 +2,7 @@
 
 ## Active Cycle
 
-Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](../development_cycle.md).
+Future checklist items must include upstream LLVM mapping before they can be marked complete. See [development_cycle.md](../../development_cycle.md).
 
 No active cycle. Pull the next bounded slice from the [Pipeline-Ready Optimizer Epic](pipeline_ready_optimizer_epic.md).
 
@@ -187,26 +187,26 @@ LLVM memory optimization yet.
 
 Track each reproduced LLVM algorithm here as it lands:
 
-- `instcombine` subset: documented in [passes/instcombine.md](passes/instcombine.md).
-- `dce` subset: documented in [passes/dce.md](passes/dce.md).
-- `simplifycfg` subset: documented in [passes/simplifycfg.md](passes/simplifycfg.md).
-- def-use use-count subset: documented in [analysis/def_use.md](analysis/def_use.md).
-- CFG successor/predecessor subset: documented in [analysis/cfg.md](analysis/cfg.md).
-- alias analysis stack-slot subset: documented in [analysis/alias.md](analysis/alias.md).
-- dominator analysis subset: documented in [analysis/dominator.md](analysis/dominator.md).
-- LoopInfo natural-loop subset: documented in [analysis/loop_info.md](analysis/loop_info.md).
-- `early-cse` subset: documented in [passes/early_cse.md](passes/early_cse.md).
-- `mem2reg` single-block subset: documented in [passes/mem2reg.md](passes/mem2reg.md).
-- SROA zero-offset alloca forwarding subset: documented in [passes/sroa.md](passes/sroa.md).
-- GVN dominating-expression subset: documented in [passes/gvn.md](passes/gvn.md).
-- ADCE dead-chain subset: documented in [passes/adce.md](passes/adce.md).
-- LICM pure-instruction hoisting subset: documented in [passes/licm.md](passes/licm.md).
-- memory IR subset: documented in [ir_memory.md](ir_memory.md).
-- named pipeline aliases: documented in [pipelines.md](pipelines.md).
-- pass-manager instrumentation and conservative invalidation: documented in [pass_manager.md](pass_manager.md).
-- scalar IR casts, div/rem spelling, flags, and freeze: documented in [ir_scalar.md](ir_scalar.md).
-- InstSimplify-style scalar helper: documented in [passes/inst_simplify.md](passes/inst_simplify.md).
-- stack-slot MemoryLocation subset: documented in [analysis/memory_location.md](analysis/memory_location.md).
+- `instcombine` subset: documented in [passes/instcombine.md](../../passes/instcombine.md).
+- `dce` subset: documented in [passes/dce.md](../../passes/dce.md).
+- `simplifycfg` subset: documented in [passes/simplifycfg.md](../../passes/simplifycfg.md).
+- def-use use-count subset: documented in [analysis/def_use.md](../../analysis/def_use.md).
+- CFG successor/predecessor subset: documented in [analysis/cfg.md](../../analysis/cfg.md).
+- alias analysis stack-slot subset: documented in [analysis/alias.md](../../analysis/alias.md).
+- dominator analysis subset: documented in [analysis/dominator.md](../../analysis/dominator.md).
+- LoopInfo natural-loop subset: documented in [analysis/loop_info.md](../../analysis/loop_info.md).
+- `early-cse` subset: documented in [passes/early_cse.md](../../passes/early_cse.md).
+- `mem2reg` single-block subset: documented in [passes/mem2reg.md](../../passes/mem2reg.md).
+- SROA zero-offset alloca forwarding subset: documented in [passes/sroa.md](../../passes/sroa.md).
+- GVN dominating-expression subset: documented in [passes/gvn.md](../../passes/gvn.md).
+- ADCE dead-chain subset: documented in [passes/adce.md](../../passes/adce.md).
+- LICM pure-instruction hoisting subset: documented in [passes/licm.md](../../passes/licm.md).
+- memory IR subset: documented in [ir/memory.md](../../ir/memory.md).
+- named pipeline aliases: documented in [pipelines.md](../../passes/pipelines.md).
+- pass-manager instrumentation and conservative invalidation: documented in [pass_manager.md](../../passes/pass_manager.md).
+- scalar IR casts, div/rem spelling, flags, and freeze: documented in [ir/scalar.md](../../ir/scalar.md).
+- InstSimplify-style scalar helper: documented in [passes/inst_simplify.md](../../passes/inst_simplify.md).
+- stack-slot MemoryLocation subset: documented in [analysis/memory_location.md](../../analysis/memory_location.md).
 
 ## Completed Step Notes
 
@@ -215,7 +215,7 @@ Track each reproduced LLVM algorithm here as it lands:
 - `simplifycfg` now folds constant conditional branches and removes blocks unreachable from function entry.
 - `opt` comparison fixtures now exist for `instcombine`, `dce`, and `simplifycfg`; `opt` was not available in this environment, so the committed verification covers the `z_llvm` side of each fixture.
 - DCE now uses a shared def-use use-count analysis and decrements operand uses as instructions are removed.
-- Unsupported LLVM IR constructs and current parser errors are tracked in [unsupported_ir.md](unsupported_ir.md).
+- Unsupported LLVM IR constructs and current parser errors are tracked in [ir/unsupported.md](../../ir/unsupported.md).
 - `icmp eq/ne` parsing, printing, verification, and constant folding are now supported.
 - `phi` parsing, printing, verification, and def-use tracking are now supported for the current integer/value subset.
 - `simplifycfg` now prunes phi incoming values from removed unreachable predecessors and replaces trivial phis.
@@ -233,18 +233,18 @@ Track each reproduced LLVM algorithm here as it lands:
 - Dominator analysis now exposes immediate dominators and dominance-frontier sets for mem2reg phi placement.
 - `mem2reg` now promotes one multi-block stack slot with dominance-frontier phi insertion and a dominator-tree rename walk.
 - `opt-22` comparison fixtures now cover multi-block `mem2reg` if/else, loop-carried, and unreachable-predecessor cases.
-- `undef` values now parse, print, verify, and normalize as documented in [ir_values.md](ir_values.md).
+- `undef` values now parse, print, verify, and normalize as documented in [ir/values.md](../../ir/values.md).
 - `mem2reg` now replaces promoted uninitialized loads with `undef` and compares that behavior against `opt-22`.
 - `mem2reg` now keeps promoting independent stack slots until no promotable alloca remains, with `opt-22` coverage for two promoted slots.
 - `mem2reg` promotability rejection is now tested and documented for escaped stack slots and stores of the stack-slot pointer.
 - Memory IR now parses, prints, and verifies a first opaque-pointer `getelementptr` form.
 - Alias analysis now traces simple `getelementptr` values back to stack-slot roots and distinguishes zero-offset must-alias from conservative same-root may-alias.
 - `opt-22` comparison fixtures now cover escaped stack-slot rejection, stored stack-slot pointer rejection, and GEP-backed memory that remains unpromoted.
-- Control-flow IR now supports the `unreachable` terminator, documented in [ir_control_flow.md](ir_control_flow.md).
-- Select IR now parses, prints, verifies, tracks def-use, and participates in value replacement paths as documented in [ir_select.md](ir_select.md).
+- Control-flow IR now supports the `unreachable` terminator, documented in [ir/control_flow.md](../../ir/control_flow.md).
+- Select IR now parses, prints, verifies, tracks def-use, and participates in value replacement paths as documented in [ir/select.md](../../ir/select.md).
 - `instcombine` now folds `select` with constant conditions and identical arms.
 - `opt-22` comparison fixtures now cover `select` folding and constant-branch simplification to `unreachable`.
-- Zig's real LLVM backend API surface is now inventoried in [inventory/zig_llvm_api_inventory.md](inventory/zig_llvm_api_inventory.md), with replacement owner components for IR, AIR lowering, target/ABI, codegen, MC/object, debug, bitcode, sanitizer/coverage, LTO, host CPU, and linker-adjacent bindings.
+- Zig's real LLVM backend API surface is now inventoried in [inventory/zig_llvm_api_inventory.md](../../inventory/zig_llvm_api_inventory.md), with replacement owner components for IR, AIR lowering, target/ABI, codegen, MC/object, debug, bitcode, sanitizer/coverage, LTO, host CPU, and linker-adjacent bindings.
 - The current optimizer is explicitly treated as phase-zero infrastructure rather than the whole LLVM replacement.
 - `src/ir.zig` is now a compatibility facade over `src/ir/core.zig`, starting the move toward separate parser, printer, verifier, and core IR files.
 - `icmp` now supports signed and unsigned relational predicates with InstCombine constant and same-operand folding.

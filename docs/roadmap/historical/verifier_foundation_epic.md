@@ -1,9 +1,9 @@
 # Verifier Foundation Epic
 
-Source plan: [all_discovered_llvm_optimizations_implementation_plan.md](all_discovered_llvm_optimizations_implementation_plan.md)
+Source plan: [all_discovered_llvm_optimizations_implementation_plan.md](../all_discovered_llvm_optimizations_implementation_plan.md)
 
 Inventory justification:
-[zig_llvm_pass_pipeline_inventory.md](../inventory/zig_llvm_pass_pipeline_inventory.md)
+[zig_llvm_pass_pipeline_inventory.md](../../inventory/zig_llvm_pass_pipeline_inventory.md)
 lists `verify` / `VerifierPass` as mandatory P0 pipeline functionality owned
 by `llvm/lib/IR/Verifier.cpp`.
 
@@ -20,7 +20,7 @@ loop rotation, inlining, globals, vectorization, or LTO.
 
 ## Checklist
 
-- [x] Add the verifier LLVM Algorithm Contract in [ir_verifier.md](../ir_verifier.md).
+- [x] Add the verifier LLVM Algorithm Contract in [ir/verifier.md](../../ir/verifier.md).
 - [x] Add `verify` inventory mapping as the explicit justification.
 - [x] Check dominance for ordinary named SSA value uses.
 - [x] Reject same-block use-before-def.

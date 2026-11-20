@@ -1,5 +1,8 @@
 # Zig LLVM Replacement Plan
 
+This early plan records the proposed implementation order. The
+[current state](../../current_state.md) records the scope of the shipped toolchain.
+
 Goal: make this project useful to Zig's actual LLVM-removal path. The project
 does this by inventorying the LLVM behavior Zig still relies on, reproducing
 the smallest correct subsets in Zig, and producing fixtures, docs, and
@@ -9,7 +12,7 @@ This is not an educational subset, not a line-for-line C++ port, and not a
 promise to clone all of LLVM before helping Zig. LLVM remains the oracle for
 comparison while Zig's native backends remain the primary direction for final
 code generation. This repository should stay aligned with
-[roadmap/zig_aligned_llvm_removal_plan.md](roadmap/zig_aligned_llvm_removal_plan.md).
+[roadmap/zig_aligned_llvm_removal_plan.md](../zig_aligned_llvm_removal_plan.md).
 
 ## Scope
 
@@ -97,7 +100,7 @@ docs/inventory/zig_llvm_api_inventory.md
 
 This document must list each Zig binding, the C++/LLVM function it reaches, the replacement component that will own it, and whether it is required for Debug, ReleaseFast, ReleaseSmall, LTO, tests, or tooling.
 
-Status: the first inventory lives in [inventory/zig_llvm_api_inventory.md](inventory/zig_llvm_api_inventory.md). It shows that the current project is phase-zero optimizer infrastructure: useful IR and pass groundwork, but still much narrower than the full Zig LLVM dependency surface. New implementation cycles should start from that inventory before adding more familiar LLVM passes.
+Status: the first inventory lives in [inventory/zig_llvm_api_inventory.md](../../inventory/zig_llvm_api_inventory.md). It shows that the current project is phase-zero optimizer infrastructure: useful IR and pass groundwork, but still much narrower than the full Zig LLVM dependency surface. New implementation cycles should start from that inventory before adding more familiar LLVM passes.
 
 ## 2. Define the Aligned Architecture
 
@@ -223,7 +226,7 @@ Deliverables:
 src/pass_manager.zig
 src/pipeline.zig
 src/analysis/manager.zig
-docs/pass_manager.md
+docs/passes/pass_manager.md
 ```
 
 ## 5. Reproduce the Optimization Pipeline
